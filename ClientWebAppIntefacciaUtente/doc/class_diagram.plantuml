@@ -1,0 +1,155 @@
+@startuml
+enum UserRole {
+  tecnico
+  amministratore
+}
+
+class User {
+  id: string
+  username: string
+  role: UserRole
+  displayName: string
+  avatarInitials: string
+}
+
+enum StationStatus {
+  operativa
+  guasta
+  manutenzione
+  offline
+}
+
+class Station {
+  id: string
+  code: string
+  name: string
+  city: string
+  status: StationStatus
+  coordinates: { x: number, y: number }
+  lastHeartbeat: number
+  platforms: number
+  faultDescription?: string
+  faultSince?: number
+  operatorsDispatched?: boolean
+}
+
+enum TrainStatus {
+  in_viaggio
+  in_stazione
+  in_ritardo
+  guasto
+  soppresso
+  in_attesa
+}
+
+class Train {
+  id: string
+  convoglio: string
+  status: TrainStatus
+  currentStationId: string | null
+  nextStationId: string | null
+  previousStationId: string | null
+  routeId: string
+  direction: 'andata' | 'ritorno'
+  arrivalTime: number | null
+  departureTime: number | null
+  delayMinutes: number
+  passengers: number
+  lastUpdate: number
+  progressPercent: number
+}
+
+class Route {
+  id: string
+  name: string
+  code: string
+  stationIds: string[]
+  trainIds: string[]
+  travelTimes: number[]
+  active: boolean
+  createdAt: number
+}
+
+class Transit {
+  id: string
+  trainId: string
+  stationId: string
+  type: 'ingresso' | 'uscita'
+  timestamp: number
+  delayed: boolean
+  delayMinutes: number
+}
+
+enum AlertSeverity {
+  info
+  warning
+  critical
+}
+
+enum AlertType {
+  treno_fermo
+  stazione_guasta
+  sensore_offline
+  ritardo
+  treno_soppresso
+  operatori_inviati
+  heartbeat_mancante
+}
+
+class Alert {
+  id: string
+  type: AlertType
+  severity: AlertSeverity
+  message: string
+  stationId?: string
+  trainId?: string
+  timestamp: number
+  acknowledged: boolean
+  resolvedAt?: number
+}
+
+class OperatorDispatch {
+  id: string
+  stationId: string
+  dispatchedAt: number
+  estimatedArrival: number
+  operatorCount: number
+  status: 'in_viaggio' | 'arrivato' | 'completato'
+}
+
+class DashboardKPI {
+  totalTrains: number
+  trainsInMotion: number
+  trainsDelayed: number
+  stationsOperative: number
+  stationsFaulty: number
+  activeAlerts: number
+  avgDelay: number
+}
+
+class ExpectedTrain {
+  trainId: string
+  convoglio: string
+  type: 'ingresso' | 'uscita'
+  expectedTime: number
+  delayMinutes: number
+  status: TrainStatus
+  fromStationId?: string
+  toStationId?: string
+}
+
+User -left-> UserRole
+Station -down-> StationStatus
+Train -down-> TrainStatus
+Alert -down-> AlertSeverity
+Alert -down-> AlertType
+
+Route "1" *-- "*" Station : contains >
+Route "1" *-- "*" Train : contains >
+Train "*" -down- "1" Station : current/next/previous >
+Transit "*" -down- "1" Train : refers to >
+Transit "*" -down- "1" Station : occurs at >
+Alert "*" -down- "0..1" Station : relates to >
+Alert "*" -down- "0..1" Train : relates to >
+OperatorDispatch "*" -down- "1" Station : dispatched to >
+@enduml

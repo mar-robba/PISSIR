@@ -1,0 +1,141 @@
+@startuml Sistema_Traffico_Ferroviario_ComponentDiagram
+
+skinparam componentStyle uml2
+skinparam backgroundColor white
+skinparam interface {
+  BackgroundColor #FFF5CC
+}
+skinparam component {
+  BackgroundColor #E8F0FE
+  BorderColor #4A78B0
+}
+skinparam database {
+  BackgroundColor #F0E8FE
+}
+
+title Sistema di Monitoraggio e Gestione del Traffico Ferroviario\nDiagramma dei Componenti
+
+' ============================================================
+' INTERFACCE
+' ============================================================
+interface "IAuthService"          as IAuth
+interface "IAdminREST"            as IAdminAPI
+interface "ITecnicoREST"          as ITecnicoAPI
+interface "IPersistence"          as IPersistence
+interface "ITrainTelemetryTopic"  as ITrainTopic
+interface "IStationStatusTopic"   as IStationTopic
+interface "IAlertsTopic"          as IAlertTopic
+interface "ITrackQuery"           as ITrackQuery
+interface "ISensorIngresso"       as ISensorIn
+interface "ISensorUscita"         as ISensorOut
+interface "ITrenoCommand"         as ITrenoCmd
+
+' ============================================================
+' CLIENT LAYER
+' ============================================================
+package "Client Layer" {
+  component "Client App\n(SPA / Web-App)" as ClientApp
+}
+
+component "Keycloak\n(OAuth2)" as Keycloak
+IAuth -- Keycloak
+ClientApp ..> IAuth : login / token
+
+' ============================================================
+' LIVELLO CENTRALE (OCC)
+' ============================================================
+package "Centrale Operativa (OCC)" {
+  component "REST API Gateway"     as RestGw
+  component "Ingestion Service"    as Ingestion
+  component "Traffic Logic Engine" as TrafficEngine
+  component "Fault Manager"        as FaultMgr
+  database  "DB Centrale\n(Postgres/Mongo)" as CentralDB
+}
+
+IAdminAPI   -- RestGw
+ITecnicoAPI -- RestGw
+ClientApp ..> IAdminAPI   : gestione tratte/treni
+ClientApp ..> ITecnicoAPI : monitor traffico/guasti
+RestGw    ..> IAuth       : verifica token
+
+IPersistence -- CentralDB
+TrafficEngine ..> IPersistence : legge/scrive tratte
+FaultMgr      ..> IPersistence : legge/scrive stato guasti
+Ingestion     ..> IPersistence : storicizza transiti
+
+ITrackQuery -- TrafficEngine
+RestGw ..> ITrackQuery : query tratte correnti
+
+' ============================================================
+' LIVELLO MESSAGGISTICA
+' ============================================================
+component "Broker MQTT\n(Mosquitto/RabbitMQ)" as Broker
+
+ITrainTopic   -- Broker
+IStationTopic -- Broker
+IAlertTopic   -- Broker
+
+Ingestion ..> ITrainTopic   : subscribe
+Ingestion ..> IStationTopic : subscribe
+FaultMgr  ..> IStationTopic : subscribe (heartbeat)
+FaultMgr  ..> IAlertTopic   : publish comandi/allarmi
+
+' ============================================================
+' LIVELLO EDGE - STAZIONE (rappresentante generale)
+' ============================================================
+package "Stazione [1..*]" {
+  component "Logic Controller"    as LogicSt
+  component "Local Buffer"        as BufferSt
+  component "Heartbeat Generator" as HBGenSt
+  database  "DB locale"           as LocalDB_St
+}
+
+ISensorIn  -- LogicSt
+ISensorOut -- LogicSt
+
+LogicSt --> LocalDB_St : stato locale
+
+BufferSt ..> IStationTopic : publish (retry su riconnessione)
+HBGenSt  ..> IStationTopic : publish heartbeat
+LogicSt  ..> IAlertTopic   : subscribe guasti/comandi
+LogicSt  ..> ITrackQuery   : richiede prossima stazione
+
+note bottom of LogicSt
+  Componente replicato: una istanza
+  per ogni stazione della rete
+  (es. AL, AT, TO, ...)
+end note
+
+' ============================================================
+' TRENO (rappresentante generale, Digital Twin)
+' ============================================================
+package "Treno [1..*]" {
+  component "Treno" as Treno
+}
+
+ITrenoCmd -- Treno
+
+LogicSt ..> ITrenoCmd : segnalazione ingresso/guasto
+
+Treno ..> ISensorIn  : ping prossimità
+Treno ..> ISensorOut : ping prossimità
+Treno ..> ITrainTopic : publish posizione GPS
+
+note bottom of Treno
+  Componente replicato: una istanza
+  (processo/thread indipendente)
+  per ogni convoglio in circolazione
+end note
+
+' ============================================================
+' LEGENDA
+' ============================================================
+legend right
+  |= Notazione |= Significato |
+  | Interfaccia -- Componente | il componente **fornisce/realizza** l'interfaccia (provided, ball) |
+  | Componente ..> Interfaccia | il componente **richiede/usa** l'interfaccia (required, socket) |
+  | Componente --> DB | accesso diretto a persistenza locale |
+  | [1..*] | molteplicità: N istanze concorrenti del componente |
+endlegend
+
+@enduml

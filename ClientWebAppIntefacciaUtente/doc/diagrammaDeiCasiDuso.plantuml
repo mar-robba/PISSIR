@@ -1,0 +1,48 @@
+@startuml UseCaseDiagram_GestioneTraffico
+
+left to right direction
+skinparam packageStyle rectangle
+
+actor Tecnico
+actor Amministratore
+
+rectangle "Sistema di Gestione del Traffico Ferroviario" {
+
+  usecase "Visualizza situazione\ncorrente del traffico" as UC1
+  usecase "Visualizza le tratte" as UC2
+  usecase "Visualizza le tratte\nseguite da un treno" as UC3
+  usecase "Visualizza treni attesi\nin ingresso/uscita\nin una stazione" as UC4
+  usecase "Invia operatori per\nriparare una stazione guasta" as UC5
+
+  usecase "Aggiungi tratta" as UC6
+  usecase "Elimina tratta" as UC7
+  usecase "Modifica stazioni\nattraversate da un treno" as UC8
+  usecase "Sopprimi treno\nfermo in stazione" as UC9
+
+  ' Relazioni di estensione/inclusione
+  UC3 .down.> UC2 : <<extend>>
+  UC4 .down.> UC1 : <<extend>>
+  UC8 .down.> UC2 : <<include>>
+}
+
+' Associazioni Tecnico
+Tecnico --> UC1
+Tecnico --> UC2
+Tecnico --> UC3
+Tecnico --> UC4
+Tecnico --> UC5
+
+' Associazioni Amministratore
+Amministratore --> UC1
+Amministratore --> UC2
+Amministratore --> UC6
+Amministratore --> UC7
+Amministratore --> UC8
+Amministratore --> UC9
+
+note right of UC9
+  Funzionalità opzionale
+  (come indicato nei requisiti)
+end note
+
+@enduml
