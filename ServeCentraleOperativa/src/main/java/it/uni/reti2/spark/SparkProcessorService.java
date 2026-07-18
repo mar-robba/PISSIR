@@ -1,4 +1,4 @@
-package it.uni.reti2.centrale.spark;
+package it.uni.reti2.spark;
 
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;

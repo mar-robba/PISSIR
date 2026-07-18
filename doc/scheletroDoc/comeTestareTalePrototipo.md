@@ -67,7 +67,7 @@ I will list everything inside `ServeCentraleOperativa` to check if it contains a
 
 Ran command: `find ServeCentraleOperativa`
 
-I will read the `README.md` in `BrokerMosquitto/centrale-operativa` to understand what that project is and how it expects to be run.
+I will read the `README.md` in `ServeCentraleOperativa` to understand what that project is and how it expects to be run.
 
 Viewed README.md:1-59
 
@@ -93,7 +93,7 @@ I will find all `application.properties` configuration files in the project to u
 
 Ran command: `find . -name "application.properties"`
 
-I will view the `application.properties` file of `centrale-operativa` to check the configured ports, MQTT settings, and HTTP configurations.
+I will view the `application.properties` file of `ServeCentraleOperativa` to check the configured ports, MQTT settings, and HTTP configurations.
 
 Viewed application.properties:1-23
 
@@ -121,7 +121,7 @@ I will view `Treni/src/main/java/it/uni/reti2/TrenoService.java`.
 
 Viewed TrenoService.java:1-105
 
-I will view `BrokerMosquitto/centrale-operativa/src/main/java/it/uni/reti2/CentraleResource.java` to see what HTTP endpoints the Central Server exposes.
+I will view `ServeCentraleOperativa/src/main/java/it/uni/reti2/CentraleResource.java` to see what HTTP endpoints the Central Server exposes.
 
 Viewed CentraleResource.java:1-95
 
@@ -149,7 +149,7 @@ I will check if there are any files under any `src/test` directories in the proj
 
 Ran command: `find . -path "*/src/test/*"`
 
-I will read `BrokerMosquitto/centrale-operativa/pom.xml` to check if there are database dependencies configured.
+I will read `ServeCentraleOperativa/pom.xml` to check if there are database dependencies configured.
 
 Viewed pom.xml:1-118
 
@@ -159,7 +159,7 @@ Per testare questa applicazione di monitoraggio e gestione del traffico ferrovia
 
 ### Architettura del Sistema
 *   **Broker MQTT (Mosquitto)**: Fa da intermediario (Pub/Sub) e gira su Docker.
-*   **Centrale Operativa** (`BrokerMosquitto/centrale-operativa`): Ascolta tutti i messaggi sul topic wildcard `railway/#` (heartbeat stazioni, transiti, telemetrie) ed espone un'API HTTP per l'invio di alert a tutti.
+*   **Centrale Operativa** (`ServeCentraleOperativa`): Ascolta tutti i messaggi sul topic wildcard `railway/#` (heartbeat stazioni, transiti, telemetrie) ed espone un'API HTTP per l'invio di alert a tutti.
 *   **Stazioni** (`Stazioni`): Invia periodicamente un heartbeat (ogni 10 secondi) ed espone un'API HTTP per simulare il passaggio dei treni.
 *   **Treni** (`Treni`): Invia periodicamente la telemetria/posizione (ogni 5 secondi) ed espone un'API HTTP per simulare le emergenze.
 *   **Interfaccia Utente** (`ClientWebAppIntefacciaUtente`): Dashboard in React che simula l'interfaccia di monitoraggio (attualmente con dati simulati localmente).
@@ -183,7 +183,7 @@ Il broker Mosquitto deve essere attivo per permettere lo scambio di messaggi.
 ### Step 2: Avviare la Centrale Operativa
 1. Apri un nuovo terminale e posizionati nella cartella centrale:
    ```bash
-   cd BrokerMosquitto/centrale-operativa
+   cd ServeCentraleOperativa
    ```
 2. Avvia il microservizio in modalità sviluppo (Dev Mode):
    ```bash

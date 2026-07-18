@@ -1,6 +1,6 @@
 Listed directory BrokerMosquitto
 Viewed docker-compose.yml:1-14
-Listed directory centrale-operativa
+Listed directory ServeCentraleOperativa
 
 L'architettura che è stata configurata in questa cartella si basa su un pattern di messaggistica **Publish/Subscribe (Pub/Sub)**, ed è un'ottima base per un'architettura a **microservizi**. 
 
@@ -16,7 +16,7 @@ Il sistema si divide principalmente in due attori: il **Broker** e i **Client** 
     I messaggi non vengono inviati da un servizio A a un servizio B. Invece, vengono inviati su un "canale" chiamato **Topic** (es. `treni/posizione` o `sensori/temperatura`).
 *   **Publish (Pubblicare) e Subscribe (Iscriversi):**
     *   Un microservizio **pubblica** (invia) un messaggio su un determinato Topic (es. un sensore sul treno che invia le sue coordinate al topic `treni/123/posizione`).
-    *   Un altro microservizio si **iscrive** a quel Topic. Appena Mosquitto riceve il messaggio, lo smista automaticamente a tutti i microservizi iscritti (es. la `centrale-operativa` che aggiorna la mappa).
+    *   Un altro microservizio si **iscrive** a quel Topic. Appena Mosquitto riceve il messaggio, lo smista automaticamente a tutti i microservizi iscritti (es. la `ServeCentraleOperativa` che aggiorna la mappa).
 
 I microservizi **non si conoscono direttamente tra loro**: sanno solo dell'esistenza di Mosquitto. Questo disaccoppiamento è il vero potere di questa architettura!
 
@@ -24,7 +24,7 @@ I microservizi **non si conoscono direttamente tra loro**: sanno solo dell'esist
 
 ### 2. Come usare i microservizi con questo sistema?
 
-Per usare i microservizi, ogni nuovo servizio che crei diventerà un **Client MQTT**. Dato che stai usando **Quarkus** (nella cartella `centrale-operativa`), ecco i passi pratici per creare e far comunicare i tuoi microservizi:
+Per usare i microservizi, ogni nuovo servizio che crei diventerà un **Client MQTT**. Dato che stai usando **Quarkus** (nella cartella `ServeCentraleOperativa`), ecco i passi pratici per creare e far comunicare i tuoi microservizi:
 
 #### A. Creare un nuovo microservizio
 Puoi creare un nuovo progetto Quarkus (es. `gestione-treni` o `rilevamento-sensori`) e aggiungere l'estensione per MQTT. 
@@ -103,6 +103,6 @@ Vuoi fare un microservizio in **Python** (usando la libreria `paho-mqtt`) per fa
 ### In sintesi, i passi per procedere:
 1. Assicurati che Mosquitto sia acceso (`docker compose up -d` dentro la cartella `BrokerMosquitto`).
 2. Sfrutta il file `alberoDeiTopic.md` per progettare bene la gerarchia dei tuoi messaggi (es. `stazione/binario/treno/...`).
-3. Avvia la `centrale-operativa` e aggiungi eventuali altri microservizi Quarkus facendoli connettere alla stessa porta `1883`.
+3. Avvia la `ServeCentraleOperativa` e aggiungi eventuali altri microservizi Quarkus facendoli connettere alla stessa porta `1883`.
 
 Hai in mente un microservizio specifico che vorresti creare ora per testarlo? Se vuoi possiamo implementarne uno di prova insieme.

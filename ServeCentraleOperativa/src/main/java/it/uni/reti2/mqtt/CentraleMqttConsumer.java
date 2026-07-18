@@ -1,9 +1,9 @@
-package it.uni.reti2.centrale.mqtt;
+package it.uni.reti2.mqtt;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import it.uni.reti2.centrale.entity.EventoStazione;
-import it.uni.reti2.centrale.entity.TelemetriaTreno;
+import it.uni.reti2.entity.EventoStazione;
+import it.uni.reti2.entity.TelemetriaTreno;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;

@@ -76,9 +76,9 @@ Quarkus usa l'estensione **SmallRye Reactive Messaging** con il connector **smal
 
 #### File principali:
 
-- [CentraleOperativa.java](file:///home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/BrokerMosquitto/centrale-operativa/src/main/java/it/uni/reti2/CentraleOperativa.java) — **Subscriber** su `railway/#`
-- [CentraleResource.java](file:///home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/BrokerMosquitto/centrale-operativa/src/main/java/it/uni/reti2/CentraleResource.java) — **REST + Publisher** su `railway/alerts`
-- [application.properties](file:///home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/BrokerMosquitto/centrale-operativa/src/main/resources/application.properties) — Configurazione canali MQTT
+- [CentraleOperativa.java](file:///home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/ServeCentraleOperativa/src/main/java/it/uni/reti2/CentraleOperativa.java) — **Subscriber** su `railway/#`
+- [CentraleResource.java](file:///home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/ServeCentraleOperativa/src/main/java/it/uni/reti2/CentraleResource.java) — **REST + Publisher** su `railway/alerts`
+- [application.properties](file:///home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/ServeCentraleOperativa/src/main/resources/application.properties) — Configurazione canali MQTT
 
 #### Cosa fa:
 
@@ -261,7 +261,7 @@ docker-compose up -d
 ### Passo 2: Avvia la Centrale Operativa (terminale 1)
 
 ```bash
-cd BrokerMosquitto/centrale-operativa
+cd ServeCentraleOperativa
 ./mvnw quarkus:dev
 # → Parte sulla porta 8080
 ```
@@ -327,11 +327,6 @@ curl -X POST http://localhost:8082/treno/emergenza
 │  mp.messaging.incoming.alerts-in.topic=railway/alerts            │
 │       ▲                                                          │
 │       │ il nome "alerts-in" collega properties ↔ codice          │
-│       ▼                                                          │
-│  @Incoming("alerts-in")            ← nel codice Java             │
-│  public void ricevi(Message msg) { ← invocato ad ogni msg MQTT  │
-│      // gestisci il messaggio                                    │
-│  }                                                               │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -343,15 +338,19 @@ curl -X POST http://localhost:8082/treno/emergenza
 MonitoraggioEGestioneDelTrafficoFerroviario/
 ├── BrokerMosquitto/
 │   ├── docker-compose.yml              ← Container Mosquitto
-│   ├── config/mosquitto.conf           ← Configurazione broker
-│   └── centrale-operativa/             ← Microservizio Centrale
-│       ├── pom.xml
-│       └── src/main/
-│           ├── java/it/uni/reti2/
-│           │   ├── CentraleOperativa.java  ← @Incoming("railway-in") = subscriber
-│           │   └── CentraleResource.java   ← REST + @Channel("alerts-out") = publisher
-│           └── resources/
-│               └── application.properties  ← Configurazione canali MQTT
+│   └── config/mosquitto.conf           ← Configurazione broker
+│
+├── ServeCentraleOperativa/             ← Microservizio Centrale
+│   ├── pom.xml
+│   └── src/main/
+│       ├── java/it/uni/reti2/
+│       │   ├── mqtt/CentraleMqttConsumer.java  ← @Incoming subscriber
+│       │   ├── spark/SparkProcessorService.java
+│       │   └── entity/
+│       │       ├── EventoStazione.java
+│       │       └── TelemetriaTreno.java
+│       └── resources/
+│           └── application.properties  ← Configurazione canali MQTT
 │
 ├── Stazioni/                            ← Microservizio Stazione
 │   ├── pom.xml
@@ -373,4 +372,3 @@ MonitoraggioEGestioneDelTrafficoFerroviario/
         └── resources/
             └── application.properties  ← Configurazione canali MQTT
 ```
-
