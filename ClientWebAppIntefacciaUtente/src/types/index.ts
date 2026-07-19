@@ -1,9 +1,15 @@
 // ============================================================
 // TYPES — Sistema di Monitoraggio Traffico Ferroviario
+// 
+// File centrale contenente tutte le interfacce e i tipi TypeScript 
+// strutturati in modo coerente col backend Java Panache.
+// Garantisce la Type Safety nell'intera Web App React.
 // ============================================================
 
+/** Identifica i privilegi dell'utente loggato. */
 export type UserRole = 'tecnico' | 'amministratore';
 
+/** Oggetto di sessione per l'autenticazione JWT-based. */
 export interface User {
   id: string;
   username: string;
@@ -21,8 +27,8 @@ export interface Station {
   name: string;
   city: string;
   status: StationStatus;
-  coordinates: { x: number; y: number }; // posizione nella mappa SVG
-  lastHeartbeat: number; // timestamp ms
+  coordinates: { x: number; y: number }; // posizione proporzionale per rendering su mappa SVG o Canvas
+  lastHeartbeat: number; // timestamp ms (Unix Epoch)
   platforms: number;
   faultDescription?: string;
   faultSince?: number;
@@ -40,34 +46,35 @@ export type TrainStatus =
 
 export interface Train {
   id: string;
-  convoglio: string; // numero convoglio es. "IC 351"
+  convoglio: string; // numero identificativo o matricola es. "IC 351"
   status: TrainStatus;
   currentStationId: string | null;
   nextStationId: string | null;
   previousStationId: string | null;
   routeId: string;
   direction: 'andata' | 'ritorno';
-  arrivalTime: number | null; // timestamp previsto arrivo prossima stazione
+  arrivalTime: number | null; // stima timestamp d'arrivo prossima stazione
   departureTime: number | null;
-  delayMinutes: number;
+  delayMinutes: number; // ritardo positivo o negativo (anticipo)
   passengers: number;
-  lastUpdate: number;
-  progressPercent: number; // 0-100, posizione tra stazione precedente e successiva
+  lastUpdate: number; // ultimo dato telemetrico GPS
+  progressPercent: number; // 0-100, posizione interpolata tra stazione precedente e successiva per visualizzatori lineari
 }
 
 // --- TRATTE ---
 export interface Route {
   id: string;
   name: string;
-  code: string; // es. "AL-TO-001"
-  stationIds: string[]; // ordinate andata
-  trainIds: string[];
-  travelTimes: number[]; // minuti tra stazione[i] e stazione[i+1]
-  active: boolean;
+  code: string; // codice univoco es. "AL-TO-001"
+  stationIds: string[]; // sequenza ordinata di nodi stazioni attraversate (andata)
+  trainIds: string[]; // pool di treni assegnati alla linea
+  travelTimes: number[]; // storico o delta previsti: minuti necessari tra stazione[i] e stazione[i+1]
+  active: boolean; // se la linea ferroviaria è attualmente aperta al traffico
   createdAt: number;
 }
 
 // --- TRANSIT LOG ---
+/** Definisce storicamente quando un convoglio ha varcato il perimetro di una specifica stazione. */
 export interface Transit {
   id: string;
   trainId: string;
@@ -92,16 +99,17 @@ export type AlertType =
 export interface Alert {
   id: string;
   type: AlertType;
-  severity: AlertSeverity;
+  severity: AlertSeverity; // info (blu), warning (giallo), critical (rosso) nella UI
   message: string;
-  stationId?: string;
-  trainId?: string;
+  stationId?: string; // associato opzionalmente ad una stazione
+  trainId?: string;   // associato opzionalmente ad un treno
   timestamp: number;
-  acknowledged: boolean;
+  acknowledged: boolean; // false se da gestire, true se risolto/soppresso in dashboard
   resolvedAt?: number;
 }
 
 // --- OPERATORI ---
+/** Monitoraggio delle squadre di intervento field edge per ripristino guasti. */
 export interface OperatorDispatch {
   id: string;
   stationId: string;
@@ -112,6 +120,7 @@ export interface OperatorDispatch {
 }
 
 // --- KPI ---
+/** Modello dati per riempire in un colpo solo il riepilogo "a colpo d'occhio". */
 export interface DashboardKPI {
   totalTrains: number;
   trainsInMotion: number;
@@ -119,7 +128,7 @@ export interface DashboardKPI {
   stationsOperative: number;
   stationsFaulty: number;
   activeAlerts: number;
-  avgDelay: number; // minuti
+  avgDelay: number; // media matematica di tutti i ritardi
 }
 
 // --- EXPECTED TRAINS ---

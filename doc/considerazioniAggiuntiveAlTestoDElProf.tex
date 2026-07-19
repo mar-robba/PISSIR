@@ -1,4 +1,4 @@
-% Created 2026-07-17 ven 21:36
+% Created 2026-07-19 dom 17:35
 % Intended LaTeX compiler: pdflatex
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
@@ -29,11 +29,11 @@
 \tableofcontents
 
 \section{Per il DB}
-\label{sec:org3e8b37b}
+\label{sec:org51e787a}
 \subsection{Stazione}
-\label{sec:orgf4dd051}
+\label{sec:org6ea8298}
 \subsubsection{Di tracciamento}
-\label{sec:orgba31a23}
+\label{sec:org6a68b48}
 \begin{itemize}
 \item Quali dati produce la stazione
 \begin{enumerate}
@@ -54,7 +54,7 @@ un treno può uscirvi senza entrarvi
 \end{enumerate}
 \end{itemize}
 \subsubsection{guasti}
-\label{sec:org8b333c3}
+\label{sec:orgd7efaea}
 \begin{itemize}
 \item Stato del guasto(risolto/non risolto)
 \begin{enumerate}
@@ -82,7 +82,7 @@ ne inibisce l'uso
 \end{enumerate}
 \end{itemize}
 \subsection{Treno}
-\label{sec:orga84df40}
+\label{sec:org91c8a1f}
 \begin{itemize}
 \item stato: fermo(per via di un guasto su una linea) o attivo guasto etc per gestire se lasciarlo fermo o farlo muovere
 \begin{itemize}
@@ -91,14 +91,232 @@ ne inibisce l'uso
 \end{itemize}
 \end{itemize}
 \section{TAbelle Db}
-\label{sec:org3dc95d2}
+\label{sec:org4b0acb5}
 \subsection{Centrale}
-\label{sec:org74465b4}
+\label{sec:org9df4627}
 \begin{minted}[breaklines=true,breakanywhere=true,fontsize=\small]{sql}
-CREATE TABLE
+================================================================
+SCHEMA DEL DATABASE CENTRALE
+Monitoraggio e Gestione del Traffico Ferroviario
+Autore: Marco Robba
+================================================================
+
+
+================================================================
+1. DATABASE CENTRALE
+================================================================
+
+Il database centrale raccoglie tutte le informazioni provenienti dai
+microservizi (stazioni e treni) e le storicizza. Le tabelle si dividono
+in tabelle operative (stato corrente) e tabelle storiche (dati
+storicizzati).
+
+
+----------------------------------------------------------------
+1.1 Tabelle Operative
+----------------------------------------------------------------
+
+--- Stazione ---
+
+CREATE TABLE Stazione (
+    id_stazione                  INT PRIMARY KEY,
+    nome                         VARCHAR(100) NOT NULL,
+    tipoCapolineaPartenzaoNormale VARCHAR(50)
+        CHECK (tipoCapolineaPartenzaoNormale
+               IN ('capolinea','partenza','normale'))
+);
+
+--- Tratte ---
+
+CREATE TABLE Tratte (
+    id_Tratta          INT PRIMARY KEY,
+    StazionePartenzaFK INT NOT NULL,
+    StazioneArrivoFK   INT NOT NULL,
+    FOREIGN KEY (StazionePartenzaFK) REFERENCES Stazione(id_stazione),
+    FOREIGN KEY (StazioneArrivoFK)   REFERENCES Stazione(id_stazione)
+);
+
+--- Utenti ---
+
+CREATE TABLE Utenti (
+    id_utente  INT PRIMARY KEY,
+    tipo       VARCHAR(50) NOT NULL,   -- es. 'operatore','tecnico','admin'
+    nome       VARCHAR(100) NOT NULL,
+    cognome    VARCHAR(100) NOT NULL,
+    matricola  VARCHAR(50)  UNIQUE NOT NULL
+);
+
+--- Treni ---
+
+CREATE TABLE Treni (
+    id_convoglio                    INT PRIMARY KEY,
+    stato                           VARCHAR(30) NOT NULL
+        CHECK (stato IN ('attivo','fermo','rotto','in manutenzione')),
+    itinerario                      INT,
+    PosizioneAttualeTrattaOStazione INT,
+    FOREIGN KEY (itinerario)
+        REFERENCES Itinerari(id_itinerario),
+    FOREIGN KEY (PosizioneAttualeTrattaOStazione)
+        REFERENCES Tratte(id_Tratta)
+);
+
+--- Itinerari ---
+
+CREATE TABLE Itinerari (
+    id_itinerario INT PRIMARY KEY
+
+);
+
+-- Tabella associativa N:M  Itinerari <-> Tratte
+-- Un itinerario e' composto da piu' tratte ordinate
+CREATE TABLE Itinerario_Tratta (
+    id_itinerario INT NOT NULL,
+    id_Tratta     INT NOT NULL,
+    ordine        INT NOT NULL,   -- posizione della tratta nell'itinerario
+    PRIMARY KEY (id_itinerario, id_Tratta),
+    FOREIGN KEY (id_itinerario) REFERENCES Itinerari(id_itinerario),
+    FOREIGN KEY (id_Tratta)     REFERENCES Tratte(id_Tratta)
+);
+
+--- Transiti ---
+
+-- Relazione (0,N) Stazione  --  (0,1) Transiti
+-- "e_spettatrice_correntemente"
+CREATE TABLE Transiti (
+    id_transito    INT PRIMARY KEY,
+    id_stazione    INT NOT NULL,
+    id_convoglio   INT NOT NULL,
+    id_Tratta      INT,
+    tempoEntrata   TIMESTAMP NOT NULL,
+    tempoUscita    TIMESTAMP,
+    FOREIGN KEY (id_stazione)  REFERENCES Stazione(id_stazione),
+    FOREIGN KEY (id_convoglio) REFERENCES Treni(id_convoglio),
+    FOREIGN KEY (id_Tratta)    REFERENCES Tratte(id_Tratta)
+);
+
+--- Guasti Pervenuti da Treni o Stazioni ---
+
+CREATE TABLE Guasti_Pervenuti_da_treni_o_Staz (
+    id_Guasto                    INT PRIMARY KEY,
+    Stato_RisoltoONO             BOOLEAN NOT NULL DEFAULT FALSE,
+    OperatoreCheSeNeStaOccupandoFK INT,
+    FOREIGN KEY (OperatoreCheSeNeStaOccupandoFK)
+        REFERENCES Utenti(id_utente)
+);
+
+Relazione: perAChiEAssegnataLaRiparazione
+La foreign key OperatoreCheSeNeStaOccupandoFK nella tabella
+Guasti_Pervenuti_da_treni_o_Staz realizza la relazione con Utenti
+("per a chi è assegnata la riparazione").
+
+
+----------------------------------------------------------------
+1.2 Tabelle Storiche (Storici)
+----------------------------------------------------------------
+
+Le tabelle storiche conservano una copia immutabile di ogni evento
+significativo. Ogni riga possiede un id proprio e i timestamp di
+riferimento.
+
+--- Storico Transiti ---
+
+CREATE TABLE Storico_Transiti (
+    id_storico_transito INT PRIMARY KEY AUTO_INCREMENT,
+    id_transito         INT NOT NULL,
+    id_stazione         INT NOT NULL,
+    id_convoglio        INT NOT NULL,
+    id_Tratta           INT,
+    tempoEntrata        TIMESTAMP NOT NULL,
+    tempoUscita         TIMESTAMP,
+    ts_storicizzazione  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_stazione)  REFERENCES Stazione(id_stazione),
+    FOREIGN KEY (id_convoglio) REFERENCES Treni(id_convoglio),
+    FOREIGN KEY (id_Tratta)    REFERENCES Tratte(id_Tratta)
+);
+
+--- Storico Guasti ---
+
+CREATE TABLE Storico_Guasti (
+    id_storico_guasto              INT PRIMARY KEY AUTO_INCREMENT,
+    id_Guasto                      INT NOT NULL,
+    Stato_RisoltoONO               BOOLEAN NOT NULL,
+    OperatoreCheSeNeStaOccupandoFK INT,
+    ts_apertura                    TIMESTAMP NOT NULL,
+    ts_chiusura                    TIMESTAMP,
+    ts_storicizzazione             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_Guasto)
+        REFERENCES Guasti_Pervenuti_da_treni_o_Staz(id_Guasto),
+    FOREIGN KEY (OperatoreCheSeNeStaOccupandoFK)
+        REFERENCES Utenti(id_utente)
+);
+
+--- Storico Stato Treni ---
+
+CREATE TABLE Storico_Stato_Treni (
+    id_storico_treno                INT PRIMARY KEY AUTO_INCREMENT,
+    id_convoglio                    INT NOT NULL,
+    stato                           VARCHAR(30) NOT NULL,
+    itinerario                      INT,
+    PosizioneAttualeTrattaOStazione INT,
+    ts_storicizzazione              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_convoglio) REFERENCES Treni(id_convoglio)
+);
+
+--- Storico Stato Stazioni ---
+
+CREATE TABLE Storico_Stato_Stazioni (
+    id_storico_stazione INT PRIMARY KEY AUTO_INCREMENT,
+    id_stazione         INT NOT NULL,
+    nome                VARCHAR(100) NOT NULL,
+    tipoCapolineaPartenzaoNormale VARCHAR(50),
+    funzionanteONo      BOOLEAN,
+    ts_storicizzazione  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_stazione) REFERENCES Stazione(id_stazione)
+);
+
+--- Storico Itinerari ---
+
+CREATE TABLE Storico_Itinerari (
+    id_storico_itinerario INT PRIMARY KEY AUTO_INCREMENT,
+    id_itinerario         INT NOT NULL,
+    id_convoglio          INT NOT NULL,
+    ts_assegnazione       TIMESTAMP NOT NULL,
+    ts_completamento      TIMESTAMP,
+    ts_storicizzazione    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_itinerario) REFERENCES Itinerari(id_itinerario),
+    FOREIGN KEY (id_convoglio)  REFERENCES Treni(id_convoglio)
+);
+
+--- Storico Assegnazione Operatori a Guasti ---
+
+CREATE TABLE Storico_Assegnazioni_Guasti (
+    id_storico_assegnazione INT PRIMARY KEY AUTO_INCREMENT,
+    id_Guasto               INT NOT NULL,
+    id_utente               INT NOT NULL,
+    ts_assegnazione         TIMESTAMP NOT NULL,
+    ts_risoluzione          TIMESTAMP,
+    ts_storicizzazione      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_Guasto) REFERENCES
+        Guasti_Pervenuti_da_treni_o_Staz(id_Guasto),
+    FOREIGN KEY (id_utente) REFERENCES Utenti(id_utente)
+);
+
+================================================================
+4. RIEPILOGO RELAZIONI DEL DATABASE CENTRALE
+================================================================
+
+Relazione (ER)                    | Da                | A          | Cardinalità
+-----------------------------------------------------------------------------------
+StazionePartenzaFK                | Tratte            | Stazione   | N:1
+StazioneArrivoFK                  | Tratte            | Stazione   | N:1
+e_spettatrice_correntemente       | Stazione          | Transiti   | (0,N) -- (0,1)
+inTransito                        | Treni             | Tratte     | N:1
+itinerario                        | Treni             | Itinerari  | N:1
+Itinerario_Tratta                 | Itinerari         | Tratte     | N:M
+perAChiEAssegnataLaRiparazione     | Guasti_Pervenuti  | Utenti     | N:1
 \end{minted}
 \subsection{Stazione}
-\label{sec:org70e383e}
+\label{sec:orgf346ca3}
 \begin{minted}[breaklines=true,breakanywhere=true,fontsize=\small]{sql}
 CREATE TABLE Stato (
     id_stazione                     INT PRIMARY KEY,
@@ -114,8 +332,6 @@ CREATE TABLE Tratte (
     id_tratta        INT PRIMARY KEY,  -- deve essere lo stesso del DB centrale
     stazionePartenza INT NOT NULL,
     stazioneArrivo   INT NOT NULL,
-    FOREIGN KEY (stazionePartenza) REFERENCES Stato(id_stazione),
-    FOREIGN KEY (stazioneArrivo)   REFERENCES Stato(id_stazione)
 );
 
 CREATE TABLE Guasto_Locale_Momentaneo (
@@ -138,17 +354,91 @@ CREATE TABLE Tratta_Guasto (
 CREATE TABLE Treno (
     id_Treno      INT PRIMARY KEY,
     id_transito   INT,
-    tempoUscita   TIMESTAMP,
+    tempoEntrata   TIMESTAMP,
     tempoPartenza TIMESTAMP
 );
 
 CREATE TABLE bufferChache (
     id_Evento INT PRIMARY KEY,
     tipo      VARCHAR(50),
-    id_Guasto INT NULL,      -- (0,1) verso Guasto_Locale_Momentaneo
-    id_Treno  INT NOT NULL,  -- (1,1) verso Treno
+    id_Guasto INT NULL,
+    id_Treno  INT NOT NULL, 
     FOREIGN KEY (id_Guasto) REFERENCES Guasto_Locale_Momentaneo(id_Guasto),
     FOREIGN KEY (id_Treno)  REFERENCES Treno(id_Treno)
 );
 \end{minted}
+\subsection{Treno}
+\label{sec:orgd3a1e8e}
+\begin{minted}[breaklines=true,breakanywhere=true,fontsize=\small]{sql}
+CREATE TABLE Stato_convoglio (
+    -- Chiave primaria (pallino nero)
+    id_convoglio INT PRIMARY KEY,
+
+    -- Attributi (pallino bianco)
+    direzione VARCHAR(50) NOT NULL,
+    stazione_corrente VARCHAR(100),
+
+    -- Gestione dello stato con vincolo di controllo (o ENUM in MySQL)
+    stato VARCHAR(30) NOT NULL CHECK (stato IN ('attivo', 'fermo', 'rotto', 'in manutenzione')),
+
+    prossima_stazione VARCHAR(100),
+    tratta_corrente VARCHAR(100)
+);
+\end{minted}
+\section{funzionalita da spletare per ogni componente}
+\label{sec:org3723909}
+\subsection{microservizio treno}
+\label{sec:orgcdd0303}
+\begin{itemize}
+\item aggiornamento tratta
+\begin{itemize}
+\item salvarla in ram per il proprio uso e sul db
+\end{itemize}
+\item gestione causa guasti alla prossima fermata stazione o binario (tratatta ovvero copia di stazioeni)
+\begin{itemize}
+\item ricezione dai sesori --> modifica della percorrenza della tratta, sincronizzazione sui topic di allarme delle
+nuove stazioni
+\begin{itemize}
+\item se arrivano evendi del tipo la prossima stazione è fuori uso aggiornare variabile in rame e il database
+che il treno si è femato e
+\item se l'evento è il ripristino della funzionalità della stazione allora riaggiornare la ram e il db che il
+treno è partito
+\end{itemize}
+\end{itemize}
+\item Ritardi la tratta possiede orari corretti di percorrenza
+\item inviare in certrale l'entrata e uscita da una stazione topic treni/+/passaggio
+formato : boh lo fa l'ai
+\item invio se il treno si guasta alla centrale
+\end{itemize}
+\subsection{microservizio stazione}
+\label{sec:org2a653f4}
+\begin{itemize}
+\item invio alla centrale i dati del passaggio dei treni
+\begin{itemize}
+\item i sensori della stazione informano id treno e se è in entrata o in uscita,
+poi si aggiorna la ram e si inviano i dati alla stazione centrale per la storicizzazione
+\end{itemize}
+\item la staione può perdere la connessione
+ con la centrale nel caso seguire il diagramma degli stati che ne
+descrive la dinamica di gestione
+\end{itemize}
+\subsection{Centrale}
+\label{sec:orgbe1b31b}
+\begin{itemize}
+\item deve rispondere alle richieste di visualizzazione
+\begin{itemize}
+\item montare su il motore in tepo reale, cicli continui che inviano i dati se la richiesta è ancora attiva
+\end{itemize}
+\item formattare e storicizzare i dati
+\end{itemize}
+L'unica crud a cui serve la propagazinone ai microservizzi è la
+\begin{itemize}
+\item gestione guasti
+\begin{itemize}
+\item se i microservizzi avvertono guasti , aggiornamento del db,
+\item se il tecnico invia l'operatore aggiornare il db di modo che ormai il guasto sia terminato e
+pubblicare sul topic degli allert generale per tutti i treni o tutte le stazioni che quel tale microservizio è stato risolto
+\end{itemize}
+\end{itemize}
+interrogare il database ogni 10 secondi per ogni tipo di visualizzazione di modo da rendere il ``tempo reale''
 \end{document}

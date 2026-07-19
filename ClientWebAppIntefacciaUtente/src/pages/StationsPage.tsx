@@ -28,9 +28,9 @@ export default function StationsPage() {
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in h-full">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
         {/* Stations List */}
-        <Card title="Elenco Stazioni" className="col-span-2">
+        <Card title="Elenco Stazioni" className="col-span-1">
           <div className="mb-4">
             <input 
               type="text" 

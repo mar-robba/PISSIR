@@ -23,7 +23,7 @@ export default function LoginPage() {
   };
 
   const autofill = (role: 'tecnico' | 'admin') => {
-    setUsername(role === 'tecnico' ? 'tecnico1' : 'admin1');
+    setUsername(role === 'tecnico' ? 'MAT003' : 'MAT001');
     setPassword('password');
   };
 

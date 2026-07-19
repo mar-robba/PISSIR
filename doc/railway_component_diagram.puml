@@ -1,0 +1,122 @@
+@startuml RailwayTrafficMonitoringSystem
+title Railway Traffic Monitoring & Management System - Component Diagram
+
+skinparam componentStyle rectangle
+skinparam backgroundColor White
+skinparam wrapWidth 180
+skinparam component {
+  BackgroundColor<<dashboard>> LightBlue
+  BackgroundColor<<occ>>       Tomato
+  BackgroundColor<<db>>        Violet
+  BackgroundColor<<train>>     LightSlateGray
+  BackgroundColor<<station>>   PaleGreen
+  BackgroundColor<<broker>>    LightBlue
+  BackgroundColor<<auth>>      LightBlue
+}
+
+' =====================================================
+' INTERFACES
+' =====================================================
+interface "IAdminREST"        as IAdminREST
+interface "ITechnicianREST"   as ITechnicianREST
+interface "IAuthService"      as IAuthService
+interface "restApiServices"   as IRestApiServices
+interface "realtimeData"      as IRealtimeData
+interface "IPersistence"      as IPersistence
+interface "topicTree"         as ITopicTree
+interface "sensorAPI"         as ISensorAPI
+
+' =====================================================
+' WEB DASHBOARD (Client Layer)
+' =====================================================
+package "Web Dashboard" {
+  [Client Layer (Web App)] as ClientLayer <<dashboard>>
+}
+ClientLayer -- IAdminREST
+ClientLayer -- ITechnicianREST
+ClientLayer ..> IAuthService : login / token request
+
+' =====================================================
+' IDENTITY PROVIDER
+' =====================================================
+package "Identity Provider" {
+  [Keycloak (OAuth2)] as Keycloak <<auth>>
+}
+Keycloak -- IAuthService
+
+' =====================================================
+' CORE OCC (Centrale Operativa)
+' =====================================================
+package "Core OCC" {
+  [REST API Gateway]              as Gateway     <<occ>>
+  [Traffic Logic Engine\n(Elaboration)] as Elaboration <<occ>>
+  [Ingestion Service]              as Ingestion   <<occ>>
+  [DB Centrale]                    as DBCentrale  <<db>>
+
+  IAdminREST      )-- Gateway
+  ITechnicianREST )-- Gateway
+  Gateway ..> IAuthService : token verification
+
+  Gateway -- IRestApiServices
+  Elaboration ..> IRestApiServices : sends requested data
+
+  Elaboration -- IRealtimeData
+  Ingestion ..> IRealtimeData : provides cleaned/\nreal-time data
+
+  Ingestion --> Elaboration : cleaning, formatting,\nfiltering / discarding
+  Elaboration -- IPersistence : archives events (storicizza)
+  DBCentrale -- IPersistence
+
+  Ingestion ..> ITopicTree : subscription
+}
+
+' =====================================================
+' MQTT BROKER
+' =====================================================
+package "MQTT Broker (Mosquitto / RabbitMQ)" {
+  [Topic]                   as Topic          <<broker>>
+  [Mosquitto Configuration] as MosquittoConfig <<broker>>
+  Topic -- MosquittoConfig
+}
+Topic -- ITopicTree
+
+' =====================================================
+' EDGE TRAIN  (unlabeled subsystem in original -> completed/named)
+' =====================================================
+package "Edge Train" {
+  [Sensor Ingestion REST API] as TrainIngestion <<train>>
+  [Elaboration]                as TrainElab     <<train>>
+  [Topic Gateway]              as TrainGateway  <<train>>
+  [DB]                         as TrainDB       <<db>>
+
+  () "Train\nonboard system" as Treno
+  Treno ..> TrainIngestion : train telemetry data
+
+  TrainIngestion --> TrainElab
+  TrainElab --> TrainDB : stores readings
+  TrainElab --> TrainGateway
+  TrainGateway ..> ITopicTree : publish
+}
+
+' =====================================================
+' EDGE STATION (Stazione)
+' =====================================================
+package "Edge Station" {
+  [Sensor Ingestion REST API]     as StationIngestion <<station>>
+  [Heartbeat Generator\n(Elaboration)] as HeartbeatGen <<station>>
+  [Topic Gateway]                  as StationGateway   <<station>>
+  [DB Locale]                      as DBLocale         <<db>>
+  [Heartbeat / Keepalive]          as HeartbeatKA       <<station>>
+  [Local Buffer]                   as LocalBuffer       <<station>>
+
+  StationIngestion -- ISensorAPI
+  StationGateway ..> ISensorAPI : consumes
+
+  StationGateway --> HeartbeatGen
+  HeartbeatGen ..> HeartbeatKA : implements keepalive\n/ heartbeat protocol
+  StationGateway ..> LocalBuffer : buffers requests\nwhen offline
+  LocalBuffer --> DBLocale : persists buffered data
+  StationGateway ..> ITopicTree : publish
+}
+
+@enduml

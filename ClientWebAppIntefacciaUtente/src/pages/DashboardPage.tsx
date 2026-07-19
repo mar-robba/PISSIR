@@ -10,16 +10,23 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+/**
+ * Componente principale che renderizza la Dashboard riassuntiva.
+ * Fornisce KPI di altissimo livello (treni attivi, ritardo medio, stazioni guaste, allarmi attivi)
+ * e mostra una sintesi degli ultimi allarmi e dei treni attualmente in transito.
+ */
 export default function DashboardPage() {
+  // Preleva lo stato globale sincronizzato tramite Zustand
   const { trains, stations, alerts } = useRailwayStore();
   const navigate = useNavigate();
 
-  // KPI Calculations
+  // Calcolo dinamico dei Key Performance Indicators (KPI)
   const activeTrains = trains.filter(t => t.status === 'in_viaggio' || t.status === 'in_ritardo');
   const delayedTrains = trains.filter(t => t.delayMinutes > 0);
   const faultyStations = stations.filter(s => s.status !== 'operativa');
   const unacknowledgedAlerts = alerts.filter(a => !a.acknowledged);
   
+  // Calcolo del ritardo medio aritmetico arrotondato
   const avgDelay = delayedTrains.length > 0 
     ? Math.round(delayedTrains.reduce((acc, t) => acc + t.delayMinutes, 0) / delayedTrains.length) 
     : 0;
@@ -28,6 +35,8 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6 animate-fade-in">
       {/* KPI Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        {/* KPI: Treni Attivi */}
         <Card className="flex items-center gap-4">
           <div className="p-3 bg-primary/20 rounded-full text-primary" style={{ background: 'rgba(59, 130, 246, 0.2)' }}>
             <Train size={24} color="#3b82f6" />
@@ -38,6 +47,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
+        {/* KPI: Ritardo Medio */}
         <Card className="flex items-center gap-4">
           <div className="p-3 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.2)' }}>
             <Clock size={24} color="#ef4444" />
@@ -48,6 +58,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
+        {/* KPI: Stazioni con Anomalie */}
         <Card className="flex items-center gap-4">
           <div className="p-3 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.2)' }}>
             <Building2 size={24} color="#f59e0b" />
@@ -58,6 +69,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
+        {/* KPI: Allarmi Critici (Cliccabile) */}
         <Card className="flex items-center gap-4 cursor-pointer hover:border-red-500/50 transition-colors" onClick={() => navigate('/alerts')}>
           <div className="p-3 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.2)' }}>
             <AlertTriangle size={24} color="#ef4444" />
@@ -70,7 +82,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
-        {/* Recent Alerts List */}
+        {/* Sezione: Log Allarmi Recenti */}
         <Card title="Ultimi Allarmi" className="col-span-1" action={
           <button onClick={() => navigate('/alerts')} className="btn btn-outline text-xs py-1 px-2">
             Vedi tutti
@@ -94,7 +106,7 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        {/* Live Traffic Snapshot */}
+        {/* Sezione: Snapshot Live dei Treni */}
         <Card title="Treni in Viaggio" className="col-span-2" action={
           <button onClick={() => navigate('/map')} className="btn btn-outline text-xs py-1 px-2">
             Mappa Completa

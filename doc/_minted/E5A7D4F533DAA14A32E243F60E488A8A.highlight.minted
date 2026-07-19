@@ -1,0 +1,221 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}
+\PYG{k}{SCHEMA}\PYG{+w}{ }\PYG{n}{DEL}\PYG{+w}{ }\PYG{k}{DATABASE}\PYG{+w}{ }\PYG{n}{CENTRALE}
+\PYG{n}{Monitoraggio}\PYG{+w}{ }\PYG{n}{e}\PYG{+w}{ }\PYG{n}{Gestione}\PYG{+w}{ }\PYG{n}{del}\PYG{+w}{ }\PYG{n}{Traffico}\PYG{+w}{ }\PYG{n}{Ferroviario}
+\PYG{n}{Autore}\PYG{p}{:}\PYG{+w}{ }\PYG{n}{Marco}\PYG{+w}{ }\PYG{n}{Robba}
+\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}
+
+
+\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}
+\PYG{l+m+mi}{1}\PYG{p}{.}\PYG{+w}{ }\PYG{k}{DATABASE}\PYG{+w}{ }\PYG{n}{CENTRALE}
+\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}
+
+\PYG{n}{Il}\PYG{+w}{ }\PYG{k}{database}\PYG{+w}{ }\PYG{n}{centrale}\PYG{+w}{ }\PYG{n}{raccoglie}\PYG{+w}{ }\PYG{n}{tutte}\PYG{+w}{ }\PYG{n}{le}\PYG{+w}{ }\PYG{n}{informazioni}\PYG{+w}{ }\PYG{n}{provenienti}\PYG{+w}{ }\PYG{n}{dai}
+\PYG{n}{microservizi}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{stazioni}\PYG{+w}{ }\PYG{n}{e}\PYG{+w}{ }\PYG{n}{treni}\PYG{p}{)}\PYG{+w}{ }\PYG{n}{e}\PYG{+w}{ }\PYG{n}{le}\PYG{+w}{ }\PYG{n}{storicizza}\PYG{p}{.}\PYG{+w}{ }\PYG{n}{Le}\PYG{+w}{ }\PYG{n}{tabelle}\PYG{+w}{ }\PYG{n}{si}\PYG{+w}{ }\PYG{n}{dividono}
+\PYG{k}{in}\PYG{+w}{ }\PYG{n}{tabelle}\PYG{+w}{ }\PYG{n}{operative}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{stato}\PYG{+w}{ }\PYG{n}{corrente}\PYG{p}{)}\PYG{+w}{ }\PYG{n}{e}\PYG{+w}{ }\PYG{n}{tabelle}\PYG{+w}{ }\PYG{n}{storiche}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{dati}
+\PYG{n}{storicizzati}\PYG{p}{)}\PYG{p}{.}
+
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}}
+\PYG{l+m+mi}{1}\PYG{p}{.}\PYG{l+m+mi}{1}\PYG{+w}{ }\PYG{n}{Tabelle}\PYG{+w}{ }\PYG{n}{Operative}
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Stazione \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Stazione}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}stazione}\PYG{+w}{                  }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{nome}\PYG{+w}{                         }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tipoCapolineaPartenzaoNormale}\PYG{+w}{ }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{50}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{CHECK}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{tipoCapolineaPartenzaoNormale}
+\PYG{+w}{               }\PYG{k}{IN}\PYG{+w}{ }\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}capolinea\PYGZsq{}}\PYG{p}{,}\PYG{l+s+s1}{\PYGZsq{}partenza\PYGZsq{}}\PYG{p}{,}\PYG{l+s+s1}{\PYGZsq{}normale\PYGZsq{}}\PYG{p}{)}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Tratte \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Tratta}\PYG{+w}{          }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{StazionePartenzaFK}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{StazioneArrivoFK}\PYG{+w}{   }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{StazionePartenzaFK}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Stazione}\PYG{p}{(}\PYG{n}{id\PYGZus{}stazione}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{StazioneArrivoFK}\PYG{p}{)}\PYG{+w}{   }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Stazione}\PYG{p}{(}\PYG{n}{id\PYGZus{}stazione}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Utenti \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Utenti}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}utente}\PYG{+w}{  }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tipo}\PYG{+w}{       }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{50}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}\PYG{+w}{   }\PYG{c+c1}{\PYGZhy{}\PYGZhy{} es. \PYGZsq{}operatore\PYGZsq{},\PYGZsq{}tecnico\PYGZsq{},\PYGZsq{}admin\PYGZsq{}}
+\PYG{+w}{    }\PYG{n}{nome}\PYG{+w}{       }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{cognome}\PYG{+w}{    }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{matricola}\PYG{+w}{  }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{50}\PYG{p}{)}\PYG{+w}{  }\PYG{k}{UNIQUE}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Treni \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Treni}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}convoglio}\PYG{+w}{                    }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{stato}\PYG{+w}{                           }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{30}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}
+\PYG{+w}{        }\PYG{k}{CHECK}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{stato}\PYG{+w}{ }\PYG{k}{IN}\PYG{+w}{ }\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}attivo\PYGZsq{}}\PYG{p}{,}\PYG{l+s+s1}{\PYGZsq{}fermo\PYGZsq{}}\PYG{p}{,}\PYG{l+s+s1}{\PYGZsq{}rotto\PYGZsq{}}\PYG{p}{,}\PYG{l+s+s1}{\PYGZsq{}in manutenzione\PYGZsq{}}\PYG{p}{)}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{itinerario}\PYG{+w}{                      }\PYG{n+nb}{INT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{PosizioneAttualeTrattaOStazione}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{itinerario}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Itinerari}\PYG{p}{(}\PYG{n}{id\PYGZus{}itinerario}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{PosizioneAttualeTrattaOStazione}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{p}{(}\PYG{n}{id\PYGZus{}Tratta}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Itinerari \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Itinerari}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}itinerario}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}
+
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{} Tabella associativa N:M  Itinerari \PYGZlt{}\PYGZhy{}\PYGZgt{} Tratte}
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{} Un itinerario e\PYGZsq{} composto da piu\PYGZsq{} tratte ordinate}
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Itinerario\PYGZus{}Tratta}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}itinerario}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Tratta}\PYG{+w}{     }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ordine}\PYG{+w}{        }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}\PYG{+w}{   }\PYG{c+c1}{\PYGZhy{}\PYGZhy{} posizione della tratta nell\PYGZsq{}itinerario}
+\PYG{+w}{    }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}itinerario}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{id\PYGZus{}Tratta}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}itinerario}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Itinerari}\PYG{p}{(}\PYG{n}{id\PYGZus{}itinerario}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}Tratta}\PYG{p}{)}\PYG{+w}{     }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{p}{(}\PYG{n}{id\PYGZus{}Tratta}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Transiti \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{} Relazione (0,N) Stazione  \PYGZhy{}\PYGZhy{}  (0,1) Transiti}
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{} \PYGZdq{}e\PYGZus{}spettatrice\PYGZus{}correntemente\PYGZdq{}}
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Transiti}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}transito}\PYG{+w}{    }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}stazione}\PYG{+w}{    }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}convoglio}\PYG{+w}{   }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Tratta}\PYG{+w}{      }\PYG{n+nb}{INT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tempoEntrata}\PYG{+w}{   }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tempoUscita}\PYG{+w}{    }\PYG{k}{TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}stazione}\PYG{p}{)}\PYG{+w}{  }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Stazione}\PYG{p}{(}\PYG{n}{id\PYGZus{}stazione}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}convoglio}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Treni}\PYG{p}{(}\PYG{n}{id\PYGZus{}convoglio}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}Tratta}\PYG{p}{)}\PYG{+w}{    }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{p}{(}\PYG{n}{id\PYGZus{}Tratta}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Guasti Pervenuti da Treni o Stazioni \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Guasti\PYGZus{}Pervenuti\PYGZus{}da\PYGZus{}treni\PYGZus{}o\PYGZus{}Staz}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Guasto}\PYG{+w}{                    }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{Stato\PYGZus{}RisoltoONO}\PYG{+w}{             }\PYG{n+nb}{BOOLEAN}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{+w}{ }\PYG{k}{DEFAULT}\PYG{+w}{ }\PYG{k}{FALSE}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{OperatoreCheSeNeStaOccupandoFK}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{OperatoreCheSeNeStaOccupandoFK}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Utenti}\PYG{p}{(}\PYG{n}{id\PYGZus{}utente}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{n}{Relazione}\PYG{p}{:}\PYG{+w}{ }\PYG{n}{perAChiEAssegnataLaRiparazione}
+\PYG{n}{La}\PYG{+w}{ }\PYG{k}{foreign}\PYG{+w}{ }\PYG{k}{key}\PYG{+w}{ }\PYG{n}{OperatoreCheSeNeStaOccupandoFK}\PYG{+w}{ }\PYG{n}{nella}\PYG{+w}{ }\PYG{n}{tabella}
+\PYG{n}{Guasti\PYGZus{}Pervenuti\PYGZus{}da\PYGZus{}treni\PYGZus{}o\PYGZus{}Staz}\PYG{+w}{ }\PYG{n}{realizza}\PYG{+w}{ }\PYG{n}{la}\PYG{+w}{ }\PYG{n}{relazione}\PYG{+w}{ }\PYG{n}{con}\PYG{+w}{ }\PYG{n}{Utenti}
+\PYG{p}{(}\PYG{l+s+ss}{\PYGZdq{}per a chi è assegnata la riparazione\PYGZdq{}}\PYG{p}{)}\PYG{p}{.}
+
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}}
+\PYG{l+m+mi}{1}\PYG{p}{.}\PYG{l+m+mi}{2}\PYG{+w}{ }\PYG{n}{Tabelle}\PYG{+w}{ }\PYG{n}{Storiche}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{Storici}\PYG{p}{)}
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{n}{Le}\PYG{+w}{ }\PYG{n}{tabelle}\PYG{+w}{ }\PYG{n}{storiche}\PYG{+w}{ }\PYG{n}{conservano}\PYG{+w}{ }\PYG{n}{una}\PYG{+w}{ }\PYG{n}{copia}\PYG{+w}{ }\PYG{n}{immutabile}\PYG{+w}{ }\PYG{n}{di}\PYG{+w}{ }\PYG{n}{ogni}\PYG{+w}{ }\PYG{n}{evento}
+\PYG{n}{significativo}\PYG{p}{.}\PYG{+w}{ }\PYG{n}{Ogni}\PYG{+w}{ }\PYG{n}{riga}\PYG{+w}{ }\PYG{n}{possiede}\PYG{+w}{ }\PYG{n}{un}\PYG{+w}{ }\PYG{n}{id}\PYG{+w}{ }\PYG{n}{proprio}\PYG{+w}{ }\PYG{n}{e}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{k}{timestamp}\PYG{+w}{ }\PYG{n}{di}
+\PYG{n}{riferimento}\PYG{p}{.}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Storico Transiti \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Storico\PYGZus{}Transiti}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}storico\PYGZus{}transito}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{n}{AUTO\PYGZus{}INCREMENT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}transito}\PYG{+w}{         }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}stazione}\PYG{+w}{         }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}convoglio}\PYG{+w}{        }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Tratta}\PYG{+w}{           }\PYG{n+nb}{INT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tempoEntrata}\PYG{+w}{        }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tempoUscita}\PYG{+w}{         }\PYG{k}{TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}storicizzazione}\PYG{+w}{  }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{+w}{ }\PYG{k}{DEFAULT}\PYG{+w}{ }\PYG{k}{CURRENT\PYGZus{}TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}stazione}\PYG{p}{)}\PYG{+w}{  }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Stazione}\PYG{p}{(}\PYG{n}{id\PYGZus{}stazione}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}convoglio}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Treni}\PYG{p}{(}\PYG{n}{id\PYGZus{}convoglio}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}Tratta}\PYG{p}{)}\PYG{+w}{    }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{p}{(}\PYG{n}{id\PYGZus{}Tratta}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Storico Guasti \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Storico\PYGZus{}Guasti}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}storico\PYGZus{}guasto}\PYG{+w}{              }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{n}{AUTO\PYGZus{}INCREMENT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Guasto}\PYG{+w}{                      }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{Stato\PYGZus{}RisoltoONO}\PYG{+w}{               }\PYG{n+nb}{BOOLEAN}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{OperatoreCheSeNeStaOccupandoFK}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}apertura}\PYG{+w}{                    }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}chiusura}\PYG{+w}{                    }\PYG{k}{TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}storicizzazione}\PYG{+w}{             }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{+w}{ }\PYG{k}{DEFAULT}\PYG{+w}{ }\PYG{k}{CURRENT\PYGZus{}TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}Guasto}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Guasti\PYGZus{}Pervenuti\PYGZus{}da\PYGZus{}treni\PYGZus{}o\PYGZus{}Staz}\PYG{p}{(}\PYG{n}{id\PYGZus{}Guasto}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{OperatoreCheSeNeStaOccupandoFK}\PYG{p}{)}
+\PYG{+w}{        }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Utenti}\PYG{p}{(}\PYG{n}{id\PYGZus{}utente}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Storico Stato Treni \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Storico\PYGZus{}Stato\PYGZus{}Treni}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}storico\PYGZus{}treno}\PYG{+w}{                }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{n}{AUTO\PYGZus{}INCREMENT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}convoglio}\PYG{+w}{                    }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{stato}\PYG{+w}{                           }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{30}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{itinerario}\PYG{+w}{                      }\PYG{n+nb}{INT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{PosizioneAttualeTrattaOStazione}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}storicizzazione}\PYG{+w}{              }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{+w}{ }\PYG{k}{DEFAULT}\PYG{+w}{ }\PYG{k}{CURRENT\PYGZus{}TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}convoglio}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Treni}\PYG{p}{(}\PYG{n}{id\PYGZus{}convoglio}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Storico Stato Stazioni \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Storico\PYGZus{}Stato\PYGZus{}Stazioni}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}storico\PYGZus{}stazione}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{n}{AUTO\PYGZus{}INCREMENT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}stazione}\PYG{+w}{         }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{nome}\PYG{+w}{                }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tipoCapolineaPartenzaoNormale}\PYG{+w}{ }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{50}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{funzionanteONo}\PYG{+w}{      }\PYG{n+nb}{BOOLEAN}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}storicizzazione}\PYG{+w}{  }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{+w}{ }\PYG{k}{DEFAULT}\PYG{+w}{ }\PYG{k}{CURRENT\PYGZus{}TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}stazione}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Stazione}\PYG{p}{(}\PYG{n}{id\PYGZus{}stazione}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Storico Itinerari \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Storico\PYGZus{}Itinerari}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}storico\PYGZus{}itinerario}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{n}{AUTO\PYGZus{}INCREMENT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}itinerario}\PYG{+w}{         }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}convoglio}\PYG{+w}{          }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}assegnazione}\PYG{+w}{       }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}completamento}\PYG{+w}{      }\PYG{k}{TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}storicizzazione}\PYG{+w}{    }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{+w}{ }\PYG{k}{DEFAULT}\PYG{+w}{ }\PYG{k}{CURRENT\PYGZus{}TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}itinerario}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Itinerari}\PYG{p}{(}\PYG{n}{id\PYGZus{}itinerario}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}convoglio}\PYG{p}{)}\PYG{+w}{  }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Treni}\PYG{p}{(}\PYG{n}{id\PYGZus{}convoglio}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{} Storico Assegnazione Operatori a Guasti \PYGZhy{}\PYGZhy{}\PYGZhy{}}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Storico\PYGZus{}Assegnazioni\PYGZus{}Guasti}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}storico\PYGZus{}assegnazione}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{n}{AUTO\PYGZus{}INCREMENT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Guasto}\PYG{+w}{               }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}utente}\PYG{+w}{               }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}assegnazione}\PYG{+w}{         }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}risoluzione}\PYG{+w}{          }\PYG{k}{TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{ts\PYGZus{}storicizzazione}\PYG{+w}{      }\PYG{k}{TIMESTAMP}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{+w}{ }\PYG{k}{DEFAULT}\PYG{+w}{ }\PYG{k}{CURRENT\PYGZus{}TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}Guasto}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}
+\PYG{+w}{        }\PYG{n}{Guasti\PYGZus{}Pervenuti\PYGZus{}da\PYGZus{}treni\PYGZus{}o\PYGZus{}Staz}\PYG{p}{(}\PYG{n}{id\PYGZus{}Guasto}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}utente}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Utenti}\PYG{p}{(}\PYG{n}{id\PYGZus{}utente}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}
+\PYG{l+m+mi}{4}\PYG{p}{.}\PYG{+w}{ }\PYG{n}{RIEPILOGO}\PYG{+w}{ }\PYG{n}{RELAZIONI}\PYG{+w}{ }\PYG{n}{DEL}\PYG{+w}{ }\PYG{k}{DATABASE}\PYG{+w}{ }\PYG{n}{CENTRALE}
+\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}\PYG{o}{=}
+
+\PYG{n}{Relazione}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{ER}\PYG{p}{)}\PYG{+w}{                    }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Da}\PYG{+w}{                }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{A}\PYG{+w}{          }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Cardinalità}
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}\PYGZhy{}}
+\PYG{n}{StazionePartenzaFK}\PYG{+w}{                }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{+w}{            }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Stazione}\PYG{+w}{   }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{N}\PYG{p}{:}\PYG{l+m+mi}{1}
+\PYG{n}{StazioneArrivoFK}\PYG{+w}{                  }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{+w}{            }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Stazione}\PYG{+w}{   }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{N}\PYG{p}{:}\PYG{l+m+mi}{1}
+\PYG{n}{e\PYGZus{}spettatrice\PYGZus{}correntemente}\PYG{+w}{       }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Stazione}\PYG{+w}{          }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Transiti}\PYG{+w}{   }\PYG{o}{|}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{,}\PYG{n}{N}\PYG{p}{)}\PYG{+w}{ }\PYG{c+c1}{\PYGZhy{}\PYGZhy{} (0,1)}
+\PYG{n}{inTransito}\PYG{+w}{                        }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Treni}\PYG{+w}{             }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{+w}{     }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{N}\PYG{p}{:}\PYG{l+m+mi}{1}
+\PYG{n}{itinerario}\PYG{+w}{                        }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Treni}\PYG{+w}{             }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Itinerari}\PYG{+w}{  }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{N}\PYG{p}{:}\PYG{l+m+mi}{1}
+\PYG{n}{Itinerario\PYGZus{}Tratta}\PYG{+w}{                 }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Itinerari}\PYG{+w}{         }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{+w}{     }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{N}\PYG{p}{:}\PYG{n}{M}
+\PYG{n}{perAChiEAssegnataLaRiparazione}\PYG{+w}{     }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Guasti\PYGZus{}Pervenuti}\PYG{+w}{  }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{Utenti}\PYG{+w}{     }\PYG{o}{|}\PYG{+w}{ }\PYG{n}{N}\PYG{p}{:}\PYG{l+m+mi}{1}
+\end{MintedVerbatim}

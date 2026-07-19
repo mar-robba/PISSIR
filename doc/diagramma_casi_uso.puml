@@ -1,0 +1,123 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor White
+  BorderColor Black
+}
+
+actor Amministratore
+actor Utente
+actor Tecnico
+
+' ---- Casi d'uso: gestione stazioni/treni (Amministratore) ----
+usecase "Create Destroy UpdateTratte" as UC1
+usecase "stazioni" as UC2
+usecase "Treni" as UC3
+usecase "aggiungi Stazione" as UC4
+usecase "elimina stazione" as UC5
+usecase "modifica stazione" as UC6
+
+note right of UC2
+  extension points
+  aggiungi treno
+  modifica treno
+  elimina treno
+end note
+
+note right of UC3
+  extension points
+end note
+
+' ---- Casi d'uso: visualizzazione dati ----
+usecase "visualizzazione Dati" as UC7 <<a>>
+usecase "Radice del sistema di Menù annidati" as UC8
+usecase "visualizza tutte le tratte della rete" as UC9 <<a>>
+usecase "visualizza singola tratta" as UC10 <<a>>
+usecase "visualizza treni" as UC11
+usecase "visualizza treni in ritardo" as UC12
+usecase "visualizza treni guasti e fermi nella rete" as UC13 <<a>>
+usecase "V. treno singolare" as UC14
+usecase "visualizza Mappa" as UC15
+
+note right of UC7
+  extension points
+end note
+
+note right of UC8
+  extension points
+  visualizza le tratte
+  visualizzaTreni
+  visualizza Mappa
+end note
+
+note right of UC9
+  extension points
+  se scelta la singola tratta
+  aggiorna Tratta
+end note
+
+note right of UC10
+  extension points
+  aggiorna Tratta
+end note
+
+note right of UC11
+  extension points
+  visualizza treni in ritardo
+  visualizza treni guasti e fermi nella rete
+end note
+
+note right of UC12
+  extension points
+  V. treno
+end note
+
+note right of UC13
+  extension points
+  V. treno
+end note
+
+note right of UC14
+  extension points
+  visualizza singola tratta
+end note
+
+note right of UC15
+  extension points
+  visualizza singola tratta
+end note
+
+' ---- Caso d'uso: invio tecnico ----
+usecase "invia Tecnico" as UC16
+
+' ================= RELAZIONI ATTORI =================
+Amministratore -- UC1
+Amministratore -- UC7
+Utente -- UC7
+Tecnico -- UC16
+
+' ================= EXTEND (gestione stazioni) =================
+UC4 ..> UC2 : <<Extend>>
+UC5 ..> UC2 : <<Extend>>
+UC6 ..> UC2 : <<Extend>>
+UC2 ..> UC1 : <<Extend>>
+
+' ================= INCLUDE (coerenza col sistema di visualizzazione) ==
+UC2 ..> UC7 : <<Include>>\ncoerente rispetto al\nsistema di visualizzazione
+UC3 ..> UC8 : <<Include>>\ncoerente col sistema\ndi visualizzazione
+UC7 ..> UC8 : <<Include>>
+UC16 ..> UC7 : <<Include>>
+
+' ================= EXTEND / INCLUDE (albero visualizzazione dati) =====
+UC9 ..> UC8 : <<Extend>>
+UC10 ..> UC9 : <<Extend>>
+UC13 ..> UC10 : <<Include>>
+UC13 ..> UC12 : <<Extend>>
+UC12 ..> UC11 : <<Include>>
+UC12 ..> UC14 : <<Extend>>
+UC11 ..> UC8 : <<Extend>>
+UC15 ..> UC8 : <<Extend>>
+UC10 ..> UC15 : <<Extend>>\nquando si clicca\nper una singola tratta
+
+@enduml

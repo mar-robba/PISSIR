@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { User } from '../types';
-import { MOCK_USERS } from '../api/mockData';
+import { apiClient } from '../api/apiClient';
 
 interface AuthState {
   user: User | null;
@@ -15,16 +15,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   loginError: null,
 
-  login: async (username: string, _password: string): Promise<boolean> => {
-    // Simulazione chiamata REST API: POST /api/auth/login
-    await new Promise((r) => setTimeout(r, 800));
-
-    const found = MOCK_USERS.find((u) => u.username === username);
-    if (found) {
-      set({ user: found, isAuthenticated: true, loginError: null });
+  login: async (username: string, password: string): Promise<boolean> => {
+    try {
+      const result = await apiClient.login(username, password);
+      set({ user: result.user, isAuthenticated: true, loginError: null });
       return true;
-    } else {
-      set({ loginError: 'Credenziali non valide. Riprova.' });
+    } catch (err: any) {
+      if (err.message === 'Invalid credentials') {
+        set({ loginError: 'Credenziali non valide. Riprova.' });
+      } else {
+        set({ loginError: 'Impossibile connettersi al server. Verifica che il backend sia in esecuzione.' });
+      }
       return false;
     }
   },

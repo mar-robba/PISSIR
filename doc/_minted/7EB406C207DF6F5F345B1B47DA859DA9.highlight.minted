@@ -1,0 +1,16 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Stato\PYGZus{}convoglio}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{c+c1}{\PYGZhy{}\PYGZhy{} Chiave primaria (pallino nero)}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}convoglio}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+
+\PYG{+w}{    }\PYG{c+c1}{\PYGZhy{}\PYGZhy{} Attributi (pallino bianco)}
+\PYG{+w}{    }\PYG{n}{direzione}\PYG{+w}{ }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{50}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{stazione\PYGZus{}corrente}\PYG{+w}{ }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}\PYG{p}{,}
+
+\PYG{+w}{    }\PYG{c+c1}{\PYGZhy{}\PYGZhy{} Gestione dello stato con vincolo di controllo (o ENUM in MySQL)}
+\PYG{+w}{    }\PYG{n}{stato}\PYG{+w}{ }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{30}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{+w}{ }\PYG{k}{CHECK}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{stato}\PYG{+w}{ }\PYG{k}{IN}\PYG{+w}{ }\PYG{p}{(}\PYG{l+s+s1}{\PYGZsq{}attivo\PYGZsq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s+s1}{\PYGZsq{}fermo\PYGZsq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s+s1}{\PYGZsq{}rotto\PYGZsq{}}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s+s1}{\PYGZsq{}in manutenzione\PYGZsq{}}\PYG{p}{)}\PYG{p}{)}\PYG{p}{,}
+
+\PYG{+w}{    }\PYG{n}{prossima\PYGZus{}stazione}\PYG{+w}{ }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tratta\PYGZus{}corrente}\PYG{+w}{ }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+\end{MintedVerbatim}

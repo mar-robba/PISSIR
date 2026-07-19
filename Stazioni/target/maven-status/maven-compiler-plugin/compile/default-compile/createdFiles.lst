@@ -1,0 +1,7 @@
+it/uni/reti2/main.class
+it/uni/reti2/DBLocale.class
+it/uni/reti2/StationGateway.class
+it/uni/reti2/LocalBuffer.class
+it/uni/reti2/HeartbeatGenerator.class
+it/uni/reti2/HeartbeatKA.class
+it/uni/reti2/StationIngestion.class

@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
 import { useRailwayStore } from './store/railwayStore';
-import { useSimulator } from './hooks/useSimulator';
+import { useRealtimeUpdates } from './hooks/useRealtimeUpdates';
 
 // Layout
 import MainLayout from './components/layout/MainLayout';
@@ -41,8 +41,8 @@ const RailwayApp = () => {
     initialize();
   }, [initialize]);
 
-  // Start simulation engine
-  useSimulator();
+  // Start realtime updates engine
+  useRealtimeUpdates();
 
   return (
     <Routes>

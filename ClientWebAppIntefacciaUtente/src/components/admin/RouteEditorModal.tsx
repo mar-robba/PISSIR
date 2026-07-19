@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRailwayStore } from '../../store/railwayStore';
 import { Route } from '../../types';
-import { X, Save, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { X, Save, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import Card from '../ui/Card';
 
 interface RouteEditorModalProps {

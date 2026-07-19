@@ -1,0 +1,50 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Stato}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}stazione}\PYG{+w}{                     }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{nomeStazione}\PYG{+w}{                    }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{regioneGeograficaDiAppartenenza}\PYG{+w}{ }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{100}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{funzionanteONo}\PYG{+w}{                  }\PYG{n+nb}{BOOLEAN}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{flagFaultInCorso}\PYG{+w}{                }\PYG{n+nb}{BOOLEAN}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{timestampInizioUltimoFault}\PYG{+w}{      }\PYG{k}{TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{timestampFineUltimoFault}\PYG{+w}{        }\PYG{k}{TIMESTAMP}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}tratta}\PYG{+w}{        }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}\PYG{+w}{  }\PYG{c+c1}{\PYGZhy{}\PYGZhy{} deve essere lo stesso del DB centrale}
+\PYG{+w}{    }\PYG{n}{stazionePartenza}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{stazioneArrivo}\PYG{+w}{   }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Guasto\PYGZus{}Locale\PYGZus{}Momentaneo}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Guasto}\PYG{+w}{        }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{statoRisoltoONo}\PYG{+w}{  }\PYG{n+nb}{BOOLEAN}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tipo}\PYG{+w}{             }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{50}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{descrizione}\PYG{+w}{      }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{255}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{timestamp}\PYG{+w}{        }\PYG{k}{TIMESTAMP}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{c+c1}{\PYGZhy{}\PYGZhy{} Tabella associativa per la relazione (0,N)\PYGZhy{}(0,N) Tratte \PYGZlt{}\PYGZhy{}\PYGZgt{} Guasto\PYGZus{}Locale\PYGZus{}Momentaneo}
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Tratta\PYGZus{}Guasto}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}tratta}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Guasto}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}tratta}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{id\PYGZus{}Guasto}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}tratta}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Tratte}\PYG{p}{(}\PYG{n}{id\PYGZus{}tratta}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}Guasto}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Guasto\PYGZus{}Locale\PYGZus{}Momentaneo}\PYG{p}{(}\PYG{n}{id\PYGZus{}Guasto}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{Treno}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Treno}\PYG{+w}{      }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}transito}\PYG{+w}{   }\PYG{n+nb}{INT}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tempoEntrata}\PYG{+w}{   }\PYG{k}{TIMESTAMP}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tempoPartenza}\PYG{+w}{ }\PYG{k}{TIMESTAMP}
+\PYG{p}{)}\PYG{p}{;}
+
+\PYG{k}{CREATE}\PYG{+w}{ }\PYG{k}{TABLE}\PYG{+w}{ }\PYG{n}{bufferChache}\PYG{+w}{ }\PYG{p}{(}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Evento}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{PRIMARY}\PYG{+w}{ }\PYG{k}{KEY}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{tipo}\PYG{+w}{      }\PYG{n+nb}{VARCHAR}\PYG{p}{(}\PYG{l+m+mi}{50}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Guasto}\PYG{+w}{ }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{n}{id\PYGZus{}Treno}\PYG{+w}{  }\PYG{n+nb}{INT}\PYG{+w}{ }\PYG{k}{NOT}\PYG{+w}{ }\PYG{k}{NULL}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}Guasto}\PYG{p}{)}\PYG{+w}{ }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Guasto\PYGZus{}Locale\PYGZus{}Momentaneo}\PYG{p}{(}\PYG{n}{id\PYGZus{}Guasto}\PYG{p}{)}\PYG{p}{,}
+\PYG{+w}{    }\PYG{k}{FOREIGN}\PYG{+w}{ }\PYG{k}{KEY}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{id\PYGZus{}Treno}\PYG{p}{)}\PYG{+w}{  }\PYG{k}{REFERENCES}\PYG{+w}{ }\PYG{n}{Treno}\PYG{p}{(}\PYG{n}{id\PYGZus{}Treno}\PYG{p}{)}
+\PYG{p}{)}\PYG{p}{;}
+\end{MintedVerbatim}

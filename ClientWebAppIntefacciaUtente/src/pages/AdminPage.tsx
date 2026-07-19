@@ -4,12 +4,24 @@ import Badge from '../components/ui/Badge';
 import { useState } from 'react';
 import { ShieldAlert, Plus, Trash2, Edit } from 'lucide-react';
 import RouteEditorModal from '../components/admin/RouteEditorModal';
+import TrainEditorModal from '../components/admin/TrainEditorModal';
+import StationEditorModal from '../components/admin/StationEditorModal';
 
 export default function AdminPage() {
-  const { routes, trains, suppressTrain, deleteRoute } = useRailwayStore();
-  const [activeTab, setActiveTab] = useState<'routes' | 'trains'>('routes');
+  const {
+    routes, trains, stations,
+    suppressTrain, deleteRoute, adminDeleteTrain, adminDeleteStation
+  } = useRailwayStore();
+  const [activeTab, setActiveTab] = useState<'routes' | 'trains' | 'stations'>('routes');
+
   const [isRouteModalOpen, setIsRouteModalOpen] = useState(false);
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
+
+  const [isTrainModalOpen, setIsTrainModalOpen] = useState(false);
+  const [editingTrainId, setEditingTrainId] = useState<string | null>(null);
+
+  const [isStationModalOpen, setIsStationModalOpen] = useState(false);
+  const [editingStationId, setEditingStationId] = useState<string | null>(null);
 
   const handleSuppress = (trainId: string) => {
     if (confirm("Sei sicuro di voler sopprimere questo treno? L'azione è irreversibile e genererà un allarme (UC9).")) {
@@ -23,6 +35,29 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteTrain = (trainId: string) => {
+    if (confirm("Sei sicuro di voler eliminare definitivamente questo treno dalla flotta?")) {
+      adminDeleteTrain(trainId);
+    }
+  };
+
+  const handleDeleteStation = (stationId: string) => {
+    const usedByRoutes = routes.filter(r => r.stationIds.includes(stationId));
+    const warning = usedByRoutes.length > 0
+      ? `Attenzione: la stazione è usata da ${usedByRoutes.length} tratta/e. `
+      : '';
+    if (confirm(`${warning}Sei sicuro di voler eliminare questa stazione dalla rete?`)) {
+      adminDeleteStation(stationId);
+    }
+  };
+
+  const tabClass = (tab: 'routes' | 'trains' | 'stations') =>
+    `px-6 py-2 rounded-t-md font-medium border-b-2 transition-all ${
+      activeTab === tab
+        ? 'border-primary text-primary bg-primary/10'
+        : 'border-transparent text-muted hover:bg-white/5'
+    }`;
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in h-full">
       <div className="flex items-center gap-4 border-b border-border-color pb-4">
@@ -35,35 +70,24 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-4">
-        <button 
-          className={`px-6 py-2 rounded-t-md font-medium border-b-2 transition-all ${
-            activeTab === 'routes' 
-              ? 'border-primary text-primary bg-primary/10' 
-              : 'border-transparent text-muted hover:bg-white/5'
-          }`}
-          onClick={() => setActiveTab('routes')}
-        >
+        <button className={tabClass('routes')} onClick={() => setActiveTab('routes')}>
           Gestione Tratte (UC6/UC7)
         </button>
-        <button 
-          className={`px-6 py-2 rounded-t-md font-medium border-b-2 transition-all ${
-            activeTab === 'trains' 
-              ? 'border-primary text-primary bg-primary/10' 
-              : 'border-transparent text-muted hover:bg-white/5'
-          }`}
-          onClick={() => setActiveTab('trains')}
-        >
+        <button className={tabClass('trains')} onClick={() => setActiveTab('trains')}>
           Gestione Treni (UC8/UC9)
+        </button>
+        <button className={tabClass('stations')} onClick={() => setActiveTab('stations')}>
+          Gestione Stazioni
         </button>
       </div>
 
       <div className="flex-1">
-        {activeTab === 'routes' ? (
-          <Card 
-            title="Amministrazione Tratte" 
+        {activeTab === 'routes' && (
+          <Card
+            title="Amministrazione Tratte"
             action={
-              <button 
-                className="btn btn-primary text-sm" 
+              <button
+                className="btn btn-primary text-sm"
                 onClick={() => {
                   setEditingRouteId(null);
                   setIsRouteModalOpen(true);
@@ -93,7 +117,7 @@ export default function AdminPage() {
                       <td>{route.trainIds.length} treni</td>
                       <td>
                         <div className="flex gap-2">
-                          <button 
+                          <button
                             className="btn btn-outline text-xs p-1.5 text-warning hover:bg-warning/10 hover:border-warning/50"
                             onClick={() => {
                               setEditingRouteId(route.id);
@@ -102,7 +126,7 @@ export default function AdminPage() {
                           >
                             <Edit size={14} />
                           </button>
-                          <button 
+                          <button
                             className="btn btn-outline text-xs p-1.5 text-danger hover:bg-danger/10 hover:border-danger/50"
                             onClick={() => handleDeleteRoute(route.id)}
                           >
@@ -116,8 +140,23 @@ export default function AdminPage() {
               </table>
             </div>
           </Card>
-        ) : (
-          <Card title="Amministrazione Operativa Treni">
+        )}
+
+        {activeTab === 'trains' && (
+          <Card
+            title="Amministrazione Operativa Treni"
+            action={
+              <button
+                className="btn btn-primary text-sm"
+                onClick={() => {
+                  setEditingTrainId(null);
+                  setIsTrainModalOpen(true);
+                }}
+              >
+                <Plus size={16} /> Nuovo Treno
+              </button>
+            }
+          >
             <div className="table-container">
               <table>
                 <thead>
@@ -142,21 +181,30 @@ export default function AdminPage() {
                         </td>
                         <td>
                           <div className="flex gap-2">
-                            <button 
+                            <button
                               className="btn btn-outline text-xs py-1 px-2"
                               disabled={train.status === 'soppresso'}
-                              onClick={() => alert('Mock: Apertura modale per modificare percorso treno (UC8)')}
+                              onClick={() => {
+                                setEditingTrainId(train.id);
+                                setIsTrainModalOpen(true);
+                              }}
                             >
-                              Modifica Percorso (UC8)
+                              <Edit size={14} /> Modifica (UC8)
                             </button>
                             {train.status === 'in_stazione' && (
-                              <button 
+                              <button
                                 className="btn btn-danger text-xs py-1 px-2 shadow-[0_0_10px_rgba(239,68,68,0.3)]"
                                 onClick={() => handleSuppress(train.id)}
                               >
                                 Sopprimi (UC9)
                               </button>
                             )}
+                            <button
+                              className="btn btn-outline text-xs p-1.5 text-danger hover:bg-danger/10 hover:border-danger/50"
+                              onClick={() => handleDeleteTrain(train.id)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -167,12 +215,89 @@ export default function AdminPage() {
             </div>
           </Card>
         )}
+
+        {activeTab === 'stations' && (
+          <Card
+            title="Amministrazione Stazioni"
+            action={
+              <button
+                className="btn btn-primary text-sm"
+                onClick={() => {
+                  setEditingStationId(null);
+                  setIsStationModalOpen(true);
+                }}
+              >
+                <Plus size={16} /> Nuova Stazione
+              </button>
+            }
+          >
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Codice</th>
+                    <th>Nome</th>
+                    <th>Stato</th>
+                    <th>Binari</th>
+                    <th>Azioni</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stations.map(station => (
+                    <tr key={station.id}>
+                      <td className="font-mono text-sm">{station.code}</td>
+                      <td className="font-medium">{station.name}</td>
+                      <td>
+                        <Badge type={
+                          station.status === 'operativa' ? 'success' :
+                          station.status === 'manutenzione' ? 'warning' : 'danger'
+                        }>
+                          {station.status.toUpperCase()}
+                        </Badge>
+                      </td>
+                      <td>{station.platforms}</td>
+                      <td>
+                        <div className="flex gap-2">
+                          <button
+                            className="btn btn-outline text-xs p-1.5 text-warning hover:bg-warning/10 hover:border-warning/50"
+                            onClick={() => {
+                              setEditingStationId(station.id);
+                              setIsStationModalOpen(true);
+                            }}
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            className="btn btn-outline text-xs p-1.5 text-danger hover:bg-danger/10 hover:border-danger/50"
+                            onClick={() => handleDeleteStation(station.id)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
       </div>
 
-      <RouteEditorModal 
+      <RouteEditorModal
         isOpen={isRouteModalOpen}
         onClose={() => setIsRouteModalOpen(false)}
         routeIdToEdit={editingRouteId}
+      />
+      <TrainEditorModal
+        isOpen={isTrainModalOpen}
+        onClose={() => setIsTrainModalOpen(false)}
+        trainIdToEdit={editingTrainId}
+      />
+      <StationEditorModal
+        isOpen={isStationModalOpen}
+        onClose={() => setIsStationModalOpen(false)}
+        stationIdToEdit={editingStationId}
       />
     </div>
   );

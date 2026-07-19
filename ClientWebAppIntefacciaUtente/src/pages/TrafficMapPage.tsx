@@ -5,23 +5,34 @@ import { useState } from 'react';
 import { Train as TrainType, Station } from '../types';
 
 export default function TrafficMapPage() {
-  const { stations, trains } = useRailwayStore();
+  const { stations, trains, routes } = useRailwayStore();
   const [selectedTrain, setSelectedTrain] = useState<TrainType | null>(null);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
 
-  // Adjusted viewBox dimensions for zoom
-  const viewBox = "80 120 540 360";
+  const viewBox = "0 0 600 800";
+
+  const getCoordinates = (stationId: string) => {
+    switch (stationId) {
+      case 'S1': return { x: 150, y: 150 }; // Milano
+      case 'S2': return { x: 250, y: 250 }; // Bologna
+      case 'S3': return { x: 230, y: 350 }; // Firenze
+      case 'S4': return { x: 300, y: 500 }; // Roma
+      case 'S5': return { x: 380, y: 650 }; // Napoli
+      default: return { x: 300, y: 400 };
+    }
+  };
 
   // Render stations
   const renderStations = () => {
     return stations.map(station => {
       const isFaulty = station.status === 'guasta' || station.status === 'offline';
       const isSelected = selectedStation?.id === station.id;
+      const coords = getCoordinates(station.id);
       
       return (
         <g 
           key={station.id} 
-          transform={`translate(${station.coordinates.x}, ${station.coordinates.y})`}
+          transform={`translate(${coords.x}, ${coords.y})`}
           onClick={() => { setSelectedStation(station); setSelectedTrain(null); }}
           className="cursor-pointer"
         >
@@ -51,40 +62,37 @@ export default function TrafficMapPage() {
 
   // Render connections between stations
   const renderConnections = () => {
-    // A simple MST or hardcoded connections based on routes could be here.
-    // For demo, we just connect based on coordinates loosely or draw some main lines.
-    const lines = [
-      { from: 'st-TO', to: 'st-VC' },
-      { from: 'st-VC', to: 'st-NO' },
-      { from: 'st-NO', to: 'st-MI' },
-      { from: 'st-MI', to: 'st-PC' },
-      { from: 'st-TO', to: 'st-AT' },
-      { from: 'st-AT', to: 'st-AL' },
-      { from: 'st-AL', to: 'st-GE' },
-      { from: 'st-AL', to: 'st-PV' },
-      { from: 'st-PV', to: 'st-MI' },
-      { from: 'st-TO', to: 'st-CN' }
-    ];
-
-    return lines.map((line, idx) => {
-      const st1 = stations.find(s => s.id === line.from);
-      const st2 = stations.find(s => s.id === line.to);
+    const drawnLines = new Set<string>();
+    const lines: React.ReactNode[] = [];
+    
+    routes.forEach(route => {
+      if (!route.active || !route.stationIds || route.stationIds.length < 2) return;
       
-      if (!st1 || !st2) return null;
-      
-      return (
-        <line
-          key={`line-${idx}`}
-          x1={st1.coordinates.x}
-          y1={st1.coordinates.y}
-          x2={st2.coordinates.x}
-          y2={st2.coordinates.y}
-          stroke="#cbd5e1"
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
-      );
+      for (let i = 0; i < route.stationIds.length - 1; i++) {
+        const fromId = route.stationIds[i];
+        const toId = route.stationIds[i + 1];
+        const key = [fromId, toId].sort().join('-');
+        
+        if (!drawnLines.has(key)) {
+          drawnLines.add(key);
+          const pos1 = getCoordinates(fromId);
+          const pos2 = getCoordinates(toId);
+          lines.push(
+            <line
+              key={key}
+              x1={pos1.x}
+              y1={pos1.y}
+              x2={pos2.x}
+              y2={pos2.y}
+              stroke="#cbd5e1"
+              strokeWidth="4"
+              strokeLinecap="round"
+            />
+          );
+        }
+      }
     });
+    return lines;
   };
 
   // Render trains
@@ -97,8 +105,10 @@ export default function TrafficMapPage() {
       
       // Calculate position based on progressPercent (0 to 100)
       const pct = train.progressPercent / 100;
-      const x = prevStation.coordinates.x + (nextStation.coordinates.x - prevStation.coordinates.x) * pct;
-      const y = prevStation.coordinates.y + (nextStation.coordinates.y - prevStation.coordinates.y) * pct;
+      const prevCoords = getCoordinates(prevStation.id);
+      const nextCoords = getCoordinates(nextStation.id);
+      const x = prevCoords.x + (nextCoords.x - prevCoords.x) * pct;
+      const y = prevCoords.y + (nextCoords.y - prevCoords.y) * pct;
       
       const isDelayed = train.delayMinutes > 0;
       const isSelected = selectedTrain?.id === train.id;

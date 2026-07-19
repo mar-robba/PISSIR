@@ -1,0 +1,32 @@
+** microservizio treno
+- aggiornamento tratta
+  - salvarla in ram per il proprio uso e sul db
+- gestione causa guasti alla prossima fermata stazione o binario (tratatta ovvero copia di stazioeni)
+  - ricezione dai sesori --> modifica della percorrenza della tratta, sincronizzazione sui topic di allarme delle
+    nuove stazioni
+    - se arrivano evendi del tipo la prossima stazione è fuori uso aggiornare variabile in rame e il database
+      che il treno si è femato e
+    - se l'evento è il ripristino della funzionalità della stazione allora riaggiornare la ram e il db che il
+      treno è partito
+- Ritardi la tratta possiede orari corretti di percorrenza
+- inviare in certrale l'entrata e uscita da una stazione topic treni/+/passaggio
+  formato : boh lo fa l'ai
+- invio se il treno si guasta alla centrale
+** microservizio stazione
+- invio alla centrale i dati del passaggio dei treni
+  - i sensori della stazione informano id treno e se è in entrata o in uscita,
+    poi si aggiorna la ram e si inviano i dati alla stazione centrale per la storicizzazione
+- la staione può perdere la connessione
+     con la centrale nel caso seguire il diagramma degli stati che ne
+    descrive la dinamica di gestione
+** Centrale
+ - deve rispondere alle richieste di visualizzazione
+   - montare su il motore in tepo reale, cicli continui che inviano i dati se la richiesta è ancora attiva
+ - formattare e storicizzare i dati
+ L'unica crud a cui serve la propagazinone ai microservizzi è la
+ - gestione guasti
+   - se i microservizzi avvertono guasti , aggiornamento del db,
+   - se il tecnico invia l'operatore aggiornare il db di modo che ormai il guasto sia terminato e
+     pubblicare sul topic degli allert generale per tutti i treni o tutte le stazioni che quel tale microservizio è stato risolto
+ interrogare il database ogni 10 secondi per ogni tipo di visualizzazione di modo da rendere il "tempo reale"
+
