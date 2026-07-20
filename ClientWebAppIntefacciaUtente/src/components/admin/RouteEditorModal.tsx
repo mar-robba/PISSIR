@@ -47,16 +47,16 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name || !formData.code || formData.stationIds!.length < 2) {
       alert("Compila tutti i campi obbligatori e inserisci almeno 2 stazioni.");
       return;
     }
 
     if (routeIdToEdit) {
-      updateRoute(routeIdToEdit, formData);
+      await updateRoute(routeIdToEdit, formData);
     } else {
-      addRoute(formData as Route);
+      await addRoute(formData as Route);
     }
     onClose();
   };

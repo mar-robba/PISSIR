@@ -17,4 +17,12 @@ public class Tratta extends PanacheEntityBase {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "StazioneArrivoFK", nullable = false)
     public Stazione stazioneArrivo;
+
+    /**
+     * Tempo di percorrenza nominale della tratta in minuti.
+     * Usato dal digital twin dei treni per simulare il viaggio e dal
+     * frontend per la colonna "travelTimes" della pagina Gestione Tratte.
+     */
+    @Column(name = "tempoPercorrenzaMinuti")
+    public Integer tempoPercorrenzaMinuti = 15;
 }

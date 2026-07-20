@@ -1,4 +1,37 @@
-/** Boh non so che serva e che dati gestisce questa parte 
+// ================ web soket ottimo per applicazioni in tepo reale =========== 
+
+// IMPORTANTE 
+//  Con WebSocket: Se la connessione si interrompe anche solo per un istante, 
+// il canale si chiude. Lo sviluppatore deve scrivere una quantità notevole di7
+//  codice complesso per gestire la riconnessione automatica, sincronizzare i dati
+//  persi nel frattempo e verificare l'identità dell'utente.
+// per i telefono tali perdite della connessione sono normalissime se uno, per esempio usa un whifi debole
+
+
+
+
+
+
+// differenza tra web socket e http 
+//Vantaggi: Molto semplice da implementare, facilmente memorizzabile in cache (caching), ideale per caricare pagine web standard o API tradizionali.
+//Svantaggio in tempo reale: Se hai bisogno di dati aggiornati (es. i risultati di una partita), il client deve continuare a bussare alla porta del server ogni pochi secondi (Polling), sprecando molta banda ed energia.
+/**1. Il Caching (Il vero superpotere di HTTP)
+
+Le risposte HTTP possono essere salvate in memoria (cache) dal browser, da server intermedi o dalle CDN (come Cloudflare).
+
+    Con HTTP REST: Se 10.000 utenti visitano la stessa pagina di un e-commerce, il server non deve lavorare 10.000 volte. La pagina viene salvata in cache e servita istantaneamente.
+
+    Con WebSocket: Non esiste il caching nativo. Ogni singola richiesta deve viaggiare fino al server centrale, che deve elaborarla e rispondere individualmente a ogni utente, sprecando una quantità enorme di potenza di calcolo. */
+
+/**Con WebSocket: Se la connessione si interrompe anche solo per un istante, il canale si chiude. Lo sviluppatore deve scrivere una quantità notevole di codice complesso per gestire la riconnessione automatica, sincronizzare i dati persi nel frattempo e verificare l'identità dell'utente.
+ * 
+ * 
+ * 
+ */
+
+/** 
+ * In sintesi: HTTP REST è basato su un modello a "domanda e risposta", mentre WebSocket crea un "canale sempre aperto" per uno scambio continuo.
+ * 
  * tipizzazione di typescript 
  * Tipo di funzione callback utilizzata per reagire a specifici eventi WebSocket
  * provenienti dal server.
@@ -51,7 +84,7 @@ class WebSocketClient {
      */
     this.ws.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = JSON.parse(event.data); // deserializza il json
         const eventType = data.eventType || 'UNKNOWN';
         
         // Risveglia tutti i listener registrati per questa stringa (es. 'TELEMETRY')

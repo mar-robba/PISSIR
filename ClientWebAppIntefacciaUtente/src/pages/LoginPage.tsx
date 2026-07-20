@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Train, LogIn, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
@@ -10,6 +10,29 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { login, loginError } = useAuthStore();
   const navigate = useNavigate();
+
+  // Auto-login temporaneo: invia credenziali hardcodate MAT001 e reindirizza
+  // Questo è un comportamento temporaneo per evitare la schermata di login.
+  // Rimuovere quando non più necessario.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setIsLoading(true);
+        // username: MAT001 (admin demo), password: 'password' come nel demo autofill
+        const success = await login('MAT001', 'password');
+        if (!mounted) return;
+        if (success) navigate('/');
+      } catch (e) {
+        // fall back: mostra la pagina di login se l'autologin fallisce
+        console.error('Auto-login failed', e);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    })();
+
+    return () => { mounted = false; };
+  }, [login, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

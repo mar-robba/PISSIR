@@ -10,7 +10,13 @@ import jakarta.ws.rs.core.Response;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
+/**
+ * Controller REST per l'autenticazione degli operatori della Centrale.
+ * Verifica le credenziali contro la tabella Utenti e restituisce al frontend
+ * un token di sessione con il profilo utente nel formato atteso.
+ */
 @Path("/api/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -34,15 +40,21 @@ public class AuthController {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid credentials").build();
         }
 
-        // For this demo, we assume any password works as long as the matricola exists.
-        // We will just accept it if the matricola exists.
+        // Verifica della password contro la colonna dedicata della tabella Utenti
+        if (utente.password == null || request.password == null
+                || !utente.password.equals(request.password)) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid credentials").build();
+        }
+
+        // Mapping del ruolo DB → ruolo frontend: admin→amministratore, tutto il resto→tecnico
+        String role = "admin".equalsIgnoreCase(utente.tipo) ? "amministratore" : "tecnico";
 
         Map<String, Object> userPayload = new HashMap<>();
         userPayload.put("id", utente.id);
         userPayload.put("username", utente.matricola);
-        userPayload.put("role", utente.tipo);
+        userPayload.put("role", role);
         userPayload.put("displayName", utente.nome + " " + utente.cognome);
-        
+
         String initials = "";
         if (utente.nome != null && !utente.nome.isEmpty()) {
             initials += utente.nome.substring(0, 1).toUpperCase();
@@ -52,6 +64,10 @@ public class AuthController {
         }
         userPayload.put("avatarInitials", initials);
 
-        return Response.ok(userPayload).build();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("token", UUID.randomUUID().toString());
+        payload.put("user", userPayload);
+
+        return Response.ok(payload).build();
     }
 }

@@ -1,0 +1,40 @@
+## RestApiGateway.java
+
+### REST endpoint pubblici
+
+- public Response getDashboard()
+- public List<Stazione> getStazioni()
+- public Response createStazione(StazioneDTO dto)
+- public Response updateStazione(String id, StazioneDTO dto)
+- public Response deleteStazione(String id)
+- public List<Treno> getTreni()
+- public Response createTreno(TrenoDTO dto)
+- public Response updateTreno(String id, TrenoDTO dto)
+- public Response deleteTreno(String id)
+- public List<Map<String, Object>> getTratte()
+- public Response createTratta(TrattaDTO dto)
+- public Response updateTratta(String id, TrattaDTO dto)
+- public Response deleteTratta(String id)
+- public List<Map<String, Object>> getTransiti()
+- public List<Map<String, Object>> getAllarmi()
+- public Response risolviAllarme(String id)
+- public Response sopprimiTreno(String id)
+- public Response dispacciaManutenzione(String id)
+- public Response getItinerarioTreno(String id)
+- public Response getProssimaStazione(String trenoId, String stazioneId, String direzione)
+
+### Metodi di supporto privati
+
+- private String estraiItinerarioId(TrenoDTO dto)
+- private Map<String, Object> tappaItinerario(Stazione stazione, int tempoVersoProssima)
+- private List<String> stazioniOrdinate(String itinerarioId)
+- private Response componiItinerario(Itinerario itinerario, List<String> stazioni, List<Integer> travelTimes)
+- private String generaIdTratta(String partenzaId, String arrivoId)
+- private void assegnaTreni(Itinerario itinerario, List<String> treniIds, boolean sganciaAssenti)
+- private Map<String, Object> trattaToDto(Itinerario it)
+- private String tipoAllarmePerFrontend(Guasto g)
+- private void chiudiGuasto(Guasto guasto)
+- private void pubblicaResolved(Guasto guasto)
+- private void pubblicaItinerarioAggiornato(String trenoId)
+- private static String normalizzaStatoTreno(String stato)
+- private static String normalizzaStatoStazione(String stato)

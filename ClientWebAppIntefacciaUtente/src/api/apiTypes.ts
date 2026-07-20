@@ -23,6 +23,9 @@ export interface ApiTrainPayload {
   passeggeri?: number;
   progresso?: number;
   ultimoAggiornamento?: string;
+  stazioneCorrente?: string | null;
+  prossimaStazione?: string | null;
+  direzione?: string;
 }
 
 export interface ApiStationPayload {
@@ -39,6 +42,7 @@ export interface ApiRoutePayload {
   id: string;
   nome?: string;
   stazioni?: string[];
+  travelTimes?: number[];
   attivo?: boolean;
   treniIds?: string[];
 }
@@ -49,6 +53,7 @@ export interface ApiAlertPayload {
   severita?: string;
   messaggio?: string;
   sorgenteId?: string;
+  sorgenteTipo?: string;
   timestamp?: string;
   risolto?: boolean;
   timestampRisoluzione?: string;

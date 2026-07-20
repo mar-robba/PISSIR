@@ -13,12 +13,34 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+/**tesi
+
+ Ruolo TrafficLogicEngine: è una cache in-memory aggiornata dal consumer MQTT (IngestionService) e usata dalle API REST; non è il componente che normalmente scrive sul DB. Vedi TrafficLogicEngine.java:37-66.
+ Quando il DB viene aggiornato (e dove)
+
+ Telemetria (treni): scrive/crea Treno e inserisce righe di storico quando cambia stato — vedi treno.persist() e StoricoStatoTreno.persist() in IngestionService.java:120-160.
+ Heartbeat (stazioni): crea/aggiorna Stazione e registra uno StoricoStatoStazione — vedi stazione.persist() e storico.persist() in IngestionService.java:180-210.
+ Transiti / Passaggi: crea/chiude Transito e inserisce StoricoTransito — vedi transito.persist() e storicizzaTransito(...) in IngestionService.java:236-308.
+ Allarmi (guasti): crea Guasto e relativo storico — vedi guasto.persist() e StoricoGuasto.persist() in IngestionService.java:340-364.
+ Aggiornamento posizione treno: l'endpoint/consumer aggiorna dbTreno.posizioneAttualeTratta (persistente) in IngestionService.java:447-453.
+ Operazioni REST amministrative: anche gli endpoint HTTP del RestApiGateway possono persistere entità (es. stazione.persist(), treno.persist()), vedi RestApiGateway.java:120-140 e [..#L220-L240].
+ Nota sul TrafficLogicEngine e persistenza
+
+ TrafficLogicEngine.onStart() è annotato @Transactional e carica la cache dal DB all'avvio; nel ciclo di inizializzazione imposta alcuni campi volatili (es. s.stato, t.ultimoAggiornamento) che sono marcati @Transient e quindi NON vengono persistiti (vedi Stazione.java:68-76 e Treno.java:1-30).
+ Eccezione: durante l’inizializzazione onStart() il codice imposta default per campi persistenti di Guasto (es. timestamp, severita) — questi campi sono persistiti nel DB perché non sono @Transient (vedi Guasto.java:57-74 e TrafficLogicEngine.java:62-64). Quindi un aggiornamento puntuale al DB può avvenire all'avvio per quei campi.
+ Conclusione breve
+
+ Sì: la funzionalità di aggiornare il DB è prevista e avviene principalmente nel IngestionService (gestione MQTT) e negli endpoint REST amministrativi; TrafficLogicEngine è pensato come cache e non è il punto primario di scrittura runtime (salvo i default per Guasto eseguiti in start-up).
+ Vuoi che punti esattamente altre righe o che generi una mappa delle chiamate di persistenza per ogni evento MQTT?
+
+ GPT-5 mini • 1x**/
 
 /**
  * Cache in-memory dello stato corrente della rete ferroviaria.
  * Viene aggiornato dal consumer MQTT in tempo reale (IngestionService) e letto 
  * in modo veloce dalle API REST (RestApiGateway), fungendo da strato intermedio
  * per ridurre il carico sul database relazionale.
+ * e allora quando il database in back aggiorna il proprio stato e viceversa
  */
 @ApplicationScoped
 public class TrafficLogicEngine {
@@ -31,12 +53,13 @@ public class TrafficLogicEngine {
     
     /** Mappa thread-safe per tenere traccia dei guasti attualmente segnalati e non ancora risolti */
     private final Map<String, Guasto> guastiAttivi = new ConcurrentHashMap<>();
-
+/*Prevenire errori di "Lazy Loading" (Caricamento Pigro): Se la tua entità Stazioni ha dei campi collegati (ad esempio una lista di Sensori o di Storici) che non vengono caricati immediatamente dalla query principale, l'ORM (come Hibernate) proverà a leggerli nel momento in cui accedi a quei campi. Senza una transazione aperta, riceveresti un blocco totale (il famoso errore LazyInitializationException).***/
     @Transactional
     void onStart(@Observes StartupEvent ev) {
         System.out.println("TrafficLogicEngine: Inizializzazione cache dal DB...");
-        
-        // Popola Stazioni
+
+        // Popola Stazioni: i campi persistiti (nome, coordinate, binari, tipo)
+        // arrivano direttamente dal DB, quelli volatili vengono inizializzati qui.
         for (Stazione s : Stazione.<Stazione>listAll()) {
             s.stato = "ONLINE";
             s.ultimoHeartbeat = Instant.now();
@@ -46,17 +69,19 @@ public class TrafficLogicEngine {
 
         // Popola Treni
         for (Treno t : Treno.<Treno>listAll()) {
-            t.nome = t.id; // Usa ID come nome se assente
+            if (t.nome == null || t.nome.isEmpty()) {
+                t.nome = t.id; // Usa ID come nome solo se assente
+            }
             t.ultimoAggiornamento = Instant.now();
             treni.put(t.id, t);
         }
         System.out.println("Caricati " + treni.size() + " treni.");
 
-        // Popola Guasti
+        // Popola Guasti: tipo/severita/timestamp sono ora persistiti,
+        // quindi non vanno sovrascritti; si applicano solo default per righe legacy.
         for (Guasto g : Guasto.<Guasto>list("risolto", false)) {
-            g.timestamp = Instant.now();
-            g.tipo = "sconosciuto";
-            g.severita = "warning";
+            if (g.timestamp == null) g.timestamp = Instant.now();
+            if (g.severita == null) g.severita = "warning";
             guastiAttivi.put(g.id, g);
         }
         System.out.println("Caricati " + guastiAttivi.size() + " guasti attivi.");
@@ -66,6 +91,7 @@ public class TrafficLogicEngine {
      * Aggiorna i dati di un treno nella cache.
      * @param treno L'entità Treno aggiornata.
      */
+    // sostituisce la vecchia occorreza dell'oggetto treno mappato per il proprio id con quella nuova
     public void aggiornaTreno(Treno treno) {
         treni.put(treno.id, treno);
     }
@@ -140,5 +166,70 @@ public class TrafficLogicEngine {
      */
     public List<Guasto> getGuastiAttivi() {
         return new ArrayList<>(guastiAttivi.values());
+    }
+
+    /**
+     * Rimuove un treno dalla cache (usato dalla DELETE REST).
+     * @param id ID del convoglio da rimuovere.
+     */
+    public void rimuoviTreno(String id) {
+        treni.remove(id);
+    }
+
+    /**
+     * Rimuove una stazione dalla cache (usato dalla DELETE REST).
+     * @param id ID della stazione da rimuovere.
+     */
+    public void rimuoviStazione(String id) {
+        stazioni.remove(id);
+    }
+
+    /**
+     * Cerca un guasto ancora aperto generato da una determinata sorgente e con un
+     * determinato tipo. Usato dal FaultMonitor per evitare di creare guasti duplicati
+     * per lo stesso episodio (es. heartbeat mancante segnalato una sola volta).
+     *
+     * @param sorgenteId ID della sorgente (treno o stazione).
+     * @param tipo Tipologia del guasto (es. "sensore_offline", "treno_fermo").
+     * @return Il guasto aperto corrispondente, o null se non esiste.
+     */
+    public Guasto getGuastoApertoPerSorgente(String sorgenteId, String tipo) {
+        for (Guasto g : guastiAttivi.values()) {
+            if (!g.risolto
+                    && sorgenteId != null && sorgenteId.equals(g.sorgenteId)
+                    && tipo != null && tipo.equals(g.tipo)) {
+                return g;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Calcola i KPI della dashboard nel formato atteso dal frontend.
+     * Usato sia da GET /api/dashboard che dal broadcast SNAPSHOT del FaultMonitor.
+     * @return Mappa con i contatori aggregati della rete.
+     */
+    public Map<String, Object> kpiDashboard() {
+        List<Treno> tuttiTreni = getTuttiTreni();
+        List<Stazione> tutteStazioni = getTutteStazioni();
+
+        long inMovimento = tuttiTreni.stream().filter(t -> "attivo".equalsIgnoreCase(t.stato)).count();
+        long inRitardo = tuttiTreni.stream().filter(t -> t.ritardo > 0).count();
+        long operative = tutteStazioni.stream().filter(s -> "ONLINE".equalsIgnoreCase(s.stato)).count();
+        long guaste = tutteStazioni.stream()
+                .filter(s -> "GUASTA".equalsIgnoreCase(s.stato) || "OFFLINE".equalsIgnoreCase(s.stato))
+                .count();
+        long allarmi = guastiAttivi.values().stream().filter(g -> !g.risolto).count();
+        double mediaRitardo = tuttiTreni.stream().mapToInt(t -> t.ritardo).average().orElse(0.0);
+
+        Map<String, Object> kpi = new java.util.HashMap<>();
+        kpi.put("totalTrains", tuttiTreni.size());
+        kpi.put("trainsInMotion", inMovimento);
+        kpi.put("trainsDelayed", inRitardo);
+        kpi.put("stationsOperative", operative);
+        kpi.put("stationsFaulty", guaste);
+        kpi.put("activeAlerts", allarmi);
+        kpi.put("avgDelay", mediaRitardo);
+        return kpi;
     }
 }

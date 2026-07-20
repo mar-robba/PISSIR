@@ -1,9 +1,13 @@
+//   Perché è organizzato così
+//hooks indica che lì dentro ci sono funzioni che “agganciano” comportamenti a componenti React
+
 import { useEffect } from 'react';
 import { useRailwayStore } from '../store/railwayStore';
 import { wsClient } from '../api/websocketClient';
 import { mapBackendStatus } from '../api/apiClient';
 
 export function useRealtimeUpdates() {
+  //costanti definite da un costruttore chiamato nelle import li sopra
   const { updateTrain, updateStation, addAlert, addTransit, acknowledgeAlert } = useRailwayStore();
 
   useEffect(() => {

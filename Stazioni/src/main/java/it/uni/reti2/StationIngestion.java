@@ -6,7 +6,10 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Controller REST che espone le API del nodo Edge Stazione.
@@ -105,5 +108,75 @@ public class StationIngestion {
         // Delega al gateway la notifica immediata alla Centrale Operativa
         stationGateway.inviaGuasto(descrizione);
         return Response.ok(Map.of("success", true, "messaggio", "Guasto inviato e stato aggiornato a GUASTA")).build();
+    }
+
+    /**
+     * Riceve il segnale di keepalive periodico di un sensore di binario.
+     * Aggiorna la mappa locale sensore -> ultimo battito; se un sensore smette
+     * di chiamare questo endpoint verrà segnalato come guasto dal controllo periodico.
+     *
+     * @param dati Payload contenente "sensoreId".
+     * @return Conferma ricezione del battito.
+     */
+    @POST
+    @Path("/sensore/heartbeat")
+    public Response heartbeatSensore(Map<String, String> dati) {
+        String sensoreId = dati.get("sensoreId");
+
+        // Verifica del campo mandatorio
+        if (sensoreId == null || sensoreId.isBlank()) {
+            return Response.status(400).entity("sensoreId è obbligatorio").build();
+        }
+
+        dbLocale.sensoriUltimoBattito.put(sensoreId, Instant.now());
+        return Response.ok(Map.of("success", true, "messaggio", "Keepalive registrato per " + sensoreId)).build();
+    }
+
+    /**
+     * Simula la caduta della connessione verso la Centrale Operativa.
+     * Da questo momento gli eventi vengono accodati nel buffer locale
+     * e l'heartbeat non viene più emesso (demo del meccanismo di caching).
+     *
+     * @return Conferma del cambio di modalità.
+     */
+    @POST
+    @Path("/rete/offline")
+    public Response reteOffline() {
+        dbLocale.connessioneCentrale = false;
+        return Response.ok(Map.of("success", true, "messaggio", "Connessione verso la Centrale disattivata (simulazione)")).build();
+    }
+
+    /**
+     * Simula il ripristino della connessione verso la Centrale Operativa.
+     * Oltre a riattivare il flag esegue subito il flush del buffer locale,
+     * reinviando tutti gli eventi accodati durante l'offline.
+     *
+     * @return Conferma del cambio di modalità.
+     */
+    @POST
+    @Path("/rete/online")
+    public Response reteOnline() {
+        dbLocale.connessioneCentrale = true;
+        // Flush immediato: gli eventi accumulati partono subito verso la Centrale
+        stationGateway.flush();
+        return Response.ok(Map.of("success", true, "messaggio", "Connessione ripristinata, buffer svuotato")).build();
+    }
+
+    /**
+     * Restituisce l'elenco dei treni fisicamente presenti in stazione,
+     * con l'istante di ingresso di ciascuno.
+     *
+     * @return Response JSON con la lista dei treni presenti.
+     */
+    @GET
+    @Path("/treni")
+    public Response getTreniPresenti() {
+        List<Map<String, String>> treni = dbLocale.treniPresenti.entrySet().stream()
+                .map(e -> Map.of(
+                        "trenoId", e.getKey(),
+                        "dentroDa", e.getValue().toString()))
+                .collect(Collectors.toList());
+
+        return Response.ok(Map.of("treniPresenti", treni)).build();
     }
 }

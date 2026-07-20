@@ -5,6 +5,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +62,37 @@ public class TrainIngestion {
     }
 
     /**
+     * Endpoint per interrogare lo stato completo del digital twin del viaggio:
+     * fase della macchina a stati, direzione, indice della stazione, progresso
+     * sulla tratta, ritardo accumulato, passeggeri e itinerario caricato.
+     * @return Response con la fotografia completa del viaggio simulato.
+     */
+    @GET
+    @Path("/viaggio")
+    public Response getViaggio() {
+        // LinkedHashMap perché Map.of non accetta valori null e non mantiene l'ordine
+        Map<String, Object> viaggio = new LinkedHashMap<>();
+        viaggio.put("trenoId", trainDB.trenoId);
+        viaggio.put("stato", trainDB.stato);
+        viaggio.put("faseViaggio", trainDB.faseViaggio);
+        viaggio.put("direzione", trainDB.direzione);
+        viaggio.put("indiceStazione", trainDB.indiceStazione);
+        viaggio.put("progressPercent", trainDB.progressPercent);
+        viaggio.put("ritardoMinuti", trainDB.ritardoMinuti);
+        viaggio.put("passeggeri", trainDB.passeggeri);
+        viaggio.put("stazioneCorrente", trainDB.stazioneCorrente != null ? trainDB.stazioneCorrente : "");
+        viaggio.put("prossimaStazione", trainDB.prossimaStazione != null ? trainDB.prossimaStazione : "");
+        viaggio.put("stazioneBloccante", trainDB.stazioneBloccante != null ? trainDB.stazioneBloccante : "");
+        viaggio.put("itinerarioCaricato", !trainDB.itinerario.isEmpty());
+        viaggio.put("itinerarioId", trainDB.itinerarioId != null ? trainDB.itinerarioId : "");
+        viaggio.put("stazioni", trainDB.stazioniTratta);
+        viaggio.put("latitudine", trainDB.latitudine);
+        viaggio.put("longitudine", trainDB.longitudine);
+        viaggio.put("velocita", trainDB.velocita);
+        return Response.ok(viaggio).build();
+    }
+
+    /**
      * Endpoint per recuperare i dettagli della tratta in cui si trova attualmente il treno.
      * Utile per i display informativi ai passeggeri (PIS - Passenger Information System).
      * @return Response con l'elenco delle stazioni e le informazioni di transito.
@@ -111,8 +143,8 @@ public class TrainIngestion {
         String desc = body.getOrDefault("descrizione", "Guasto generico treno");
         
         // Delega al gateway l'invio asincrono in Centrale e l'arresto logico del treno
-        String grado = "Grave";
-        trainGateway.inviaGuasto(desc,grado);
+        String severita = "CRITICAL";
+        trainGateway.inviaGuasto(desc, severita);
         
         return Response.ok(Map.of("success", true, "messaggio", "Guasto inviato. Treno in EMERGENZA.")).build();
     }

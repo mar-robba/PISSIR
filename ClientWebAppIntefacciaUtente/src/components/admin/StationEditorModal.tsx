@@ -57,7 +57,7 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.id || !formData.name) {
       alert('Inserisci codice e nome della stazione.');
       return;
@@ -68,14 +68,14 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
     }
 
     if (stationIdToEdit) {
-      adminUpdateStation(stationIdToEdit, {
+      await adminUpdateStation(stationIdToEdit, {
         name: formData.name,
         status: formData.status,
         platforms: formData.platforms,
         coordinates: formData.coordinates,
       });
     } else {
-      adminCreateStation({ ...formData, code: formData.id, city: formData.name } as Station);
+      await adminCreateStation({ ...formData, code: formData.id, city: formData.name } as Station);
     }
     onClose();
   };

@@ -1,5 +1,7 @@
 package it.uni.reti2;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import it.uni.reti2.DBLocale;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -8,6 +10,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.jboss.logging.Logger;
 
+import java.time.Instant;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -18,6 +21,11 @@ import java.util.concurrent.CompletionStage;
 @ApplicationScoped
 public class StationGateway {
     private static final Logger LOG = Logger.getLogger(StationGateway.class);
+
+    /**
+     * Parser JSON per interpretare i payload dei messaggi MQTT in ingresso.
+     */
+    private final ObjectMapper mapper = new ObjectMapper();
 
     /**
      * Database locale per accedere e aggiornare lo stato e la connettività della stazione.
@@ -52,8 +60,11 @@ public class StationGateway {
 
     // ==== listener per canali in imput
     /**
-     * Intercetta gli eventi in ingresso dalla Centrale Operativa.
-     * Attualmente gestisce la ricezione di conferme di risoluzione dei guasti.
+     * Intercetta gli eventi in ingresso dal canale condiviso railway/alerts.
+     * Il discriminante è il campo "tipoEvento" del payload:
+     * - RESOLVED riferito a questa stazione: la Centrale ha risolto il guasto, si torna ONLINE.
+     * - MAINTENANCE_DISPATCHED riferito a questa stazione: gli operatori sono in viaggio.
+     * Gli altri tipi (GUASTO, STOP, ITINERARIO_AGGIORNATO) non richiedono azioni lato stazione.
      *
      * @param message Il messaggio in arrivo dal broker.
      * @return CompletionStage che indica il processamento completato.
@@ -63,16 +74,80 @@ public class StationGateway {
         String payload = new String(message.getPayload());
         LOG.warnf("🚨 [ALERT RICEVUTO] La Centrale dice: %s", payload);
 
-        // Se riceviamo un messaggio dalla centrale, la connessione è sicuramente attiva
-        dbLocale.connessioneCentrale = true;
+        try {
+            JsonNode json = mapper.readTree(payload);
+            String tipoEvento = json.path("tipoEvento").asText();
+            String sorgenteId = json.path("sorgenteId").asText();
 
-        // Se l'alert è un avviso di "RISOLTO" e riguarda questa stazione specifica
-        if (payload.contains("\"type\":\"RESOLVED\"") && payload.contains(dbLocale.stazioneId)) {
-            LOG.info("🔧 Stazione ripristinata dalla Centrale!");
-            // Ripristina lo stato operativo normale
-            dbLocale.stato = "ONLINE";
+            switch (tipoEvento) {
+                case "RESOLVED":
+                    // La Centrale ha risolto un guasto: se riguarda questa stazione si riparte
+                    if ("STAZIONE".equals(json.path("sorgenteTipo").asText())
+                            && dbLocale.stazioneId.equals(sorgenteId)) {
+                        dbLocale.stato = "ONLINE";
+                        LOG.info("🔧 Stazione ripristinata dalla Centrale! Stato di nuovo ONLINE.");
+                    }
+                    break;
+                case "MAINTENANCE_DISPATCHED":
+                    // Notifica informativa: la Centrale ha inviato gli operatori
+                    if (dbLocale.stazioneId.equals(sorgenteId)) {
+                        LOG.info("🛠️ Operatori di manutenzione in arrivo verso la stazione!");
+                    }
+                    break;
+                default:
+                    // Nessuna azione per gli altri eventi del canale condiviso
+                    break;
+            }
+        } catch (Exception e) {
+            LOG.errorf("Payload alert non interpretabile: %s", payload);
         }
-        // ?
+        return message.ack();
+    }
+
+    /**
+     * Intercetta i passaggi fisici dei treni pubblicati sul topic wildcard
+     * railway/train/+/passaggio. Ogni stazione riceve i passaggi di TUTTI i treni,
+     * quindi filtra i soli messaggi indirizzati al proprio stazioneId.
+     * Aggiorna la mappa dei treni presenti e notifica il transito ufficiale alla Centrale.
+     * Se la stazione è GUASTA e un treno entra, viene pubblicato un alert che lo trattiene.
+     *
+     * @param message Il messaggio di passaggio in arrivo dal broker.
+     * @return CompletionStage che indica il processamento completato.
+     */
+    @Incoming("passaggio-in")
+    public CompletionStage<Void> riceviPassaggio(org.eclipse.microprofile.reactive.messaging.Message<byte[]> message) {
+        String payload = new String(message.getPayload());
+
+        try {
+            JsonNode json = mapper.readTree(payload);
+            String stazioneId = json.path("stazioneId").asText();
+
+            // Il passaggio riguarda un'altra stazione: si ignora
+            if (!dbLocale.stazioneId.equals(stazioneId)) {
+                return message.ack();
+            }
+
+            String trenoId = json.path("trenoId").asText();
+            String tipo = json.path("tipo").asText();
+            LOG.infof("🚂 [PASSAGGIO] Treno %s in %s dalla stazione %s", trenoId, tipo, stazioneId);
+
+            // Aggiorna la fotografia locale dei binari
+            if ("ENTRATA".equals(tipo)) {
+                dbLocale.treniPresenti.put(trenoId, Instant.now());
+            } else if ("USCITA".equals(tipo)) {
+                dbLocale.treniPresenti.remove(trenoId);
+            }
+
+            // Notifica ufficiale del transito verso la Centrale (fonte per la storicizzazione)
+            inviaTransito(trenoId, tipo);
+
+            // Stazione guasta: il treno appena entrato viene trattenuto con un alert dedicato
+            if ("GUASTA".equals(dbLocale.stato) && "ENTRATA".equals(tipo)) {
+                inviaGuasto(String.format("Stazione %s guasta: treno %s trattenuto", dbLocale.stazioneId, trenoId), "CRITICAL");
+            }
+        } catch (Exception e) {
+            LOG.errorf("Payload passaggio non interpretabile: %s", payload);
+        }
         return message.ack();
     }
 
@@ -81,25 +156,33 @@ public class StationGateway {
     // ================= inizion degli inviatori dei messaggi in out dalla stazione
 
     /**
-     * Segnala un guasto infrastrutturale locale inviando un alert alla Centrale.
-     * Se l'invio fallisce (rete down), l'evento viene persistito nel buffer locale.
+     * Segnala un guasto infrastrutturale locale con severità CRITICAL (default).
      *
      * @param descrizione La descrizione del problema rilevato.
      */
     public void inviaGuasto(String descrizione) {
-        dbLocale.stato = "GUASTA";
-        String alertJson = String.format("{\"sorgenteId\":\"%s\", \"tipo\":\"STATION\", \"severita\":\"CRITICAL\", \"messaggio\":\"%s\"}", dbLocale.stazioneId, descrizione);
-        
-        try {
-            alertsEmitter.send(alertJson);
-            // L'invio è andato a buon fine, la connessione è attiva
-            dbLocale.connessioneCentrale = true;
-        } catch (Exception e) {
-            LOG.error("Impossibile inviare guasto, salvo nel buffer locale.");
-            // Memorizza localmente per ritrasmettere quando torna online
-            localBuffer.add(alertJson);
-            dbLocale.connessioneCentrale = false;
+        inviaGuasto(descrizione, "CRITICAL");
+    }
+
+    /**
+     * Segnala un guasto locale inviando un alert alla Centrale nel formato condiviso
+     * del canale railway/alerts (campo discriminante "tipoEvento").
+     * Con severità CRITICAL la stazione passa in stato GUASTA; con WARNING
+     * (es. sensore che non risponde) la stazione resta operativa.
+     * Se la rete è giù l'evento viene persistito nel buffer locale.
+     *
+     * @param descrizione La descrizione del problema rilevato.
+     * @param severita "CRITICAL" oppure "WARNING".
+     */
+    public void inviaGuasto(String descrizione, String severita) {
+        if ("CRITICAL".equals(severita)) {
+            dbLocale.stato = "GUASTA";
         }
+        String alertJson = String.format(
+                "{\"tipoEvento\":\"GUASTO\",\"sorgenteTipo\":\"STAZIONE\",\"sorgenteId\":\"%s\",\"severita\":\"%s\",\"messaggio\":\"%s\",\"timestamp\":\"%s\"}",
+                dbLocale.stazioneId, severita, descrizione, Instant.now().toString());
+
+        inviaOppureBufferizza("alert", alertJson, alertsEmitter);
     }
 
     /**
@@ -110,17 +193,66 @@ public class StationGateway {
      * @param tipo "ENTRATA" oppure "USCITA".
      */
     public void inviaTransito(String trenoId, String tipo) {
-        String payload = String.format("{\"stazioneId\":\"%s\", \"trenoId\":\"%s\", \"tipo\":\"%s\"}",
-                dbLocale.stazioneId, trenoId, tipo);
-        
+        String payload = String.format(
+                "{\"stazioneId\":\"%s\",\"trenoId\":\"%s\",\"tipo\":\"%s\",\"timestamp\":\"%s\"}",
+                dbLocale.stazioneId, trenoId, tipo, Instant.now().toString());
+
+        inviaOppureBufferizza("transit", payload, transitEmitter);
+    }
+
+    /**
+     * Logica comune di invio con Store and Forward:
+     * - se la connessione verso la Centrale risulta giù NON si tenta nemmeno l'invio,
+     *   l'evento finisce direttamente nel buffer locale;
+     * - altrimenti si invia e, in caso di eccezione, si bufferizza e si marca la
+     *   connessione come persa.
+     *
+     * @param canale Canale logico dell'evento ("transit" o "alert").
+     * @param payload Il payload JSON da recapitare.
+     * @param emitter L'emitter MQTT su cui pubblicare.
+     */
+    private void inviaOppureBufferizza(String canale, String payload, Emitter<String> emitter) {
+        if (!dbLocale.connessioneCentrale) {
+            LOG.warnf("🔌 Offline: evento '%s' salvato nel buffer locale.", canale);
+            localBuffer.add(canale, payload);
+            return;
+        }
         try {
-            transitEmitter.send(payload);
-            dbLocale.connessioneCentrale = true;
+            emitter.send(payload);
         } catch (Exception e) {
-            LOG.error("Impossibile inviare transito, salvo nel buffer locale.");
+            LOG.errorf("Impossibile inviare '%s', salvo nel buffer locale.", canale);
             // Meccanismo Store and Forward: se il broker è irraggiungibile si accoda
-            localBuffer.add(payload);
+            localBuffer.add(canale, payload);
             dbLocale.connessioneCentrale = false;
+        }
+    }
+
+    /**
+     * Svuota il buffer locale reinviando ogni evento pendente sull'emitter corretto
+     * (transit o alert) in ordine FIFO. Da chiamare quando la connessione verso
+     * la Centrale torna disponibile. Se un invio fallisce l'evento viene rimesso
+     * in coda e il flush si interrompe (si riproverà al prossimo giro).
+     */
+    public void flush() {
+        while (!localBuffer.isEmpty()) {
+            LocalBuffer.EventoBufferizzato evento = localBuffer.poll();
+            if (evento == null) {
+                break;
+            }
+            try {
+                if ("alert".equals(evento.canale())) {
+                    alertsEmitter.send(evento.payload());
+                } else {
+                    transitEmitter.send(evento.payload());
+                }
+                LOG.infof("📤 Re-invio dal buffer [%s]: %s", evento.canale(), evento.payload());
+            } catch (Exception e) {
+                LOG.error("🔌 Flush interrotto: connessione ancora assente, evento rimesso in coda.");
+                // L'evento non è partito: torna in coda e si riproverà più avanti
+                localBuffer.add(evento.canale(), evento.payload());
+                dbLocale.connessioneCentrale = false;
+                break;
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-import { Train, Station, Route, Alert, DashboardKPI, Transit, TrainStatus } from '../types';
+import { Train, Station, Route, Alert, DashboardKPI, Transit, TrainStatus, User, UserRole } from '../types';
 import type {
   ApiAlertPayload,
   ApiDashboardPayload,
@@ -16,6 +16,44 @@ import type {
 // Usa la porta del backend (configurata in ServeCentraleOperativa: quarkus.http.port=8781)
 const API_BASE_URL = 'http://localhost:8781/api';
 
+/** Converte il ruolo restituito dal backend nel vocabolario del frontend. */
+const mapBackendRole = (role: string | undefined): UserRole => {
+  const lower = (role ?? '').toLowerCase();
+  if (lower === 'admin' || lower === 'amministratore') return 'amministratore';
+  return 'tecnico';
+};
+
+/**
+ * Normalizza la risposta login: supporta il formato nuovo `{ token, user }`
+ * e quello legacy con i campi utente in cima al JSON.
+ */
+const normalizeLoginResponse = (data: Record<string, unknown>): ApiLoginResponse => {
+  const rawUser = (data.user ?? data) as Record<string, unknown>;
+  const user: User = {
+    id: String(rawUser.id ?? ''),
+    username: String(rawUser.username ?? ''),
+    role: mapBackendRole(String(rawUser.role ?? '')),
+    displayName: String(rawUser.displayName ?? rawUser.username ?? ''),
+    avatarInitials: String(rawUser.avatarInitials ?? ''),
+  };
+  return {
+    token: String(data.token ?? ''),
+    user,
+  };
+};
+
+/** Converte il DTO tratta del backend nella shape Route usata dal frontend. */
+const mapApiRoute = (r: ApiRoutePayload): Route => ({
+  id: r.id,
+  name: r.nome || r.id,
+  code: r.id,
+  stationIds: r.stazioni || [],
+  trainIds: r.treniIds || [],
+  travelTimes: r.travelTimes || [],
+  active: r.attivo || false,
+  createdAt: Date.now()
+});
+
 export const mapBackendStatus = (s: string): TrainStatus => {
   const lower = (s || '').toLowerCase();
   if (lower === 'attivo') return 'in_viaggio';
@@ -25,14 +63,42 @@ export const mapBackendStatus = (s: string): TrainStatus => {
   return (lower || 'in_attesa') as TrainStatus;
 };
 
-/** Mappa inversa: converte lo stato del frontend nel formato atteso dal backend. */
+/**
+ * Mappa inversa: converte lo stato del frontend nei valori canonici del DB centrale
+ * (minuscoli: il CHECK sulla colonna Treni.stato rifiuta le varianti maiuscole).
+ */
 export const mapFrontendStatus = (s: TrainStatus): string => {
   switch (s) {
-    case 'in_viaggio': return 'ATTIVO';
-    case 'in_stazione': return 'FERMO';
-    case 'guasto': return 'ROTTO';
-    case 'soppresso': return 'IN MANUTENZIONE';
-    default: return 'FERMO';
+    case 'in_viaggio': return 'attivo';
+    case 'in_stazione': return 'fermo';
+    case 'guasto': return 'rotto';
+    case 'soppresso': return 'in manutenzione';
+    default: return 'fermo';
+  }
+};
+
+/**
+ * Converte lo stato runtime della stazione (vocabolario del backend: ONLINE/GUASTA/
+ * MANUTENZIONE/OFFLINE) nello StationStatus del frontend.
+ */
+export const mapBackendStationStatus = (s: string): 'operativa' | 'guasta' | 'manutenzione' | 'offline' => {
+  switch ((s || '').toUpperCase()) {
+    case 'ONLINE': return 'operativa';
+    case 'GUASTA': return 'guasta';
+    case 'MANUTENZIONE': return 'manutenzione';
+    case 'OFFLINE': return 'offline';
+    default: return 'operativa';
+  }
+};
+
+/** Mappa inversa: dallo StationStatus del frontend al vocabolario runtime del backend. */
+const mapFrontendStationStatus = (s: string): string => {
+  switch (s) {
+    case 'operativa': return 'ONLINE';
+    case 'guasta': return 'GUASTA';
+    case 'manutenzione': return 'MANUTENZIONE';
+    case 'offline': return 'OFFLINE';
+    default: return 'ONLINE';
   }
 };
 
@@ -65,11 +131,11 @@ export const apiClient = {
       id: t.id,
       convoglio: t.nome || t.id,
       status: mapBackendStatus(t.stato ?? ''),
-      currentStationId: null,
-      nextStationId: t.posizioneAttualeTratta?.stazioneArrivo?.id || null,
+      currentStationId: t.stazioneCorrente || null,
+      nextStationId: t.prossimaStazione || t.posizioneAttualeTratta?.stazioneArrivo?.id || null,
       previousStationId: t.posizioneAttualeTratta?.stazionePartenza?.id || null,
       routeId: t.itinerario?.id || '',
-      direction: 'andata',
+      direction: t.direzione === 'ritorno' ? 'ritorno' : 'andata',
       arrivalTime: null,
       departureTime: null,
       delayMinutes: t.ritardo || 0,
@@ -91,7 +157,7 @@ export const apiClient = {
       code: s.id,
       name: s.nome || s.id,
       city: s.nome || '',
-      status: (s.stato || 'operativa').toLowerCase() as any,
+      status: mapBackendStationStatus(s.stato || ''),
       coordinates: { x: s.latitudine || 0, y: s.longitudine || 0 },
       platforms: s.binari || 1,
       lastHeartbeat: s.ultimoHeartbeat ? new Date(s.ultimoHeartbeat).getTime() : Date.now(),
@@ -106,16 +172,7 @@ export const apiClient = {
     const res = await fetch(`${API_BASE_URL}/tratte`);
     if (!res.ok) throw new Error('Failed to fetch routes');
     const data = await res.json() as ApiRoutePayload[];
-    return data.map((r) => ({
-      id: r.id,
-      name: r.nome || r.id,
-      code: r.id,
-      stationIds: r.stazioni || [],
-      trainIds: r.treniIds || [],
-      travelTimes: [],
-      active: r.attivo || false,
-      createdAt: Date.now()
-    }));
+    return data.map(mapApiRoute);
   },
 
   /**
@@ -129,12 +186,15 @@ export const apiClient = {
         id: route.id,
         nome: route.name,
         stazioni: route.stationIds,
+        travelTimes: route.travelTimes,
         attivo: route.active,
         treniIds: route.trainIds
       })
     });
     if (!res.ok) throw new Error('Failed to create route');
-    return res.json();
+    // Il backend risponde col proprio DTO: lo si riporta nella shape Route
+    // così id/nome generati lato server finiscono nello stato locale
+    return mapApiRoute(await res.json() as ApiRoutePayload);
   },
 
   /**
@@ -147,12 +207,13 @@ export const apiClient = {
       body: JSON.stringify({
         nome: route.name,
         stazioni: route.stationIds,
+        travelTimes: route.travelTimes,
         attivo: route.active,
         treniIds: route.trainIds
       })
     });
     if (!res.ok) throw new Error('Failed to update route');
-    return res.json();
+    return mapApiRoute(await res.json() as ApiRoutePayload);
   },
 
   /**
@@ -176,8 +237,10 @@ export const apiClient = {
       type: (a.tipo || 'info').toLowerCase() as any,
       severity: (a.severita || 'info').toLowerCase() as any,
       message: a.messaggio || '',
-      stationId: a.sorgenteId,
-      trainId: a.sorgenteId,
+      // sorgenteTipo distingue la natura della sorgente: senza, un guasto treno
+      // finirebbe associato anche a una stazione (e viceversa)
+      stationId: a.sorgenteTipo === 'STAZIONE' ? a.sorgenteId : undefined,
+      trainId: a.sorgenteTipo === 'TRENO' ? a.sorgenteId : undefined,
       timestamp: a.timestamp ? new Date(a.timestamp).getTime() : Date.now(),
       acknowledged: a.risolto || false,
       resolvedAt: a.timestampRisoluzione ? new Date(a.timestampRisoluzione).getTime() : undefined
@@ -255,7 +318,7 @@ export const apiClient = {
       body: JSON.stringify({
         id: station.id,
         nome: station.name,
-        stato: (station.status || 'operativa').toUpperCase(),
+        stato: mapFrontendStationStatus(station.status || 'operativa'),
         latitudine: station.coordinates.x,
         longitudine: station.coordinates.y,
         binari: station.platforms
@@ -273,7 +336,7 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nome: station.name,
-        stato: station.status !== undefined ? station.status.toUpperCase() : undefined,
+        stato: station.status !== undefined ? mapFrontendStationStatus(station.status) : undefined,
         latitudine: station.coordinates?.x,
         longitudine: station.coordinates?.y,
         binari: station.platforms
@@ -300,7 +363,8 @@ export const apiClient = {
       body: JSON.stringify({ username, password })
     });
     if (!res.ok) throw new Error('Invalid credentials');
-    return res.json();
+    const data = await res.json() as Record<string, unknown>;
+    return normalizeLoginResponse(data);
   },
 
   /**

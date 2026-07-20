@@ -12,57 +12,69 @@ import java.util.Queue;
  */
 @ApplicationScoped
 public class LocalBuffer {
-    
+
     /**
-     * La coda vera e propria dove vengono stoccati i payload JSON degli eventi.
+     * Evento accodato in attesa di ritrasmissione.
+     * Oltre al payload JSON viene memorizzato anche il canale di destinazione
+     * ("transit" oppure "alert"), così al momento del flush ogni evento
+     * può essere reinviato sull'emitter MQTT corretto.
+     *
+     * @param canale  Canale logico di destinazione: "transit" o "alert".
+     * @param payload Il payload JSON dell'evento non recapitato.
+     */
+    public record EventoBufferizzato(String canale, String payload) {}
+
+    /**
+     * La coda vera e propria dove vengono stoccati gli eventi.
      * L'uso di LinkedList implementa nativamente l'interfaccia Queue (FIFO).
      */
-    private final Queue<String> bufferEventi = new LinkedList<>();
+    private final Queue<EventoBufferizzato> bufferEventi = new LinkedList<>();
 
     /**
      * Aggiunge un nuovo evento in coda al buffer.
-     * Da invocare quando l'invio remoto fallisce.
-     * 
-     * @param evento Il payload JSON dell'evento non recapitato.
+     * Da invocare quando l'invio remoto fallisce o la stazione è offline.
+     *
+     * @param canale  Canale di destinazione dell'evento ("transit" o "alert").
+     * @param payload Il payload JSON dell'evento non recapitato.
      */
-    public void add(String evento) {
-        bufferEventi.add(evento);
+    public synchronized void add(String canale, String payload) {
+        bufferEventi.add(new EventoBufferizzato(canale, payload));
     }
 
     /**
      * Estrae e rimuove il primo evento inserito nella coda (modalità FIFO).
-     * 
+     *
      * @return L'evento più vecchio nel buffer, oppure null se il buffer è vuoto.
      */
-    public String poll() {
+    public synchronized EventoBufferizzato poll() {
         return bufferEventi.poll();
     }
 
     /**
      * Verifica se il buffer locale è vuoto.
-     * 
+     *
      * @return true se non ci sono eventi pendenti, false altrimenti.
      */
-    public boolean isEmpty() {
+    public synchronized boolean isEmpty() {
         return bufferEventi.isEmpty();
     }
 
     /**
      * Ritorna il numero di eventi attualmente in attesa di essere inviati.
-     * 
+     *
      * @return La dimensione della coda.
      */
-    public int size() {
+    public synchronized int size() {
         return bufferEventi.size();
     }
-    
+
     /**
-     * Espone la coda sottostante. 
+     * Espone la coda sottostante.
      * Utile per scopi diagnostici (es. restituzione in un'API di stato).
-     * 
+     *
      * @return La struttura dati Queue.
      */
-    public Queue<String> getBuffer() {
+    public Queue<EventoBufferizzato> getBuffer() {
         return bufferEventi;
     }
 }

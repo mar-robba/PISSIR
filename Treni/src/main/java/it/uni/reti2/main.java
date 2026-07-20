@@ -22,23 +22,24 @@ public class main implements QuarkusApplication {
     TrainDB trainDB;
 
     public static void main(String[] args) {
-        // Validazione dei parametri di input
+        // Validazione dei parametri di input: se l'ID non arriva dagli args
+        // NON usciamo (in dev mode gli args non vengono passati) ma facciamo
+        // fallback sulla property di configurazione treno.id
         if (args.length < 1 || args[0] == null || args[0].trim().isEmpty() || "null".equalsIgnoreCase(args[0].trim())) {
-            System.err.println("❌ ERRORE: ID del treno non fornito o non valido!");
-            System.err.println("Utilizzo: java -jar treno-app.jar <TRENO_ID>");
-            System.err.println("Esempio: java -jar treno-app.jar ALFA-100");
-            System.exit(1);
+            System.err.println("⚠️ ATTENZIONE: ID del treno non fornito negli args, uso la property 'treno.id'");
+            System.err.println("Utilizzo consigliato: java -jar treno-app.jar <TRENO_ID>");
+            LOG.info("🚂 Avvio processo Treno con ID dalla configurazione (treno.id)");
+        } else {
+            // Estrae l'ID del treno dal primo parametro
+            String trenoId = args[0].trim();
+            TRENO_ID_PARAM = trenoId;
+
+            // Imposta la proprietà di sistema per Quarkus
+            // Questa proprietà verrà utilizzata dalla classe TrainDB per impostare trenoId
+            System.setProperty("treno.id", trenoId);
+
+            LOG.infof("🚂 Avvio processo Treno con ID: %s", trenoId);
         }
-
-        // Estrae l'ID del treno dal primo parametro
-        String trenoId = args[0].trim();
-        TRENO_ID_PARAM = trenoId;
-        
-        // Imposta la proprietà di sistema per Quarkus
-        // Questa proprietà verrà utilizzata dalla classe TrainDB per impostare trenoId
-        System.setProperty("treno.id", trenoId);
-
-        LOG.infof("🚂 Avvio processo Treno con ID: %s", trenoId);
 
         // Avvia l'applicazione Quarkus passando il controllo a questa classe
         Quarkus.run(main.class, args);
@@ -51,7 +52,11 @@ public class main implements QuarkusApplication {
      */
     @Override
     public int run(String... args) throws Exception {
-        trainDB.trenoId = TRENO_ID_PARAM;
+        // Se l'ID è arrivato dagli args lo forziamo, altrimenti resta quello
+        // iniettato dalla configurazione (property treno.id)
+        if (TRENO_ID_PARAM != null) {
+            trainDB.trenoId = TRENO_ID_PARAM;
+        }
         LOG.info("✅ Processo Treno AVVIATO CORRETTAMENTE");
         LOG.info("🔄 Ingresso nel ciclo infinito di simulazione del treno...");
         LOG.info("🌐 Server REST disponibile su http://localhost:8082/treno/info");

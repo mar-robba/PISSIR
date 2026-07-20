@@ -9,7 +9,10 @@ CREATE TABLE Stazione (
     nome                         VARCHAR(100) NOT NULL,
     tipoCapolineaPartenzaoNormale VARCHAR(50)
         CHECK (tipoCapolineaPartenzaoNormale
-               IN ('capolinea','partenza','normale'))
+               IN ('capolinea','partenza','normale')),
+    latitudine                   DOUBLE PRECISION,   -- ESTENSIONE: coordinate GPS per la mappa
+    longitudine                  DOUBLE PRECISION,   -- ESTENSIONE
+    binari                       INT                 -- ESTENSIONE: numero di binari
 );
 
 -- --- Tratte ---
@@ -17,6 +20,7 @@ CREATE TABLE Tratte (
     id_Tratta          VARCHAR(50) PRIMARY KEY,
     StazionePartenzaFK VARCHAR(50) NOT NULL,
     StazioneArrivoFK   VARCHAR(50) NOT NULL,
+    tempoPercorrenzaMinuti INT DEFAULT 15,           -- ESTENSIONE: tempo nominale di percorrenza
     FOREIGN KEY (StazionePartenzaFK) REFERENCES Stazione(id_stazione),
     FOREIGN KEY (StazioneArrivoFK)   REFERENCES Stazione(id_stazione)
 );
@@ -27,7 +31,8 @@ CREATE TABLE Utenti (
     tipo       VARCHAR(50) NOT NULL,   -- es. 'operatore','tecnico','admin'
     nome       VARCHAR(100) NOT NULL,
     cognome    VARCHAR(100) NOT NULL,
-    matricola  VARCHAR(50)  UNIQUE NOT NULL
+    matricola  VARCHAR(50)  UNIQUE NOT NULL,
+    password   VARCHAR(100)            -- ESTENSIONE: password verificata al login
 );
 
 -- --- Itinerari ---
@@ -77,6 +82,13 @@ CREATE TABLE Guasti_Pervenuti_da_treni_o_Staz (
     id_Guasto                    VARCHAR(50) PRIMARY KEY,
     Stato_RisoltoONO             BOOLEAN NOT NULL DEFAULT FALSE,
     OperatoreCheSeNeStaOccupandoFK VARCHAR(50),
+    tipo            VARCHAR(50),   -- ESTENSIONE: tipologia guasto (stazione_guasta/treno_fermo/sensore_offline)
+    severita        VARCHAR(20),   -- ESTENSIONE: gravita' (CRITICAL/WARNING/INFO)
+    sorgenteTipo    VARCHAR(20),   -- ESTENSIONE: tipo sorgente (STAZIONE/TRENO)
+    sorgenteId      VARCHAR(50),   -- ESTENSIONE: id della sorgente del guasto
+    messaggio       VARCHAR(500),  -- ESTENSIONE: descrizione leggibile
+    ts_apertura     TIMESTAMP,     -- ESTENSIONE: istante di apertura
+    ts_risoluzione  TIMESTAMP,     -- ESTENSIONE: istante di risoluzione (null se aperto)
     FOREIGN KEY (OperatoreCheSeNeStaOccupandoFK)
         REFERENCES Utenti(id_utente)
 );

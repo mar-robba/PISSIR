@@ -1,4 +1,4 @@
-import { LogOut, Search } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './Topbar.css';
@@ -32,11 +32,7 @@ export default function Topbar() {
       </div>
 
       <div className="topbar-actions">
-        <div className="search-bar">
-          <Search size={18} className="search-icon" />
-          <input type="text" placeholder="Cerca treno, stazione..." className="search-input" />
-        </div>
-        
+
         <button onClick={handleLogout} className="btn btn-outline logout-btn">
           <LogOut size={18} />
           <span>Logout</span>

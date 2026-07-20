@@ -1,5 +1,6 @@
 package it.uni.reti2.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 
@@ -21,4 +22,12 @@ public class Utente extends PanacheEntityBase {
 
     @Column(name = "matricola", nullable = false, unique = true, length = 50)
     public String matricola;
+
+    /**
+     * Password in chiaro dell'utente (semplificazione didattica, verificata al login).
+     * Mai serializzata nelle risposte JSON: l'entità Guasto espone l'operatore assegnato.
+     */
+    @JsonIgnore
+    @Column(name = "password", length = 100)
+    public String password;
 }

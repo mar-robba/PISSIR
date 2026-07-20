@@ -46,6 +46,18 @@ public class Stazione extends PanacheEntityBase {
     @Column(name = "tipoCapolineaPartenzaoNormale", length = 50)
     public String tipoCapolineaPartenzaoNormale;
 
+    /** Latitudine GPS della stazione, usata per il rendering sulla mappa. Persistita in DB. */
+    @Column(name = "latitudine")
+    public Double latitudine = 0.0;
+
+    /** Longitudine GPS della stazione, usata per il rendering sulla mappa. Persistita in DB. */
+    @Column(name = "longitudine")
+    public Double longitudine = 0.0;
+
+    /** Numero di binari disponibili nella stazione. Persistito in DB. */
+    @Column(name = "binari")
+    public Integer binari = 1;
+
     // ──────────────────────────────────────────────────────────────
     // Campi volatili / in-memory: NON persistiti su schema.sql.
     // Aggiornati dal ciclo di heartbeat MQTT e dalla cache
@@ -55,18 +67,6 @@ public class Stazione extends PanacheEntityBase {
     /** Stato operativo corrente (es. "ONLINE", "GUASTA", "MANUTENZIONE", "OFFLINE"). */
     @Transient
     public String stato = "OFFLINE";
-
-    /** Latitudine GPS della stazione, usata per il rendering sulla mappa. */
-    @Transient
-    public double latitudine;
-
-    /** Longitudine GPS della stazione, usata per il rendering sulla mappa. */
-    @Transient
-    public double longitudine;
-
-    /** Numero di binari disponibili nella stazione. */
-    @Transient
-    public int binari;
 
     /** Timestamp dell'ultimo segnale di heartbeat ricevuto dalla stazione. */
     @Transient

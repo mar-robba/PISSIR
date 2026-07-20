@@ -12,13 +12,13 @@ import java.time.Instant;
  * di bordo di un treno (freni, motori) oppure dai sottosistemi di una stazione
  * (alimentazione, scambi).</p>
  *
- * <h3>Campi persistiti vs. transient</h3>
- * <p>Solo {@code id}, {@code risolto} e {@code operatore} sono colonne effettive in DB.
- * I campi annotati con {@link Transient} ({@code tipo}, {@code severita}, {@code sorgenteId},
- * {@code messaggio}, {@code timestamp}, {@code timestampRisoluzione}) vivono esclusivamente
- * in memoria e vengono popolati da {@code IngestionService} al momento della ricezione
- * del messaggio MQTT, e da {@code RestApiGateway} per comporre i DTO JSON destinati al frontend.
- * Questa scelta separa il modello relazionale dallo schema di comunicazione runtime.</p>
+ * <h3>Campi persistiti</h3>
+ * <p>Oltre a {@code id}, {@code risolto} e {@code operatore}, vengono persistiti anche
+ * {@code tipo}, {@code severita}, {@code sorgenteTipo}, {@code sorgenteId}, {@code messaggio}
+ * e i timestamp di apertura/risoluzione (colonne {@code ts_apertura}/{@code ts_risoluzione}).
+ * Vengono popolati da {@code IngestionService} al momento della ricezione del messaggio MQTT
+ * (o dal {@code FaultMonitor} per i guasti rilevati automaticamente) e letti da
+ * {@code RestApiGateway} per comporre i DTO JSON destinati al frontend.</p>
  *
  * @see it.uni.reti2.entity.StoricoGuasto
  * @see it.uni.reti2.ingestion.IngestionService#onAlert
@@ -49,33 +49,31 @@ public class Guasto extends PanacheEntityBase {
     @JoinColumn(name = "OperatoreCheSeNeStaOccupandoFK")
     public Utente operatore;
 
-    // ──────────────────────────────────────────────────────────────
-    // Campi @Transient: NON persistiti su DB, usati solo in-memory
-    // per la comunicazione tra IngestionService, TrafficLogicEngine
-    // e RestApiGateway.
-    // ──────────────────────────────────────────────────────────────
-
-    /** Tipologia del guasto (es. "STATION", "TRAIN", "SYSTEM"). */
-    @Transient
+    /** Tipologia del guasto (es. "stazione_guasta", "treno_fermo", "sensore_offline"). */
+    @Column(name = "tipo", length = 50)
     public String tipo;
 
     /** Gravità dell'allarme (es. "CRITICAL", "WARNING", "INFO"). */
-    @Transient
+    @Column(name = "severita", length = 20)
     public String severita;
 
+    /** Tipo del componente sorgente che ha generato l'allarme ("STAZIONE" o "TRENO"). */
+    @Column(name = "sorgenteTipo", length = 20)
+    public String sorgenteTipo;
+
     /** ID del componente sorgente che ha generato l'allarme (treno o stazione). */
-    @Transient
+    @Column(name = "sorgenteId", length = 50)
     public String sorgenteId;
 
     /** Messaggio di dettaglio leggibile dall'operatore. */
-    @Transient
+    @Column(name = "messaggio", length = 500)
     public String messaggio;
 
-    /** Istante di creazione dell'allarme (in-memory). */
-    @Transient
+    /** Istante di apertura/segnalazione dell'allarme. */
+    @Column(name = "ts_apertura")
     public Instant timestamp;
 
-    /** Istante di risoluzione dell'allarme (in-memory, usato per DTO). */
-    @Transient
+    /** Istante di risoluzione dell'allarme (null se ancora aperto). */
+    @Column(name = "ts_risoluzione")
     public Instant timestampRisoluzione;
 }

@@ -3,11 +3,19 @@ import type { Train, Station, Alert, Route, Transit } from '../types';
 import { apiClient } from '../api/apiClient';
 
 /**
+ * src/store in React
+In questa app, la cartella src/store contiene il codice per lo stato globale dell’app, non i singoli componenti.
+
+Cosa c’è dentro
+railwayStore.ts
+definisce lo stato globale di treni, stazioni, alert, tratte, transiti, selezioni
+espone azioni per modificare lo stato:
  * Interfaccia dello Stato Globale dell'applicazione gestito con Zustand.
  * Comprende gli array immutabili di tutte le entità core (treni, stazioni, ecc)
  * e i metodi/azioni ("actions") per mutarle o aggiornarle in risposta 
  * agli eventi di WebSocket o azioni dell'operatore.
  */
+
 interface RailwayState {
   trains: Train[];
   stations: Station[];
@@ -130,8 +138,8 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
   /** Crea una nuova tratta sul backend e la aggiunge allo stato locale (UC6). */
   addRoute: async (route) => {
     try {
-      await apiClient.createRoute(route);
-      set((s) => ({ routes: [...s.routes, route] }));
+      const creata = await apiClient.createRoute(route);
+      set((s) => ({ routes: [...s.routes, creata] }));
     } catch (err) {
       console.error('Failed to create route', err);
       alert('Errore: impossibile creare la tratta sul server.');
@@ -141,9 +149,9 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
   /** Aggiorna una tratta sul backend e nello stato locale (UC7). */
   updateRoute: async (id, update) => {
     try {
-      await apiClient.updateRoute(id, update);
+      const aggiornata = await apiClient.updateRoute(id, update);
       set((s) => ({
-        routes: s.routes.map((r) => (r.id === id ? { ...r, ...update } : r)),
+        routes: s.routes.map((r) => (r.id === id ? aggiornata : r)),
       }));
     } catch (err) {
       console.error('Failed to update route', err);

@@ -64,14 +64,14 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.convoglio) {
       alert('Inserisci il codice del convoglio (es. IC 351).');
       return;
     }
 
     if (trainIdToEdit) {
-      adminUpdateTrain(trainIdToEdit, {
+      await adminUpdateTrain(trainIdToEdit, {
         convoglio: formData.convoglio,
         routeId: formData.routeId,
         status: formData.status,
@@ -79,7 +79,7 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
         delayMinutes: formData.delayMinutes,
       });
     } else {
-      adminCreateTrain(formData as Train);
+      await adminCreateTrain(formData as Train);
     }
     onClose();
   };
