@@ -6,16 +6,20 @@ import { ShieldAlert, Plus, Trash2, Edit } from 'lucide-react';
 import RouteEditorModal from '../components/admin/RouteEditorModal';
 import TrainEditorModal from '../components/admin/TrainEditorModal';
 import StationEditorModal from '../components/admin/StationEditorModal';
+import TrackSegmentEditorModal from '../components/admin/TrackSegmentEditorModal';
+import './AdminPage.css';
 
 export default function AdminPage() {
   const {
-    routes, trains, stations,
-    suppressTrain, deleteRoute, adminDeleteTrain, adminDeleteStation
+    routes, trackSegments, trains, stations,
+    suppressTrain, deleteRoute, deleteTrackSegment, adminDeleteTrain, adminDeleteStation
   } = useRailwayStore();
-  const [activeTab, setActiveTab] = useState<'routes' | 'trains' | 'stations'>('routes');
+  const [activeTab, setActiveTab] = useState<'routes' | 'segments' | 'trains' | 'stations'>('routes');
 
   const [isRouteModalOpen, setIsRouteModalOpen] = useState(false);
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
+  const [isSegmentModalOpen, setIsSegmentModalOpen] = useState(false);
+  const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
 
   const [isTrainModalOpen, setIsTrainModalOpen] = useState(false);
   const [editingTrainId, setEditingTrainId] = useState<string | null>(null);
@@ -34,6 +38,9 @@ export default function AdminPage() {
       deleteRoute(routeId);
     }
   };
+  const handleDeleteSegment = (id: string) => {
+    if (confirm('Eliminare la tratta fisica? Se è usata da un itinerario il server la proteggerà.')) deleteTrackSegment(id);
+  };
 
   const handleDeleteTrain = (trainId: string) => {
     if (confirm("Sei sicuro di voler eliminare definitivamente questo treno dalla flotta?")) {
@@ -51,7 +58,7 @@ export default function AdminPage() {
     }
   };
 
-  const tabClass = (tab: 'routes' | 'trains' | 'stations') =>
+  const tabClass = (tab: 'routes' | 'segments' | 'trains' | 'stations') =>
     `px-6 py-2 rounded-t-md font-medium border-b-2 transition-all ${
       activeTab === tab
         ? 'border-primary text-primary bg-primary/10'
@@ -59,7 +66,7 @@ export default function AdminPage() {
     }`;
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in h-full">
+    <div className="admin-page flex flex-col gap-6 animate-fade-in h-full">
       <div className="flex items-center gap-4 border-b border-border-color pb-4">
         <ShieldAlert size={32} className="text-warning" />
         <div>
@@ -71,7 +78,10 @@ export default function AdminPage() {
       {/* Tabs */}
       <div className="flex gap-4">
         <button className={tabClass('routes')} onClick={() => setActiveTab('routes')}>
-          Gestione Tratte (UC6/UC7)
+          Gestione Itinerari (UC6/UC7)
+        </button>
+        <button className={tabClass('segments')} onClick={() => setActiveTab('segments')}>
+          Gestione Tratte fisiche
         </button>
         <button className={tabClass('trains')} onClick={() => setActiveTab('trains')}>
           Gestione Treni (UC8/UC9)
@@ -97,7 +107,7 @@ export default function AdminPage() {
               </button>
             }
           >
-            <div className="table-container">
+            <div className="table-container admin-table-window">
               <table>
                 <thead>
                   <tr>
@@ -142,6 +152,14 @@ export default function AdminPage() {
           </Card>
         )}
 
+        {activeTab === 'segments' && (
+          <Card title="Amministrazione Tratte fisiche" action={<button className="btn btn-primary text-sm" onClick={() => { setEditingSegmentId(null); setIsSegmentModalOpen(true); }}><Plus size={16} /> Nuova tratta fisica</button>}>
+            <div className="table-container admin-table-window"><table><thead><tr><th>Codice</th><th>Partenza</th><th>Arrivo</th><th>Tempo</th><th>Azioni</th></tr></thead><tbody>
+              {trackSegments.map(segment => <tr key={segment.id}><td className="font-mono text-sm">{segment.id}</td><td>{stations.find(s => s.id === segment.departureStationId)?.name ?? segment.departureStationId}</td><td>{stations.find(s => s.id === segment.arrivalStationId)?.name ?? segment.arrivalStationId}</td><td>{segment.travelTimeMinutes} min</td><td><div className="flex gap-2"><button className="btn btn-outline text-xs p-1.5 text-warning" onClick={() => { setEditingSegmentId(segment.id); setIsSegmentModalOpen(true); }}><Edit size={14}/></button><button className="btn btn-outline text-xs p-1.5 text-danger" onClick={() => handleDeleteSegment(segment.id)}><Trash2 size={14}/></button></div></td></tr>)}
+            </tbody></table></div>
+          </Card>
+        )}
+
         {activeTab === 'trains' && (
           <Card
             title="Amministrazione Operativa Treni"
@@ -157,7 +175,7 @@ export default function AdminPage() {
               </button>
             }
           >
-            <div className="table-container">
+            <div className="table-container admin-table-window">
               <table>
                 <thead>
                   <tr>
@@ -231,7 +249,7 @@ export default function AdminPage() {
               </button>
             }
           >
-            <div className="table-container">
+            <div className="table-container admin-table-window">
               <table>
                 <thead>
                   <tr>
@@ -289,6 +307,7 @@ export default function AdminPage() {
         onClose={() => setIsRouteModalOpen(false)}
         routeIdToEdit={editingRouteId}
       />
+      <TrackSegmentEditorModal isOpen={isSegmentModalOpen} onClose={() => setIsSegmentModalOpen(false)} segmentId={editingSegmentId} />
       <TrainEditorModal
         isOpen={isTrainModalOpen}
         onClose={() => setIsTrainModalOpen(false)}

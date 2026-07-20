@@ -73,6 +73,14 @@ export interface Route {
   createdAt: number;
 }
 
+/** Collegamento fisico diretto fra due stazioni; può appartenere a più itinerari. */
+export interface TrackSegment {
+  id: string;
+  departureStationId: string;
+  arrivalStationId: string;
+  travelTimeMinutes: number;
+}
+
 // --- TRANSIT LOG ---
 /** Definisce storicamente quando un convoglio ha varcato il perimetro di una specifica stazione. */
 export interface Transit {

@@ -1,0 +1,13 @@
+import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
+import { useRailwayStore } from '../../store/railwayStore';
+import type { TrackSegment } from '../../types';
+
+export default function TrackSegmentEditorModal({ isOpen, onClose, segmentId }: {isOpen: boolean; onClose: () => void; segmentId: string | null}) {
+  const { trackSegments, stations, createTrackSegment, updateTrackSegment } = useRailwayStore();
+  const [form, setForm] = useState<TrackSegment>({ id: '', departureStationId: '', arrivalStationId: '', travelTimeMinutes: 15 });
+  useEffect(() => { if (!isOpen) return; const current = trackSegments.find((t) => t.id === segmentId); setForm(current ?? { id: '', departureStationId: '', arrivalStationId: '', travelTimeMinutes: 15 }); }, [isOpen, segmentId, trackSegments]);
+  if (!isOpen) return null;
+  const save = async () => { if (!form.id || !form.departureStationId || !form.arrivalStationId) return alert('Compila codice, partenza e arrivo.'); if (segmentId) await updateTrackSegment(segmentId, form); else await createTrackSegment(form); onClose(); };
+  return <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="glass-panel w-full max-w-xl p-6"><div className="flex justify-between items-center mb-5"><h2 className="text-xl font-bold">{segmentId ? 'Modifica tratta fisica' : 'Nuova tratta fisica'}</h2><button onClick={onClose}><X/></button></div><div className="grid gap-4"><label>Codice<input disabled={!!segmentId} className="input-field w-full" value={form.id} onChange={(e) => setForm({...form, id: e.target.value.toUpperCase()})}/></label><label>Stazione di partenza<select className="input-field w-full" value={form.departureStationId} onChange={(e) => setForm({...form, departureStationId: e.target.value})}><option value="">Seleziona…</option>{stations.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}</select></label><label>Stazione di arrivo<select className="input-field w-full" value={form.arrivalStationId} onChange={(e) => setForm({...form, arrivalStationId: e.target.value})}><option value="">Seleziona…</option>{stations.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}</select></label><label>Tempo di percorrenza (minuti)<input type="number" min="1" className="input-field w-full" value={form.travelTimeMinutes} onChange={(e) => setForm({...form, travelTimeMinutes: Number(e.target.value) || 1})}/></label></div><div className="flex justify-end gap-3 mt-6"><button className="btn btn-outline" onClick={onClose}>Annulla</button><button className="btn btn-primary" onClick={save}>Salva</button></div></div></div>;
+}

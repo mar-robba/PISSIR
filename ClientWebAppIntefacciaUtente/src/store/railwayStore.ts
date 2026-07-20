@@ -1,6 +1,12 @@
 import { create } from 'zustand';
-import type { Train, Station, Alert, Route, Transit } from '../types';
+import type { Train, Station, Alert, Route, TrackSegment, Transit } from '../types';
 import { apiClient } from '../api/apiClient';
+
+/** Restituisce il dettaglio ricevuto dalla Centrale per mostrarlo all'operatore. */
+const dettaglioErrore = (err: unknown): string =>
+  err instanceof Error && err.message
+    ? `\nMotivo: ${err.message}`
+    : '\nMotivo: il server non ha fornito ulteriori dettagli.';
 
 /**
  * src/store in React
@@ -21,6 +27,7 @@ interface RailwayState {
   stations: Station[];
   alerts: Alert[];
   routes: Route[];
+  trackSegments: TrackSegment[];
   transits: Transit[];
   selectedTrainId: string | null;
   selectedStationId: string | null;
@@ -35,6 +42,9 @@ interface RailwayState {
   addRoute: (route: Route) => Promise<void>;
   updateRoute: (id: string, update: Partial<Route>) => Promise<void>;
   deleteRoute: (id: string) => Promise<void>;
+  createTrackSegment: (segment: TrackSegment) => Promise<void>;
+  updateTrackSegment: (id: string, segment: Partial<TrackSegment>) => Promise<void>;
+  deleteTrackSegment: (id: string) => Promise<void>;
   addTransit: (transit: Transit) => void;
 
   // Azioni CRUD amministrative (persistite sul backend via API)
@@ -65,6 +75,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
   stations: [],
   alerts: [],
   routes: [],
+  trackSegments: [],
   transits: [],
   selectedTrainId: null,
   selectedStationId: null,
@@ -74,14 +85,15 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
    */
   initialize: async () => {
     try {
-      const [trains, stations, alerts, routes, transits] = await Promise.all([
+      const [trains, stations, alerts, routes, trackSegments, transits] = await Promise.all([
         apiClient.getTrains(),
         apiClient.getStations(),
         apiClient.getAlerts(),
         apiClient.getRoutes(),
+        apiClient.getTrackSegments(),
         apiClient.getTransits(),
       ]);
-      set({ trains, stations, alerts, routes, transits });
+      set({ trains, stations, alerts, routes, trackSegments, transits });
     } catch (err) {
       console.error('Failed to initialize railway store from API', err);
     }
@@ -142,7 +154,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       set((s) => ({ routes: [...s.routes, creata] }));
     } catch (err) {
       console.error('Failed to create route', err);
-      alert('Errore: impossibile creare la tratta sul server.');
+      alert(`Errore: impossibile creare la tratta sul server.${dettaglioErrore(err)}`);
     }
   },
 
@@ -155,7 +167,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       }));
     } catch (err) {
       console.error('Failed to update route', err);
-      alert('Errore: impossibile aggiornare la tratta sul server.');
+      alert(`Errore: impossibile aggiornare la tratta sul server.${dettaglioErrore(err)}`);
     }
   },
 
@@ -166,8 +178,29 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       set((s) => ({ routes: s.routes.filter((r) => r.id !== id) }));
     } catch (err) {
       console.error('Failed to delete route', err);
-      alert('Errore: impossibile eliminare la tratta sul server.');
+      alert(`Errore: impossibile eliminare la tratta sul server.${dettaglioErrore(err)}`);
     }
+  },
+
+  createTrackSegment: async (segment) => {
+    try {
+      const created = await apiClient.createTrackSegment(segment);
+      set((s) => ({ trackSegments: [...s.trackSegments, created] }));
+    } catch (err) { alert(`Errore: impossibile creare la tratta fisica.${dettaglioErrore(err)}`); }
+  },
+
+  updateTrackSegment: async (id, segment) => {
+    try {
+      const updated = await apiClient.updateTrackSegment(id, segment);
+      set((s) => ({ trackSegments: s.trackSegments.map((t) => t.id === id ? updated : t) }));
+    } catch (err) { alert(`Errore: impossibile aggiornare la tratta fisica.${dettaglioErrore(err)}`); }
+  },
+
+  deleteTrackSegment: async (id) => {
+    try {
+      await apiClient.deleteTrackSegment(id);
+      set((s) => ({ trackSegments: s.trackSegments.filter((t) => t.id !== id) }));
+    } catch (err) { alert(`Errore: impossibile eliminare la tratta fisica.${dettaglioErrore(err)}`); }
   },
 
   /** Crea un nuovo treno sul backend e lo aggiunge allo stato locale. */
@@ -177,7 +210,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       set((s) => ({ trains: [...s.trains, train] }));
     } catch (err) {
       console.error('Failed to create train', err);
-      alert('Errore: impossibile creare il treno sul server.');
+      alert(`Errore: impossibile creare il treno sul server.${dettaglioErrore(err)}`);
     }
   },
 
@@ -190,7 +223,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       }));
     } catch (err) {
       console.error('Failed to update train', err);
-      alert('Errore: impossibile aggiornare il treno sul server.');
+      alert(`Errore: impossibile aggiornare il treno sul server.${dettaglioErrore(err)}`);
     }
   },
 
@@ -201,7 +234,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       set((s) => ({ trains: s.trains.filter((t) => t.id !== id) }));
     } catch (err) {
       console.error('Failed to delete train', err);
-      alert('Errore: impossibile eliminare il treno sul server.');
+      alert(`Errore: impossibile eliminare il treno sul server.${dettaglioErrore(err)}`);
     }
   },
 
@@ -212,7 +245,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       set((s) => ({ stations: [...s.stations, station] }));
     } catch (err) {
       console.error('Failed to create station', err);
-      alert('Errore: impossibile creare la stazione sul server.');
+      alert(`Errore: impossibile creare la stazione sul server.${dettaglioErrore(err)}`);
     }
   },
 
@@ -225,7 +258,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       }));
     } catch (err) {
       console.error('Failed to update station', err);
-      alert('Errore: impossibile aggiornare la stazione sul server.');
+      alert(`Errore: impossibile aggiornare la stazione sul server.${dettaglioErrore(err)}`);
     }
   },
 
@@ -236,7 +269,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       set((s) => ({ stations: s.stations.filter((st) => st.id !== id) }));
     } catch (err) {
       console.error('Failed to delete station', err);
-      alert('Errore: impossibile eliminare la stazione sul server.');
+      alert(`Errore: impossibile eliminare la stazione sul server.${dettaglioErrore(err)}`);
     }
   },
 

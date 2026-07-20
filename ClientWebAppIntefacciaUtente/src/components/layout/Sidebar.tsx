@@ -38,7 +38,11 @@ export default function Sidebar() {
         
         <NavLink to="/routes" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
           <RouteIcon size={20} />
-          <span>Tratte</span>
+          <span>Itinerari</span>
+        </NavLink>
+        <NavLink to="/tratte" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <RouteIcon size={20} />
+          <span>Tratte fisiche</span>
         </NavLink>
         
         <NavLink to="/stations" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>

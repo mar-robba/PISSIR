@@ -81,6 +81,14 @@ public class RestApiGateway {
         public List<String> treniIds;
     }
 
+    /** DTO della singola tratta fisica tra due stazioni, distinto da un itinerario. */
+    public static class TrattaElementoDTO {
+        public String id;
+        public String stazionePartenzaId;
+        public String stazioneArrivoId;
+        public Integer tempoPercorrenzaMinuti;
+    }
+
     /**
      * Fornisce indicatori chiave di prestazione (KPI) per la dashboard di riepilogo.
      * @return Statistiche sommarie su treni e stazioni nel formato atteso dal frontend.
@@ -320,6 +328,74 @@ public class RestApiGateway {
     // ──────────────────────────────────────────────────────────────
     // TRATTE (itinerari per il frontend)
     // ──────────────────────────────────────────────────────────────
+
+    // TRATTE ELEMENTARI (archi fisici della rete)
+    // ──────────────────────────────────────────────────────────────
+
+    @GET
+    @Path("/tratte-elementari")
+    @Transactional
+    public List<Map<String, Object>> getTratteElementari() {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Tratta tratta : Tratta.<Tratta>listAll(Sort.by("id"))) result.add(trattaElementoToDto(tratta));
+        return result;
+    }
+
+    @POST
+    @Path("/tratte-elementari")
+    @Transactional
+    public Response createTrattaElemento(TrattaElementoDTO dto) {
+        if (dto == null || dto.id == null || dto.id.isBlank()
+                || dto.stazionePartenzaId == null || dto.stazioneArrivoId == null) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("errore", "id e stazioni di partenza/arrivo sono obbligatori")).build();
+        }
+        if (Tratta.findById(dto.id) != null) return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Tratta già esistente")).build();
+        Stazione partenza = Stazione.findById(dto.stazionePartenzaId);
+        Stazione arrivo = Stazione.findById(dto.stazioneArrivoId);
+        if (partenza == null || arrivo == null) return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("errore", "Stazione di partenza o arrivo inesistente")).build();
+        Tratta tratta = new Tratta();
+        tratta.id = dto.id;
+        tratta.stazionePartenza = partenza;
+        tratta.stazioneArrivo = arrivo;
+        tratta.tempoPercorrenzaMinuti = dto.tempoPercorrenzaMinuti != null ? dto.tempoPercorrenzaMinuti : 15;
+        tratta.persist();
+        return Response.status(Response.Status.CREATED).entity(trattaElementoToDto(tratta)).build();
+    }
+
+    @PUT
+    @Path("/tratte-elementari/{id}")
+    @Transactional
+    public Response updateTrattaElemento(@PathParam("id") String id, TrattaElementoDTO dto) {
+        Tratta tratta = Tratta.findById(id);
+        if (tratta == null) return Response.status(Response.Status.NOT_FOUND).build();
+        if (dto.stazionePartenzaId != null) {
+            Stazione s = Stazione.findById(dto.stazionePartenzaId);
+            if (s == null) return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("errore", "Stazione di partenza inesistente")).build();
+            tratta.stazionePartenza = s;
+        }
+        if (dto.stazioneArrivoId != null) {
+            Stazione s = Stazione.findById(dto.stazioneArrivoId);
+            if (s == null) return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("errore", "Stazione di arrivo inesistente")).build();
+            tratta.stazioneArrivo = s;
+        }
+        if (dto.tempoPercorrenzaMinuti != null) tratta.tempoPercorrenzaMinuti = dto.tempoPercorrenzaMinuti;
+        return Response.ok(trattaElementoToDto(tratta)).build();
+    }
+
+    @DELETE
+    @Path("/tratte-elementari/{id}")
+    @Transactional
+    public Response deleteTrattaElemento(@PathParam("id") String id) {
+        Tratta tratta = Tratta.findById(id);
+        if (tratta == null) return Response.status(Response.Status.NOT_FOUND).build();
+        long usi = ItinerarioTratta.count("id.idTratta", id);
+        if (usi > 0) return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Tratta usata da " + usi + " itinerari: modificare prima gli itinerari")).build();
+        if (Transito.count("tratta.id", id) > 0 || StoricoTransito.count("tratta.id", id) > 0) {
+            return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Tratta presente nei transiti storici e non eliminabile")).build();
+        }
+        tratta.delete();
+        return Response.noContent().build();
+    }
 
     /**
      * Recupera l'elenco degli itinerari o tratte dal Database persistente (Panache ORM).
@@ -847,6 +923,15 @@ public class RestApiGateway {
             treniIds.add(t.id);
         }
         dto.put("treniIds", treniIds);
+        return dto;
+    }
+
+    private Map<String, Object> trattaElementoToDto(Tratta tratta) {
+        Map<String, Object> dto = new HashMap<>();
+        dto.put("id", tratta.id);
+        dto.put("stazionePartenzaId", tratta.stazionePartenza.id);
+        dto.put("stazioneArrivoId", tratta.stazioneArrivo.id);
+        dto.put("tempoPercorrenzaMinuti", tratta.tempoPercorrenzaMinuti != null ? tratta.tempoPercorrenzaMinuti : 15);
         return dto;
     }
 

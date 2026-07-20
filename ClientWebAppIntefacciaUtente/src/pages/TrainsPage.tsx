@@ -3,6 +3,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { useState } from 'react';
 import { Train as TrainIcon, Clock, Users, MapPin } from 'lucide-react';
+import './TrainsPage.css';
 
 export default function TrainsPage() {
   const { trains, stations, routes } = useRailwayStore();
@@ -34,10 +35,10 @@ export default function TrainsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in h-full">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+    <div className="trains-page flex flex-col gap-6 animate-fade-in h-full">
+      <div className="trains-workspace grid grid-cols-1 gap-6">
         {/* Trains List */}
-        <Card title="Elenco Treni" className="col-span-2">
+        <Card title="Elenco Treni" className="trains-list-card">
           <div className="mb-4">
             <input 
               type="text" 
@@ -47,7 +48,7 @@ export default function TrainsPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="table-container">
+          <div className="table-container trains-table-window">
             <table>
               <thead>
                 <tr>
@@ -103,7 +104,7 @@ export default function TrainsPage() {
         </Card>
 
         {/* Train Details */}
-        <Card title="Dettagli Treno" className="col-span-1 flex flex-col">
+        <Card title="Dettagli Treno" className="trains-detail-card flex flex-col">
           {!selectedTrain ? (
             <div className="text-center text-muted p-8 flex-1 flex flex-col items-center justify-center">
               <TrainIcon size={48} className="mb-4 opacity-20" />

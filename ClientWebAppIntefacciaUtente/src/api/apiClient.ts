@@ -1,9 +1,10 @@
-import { Train, Station, Route, Alert, DashboardKPI, Transit, TrainStatus, User, UserRole } from '../types';
+import { Train, Station, Route, TrackSegment, Alert, DashboardKPI, Transit, TrainStatus, User, UserRole } from '../types';
 import type {
   ApiAlertPayload,
   ApiDashboardPayload,
   ApiLoginResponse,
   ApiRoutePayload,
+  ApiTrackSegmentPayload,
   ApiStationPayload,
   ApiTransitPayload,
   ApiTrainPayload
@@ -15,6 +16,30 @@ import type {
  */
 // Usa la porta del backend (configurata in ServeCentraleOperativa: quarkus.http.port=8781)
 const API_BASE_URL = 'http://localhost:8781/api';
+
+/**
+ * Estrae il dettaglio di un errore restituito dalla Centrale. Le API usano
+ * normalmente `{ "errore": "..." }`, ma sono gestiti anche gli altri formati
+ * JSON e le risposte testuali, così l'interfaccia può spiegare il rifiuto.
+ */
+const createApiError = async (res: Response): Promise<Error> => {
+  let dettaglio = '';
+
+  try {
+    const contentType = res.headers.get('content-type') ?? '';
+    if (contentType.includes('application/json')) {
+      const body = await res.json() as Record<string, unknown>;
+      const value = body.errore ?? body.message ?? body.detail;
+      if (typeof value === 'string') dettaglio = value;
+    } else {
+      dettaglio = (await res.text()).trim();
+    }
+  } catch {
+    // Una risposta di errore senza body rimane comunque gestibile dal chiamante.
+  }
+
+  return new Error(dettaglio || `Il server ha risposto con HTTP ${res.status}.`);
+};
 
 /** Converte il ruolo restituito dal backend nel vocabolario del frontend. */
 const mapBackendRole = (role: string | undefined): UserRole => {
@@ -52,6 +77,13 @@ const mapApiRoute = (r: ApiRoutePayload): Route => ({
   travelTimes: r.travelTimes || [],
   active: r.attivo || false,
   createdAt: Date.now()
+});
+
+const mapApiTrackSegment = (t: ApiTrackSegmentPayload): TrackSegment => ({
+  id: t.id,
+  departureStationId: t.stazionePartenzaId,
+  arrivalStationId: t.stazioneArrivoId,
+  travelTimeMinutes: t.tempoPercorrenzaMinuti ?? 15,
 });
 
 export const mapBackendStatus = (s: string): TrainStatus => {
@@ -133,7 +165,9 @@ export const apiClient = {
       status: mapBackendStatus(t.stato ?? ''),
       currentStationId: t.stazioneCorrente || null,
       nextStationId: t.prossimaStazione || t.posizioneAttualeTratta?.stazioneArrivo?.id || null,
-      previousStationId: t.posizioneAttualeTratta?.stazionePartenza?.id || null,
+      // Al primo avvio la tratta persistita può non essere ancora disponibile;
+      // la stazione corrente della telemetria è comunque l'estremo di partenza.
+      previousStationId: t.posizioneAttualeTratta?.stazionePartenza?.id || t.stazioneCorrente || null,
       routeId: t.itinerario?.id || '',
       direction: t.direzione === 'ritorno' ? 'ritorno' : 'andata',
       arrivalTime: null,
@@ -175,6 +209,35 @@ export const apiClient = {
     return data.map(mapApiRoute);
   },
 
+  getTrackSegments: async (): Promise<TrackSegment[]> => {
+    const res = await fetch(`${API_BASE_URL}/tratte-elementari`);
+    if (!res.ok) throw new Error('Failed to fetch track segments');
+    return (await res.json() as ApiTrackSegmentPayload[]).map(mapApiTrackSegment);
+  },
+
+  createTrackSegment: async (segment: TrackSegment): Promise<TrackSegment> => {
+    const res = await fetch(`${API_BASE_URL}/tratte-elementari`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: segment.id, stazionePartenzaId: segment.departureStationId, stazioneArrivoId: segment.arrivalStationId, tempoPercorrenzaMinuti: segment.travelTimeMinutes })
+    });
+    if (!res.ok) throw await createApiError(res);
+    return mapApiTrackSegment(await res.json() as ApiTrackSegmentPayload);
+  },
+
+  updateTrackSegment: async (id: string, segment: Partial<TrackSegment>): Promise<TrackSegment> => {
+    const res = await fetch(`${API_BASE_URL}/tratte-elementari/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stazionePartenzaId: segment.departureStationId, stazioneArrivoId: segment.arrivalStationId, tempoPercorrenzaMinuti: segment.travelTimeMinutes })
+    });
+    if (!res.ok) throw await createApiError(res);
+    return mapApiTrackSegment(await res.json() as ApiTrackSegmentPayload);
+  },
+
+  deleteTrackSegment: async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/tratte-elementari/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw await createApiError(res);
+  },
+
   /**
    * Crea una nuova tratta inviando un payload JSON al backend.
    */
@@ -191,7 +254,7 @@ export const apiClient = {
         treniIds: route.trainIds
       })
     });
-    if (!res.ok) throw new Error('Failed to create route');
+    if (!res.ok) throw await createApiError(res);
     // Il backend risponde col proprio DTO: lo si riporta nella shape Route
     // così id/nome generati lato server finiscono nello stato locale
     return mapApiRoute(await res.json() as ApiRoutePayload);
@@ -212,7 +275,7 @@ export const apiClient = {
         treniIds: route.trainIds
       })
     });
-    if (!res.ok) throw new Error('Failed to update route');
+    if (!res.ok) throw await createApiError(res);
     return mapApiRoute(await res.json() as ApiRoutePayload);
   },
 
@@ -222,7 +285,7 @@ export const apiClient = {
    */
   deleteRoute: async (id: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/tratte/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to delete route');
+    if (!res.ok) throw await createApiError(res);
   },
 
   /**
@@ -279,7 +342,7 @@ export const apiClient = {
         ritardo: train.delayMinutes
       })
     });
-    if (!res.ok) throw new Error('Failed to create train');
+    if (!res.ok) throw await createApiError(res);
   },
 
   /**
@@ -297,7 +360,7 @@ export const apiClient = {
         ritardo: train.delayMinutes
       })
     });
-    if (!res.ok) throw new Error('Failed to update train');
+    if (!res.ok) throw await createApiError(res);
   },
 
   /**
@@ -305,7 +368,7 @@ export const apiClient = {
    */
   deleteTrain: async (id: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/treni/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to delete train');
+    if (!res.ok) throw await createApiError(res);
   },
 
   /**
@@ -324,7 +387,7 @@ export const apiClient = {
         binari: station.platforms
       })
     });
-    if (!res.ok) throw new Error('Failed to create station');
+    if (!res.ok) throw await createApiError(res);
   },
 
   /**
@@ -342,7 +405,7 @@ export const apiClient = {
         binari: station.platforms
       })
     });
-    if (!res.ok) throw new Error('Failed to update station');
+    if (!res.ok) throw await createApiError(res);
   },
 
   /**
@@ -350,7 +413,7 @@ export const apiClient = {
    */
   deleteStation: async (id: string): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/stazioni/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to delete station');
+    if (!res.ok) throw await createApiError(res);
   },
 
   /**

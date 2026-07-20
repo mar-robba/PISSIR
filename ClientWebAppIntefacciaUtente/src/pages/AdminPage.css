@@ -1,0 +1,27 @@
+.admin-table-window {
+  max-height: clamp(23rem, 52vh, 34rem);
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 transparent;
+}
+
+.admin-table-window table { min-width: 670px; }
+
+.admin-table-window td { padding-top: .5rem; padding-bottom: .5rem; }
+
+.admin-table-window th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  box-shadow: 0 1px 0 var(--border-color);
+}
+
+.admin-table-window::-webkit-scrollbar { width: .45rem; height: .45rem; }
+.admin-table-window::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: #94a3b8; }
+.admin-table-window::-webkit-scrollbar-track { background: transparent; }
+
+@media (max-width: 640px) {
+  .admin-table-window { max-height: 58vh; }
+}

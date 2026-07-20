@@ -12,6 +12,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import TrafficMapPage from './pages/TrafficMapPage';
 import RoutesPage from './pages/RoutesPage';
+import TrackSegmentsPage from './pages/TrackSegmentsPage';
 import StationsPage from './pages/StationsPage';
 import TrainsPage from './pages/TrainsPage';
 import AlertsPage from './pages/AlertsPage';
@@ -50,6 +51,7 @@ const RailwayApp = () => {
         <Route index element={<DashboardPage />} />
         <Route path="map" element={<TrafficMapPage />} />
         <Route path="routes" element={<RoutesPage />} />
+        <Route path="tratte" element={<TrackSegmentsPage />} />
         <Route path="stations" element={<StationsPage />} />
         <Route path="trains" element={<TrainsPage />} />
         <Route path="alerts" element={<AlertsPage />} />

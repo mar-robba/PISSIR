@@ -16,12 +16,26 @@ export function useRealtimeUpdates() {
 
     // Sottoscrizione ai vari topic/eventi
     const unsubTelemetry = wsClient.subscribe('TELEMETRY', (data) => {
-      // data.trainId, data.velocita, data.latitudine, data.longitudine, ecc.
+      // Ogni frame contiene anche la stazione da cui il treno è partito e quella
+      // verso cui è diretto: servono alla mappa per scegliere l'arco corretto.
       if (data.trainId) {
+        const originStationId = typeof data.stazioneCorrente === 'string' && data.stazioneCorrente
+          ? data.stazioneCorrente
+          : null;
+        const destinationStationId = typeof data.prossimaStazione === 'string' && data.prossimaStazione
+          ? data.prossimaStazione
+          : null;
+
         updateTrain(data.trainId, {
           progressPercent: data.progressPercent ?? undefined,
           status: mapBackendStatus(data.stato || data.status) as any,
           delayMinutes: data.delayMinutes ?? undefined,
+          // Non sovrascriviamo gli estremi già noti con stringhe vuote.
+          ...(originStationId ? {
+            currentStationId: originStationId,
+            previousStationId: originStationId,
+          } : {}),
+          ...(destinationStationId ? { nextStationId: destinationStationId } : {}),
           lastUpdate: Date.now()
         });
       }

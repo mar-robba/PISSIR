@@ -1,35 +1,172 @@
 import { useRailwayStore } from '../store/railwayStore';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { useState } from 'react';
-import { Train as TrainType, Station } from '../types';
+import { useMemo, useState } from 'react';
+import { Route, Station, TrackSegment, Train as TrainType } from '../types';
+
+type DiagramPoint = { x: number; y: number };
+type GraphEdge = { fromId: string; toId: string; key: string };
+
+const MAP_WIDTH = 600;
+const MAP_HEIGHT = 800;
+const MAP_PADDING = 70;
+
+/**
+ * Restituisce tutti gli archi della rete, senza duplicati e senza dipendere
+ * dalle coordinate GPS. Le tratte fisiche hanno priorità; gli itinerari attivi
+ * completano il grafo quando non esiste ancora una tratta fisica corrispondente.
+ */
+function buildGraphEdges(
+  stations: Station[],
+  routes: Route[],
+  trackSegments: TrackSegment[],
+): GraphEdge[] {
+  const stationIds = new Set(stations.map(({ id }) => id));
+  const edges = new Map<string, GraphEdge>();
+
+  const addEdge = (fromId: string, toId: string) => {
+    if (fromId === toId || !stationIds.has(fromId) || !stationIds.has(toId)) return;
+
+    // Il grafo della mappa è non orientato: A-B è lo stesso arco di B-A.
+    const key = [fromId, toId].sort().join('::');
+    edges.set(key, { fromId, toId, key });
+  };
+
+  trackSegments.forEach(({ departureStationId, arrivalStationId }) => {
+    addEdge(departureStationId, arrivalStationId);
+  });
+
+  routes.filter(({ active }) => active).forEach(({ stationIds }) => {
+    for (let index = 0; index < stationIds.length - 1; index += 1) {
+      addEdge(stationIds[index], stationIds[index + 1]);
+    }
+  });
+
+  return [...edges.values()];
+}
+
+/**
+ * Layout force-directed deterministico: nodi collegati si attraggono, tutti i
+ * nodi si respingono. Di conseguenza una stazione nuova compare sempre e viene
+ * posizionata in funzione degli archi della rete, non di latitudine/longitudine.
+ */
+function calculateGraphLayout(stations: Station[], edges: GraphEdge[]): Map<string, DiagramPoint> {
+  const orderedStations = [...stations].sort((a, b) => a.id.localeCompare(b.id));
+  const positions = new Map<string, DiagramPoint>();
+  const count = orderedStations.length;
+
+  if (count === 0) return positions;
+
+  const centerX = MAP_WIDTH / 2;
+  const centerY = MAP_HEIGHT / 2;
+  const initialRadius = Math.min(230, 70 + count * 15);
+
+  // Posizione iniziale stabile basata sull'ID, poi raffinata dalle forze del grafo.
+  orderedStations.forEach((station, index) => {
+    const angle = (2 * Math.PI * index) / count - Math.PI / 2;
+    positions.set(station.id, {
+      x: centerX + initialRadius * Math.cos(angle),
+      y: centerY + initialRadius * Math.sin(angle),
+    });
+  });
+
+  const desiredEdgeLength = 145;
+  const repulsion = 15000;
+
+  for (let iteration = 0; iteration < 140; iteration += 1) {
+    const displacement = new Map<string, DiagramPoint>(
+      orderedStations.map(({ id }) => [id, { x: 0, y: 0 }]),
+    );
+
+    // Repulsione tra ciascuna coppia: evita sovrapposizioni anche per nodi isolati.
+    for (let first = 0; first < count; first += 1) {
+      for (let second = first + 1; second < count; second += 1) {
+        const firstId = orderedStations[first].id;
+        const secondId = orderedStations[second].id;
+        const firstPoint = positions.get(firstId)!;
+        const secondPoint = positions.get(secondId)!;
+        let dx = firstPoint.x - secondPoint.x;
+        let dy = firstPoint.y - secondPoint.y;
+        let distanceSquared = dx * dx + dy * dy;
+
+        // Direzione deterministica se i due punti coincidono esattamente.
+        if (distanceSquared < 0.01) {
+          dx = first % 2 === 0 ? 1 : -1;
+          dy = second % 2 === 0 ? 1 : -1;
+          distanceSquared = 2;
+        }
+
+        const distance = Math.sqrt(distanceSquared);
+        const force = repulsion / distanceSquared;
+        const firstMove = displacement.get(firstId)!;
+        const secondMove = displacement.get(secondId)!;
+        firstMove.x += (dx / distance) * force;
+        firstMove.y += (dy / distance) * force;
+        secondMove.x -= (dx / distance) * force;
+        secondMove.y -= (dy / distance) * force;
+      }
+    }
+
+    // Attrazione sugli archi: mantiene vicine le stazioni realmente collegate.
+    edges.forEach(({ fromId, toId }) => {
+      const from = positions.get(fromId)!;
+      const to = positions.get(toId)!;
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const force = (distance - desiredEdgeLength) * 0.075;
+      const fromMove = displacement.get(fromId)!;
+      const toMove = displacement.get(toId)!;
+      fromMove.x += (dx / distance) * force;
+      fromMove.y += (dy / distance) * force;
+      toMove.x -= (dx / distance) * force;
+      toMove.y -= (dy / distance) * force;
+    });
+
+    // Raffreddamento progressivo: il layout converge invece di oscillare.
+    const cooling = 0.22 * (1 - iteration / 140) + 0.03;
+    orderedStations.forEach(({ id }) => {
+      const point = positions.get(id)!;
+      const move = displacement.get(id)!;
+      positions.set(id, {
+        x: Math.max(MAP_PADDING, Math.min(MAP_WIDTH - MAP_PADDING, point.x + move.x * cooling)),
+        y: Math.max(MAP_PADDING, Math.min(MAP_HEIGHT - MAP_PADDING, point.y + move.y * cooling)),
+      });
+    });
+  }
+
+  return positions;
+}
 
 export default function TrafficMapPage() {
-  const { stations, trains, routes } = useRailwayStore();
+  const { stations, trains, routes, trackSegments } = useRailwayStore();
   const [selectedTrain, setSelectedTrain] = useState<TrainType | null>(null);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
 
-  const viewBox = "0 0 600 800";
+  // Spazio interno del diagramma SVG; non ha alcuna semantica geografica.
+  const viewBox = `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`;
+  const graphEdges = useMemo(
+    () => buildGraphEdges(stations, routes, trackSegments),
+    [stations, routes, trackSegments],
+  );
+  const graphLayout = useMemo(
+    () => calculateGraphLayout(stations, graphEdges),
+    [stations, graphEdges],
+  );
+  const getCoordinates = (stationId: string): DiagramPoint =>
+    graphLayout.get(stationId) ?? { x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2 };
 
-  const getCoordinates = (stationId: string) => {
-    switch (stationId) {
-      case 'S1': return { x: 150, y: 150 }; // Milano
-      case 'S2': return { x: 250, y: 250 }; // Bologna
-      case 'S3': return { x: 230, y: 350 }; // Firenze
-      case 'S4': return { x: 300, y: 500 }; // Roma
-      case 'S5': return { x: 380, y: 650 }; // Napoli
-      default: return { x: 300, y: 400 };
-    }
-  };
-
-  // Render stations
+  // Crea un gruppo SVG per ogni stazione. Il gruppo viene traslato nel punto
+  // assegnato e, al click, diventa la stazione mostrata nel pannello laterale.
   const renderStations = () => {
     return stations.map(station => {
+      // Rosso per guasta/offline; verde per gli altri stati operativi.
       const isFaulty = station.status === 'guasta' || station.status === 'offline';
       const isSelected = selectedStation?.id === station.id;
       const coords = getCoordinates(station.id);
       
       return (
+        // Il gruppo SVG è cliccabile e contiene simbolo e codice della stazione.
         <g 
           key={station.id} 
           transform={`translate(${coords.x}, ${coords.y})`}
@@ -43,6 +180,7 @@ export default function TrafficMapPage() {
             strokeWidth="3"
             className="transition-all duration-300"
           />
+          {/* Il secondo cerchio pulsante rende immediatamente visibile un guasto. */}
           {isFaulty && (
             <circle r={18} fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping opacity-75" />
           )}
@@ -60,63 +198,50 @@ export default function TrafficMapPage() {
     });
   };
 
-  // Render connections between stations
+  // Disegna gli archi usati anche dal layout automatico delle stazioni.
   const renderConnections = () => {
-    const drawnLines = new Set<string>();
-    const lines: React.ReactNode[] = [];
-    
-    routes.forEach(route => {
-      if (!route.active || !route.stationIds || route.stationIds.length < 2) return;
-      
-      for (let i = 0; i < route.stationIds.length - 1; i++) {
-        const fromId = route.stationIds[i];
-        const toId = route.stationIds[i + 1];
-        const key = [fromId, toId].sort().join('-');
-        
-        if (!drawnLines.has(key)) {
-          drawnLines.add(key);
-          const pos1 = getCoordinates(fromId);
-          const pos2 = getCoordinates(toId);
-          lines.push(
-            <line
-              key={key}
-              x1={pos1.x}
-              y1={pos1.y}
-              x2={pos2.x}
-              y2={pos2.y}
-              stroke="#cbd5e1"
-              strokeWidth="4"
-              strokeLinecap="round"
-            />
-          );
-        }
-      }
+    return graphEdges.map(({ fromId, toId, key }) => {
+      const from = getCoordinates(fromId);
+      const to = getCoordinates(toId);
+      return <line key={key} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#cbd5e1" strokeWidth="4" strokeLinecap="round" />;
     });
-    return lines;
   };
 
-  // Render trains
+  // I treni in viaggio sono interpolati sull'arco; quelli fermi vengono mostrati
+  // nel nodo della stazione corrente, così nessun convoglio localizzabile sparisce.
   const renderTrains = () => {
-    return trains.filter(t => t.status === 'in_viaggio' || t.status === 'in_ritardo').map(train => {
+    return trains.filter(train => train.status !== 'soppresso').map(train => {
       const prevStation = stations.find(s => s.id === train.previousStationId);
       const nextStation = stations.find(s => s.id === train.nextStationId);
+      const currentStation = stations.find(s => s.id === train.currentStationId);
+      const isMoving = train.status === 'in_viaggio' || train.status === 'in_ritardo';
+
+      let position: DiagramPoint | null = null;
+      if (isMoving && prevStation && nextStation) {
+        // Interpolazione lineare: 0% coincide con la stazione precedente,
+        // 100% con la successiva. Il clamp protegge la vista da frame incompleti.
+        const pct = Math.max(0, Math.min(100, train.progressPercent)) / 100;
+        const prevCoords = getCoordinates(prevStation.id);
+        const nextCoords = getCoordinates(nextStation.id);
+        position = {
+          x: prevCoords.x + (nextCoords.x - prevCoords.x) * pct,
+          y: prevCoords.y + (nextCoords.y - prevCoords.y) * pct,
+        };
+      } else if (currentStation) {
+        position = getCoordinates(currentStation.id);
+      }
+
+      // Un treno senza stazione corrente né estremi di tratta non è localizzabile.
+      if (!position) return null;
       
-      if (!prevStation || !nextStation) return null;
-      
-      // Calculate position based on progressPercent (0 to 100)
-      const pct = train.progressPercent / 100;
-      const prevCoords = getCoordinates(prevStation.id);
-      const nextCoords = getCoordinates(nextStation.id);
-      const x = prevCoords.x + (nextCoords.x - prevCoords.x) * pct;
-      const y = prevCoords.y + (nextCoords.y - prevCoords.y) * pct;
-      
-      const isDelayed = train.delayMinutes > 0;
+      const isDelayed = train.delayMinutes > 0 || train.status === 'in_ritardo';
       const isSelected = selectedTrain?.id === train.id;
 
       return (
+        // Il gruppo SVG è cliccabile e contiene simbolo e nome del treno.
         <g 
           key={train.id}
-          transform={`translate(${x}, ${y})`}
+          transform={`translate(${position.x}, ${position.y})`}
           onClick={() => { setSelectedTrain(train); setSelectedStation(null); }}
           className="cursor-pointer transition-all duration-1000"
         >
@@ -157,6 +282,7 @@ export default function TrafficMapPage() {
             </defs>
             <rect x="0" y="0" width="2000" height="2000" fill="url(#grid)" />
             
+            {/* Ordine di rendering: linee sotto, poi stazioni e infine treni in primo piano. */}
             {renderConnections()}
             {renderStations()}
             {renderTrains()}

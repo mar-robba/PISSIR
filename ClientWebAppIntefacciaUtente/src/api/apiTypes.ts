@@ -47,6 +47,13 @@ export interface ApiRoutePayload {
   treniIds?: string[];
 }
 
+export interface ApiTrackSegmentPayload {
+  id: string;
+  stazionePartenzaId: string;
+  stazioneArrivoId: string;
+  tempoPercorrenzaMinuti?: number;
+}
+
 export interface ApiAlertPayload {
   id: string;
   tipo?: string;

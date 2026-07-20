@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRailwayStore } from '../../store/railwayStore';
 import { Station, StationStatus } from '../../types';
 import { X, Save } from 'lucide-react';
@@ -23,6 +23,8 @@ const STATUS_OPTIONS: { value: StationStatus; label: string }[] = [
  */
 export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }: StationEditorModalProps) {
   const { stations, adminCreateStation, adminUpdateStation } = useRailwayStore();
+  const stationsRef = useRef(stations);
+  stationsRef.current = stations;
 
   const [formData, setFormData] = useState<Partial<Station>>({
     id: '',
@@ -36,7 +38,7 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
   useEffect(() => {
     if (isOpen) {
       if (stationIdToEdit) {
-        const existingStation = stations.find(s => s.id === stationIdToEdit);
+        const existingStation = stationsRef.current.find(s => s.id === stationIdToEdit);
         if (existingStation) {
           setFormData({ ...existingStation });
         }
@@ -53,7 +55,7 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
         });
       }
     }
-  }, [isOpen, stationIdToEdit, stations]);
+  }, [isOpen, stationIdToEdit]);
 
   if (!isOpen) return null;
 
