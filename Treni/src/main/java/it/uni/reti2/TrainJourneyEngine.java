@@ -19,6 +19,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+// Schematizza sta roba se no è troppo faticoso da memorizzare  conta è forse l'unico nodo del sistema(un nodo è quella parte che si discosta da sistemi crud basati)
+// disegnati proprio un diagramma a stati finiti cos'ì che possa essere meglio visualizzare le transizioni e dunque schematizzare che così si "eccede per spazio"
 
 /**
  * TrainJourneyEngine è il "digital twin" del treno: un motore a eventi discreti
@@ -75,7 +77,7 @@ public class TrainJourneyEngine {
 
     /** Durata della sosta in stazione, in secondi reali. */
     @ConfigProperty(name = "viaggio.sosta.secondi", defaultValue = "20")
-    long sostaSecondi;
+    long sostaSecondi; //per una più corretta simulazione ogni stazione dovrebbe avere la propria
 
     /**
      * Fattore di accelerazione della simulazione: 1 minuto simulato dura
@@ -151,14 +153,15 @@ public class TrainJourneyEngine {
      * fase corrente della macchina a stati.
      */
     private void tick() {
-        // Richiesta di ricarica arrivata dalla Centrale (ITINERARIO_AGGIORNATO)
+        // Richiesta di ricarica arrivata dalla Centrale (ITINERARIO_AGGIORNATO) lo varia la centrale attraverso il gateway
+        // se si sta richiedendo un nuovo itinerario cancella il precedente
         if (ricaricaItinerarioRichiesta) {
             ricaricaItinerarioRichiesta = false;
             LOG.info("🔄 [TWIN] Itinerario aggiornato dalla Centrale: ricarico e ricomincio il viaggio");
-            trainDB.itinerario = new ArrayList<>();
-            trainDB.itinerarioId = null;
-            viaggioAvviato = false;
-            ultimoTentativoCaricamento = Instant.EPOCH; // riprova subito
+            trainDB.itinerario = new ArrayList<>(); // ?
+            trainDB.itinerarioId = null; // ?
+            viaggioAvviato = false;// ?
+            ultimoTentativoCaricamento = Instant.EPOCH; // riprova subito// un modo più elegante per dire 0 // Istante dell'ultimo tentativo (fallito o no) di caricamento itinerario. */
         }
 
         // Senza itinerario non si viaggia: tenta il caricamento (con retry ogni 15s)
@@ -167,9 +170,10 @@ public class TrainJourneyEngine {
             return;
         }
 
-        // Itinerario pronto ma viaggio non ancora partito
+        // --- inizializzazione delle variabili per la partenza
+        // Itinerario pronto ma viaggio non ancora partito (se l'itinerario non fosse pronto si sabbe usciti prima)
         if (!viaggioAvviato) {
-            if (autostart) {
+            if (autostart) {// nel programma non c'è maniera ancora per cambiare tale variabile
                 avviaViaggio();
             }
             return;
@@ -206,12 +210,14 @@ public class TrainJourneyEngine {
      * itinerario assegnato...) logga e riprova al massimo ogni 15 secondi.
      */
     private void tentaCaricamentoItinerario() {
+        // -- per non intasare il sistema di richieste dell'itinerario
         Instant adesso = Instant.now();
         if (Duration.between(ultimoTentativoCaricamento, adesso).getSeconds() < RETRY_CARICAMENTO_SECONDI) {
             return; // troppo presto per riprovare
         }
         ultimoTentativoCaricamento = adesso;
 
+        // richiesta http
         String url = centraleUrl + "/api/treni/" + trainDB.trenoId + "/itinerario";
         try {
             HttpRequest richiesta = HttpRequest.newBuilder()
@@ -227,10 +233,14 @@ public class TrainJourneyEngine {
                 return;
             }
 
+            // todo: controllla un po meglio come è sto modello che mi sembra un po strano questo inserimento dei dati
+
+            //  --- si riempie il db locale delle informaizoni riguardo alla tratta
             // Parsing della risposta: {"itinerarioId":"...","stazioni":[{...},...]}
             JsonNode radice = objectMapper.readTree(risposta.body());
             List<TrainDB.TappaItinerario> tappe = new ArrayList<>();
-            List<String> soloId = new ArrayList<>();
+            List<String> soloId = new ArrayList<>();// ?
+            // per ogni tappa nel json immetterla nella lista tappe
             for (JsonNode nodo : radice.path("stazioni")) {
                 TrainDB.TappaItinerario tappa = new TrainDB.TappaItinerario(
                         nodo.path("id").asText(),
@@ -242,18 +252,22 @@ public class TrainJourneyEngine {
                 soloId.add(tappa.id);
             }
 
+            // un contrllo del cavolo sulla validità dell'itinerario,  e si dovrebbe attendere che la stazione riflagghi vera la ricaricaItinerarioRichiesta se no il treno rimane fermo
             if (tappe.size() < 2) {
                 LOG.warnf("⚠️ [TWIN] Itinerario con meno di 2 stazioni (%d): impossibile viaggiare, riprovo", tappe.size());
                 return;
             }
-
+            // aggiornamento del db
             trainDB.itinerarioId = radice.path("itinerarioId").asText(null);
-            trainDB.itinerario = tappe;
-            trainDB.stazioniTratta = soloId;
+            trainDB.itinerario = tappe; // perchè è una lista di tappe
+            trainDB.stazioniTratta = soloId; // ma come cazzo lo abbiamo fatto sto modello ??
+
             LOG.infof("🗺️ [TWIN] Itinerario %s caricato: %d stazioni %s",
                     trainDB.itinerarioId, tappe.size(), soloId);
+            // immagino totalmente di best practise, niente manda realmente interrupt a questo thread
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            // sarebbe qualsiasi altra eccezione
         } catch (Exception e) {
             LOG.warnf("⚠️ [TWIN] Centrale non raggiungibile (%s), riprovo tra %ds: %s",
                     url, RETRY_CARICAMENTO_SECONDI, e.getMessage());
@@ -297,9 +311,10 @@ public class TrainJourneyEngine {
     private void tickInStazione() {
         trainDB.velocita = 0;
         if (trainDB.tArrivoInStazione == null
-                || Duration.between(trainDB.tArrivoInStazione, Instant.now()).getSeconds() < sostaCorrenteSecondi) {
+                || Duration.between(trainDB.tArrivoInStazione, Instant.now()).getSeconds() < sostaCorrenteSecondi) { // sostaCorrenteSecondi: hardcoddato nelle proprietà di application.propriety modificate in run allinizione del file
             return; // sosta ancora in corso
         }
+        // cotrollo di robustezza
         if (!"FERMO".equals(trainDB.stato)) {
             return; // solo un treno regolarmente fermo può ripartire
         }
@@ -310,6 +325,7 @@ public class TrainJourneyEngine {
             trainDB.faseViaggio = "TERMINATO"; // non dovrebbe accadere con l'inversione al capolinea
             return;
         }
+
         // Trattenuto in stazione se la corrente o la prossima sono note come guaste
         if (trainDB.stazioniGuaste.contains(corrente.id) || trainDB.stazioniGuaste.contains(prossima.id)) {
             return;
@@ -366,6 +382,9 @@ public class TrainJourneyEngine {
      * @param arrivo Tappa in cui il treno è appena entrato.
      */
     private void arrivoInStazione(TrainDB.TappaItinerario arrivo) {
+        // Pubblica arrivo
+        trainDB.tArrivoInStazione = Instant.now();
+
         boolean andata = "andata".equals(trainDB.direzione);
         trainDB.indiceStazione = andata ? trainDB.indiceStazione + 1 : trainDB.indiceStazione - 1;
         trainDB.latitudine = arrivo.latitudine;
@@ -374,7 +393,7 @@ public class TrainJourneyEngine {
         trainDB.velocita = 0;
         trainDB.stato = "FERMO";
         trainDB.faseViaggio = "IN_STAZIONE";
-        trainDB.tArrivoInStazione = Instant.now();
+
         // Salita/discesa passeggeri simulata a ogni ENTRATA
         trainDB.passeggeri = 50 + random.nextInt(351);
 
@@ -508,6 +527,7 @@ public class TrainJourneyEngine {
      * In andata il tempo è sulla tappa di partenza, al ritorno il segmento è lo
      * stesso dell'andata quindi il tempo sta sulla tappa di arrivo.
      */
+    //?? capire come
     private int tempoTrattaMinuti(TrainDB.TappaItinerario da, TrainDB.TappaItinerario a) {
         int minuti = "andata".equals(trainDB.direzione) ? da.tempoVersoProssimaMinuti : a.tempoVersoProssimaMinuti;
         return Math.max(1, minuti); // mai 0 per evitare divisioni per zero

@@ -1,0 +1,25 @@
+#    -*- mode: org -*-
+
+
+Archived entries from file /home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/doc/considerazioniAggiuntiveAlTestoDElProf.org
+
+
+* Uso dei gateway per la bufferizzazione
+:PROPERTIES:
+:ARCHIVE_TIME: 2026-07-24 ven 11:22
+:ARCHIVE_FILE: ~/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/doc/considerazioniAggiuntiveAlTestoDElProf.org
+:ARCHIVE_OLPATH: Note e caratteristiche che possono essere dimenticate
+:ARCHIVE_CATEGORY: considerazioniAggiuntiveAlTestoDElProf
+:END:
+private void inviaOppureBufferizza(String canale, String payload, Emitter<String> emitter) {
+    if (!dbLocale.connessioneCentrale) {
+        localBuffer.add(canale, payload);  // ← salva in coda locale
+        return;
+    }
+    try {
+        emitter.send(payload);
+    } catch (Exception e) {
+        localBuffer.add(canale, payload);  // ← fallback: buffer locale
+        dbLocale.connessioneCentrale = false;
+    }
+}
