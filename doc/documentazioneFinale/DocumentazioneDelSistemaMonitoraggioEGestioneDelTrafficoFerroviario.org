@@ -229,6 +229,163 @@ MotoreDiViaggio -[hidden]down-> KeepAlive
 [[file:/tmp/babel-3T4YVM/plantuml-CHitGo.png]]
 
 
+*** Della Stazione
+#+begin_src plantuml file: StatiStazione
+@startuml Diagramma degli Stati – Microservizio Stazione (Verifica ID)
+' =========================================================================
+'  Diagramma degli stati del microservizio Stazione, limitato esclusivamente
+'  al ciclo di vita dell'ID passato in input al processo: lettura dell'ID,
+'  verifica della sua esistenza nel database centrale via MQTT (stesso
+'  pattern richiesta/risposta usato dal Treno), e componenti MQTT
+'  (listener/publisher) coinvolti sia lato Stazione sia lato Centrale
+'  Operativa una volta che il processo è stato riconosciuto.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title Diagramma degli Stati – Verifica ID Stazione e Comunicazione con la Centrale
+
+' ===================== AVVIO DEL PROCESSO =====================
+[*] --> AvvioProcesso
+
+state "Avvio Processo\n(main.java)" as AvvioProcesso {
+    state "Lettura args CLI" as LetturaArgs
+    state "ID da args" as IdDaArgs
+    state "Fallback su\nproperty stazione.id" as FallbackProperty
+
+    [*] --> LetturaArgs
+    LetturaArgs --> IdDaArgs : args[0] presente\ne valido
+    LetturaArgs --> FallbackProperty : args vuoti / null /\nstringa \"null\"
+    IdDaArgs --> QuarkusBoot : System.setProperty("stazione.id", id)
+    FallbackProperty --> QuarkusBoot : usa @ConfigProperty\n(default "S1")
+}
+
+state "Quarkus Boot\n(CDI + Reactive Messaging)" as QuarkusBoot
+note right of QuarkusBoot
+  Quarkus avvia il container CDI, inietta i bean
+  (DBLocale, StationDatabaseValidator, StationGateway...)
+  e apre le connessioni MQTT verso il broker.
+end note
+
+QuarkusBoot --> ControlloID
+
+' ===================== VALIDAZIONE ID (via MQTT, come il Treno) =====================
+state "Controllo ID Stazione\n(main.run() + StationDatabaseValidator)" as ControlloID {
+    state "ID presente?" as CheckIDPresente
+    state "Verifica su DB Centrale\n(StationDatabaseValidator)" as VerificaDB
+
+    state "Invio richiesta\nvalidazione MQTT\n-> railway/station/{id}/validation" as InvioValidazione
+    state "Attesa risposta\nCentrale" as AttesaRisposta
+    state "Stazione riconosciuta\n(stazioneRiconosciuta = true)" as Validato
+
+    [*] --> CheckIDPresente
+    CheckIDPresente --> TerminazioneErrore : ID null o vuoto\n(return 1)
+    CheckIDPresente --> VerificaDB : ID impostato
+
+    VerificaDB --> InvioValidazione : esito = RIPROVA\n(primo tentativo /\n>= 15s dall'ultimo)
+    InvioValidazione --> AttesaRisposta
+    AttesaRisposta --> Validato : risposta MQTT\n<- railway/station/{id}/validation-response\nesisteNelDb = true
+    AttesaRisposta --> InvioValidazione : timeout / nessuna risposta\n(retry ogni 15s)
+    AttesaRisposta --> TerminazioneErrore : risposta MQTT:\nesisteNelDb = false\n(ID_NON_PRESENTE)
+}
+
+note right of ControlloID
+  Stesso pattern usato dal Treno: la richiesta di
+  validazione e la relativa risposta viaggiano
+  esclusivamente via MQTT, non via REST.
+  Il loop esterno di main.run() ripete il controllo
+  ogni 5s; StationDatabaseValidator invia una nuova
+  richiesta MQTT solo ogni 15s (throttle interno)
+  finché non arriva una risposta.
+end note
+
+state "Terminazione con Errore\n(return 1)" as TerminazioneErrore
+TerminazioneErrore --> [*]
+
+' ===================== LATO CENTRALE: gestione della richiesta di verifica =====================
+state "Lato Centrale – Verifica ID Stazione\n(ExistIdForEdgeStazione)" as CentraleVerifica {
+    state "Listener MQTT\n<- railway/station/+/validation" as RicezioneRichiesta
+    state "Stazione.findById(id)\nsu DB centrale" as QueryDB
+    state "Publisher MQTT\n-> railway/station/{id}/validation-response\nesisteNelDb = true" as RispostaTrovata
+    state "Publisher MQTT\n-> railway/station/{id}/validation-response\nesisteNelDb = false" as RispostaNonTrovata
+
+    [*] --> RicezioneRichiesta
+    RicezioneRichiesta --> QueryDB
+    QueryDB --> RispostaTrovata : stazione trovata
+    QueryDB --> RispostaNonTrovata : stazione non trovata
+}
+ControlloID -[hidden]right-> CentraleVerifica
+
+note bottom of CentraleVerifica
+  Analogo esatto di ExistIdForEdge (usato per il Treno
+  sul topic railway/train/{id}/validation), ma
+  interroga la tabella Stazione invece di Treno.
+end note
+
+Validato --> ComponentiAttivi : processo avviato correttamente\ningresso nel ciclo infinito keep-alive
+
+' ===================== COMPONENTI MQTT ATTIVI DOPO LA VALIDAZIONE =====================
+state "Componenti Attivi in Background\n(paralleli, indipendenti dallo stato di validazione dell'ID)" as ComponentiAttivi {
+
+    state "LATO STAZIONE" as LatoStazione {
+        state "HeartbeatGenerator\n(publisher, ogni 10s)\n-> railway/station/{id}/heartbeat" as HBOut
+        state "StationGateway.inviaTransito()\n(publisher)\n-> railway/station/{id}/transit" as TransitOut
+        state "StationGateway.inviaGuasto()\n(publisher)\n-> railway/alerts" as AlertOut
+        state "StationGateway.riceviAlert()\n(listener)\n<- railway/alerts" as AlertIn
+        state "StationGateway.riceviPassaggio()\n(listener, wildcard)\n<- railway/train/+/passaggio" as PassaggioIn
+        state "StationIngestion (REST)\nGET localhost:8081/stazione/info" as StationRest
+    }
+
+    state "LATO CENTRALE" as LatoCentrale {
+        state "IngestionService.onHeartbeat()\n(listener)\n<- railway/station/+/heartbeat" as CentraleHBIn
+        state "IngestionService.onTransit()\n(listener)\n<- railway/station/+/transit" as CentraleTransitIn
+        state "IngestionService.onAlert()\n(listener, solo GUASTO)\n<- railway/alerts" as CentraleAlertIn
+        state "IngestionService.onPassaggio()\n(listener)\n<- railway/train/+/passaggio" as CentralePassaggioIn
+        state "RestApiGateway / FaultMonitor\n(publisher: RESOLVED, STOP,\nMAINTENANCE_DISPATCHED)\n-> railway/alerts" as CentraleAlertOut
+    }
+
+    LatoStazione -[hidden]right-> LatoCentrale
+}
+
+note bottom of ComponentiAttivi
+  Questi componenti girano in parallelo grazie a Quarkus
+  Reactive Messaging e non dipendono da uno stato proprio:
+  leggono/scrivono sul DBLocale (lato Stazione) o sul DB
+  centrale + cache RAM (TrafficLogicEngine, lato Centrale).
+  railway/alerts è un topic CONDIVISO: sia la Stazione sia
+  la Centrale vi pubblicano e vi sono sottoscritte,
+  filtrando i messaggi tramite il campo "tipoEvento".
+end note
+
+' ===================== CICLO INFINITO KEEP-ALIVE =====================
+state "Ciclo Infinito Keep-Alive\n(main.run() -> while(true) sleep 1s)" as KeepAlive
+note right of KeepAlive
+  Il thread principale resta in vita con un loop
+  infinito. Tutta la logica è nei bean Quarkus
+  in background (heartbeat, transiti, alert).
+end note
+
+ComponentiAttivi -[hidden]down-> KeepAlive
+
+@enduml
+
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-Ew7jF5/plantuml-cZpx8S.png]]
+
 
 * Progettazione
 ** Modello dati

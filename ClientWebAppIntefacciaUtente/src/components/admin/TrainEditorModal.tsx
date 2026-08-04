@@ -60,7 +60,11 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
         });
       }
     }
-  }, [isOpen, trainIdToEdit, trains]);
+    // Non includiamo "trains" tra le dipendenze: l'array viene ricreato ad ogni
+    // aggiornamento websocket (telemetria) e altrimenti l'effetto si rieseguirebbe
+    // di continuo, azzerando i dati che l'utente sta ancora digitando nel form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, trainIdToEdit]);
 
   if (!isOpen) return null;
 

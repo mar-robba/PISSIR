@@ -62,6 +62,13 @@ public class HeartbeatGenerator implements HeartbeatKA {
      *   tramite il flush reale del Gateway.
      * Se la connessione verso la Centrale è simulata come assente, il battito
      * NON viene emesso (così la Centrale rileva la stazione come OFFLINE).
+     * Allo stesso modo, finché l'ID della stazione non è stato riconosciuto dal
+     * database centrale (validazione MQTT asincrona via StationDatabaseValidator)
+     * nessun battito viene emesso: il tick di Mutiny continua a scattare ogni 10s
+     * in background (costo trascurabile), ma resta filtrato finché
+     * dbLocale.stazioneRiconosciuta non diventa true; al tick successivo alla
+     * conferma l'heartbeat riparte da solo, senza alcun accoppiamento diretto
+     * con StationDatabaseValidator.
      *
      * @return Il flusso dati Multi di Mutiny contenente le stringhe JSON dei battiti cardiaci.
      */
@@ -81,6 +88,15 @@ public class HeartbeatGenerator implements HeartbeatKA {
                         // Reinvia effettivamente gli eventi sugli emitter corretti
                         stationGateway.flush();
                     }
+                })
+                .filter(tick -> {
+                    // ID non ancora validato dalla Centrale: nessun battito finché non arriva
+                    // la conferma via MQTT (StationDatabaseValidator.gestisciRispostaValidazione).
+                    if (!dbLocale.stazioneRiconosciuta) {
+                        LOG.warn("⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.");
+                        return false;
+                    }
+                    return true;
                 })
                 .filter(tick -> {
                     // Rete simulata giù: si salta il battito, la Centrale ci vedrà OFFLINE
@@ -104,6 +120,8 @@ public class HeartbeatGenerator implements HeartbeatKA {
                     dbLocale.connessioneCentrale = false;
                 });
     }
+
+   //boh
 
     /**
      * Controlla la mappa dei sensori monitorati: quelli il cui ultimo battito

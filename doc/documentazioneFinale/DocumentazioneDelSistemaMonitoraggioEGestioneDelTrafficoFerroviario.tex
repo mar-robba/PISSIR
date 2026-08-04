@@ -1,4 +1,4 @@
-% Created 2026-08-04 mar 21:43
+% Created 2026-08-04 mar 23:36
 % Intended LaTeX compiler: pdflatex
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
@@ -33,20 +33,20 @@ C-c C-x v per aprire un'immagine linkata in emacs
 C-c C-, per inserire un blocco di codice velocemente
 C-c C-c per compilare il codice
 \section{Introduzione Descrizione Generale}
-\label{sec:org233220d}
+\label{sec:org195f457}
 Cio che è realizzato è al fine della gestione di una rete ferroviaria e, in particolare, la gestione
 delle stazioni, dei treni che compongono tale rete.
 La gestione della rete è fornita attraverso in un app web che fornisce il neccessarrio per il monitoraggio e l'amiinistrazione della rete
 \section{Specifica}
-\label{sec:org663d71f}
+\label{sec:org22a8ca8}
 Di Quanto il sistema è capace:
 \subsection{Modellazione Per Casi D'uso}
-\label{sec:org1076e8c}
+\label{sec:orgc0dff32}
 \subsubsection{Diagramma dei casi d'uso}
-\label{sec:orgd97059b}
+\label{sec:org9145a5f}
 \begin{enumerate}
 \item Descrizione aggiuntiva
-\label{sec:orga4d5bbe}
+\label{sec:org066332d}
 \begin{center}
 \includegraphics[width=.9\linewidth]{./immagini/diocane.png}
 \end{center}
@@ -55,12 +55,12 @@ Di Quanto il sistema è capace:
 \end{itemize}
 \end{enumerate}
 \subsection{Elenco informale dei requisiti  funzionali}
-\label{sec:orgf7f62b9}
+\label{sec:orgbdaf06a}
 \subsubsection{funzionalita da espletare per ogni componente}
-\label{sec:org250092c}
+\label{sec:orgf3d89d7}
 \begin{enumerate}
 \item microservizio treno
-\label{sec:orgb308a83}
+\label{sec:orgdb800c7}
 \begin{itemize}
 \item aggiornamento tratta
 \begin{itemize}
@@ -83,7 +83,7 @@ formato : boh lo fa l'ai
 \item invio se il treno si guasta alla centrale
 \end{itemize}
 \item microservizio stazione
-\label{sec:orgae06ba2}
+\label{sec:org68fd0f7}
 \begin{itemize}
 \item invio alla centrale i dati del passaggio dei treni
 \begin{itemize}
@@ -95,7 +95,7 @@ poi si aggiorna la ram e si inviano i dati alla stazione centrale per la storici
 descrive la dinamica di gestione
 \end{itemize}
 \item Centrale
-\label{sec:orga6a5c36}
+\label{sec:orgbc3e5e7}
 \begin{itemize}
 \item deve rispondere alle richieste di visualizzazione
 \begin{itemize}
@@ -115,24 +115,30 @@ pubblicare sul topic degli allert generale per tutti i treni o tutte le stazioni
 interrogare il database ogni 10 secondi per ogni tipo di visualizzazione di modo da rendere il ``tempo reale''
 \end{enumerate}
 \subsection{Elenco maggiomente formale dei requisiti}
-\label{sec:org7c9e33b}
+\label{sec:org0f16302}
 \subsection{Diagrammi degli stati}
-\label{sec:org52b7e94}
+\label{sec:org13d519a}
 \subsubsection{Del Treno}
-\label{sec:orge6bdc87}
+\label{sec:orgd307a70}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-3T4YVM/plantuml-K26lQ5.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-Ew7jF5/plantuml-VEV2Gg.png}
+\label{}
+\end{center}
+\subsubsection{Della Stazione}
+\label{sec:org55e7884}
+\begin{center}
+\includegraphics[width=.9\linewidth]{/tmp/babel-Ew7jF5/plantuml-hTzMYc.png}
 \label{}
 \end{center}
 \section{Progettazione}
-\label{sec:org895546a}
+\label{sec:orgbd3f32c}
 \subsection{Modello dati}
-\label{sec:orgf9603f8}
+\label{sec:org989b319}
 \subsection{Diagramma delle componenti}
-\label{sec:org6ce86ff}
+\label{sec:org6f7b2fc}
 \begin{center}
 \includegraphics[width=.9\linewidth]{./immagini/diagrammaDelleComponenti.png}
 \end{center}
 \subsection{Diagramma di sequenza}
-\label{sec:org59db26b}
+\label{sec:orgb0248fd}
 \end{document}
