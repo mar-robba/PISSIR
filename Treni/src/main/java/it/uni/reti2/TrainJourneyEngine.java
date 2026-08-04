@@ -164,6 +164,12 @@ public class TrainJourneyEngine {
             ultimoTentativoCaricamento = Instant.EPOCH; // riprova subito// un modo più elegante per dire 0 // Istante dell'ultimo tentativo (fallito o no) di caricamento itinerario. */
         }
 
+        // Non facciamo nulla finché il treno non è stato validato dal server centrale
+        // o se l'ID del treno non è valido (null o vuoto).
+        if (!trainDB.trenoRiconosciuto || trainDB.trenoId == null || trainDB.trenoId.trim().isEmpty() || "null".equalsIgnoreCase(trainDB.trenoId.trim())) {
+            return;
+        }
+
         // Senza itinerario non si viaggia: tenta il caricamento (con retry ogni 15s)
         if (trainDB.itinerario.isEmpty()) {
             tentaCaricamentoItinerario();

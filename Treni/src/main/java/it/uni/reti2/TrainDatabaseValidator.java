@@ -1,83 +1,123 @@
 package it.uni.reti2;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.eclipse.microprofile.reactive.messaging.Channel;
+import org.eclipse.microprofile.reactive.messaging.Emitter;
+import org.eclipse.microprofile.reactive.messaging.Incoming;
+import org.eclipse.microprofile.reactive.messaging.Message;
 import org.jboss.logging.Logger;
 
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.CompletionStage;
 
-/** Verifica che l'argomento di avvio sia una chiave primaria di Treni.id_convoglio. */
+/**
+ * Verifica che l'ID del treno sia valido tramite messaggistica MQTT.
+ */
 @ApplicationScoped
 public class TrainDatabaseValidator {
 
     private static final Logger LOG = Logger.getLogger(TrainDatabaseValidator.class);
     private static final long RETRY_SECONDI = 15;
 
+    public enum EsitoVerifica {
+        VALIDATO,
+        ID_NON_PRESENTE,
+        RIPROVA
+    }
+
     @Inject
     TrainDB trainDB;
 
-    @ConfigProperty(name = "centrale.url", defaultValue = "https://localhost:8444")
-    String centraleUrl;
-
     @Inject
-    SecureHttpClient secureHttpClient;
+    ObjectMapper mapper;
+
+    // Emitter per l'invio della richiesta di verifica via MQTT
+    @Inject
+    @Channel("validation-request-out")
+    Emitter<String> validationEmitter;
 
     private Instant ultimoTentativo = Instant.EPOCH;
-    private boolean erroreIdGiaSegnalato = false;
+    private volatile EsitoVerifica esitoCorrente = EsitoVerifica.RIPROVA;
 
-    /** @return true solo se l'ID è presente come chiave primaria nel database. */
-    public synchronized boolean verificaSeNecessario() {
-        if (trainDB.trenoRiconosciuto) return true;
+    /**
+     * Verifica lo stato dell'ID. Se la risposta non è ancora arrivata,
+     * invia una richiesta di validazione via MQTT rispettando l'intervallo di retry.
+     */
+    public synchronized EsitoVerifica verificaSeNecessario() {
+        if (trainDB.trenoRiconosciuto || esitoCorrente == EsitoVerifica.VALIDATO) {
+            return EsitoVerifica.VALIDATO;
+        }
+
+        if (esitoCorrente == EsitoVerifica.ID_NON_PRESENTE) {
+            return EsitoVerifica.ID_NON_PRESENTE;
+        }
 
         Instant adesso = Instant.now();
-        if (Duration.between(ultimoTentativo, adesso).getSeconds() < RETRY_SECONDI) return false;
+        if (Duration.between(ultimoTentativo, adesso).getSeconds() < RETRY_SECONDI) {
+            return EsitoVerifica.RIPROVA;
+        }
         ultimoTentativo = adesso;
 
         String idTreno = trainDB.trenoId == null ? "" : trainDB.trenoId.trim();
         if (idTreno.isEmpty()) {
             LOG.error("Impossibile verificare il processo: ID del treno vuoto");
-            return false;
+            return EsitoVerifica.RIPROVA;
         }
 
-        String idCodificato = URLEncoder.encode(idTreno, StandardCharsets.UTF_8).replace("+", "%20");
-        String url = centraleUrl + "/api/treni/" + idCodificato + "/verifica";
+        // Pubblica il messaggio di richiesta sul broker MQTT
+        inviaRichiestaValidazione(idTreno);
+
+        return EsitoVerifica.RIPROVA;
+    }
+
+    private void inviaRichiestaValidazione(String idTreno) {
         try {
-            HttpRequest richiesta = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(5))
-                    .GET()
-                    .build();
-            HttpResponse<Void> risposta = secureHttpClient.get().send(richiesta, HttpResponse.BodyHandlers.discarding());
-            if (risposta.statusCode() == 404) {
-                if (!erroreIdGiaSegnalato) {
-                    LOG.errorf("L'ID '%s' non è una chiave primaria presente nel database: il processo non invierà telemetria.", idTreno);
-                    erroreIdGiaSegnalato = true;
-                }
-                return false;
-            }
-            if (risposta.statusCode() != 200) {
-                LOG.warnf("Verifica dell'ID '%s' non riuscita (HTTP %d); riprovo tra %ds",
-                        idTreno, risposta.statusCode(), RETRY_SECONDI);
-                return false;
-            }
+            ObjectNode payloadJson = mapper.createObjectNode();
+            payloadJson.put("trenoId", idTreno);
 
-            trainDB.trenoRiconosciuto = true;
-            LOG.infof("🚂 Processo associato alla chiave primaria del database: %s", trainDB.trenoId);
-            return true;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
+            validationEmitter.send(payloadJson.toString());
+            LOG.infof("📩 Richiesta di validazione inviata per il treno: %s", idTreno);
         } catch (Exception e) {
-            LOG.warnf("Centrale non raggiungibile durante la verifica dell'ID '%s'; riprovo tra %ds: %s",
+            LOG.warnf("Errore durante l'invio della richiesta MQTT per ID '%s'; riprovo tra %ds: %s",
                     idTreno, RETRY_SECONDI, e.getMessage());
-            return false;
         }
+    }
+
+    /**
+     * Ascolta in modo asincrono la risposta dal server centrale sul canale di validation response.
+     */
+    @Incoming("validation-response-in")
+    public CompletionStage<Void> gestisciRispostaValidazione(Message<byte[]> messaggio) {
+        try {
+            String payload = new String(messaggio.getPayload());
+            JsonNode root = mapper.readTree(payload);
+
+            String trenoIdRisposta = root.has("trenoId") ? root.get("trenoId").asText() : null;
+            String trenoIdCorrente = trainDB.trenoId != null ? trainDB.trenoId.trim() : "";
+
+            // Verifica che la risposta appartenga a questo specifico treno
+            if (trenoIdRisposta != null && trenoIdRisposta.equals(trenoIdCorrente)) {
+                boolean esiste = root.has("esisteNelDb") && root.get("esisteNelDb").asBoolean();
+
+                if (esiste) {
+                    trainDB.trenoRiconosciuto = true;
+                    this.esitoCorrente = EsitoVerifica.VALIDATO;
+                    LOG.infof("🚂 Processo associato con successo alla chiave primaria del database: %s", trenoIdRisposta);
+                } else {
+                    this.esitoCorrente = EsitoVerifica.ID_NON_PRESENTE;
+                    LOG.errorf("❌ L'ID '%s' non è presente nel database centrale: il treno non è registrato.", trenoIdRisposta);
+                }
+            }
+        } catch (JsonProcessingException e) {
+            LOG.error("Errore nel parsing del messaggio di risposta di validazione MQTT", e);
+        }
+
+        return messaggio.ack();
     }
 }

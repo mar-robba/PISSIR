@@ -109,6 +109,7 @@ public class IngestionService {
         // Normalizza eventuali numeri con virgola (es. 44,912444) → 44.912444
         payload = normalizeDecimalComma(payload);
         try {
+
             JsonNode root = mapper.readTree(payload);
             String trenoId = root.has("trenoId") ? root.get("trenoId").asText() : "N/A";
             String nome = root.has("nome") ? root.get("nome").asText() : trenoId;

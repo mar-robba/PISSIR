@@ -688,6 +688,8 @@ public class RestApiGateway {
         return Response.ok(stazione).build();
     }
 
+
+    //------ da riordinare ma per comodità lascerò così
     // ──────────────────────────────────────────────────────────────
     // SUPPORTO AL DIGITAL TWIN DEI TRENI
     // ──────────────────────────────────────────────────────────────

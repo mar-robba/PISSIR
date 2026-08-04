@@ -21,6 +21,9 @@ public class main implements QuarkusApplication {
     @Inject
     TrainDB trainDB;
 
+    @Inject
+    TrainDatabaseValidator trainDatabaseValidator;
+
     public static void main(String[] args) {
         // Validazione dei parametri di input: se l'ID non arriva dagli args
         // NON usciamo (in dev mode gli args non vengono passati) ma facciamo
@@ -48,7 +51,7 @@ public class main implements QuarkusApplication {
     /**
      * Metodo eseguito quando Quarkus è completamente avviato.
      * Mantiene il processo in esecuzione con un ciclo infinito.
-     * @return Codice di uscita (0 = successo)
+     * @return Codice di uscita (0 = successo, 1 = errore)
      */
     @Override
     public int run(String... args) throws Exception {
@@ -57,6 +60,30 @@ public class main implements QuarkusApplication {
         if (TRENO_ID_PARAM != null) {
             trainDB.trenoId = TRENO_ID_PARAM;
         }
+
+        if (trainDB.trenoId == null || trainDB.trenoId.trim().isEmpty()) {
+            LOG.error("ID del treno non impostato: impossibile avviare il processo.");
+            return 1;
+        }
+
+        LOG.infof("🔎 Verifica ID treno '%s' nel database centrale...", trainDB.trenoId);
+        while (true) {
+            TrainDatabaseValidator.EsitoVerifica esito = trainDatabaseValidator.verificaSeNecessario();
+            switch (esito) {
+                case VALIDATO:
+                    break;
+                case ID_NON_PRESENTE:
+                    LOG.error("❌ ERRORE FATALE: ID del treno non presente nel database centrale. " +
+                            "Il processo verrà terminato.");
+                    return 1;
+                case RIPROVA:
+                    LOG.warn("ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...");
+                    Thread.sleep(5000);
+                    continue;
+            }
+            break;
+        }
+
         LOG.info("✅ Processo Treno AVVIATO CORRETTAMENTE");
         LOG.info("🔄 Ingresso nel ciclo infinito di simulazione del treno...");
         LOG.info("🌐 Server REST disponibile su http://localhost:8082/treno/info");

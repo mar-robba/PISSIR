@@ -1,0 +1,138 @@
+% Created 2026-08-04 mar 21:43
+% Intended LaTeX compiler: pdflatex
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\usepackage[newfloat]{minted}
+\author{marco robba}
+\date{\today}
+\title{}
+\hypersetup{
+ pdfauthor={marco robba},
+ pdftitle={},
+ pdfkeywords={},
+ pdfsubject={},
+ pdfcreator={Emacs 30.2 (Org mode 9.7.29)}, 
+ pdflang={English}}
+\begin{document}
+
+\tableofcontents
+
+sas\#+title:Monitoraggio e gestione del traffico ferroviario Documentazione
+// per mermid mettere il codice solo nel file .org e poi usare la foto del mermid compilato nel latex
+C-c C-x v per aprire un'immagine linkata in emacs
+C-c C-, per inserire un blocco di codice velocemente
+C-c C-c per compilare il codice
+\section{Introduzione Descrizione Generale}
+\label{sec:org233220d}
+Cio che è realizzato è al fine della gestione di una rete ferroviaria e, in particolare, la gestione
+delle stazioni, dei treni che compongono tale rete.
+La gestione della rete è fornita attraverso in un app web che fornisce il neccessarrio per il monitoraggio e l'amiinistrazione della rete
+\section{Specifica}
+\label{sec:org663d71f}
+Di Quanto il sistema è capace:
+\subsection{Modellazione Per Casi D'uso}
+\label{sec:org1076e8c}
+\subsubsection{Diagramma dei casi d'uso}
+\label{sec:orgd97059b}
+\begin{enumerate}
+\item Descrizione aggiuntiva
+\label{sec:orga4d5bbe}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./immagini/diocane.png}
+\end{center}
+\begin{itemize}
+\item gestisci <entità> indicherebbe crea enità, elimina entità, aggiungi entità, modifica entità
+\end{itemize}
+\end{enumerate}
+\subsection{Elenco informale dei requisiti  funzionali}
+\label{sec:orgf7f62b9}
+\subsubsection{funzionalita da espletare per ogni componente}
+\label{sec:org250092c}
+\begin{enumerate}
+\item microservizio treno
+\label{sec:orgb308a83}
+\begin{itemize}
+\item aggiornamento tratta
+\begin{itemize}
+\item salvarla in ram per il proprio uso e sul db
+\end{itemize}
+\item gestione causa guasti alla prossima fermata stazione o binario (tratatta ovvero copia di stazioeni)
+\begin{itemize}
+\item ricezione dai sesori --> modifica della percorrenza della tratta, sincronizzazione sui topic di allarme delle
+nuove stazioni
+\begin{itemize}
+\item se arrivano evendi del tipo la prossima stazione è fuori uso aggiornare variabile in rame e il database
+che il treno si è femato e
+\item se l'evento è il ripristino della funzionalità della stazione allora riaggiornare la ram e il db che il
+treno è partito
+\end{itemize}
+\end{itemize}
+\item Ritardi la tratta possiede orari corretti di percorrenza
+\item inviare in certrale l'entrata e uscita da una stazione topic treni/+/passaggio
+formato : boh lo fa l'ai
+\item invio se il treno si guasta alla centrale
+\end{itemize}
+\item microservizio stazione
+\label{sec:orgae06ba2}
+\begin{itemize}
+\item invio alla centrale i dati del passaggio dei treni
+\begin{itemize}
+\item i sensori della stazione informano id treno e se è in entrata o in uscita,
+poi si aggiorna la ram e si inviano i dati alla stazione centrale per la storicizzazione
+\end{itemize}
+\item la staione può perdere la connessione
+ con la centrale nel caso seguire il diagramma degli stati che ne
+descrive la dinamica di gestione
+\end{itemize}
+\item Centrale
+\label{sec:orga6a5c36}
+\begin{itemize}
+\item deve rispondere alle richieste di visualizzazione
+\begin{itemize}
+\item montare su il motore in tepo reale, cicli continui che inviano i dati se la richiesta è ancora attiva
+\end{itemize}
+\item formattare e storicizzare i dati
+\end{itemize}
+L'unica crud a cui serve la propagazinone ai microservizzi è la
+\begin{itemize}
+\item gestione guasti
+\begin{itemize}
+\item se i microservizzi avvertono guasti , aggiornamento del db,
+\item se il tecnico invia l'operatore aggiornare il db di modo che ormai il guasto sia terminato e
+pubblicare sul topic degli allert generale per tutti i treni o tutte le stazioni che quel tale microservizio è stato risolto
+\end{itemize}
+\end{itemize}
+interrogare il database ogni 10 secondi per ogni tipo di visualizzazione di modo da rendere il ``tempo reale''
+\end{enumerate}
+\subsection{Elenco maggiomente formale dei requisiti}
+\label{sec:org7c9e33b}
+\subsection{Diagrammi degli stati}
+\label{sec:org52b7e94}
+\subsubsection{Del Treno}
+\label{sec:orge6bdc87}
+\begin{center}
+\includegraphics[width=.9\linewidth]{/tmp/babel-3T4YVM/plantuml-K26lQ5.png}
+\label{}
+\end{center}
+\section{Progettazione}
+\label{sec:org895546a}
+\subsection{Modello dati}
+\label{sec:orgf9603f8}
+\subsection{Diagramma delle componenti}
+\label{sec:org6ce86ff}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./immagini/diagrammaDelleComponenti.png}
+\end{center}
+\subsection{Diagramma di sequenza}
+\label{sec:org59db26b}
+\end{document}

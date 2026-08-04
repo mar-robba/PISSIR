@@ -11,6 +11,9 @@ public class main implements QuarkusApplication {
     @Inject
     DBLocale dbLocale;
 
+    @Inject
+    StationDatabaseValidator stationDatabaseValidator;
+
     private static final Logger LOG = Logger.getLogger(main.class);
     private static String STAZIONE_ID_PARAM;
 
@@ -36,6 +39,30 @@ public class main implements QuarkusApplication {
         if (STAZIONE_ID_PARAM != null) {
             dbLocale.stazioneId = STAZIONE_ID_PARAM;
         }
+
+        if (dbLocale.stazioneId == null || dbLocale.stazioneId.trim().isEmpty()) {
+            LOG.error("ID della stazione non impostato: impossibile avviare il processo.");
+            return 1;
+        }
+
+        LOG.infof("🔎 Verifica ID stazione '%s' nel database centrale...", dbLocale.stazioneId);
+        while (true) {
+            StationDatabaseValidator.EsitoVerifica esito = stationDatabaseValidator.verificaSeNecessario();
+            switch (esito) {
+                case VALIDATO:
+                    break;
+                case ID_NON_PRESENTE:
+                    LOG.error("❌ ERRORE FATALE: ID della stazione non presente nel database centrale. " +
+                            "Il processo verrà terminato.");
+                    return 1;
+                case RIPROVA:
+                    LOG.warn("ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...");
+                    Thread.sleep(5000);
+                    continue;
+            }
+            break;
+        }
+
         LOG.info("✅ Processo Stazione AVVIATO CORRETTAMENTE");
         LOG.info("🔄 Ingresso nel ciclo infinito di mantenimento del nodo Stazione...");
         LOG.info("🌐 Server REST disponibile su http://localhost:8081/stazione/info");

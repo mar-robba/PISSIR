@@ -1,7 +1,9 @@
 /home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/Stazioni/src/main/java/it/uni/reti2/StationGateway.java
 /home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/Stazioni/src/main/java/it/uni/reti2/StationIngestion.java
+/home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/Stazioni/src/main/java/it/uni/reti2/StationDatabaseValidator.java
 /home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/Stazioni/src/main/java/it/uni/reti2/HeartbeatGenerator.java
 /home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/Stazioni/src/main/java/it/uni/reti2/main.java
 /home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/Stazioni/src/main/java/it/uni/reti2/DBLocale.java
 /home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/Stazioni/src/main/java/it/uni/reti2/LocalBuffer.java
+/home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/Stazioni/src/main/java/it/uni/reti2/SecureHttpClient.java
 /home/marco/Marco/Uni/Anno_3/reti2/progetto/corretto/codice/MonitoraggioEGestioneDelTrafficoFerroviario/Stazioni/src/main/java/it/uni/reti2/HeartbeatKA.java

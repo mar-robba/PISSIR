@@ -48,23 +48,6 @@ while (it.hasNext()) {
 }
 ```
 
----
-
-### B002 - Classe `Sensori` inesistente (Deployment Error)
-
-**File:** `Treni/src/main/java/it/uni/reti2/main.java`
-
-```java
-@Inject
-Sensori sensori;
-```
-
-**Problema:** La classe `Sensori` non esiste in nessun package del progetto. Quarkus lancia `UnsatisfiedResolutionException` al deploy, impedendo l'avvio del processo Treno.
-
-**Soluzione:** Creare la classe `Sensori` mancante oppure rimuovere iniezione e logica di simulazione sensori.
-
----
-
 ### B003 - Sovrascrittura timestamp guasti all'avvio (Data Corruption)
 
 **File:** `ServeCentraleOperativa/src/main/java/it/uni/reti2/elaboration/TrafficLogicEngine.java`

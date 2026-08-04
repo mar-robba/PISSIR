@@ -1,0 +1,209 @@
+@startuml Diagramma degli Stati – Microservizio Treno
+' =========================================================================
+'  Diagramma degli stati del microservizio Treno
+'  Descrive l'intero ciclo di vita del processo: dall'avvio (con o senza ID)
+'  fino alla terminazione o al ciclo continuo di simulazione.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title Diagramma degli Stati – Ciclo di Vita del Microservizio Treno
+
+' ===================== AVVIO DEL PROCESSO =====================
+[*] --> AvvioProcesso
+
+state "Avvio Processo\n(main.java)" as AvvioProcesso {
+    state "Lettura args CLI" as LetturaArgs
+    state "ID da args" as IdDaArgs
+    state "Fallback su\nproperty treno.id" as FallbackProperty
+
+    [*] --> LetturaArgs
+    LetturaArgs --> IdDaArgs : args[0] presente\ne valido
+    LetturaArgs --> FallbackProperty : args vuoti / null /\nstringa \"null\"
+    IdDaArgs --> QuarkusBoot : System.setProperty("treno.id", id)
+    FallbackProperty --> QuarkusBoot : usa @ConfigProperty
+}
+
+state "Quarkus Boot\n(CDI + Reactive Messaging)" as QuarkusBoot
+note right of QuarkusBoot
+  Quarkus avvia il container CDI,
+  inietta i bean (@ApplicationScoped)
+  e apre le connessioni MQTT.
+end note
+
+QuarkusBoot --> ControlloID
+
+' ===================== VALIDAZIONE ID =====================
+state "Controllo ID Treno\n(main.run())" as ControlloID {
+    state "ID presente?" as CheckIDPresente
+    state "Verifica su DB Centrale\n(TrainDatabaseValidator)" as VerificaDB
+
+    state "Invio richiesta\nvalidazione MQTT" as InvioValidazione
+    state "Attesa risposta\nCentrale" as AttesaRisposta
+    state "Treno riconosciuto\n(trenoRiconosciuto = true)" as Validato
+
+    [*] --> CheckIDPresente
+    CheckIDPresente --> TerminazioneErrore : ID null o vuoto\n(return 1)
+    CheckIDPresente --> VerificaDB : ID impostato
+
+    VerificaDB --> InvioValidazione : esito = RIPROVA\n(primo tentativo)
+    InvioValidazione --> AttesaRisposta
+    AttesaRisposta --> Validato : risposta MQTT:\nesisteNelDb = true
+    AttesaRisposta --> InvioValidazione : timeout / centrale\nirraggiungibile\n(retry ogni 15s)
+    AttesaRisposta --> TerminazioneErrore : risposta MQTT:\nesisteNelDb = false\n(ID_NON_PRESENTE)
+}
+
+state "Terminazione con Errore\n(return 1)" as TerminazioneErrore
+TerminazioneErrore --> [*]
+
+Validato --> MotoreDiViaggio : trenoRiconosciuto = true\nTick reattivo ogni 1s avviato
+
+' ===================== MOTORE DI VIAGGIO (TrainJourneyEngine) =====================
+state "Motore di Viaggio – Digital Twin\n(TrainJourneyEngine)" as MotoreDiViaggio {
+
+    ' --- Caricamento itinerario ---
+    state "Attesa Itinerario" as AttesaItinerario
+    note left of AttesaItinerario
+      GET /api/treni/{id}/itinerario
+      verso la Centrale Operativa.
+      Retry ogni 15s se fallisce.
+    end note
+
+    state "Itinerario Caricato\n(≥ 2 stazioni)" as ItinerarioCaricato
+
+    state "Avvio Viaggio\n(avviaViaggio())" as AvvioViaggio
+    note right of AvvioViaggio
+      Posiziona il treno alla prima
+      stazione, stato = FERMO,
+      faseViaggio = IN_STAZIONE,
+      genera passeggeri iniziali.
+    end note
+
+    ' --- Ciclo di simulazione (macchina a stati) ---
+    state "Ciclo di Simulazione\n(tick ogni 1s)" as CicloSimulazione {
+
+        state "IN_STAZIONE\n(FERMO)" as InStazione
+        note bottom of InStazione
+          Attende scadenza sosta.
+          Non parte se stazione
+          corrente/prossima guasta.
+          Sosta doppia al capolinea.
+        end note
+
+        state "IN_VIAGGIO" as InViaggio
+        note bottom of InViaggio
+          Interpola GPS tra le due
+          stazioni, avanza il
+          progressPercent con il
+          tempo scalato dal fattore
+          di accelerazione.
+        end note
+
+        state "BLOCCATO\nGUASTO STAZIONE" as Bloccato
+        note bottom of Bloccato
+          Treno fermo, accumula
+          ritardo. Congela il
+          progressPercent se
+          bloccato a metà tratta.
+        end note
+
+        state "EMERGENZA\n(guasto di bordo)" as Emergenza
+        note bottom of Emergenza
+          Guasto rilevato dai sensori.
+          Viaggio congelato: il tempo
+          di tratta non avanza.
+          Velocità = 0.
+        end note
+
+        state "SOPPRESSO" as Soppresso
+        note bottom of Soppresso
+          Stato definitivo.
+          Corsa cancellata dalla
+          Centrale (alert STOP).
+          faseViaggio = TERMINATO.
+        end note
+
+        state "Inversione al\nCapolinea" as Inversione
+
+        ' --- Transizioni principali ---
+        [*] --> InStazione
+
+        InStazione --> InViaggio : sosta scaduta\n+ stato = FERMO\n+ nessuna stazione guasta\n[pubblica USCITA MQTT]
+        InViaggio --> InStazione : progressPercent ≥ 100%\n(arrivo in stazione)\n[pubblica ENTRATA MQTT]
+
+        ' --- Inversione ---
+        InStazione --> Inversione : arrivo al capolinea\n(ultimo/primo indice)
+        Inversione --> InStazione : direzione invertita\n(andata ↔ ritorno)\nsosta doppia
+
+        ' --- Guasto stazione ---
+        InStazione --> Bloccato : alert GUASTO CRITICAL\nstazione corrente/prossima
+        InViaggio --> Bloccato : alert GUASTO CRITICAL\nstazione corrente/prossima
+        Bloccato --> InStazione : alert RESOLVED\n(ero IN_STAZIONE)
+        Bloccato --> InViaggio : alert RESOLVED\n(ero IN_VIAGGIO)
+
+        ' --- Emergenza di bordo ---
+        InStazione --> Emergenza : sensore rileva guasto\n[inviaGuasto() MQTT]
+        InViaggio --> Emergenza : sensore rileva guasto\n[inviaGuasto() MQTT]
+        Emergenza --> InStazione : alert RESOLVED\nper questo TRENO\n(stato → FERMO)
+        Emergenza --> InViaggio : alert RESOLVED\nper questo TRENO\n(stato → FERMO,\nriprende la marcia)
+
+        ' --- Soppressione ---
+        InStazione --> Soppresso : alert STOP target = trenoId
+        InViaggio --> Soppresso : alert STOP target = trenoId
+        Bloccato --> Soppresso : alert STOP target = trenoId
+        Emergenza --> Soppresso : alert STOP target = trenoId
+        Soppresso --> [*] : TERMINATO\n(il tick non fa più nulla)
+    }
+
+    ' --- Transizioni esterne al ciclo ---
+    [*] --> AttesaItinerario
+    AttesaItinerario --> AttesaItinerario : Centrale irraggiungibile /\nHTTP != 200 /\n< 2 stazioni\n(retry ogni 15s)
+    AttesaItinerario --> ItinerarioCaricato : HTTP 200 +\nparsing JSON OK
+    ItinerarioCaricato --> AvvioViaggio : autostart = true
+    AvvioViaggio --> CicloSimulazione
+
+    ' --- Ricarica itinerario ---
+    CicloSimulazione --> AttesaItinerario : alert ITINERARIO_AGGIORNATO\n(reset completo,\nricarica dalla Centrale)
+}
+
+' ===================== COMPONENTI IN BACKGROUND =====================
+state "Componenti Attivi in Background\n(paralleli al ciclo di simulazione)" as Background {
+    state "TrainElab\n(telemetria MQTT\nogni 5s)" as Telemetria
+    state "TrainGateway\n(listener alert\nMQTT in ingresso)" as Gateway
+    state "TrainIngestion\n(API REST\nhttp://localhost:8082)" as Ingestion
+}
+
+note bottom of Background
+  Questi componenti girano in parallelo
+  grazie a Quarkus Reactive Messaging.
+  Non hanno stati propri: leggono/scrivono
+  sul TrainDB condiviso e interagiscono
+  con il TrainJourneyEngine.
+end note
+
+MotoreDiViaggio -[hidden]right-> Background
+
+' ===================== CICLO INFINITO KEEP-ALIVE =====================
+state "Ciclo Infinito Keep-Alive\n(main.run() → while(true) sleep 1s)" as KeepAlive
+note right of KeepAlive
+  Il thread principale resta in
+  vita con un loop infinito.
+  Tutta la logica è nei bean
+  Quarkus in background.
+end note
+
+MotoreDiViaggio -[hidden]down-> KeepAlive
+
+@enduml

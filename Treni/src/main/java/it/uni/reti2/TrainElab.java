@@ -19,7 +19,7 @@ import java.util.Locale;
  */
 @ApplicationScoped
 public class TrainElab {
-    // boh
+
     private static final Logger LOG = Logger.getLogger(TrainElab.class);
 
     /**

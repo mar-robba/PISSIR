@@ -1,4 +1,5 @@
-# Lavoro Svolto — riepilogo completo delle modifiche (sessione 2026-07-19)
+# Lavoro Svolto — riepilogo completo delle modifiche (sessione 2026-07-19 Claude code)
+
 
 Questo documento riassume TUTTO ciò che è stato fatto sul progetto in questa sessione:
 i bug trovati, le funzionalità aggiunte, i file toccati e lo stato di verifica.

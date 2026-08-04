@@ -28,6 +28,8 @@ public class TrainDB {
     @ConfigProperty(name = "treno.id", defaultValue = "TRN001")
     public String trenoId;
 
+    public boolean trenoRiconosciuto = false;
+
     /**
      * Stato corrente del treno.
      * Valori possibili previsti dalla logica di business:

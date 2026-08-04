@@ -34,6 +34,7 @@ public class Sensori {
 
             switch (scelta) {
                 case "1" -> simulaGuasto(scanner);
+                // dovrebbe essere fatto dal treinjourneyengine, potrebbe creare errori di robustezza
                 case "2" -> simulaPassaggio(scanner);
                 case "0", "q", "Q" -> attivo = false;
                 default -> System.out.println("Scelta non valida.");

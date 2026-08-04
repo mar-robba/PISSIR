@@ -1,7 +1,12 @@
 it/uni/reti2/TrainDB.class
 it/uni/reti2/main.class
 it/uni/reti2/TrainGateway.class
+it/uni/reti2/SecureHttpClient.class
+it/uni/reti2/TrainDatabaseValidator$EsitoVerifica.class
 it/uni/reti2/TrainDB$TappaItinerario.class
 it/uni/reti2/TrainElab.class
+it/uni/reti2/Sensori.class
 it/uni/reti2/TrainIngestion.class
+it/uni/reti2/TrainDatabaseValidator.class
 it/uni/reti2/TrainJourneyEngine.class
+it/uni/reti2/main$1.class

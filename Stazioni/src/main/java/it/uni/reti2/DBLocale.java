@@ -6,6 +6,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+// da spostare in un sqlite per maggiore resilienza nel caso di un fault energetico da parte della stazione
 
 /**
  * DBLocale funge da archivio di stato in-memory per il nodo Stazione.
@@ -15,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @ApplicationScoped
 public class DBLocale {
-    
+
     /**
      * Identificativo univoco della stazione.
      * Recuperato dalle properties di configurazione (es. application.properties).
@@ -29,8 +30,11 @@ public class DBLocale {
      * - "ONLINE": stazione operativa, binari liberi da guasti.
      * - "GUASTA": stazione inagibile (es. guasto ai sistemi di terra).
      */
-    public String stato = "ONLINE"; 
-    
+    public String stato = "ONLINE";
+
+    // per il riconoscimento della stazione
+    public boolean stazioneRiconosciuta = false ;
+
     /**
      * Flag booleano che indica se la connessione verso il sistema centrale (Centrale Operativa)
      * è attualmente attiva e funzionante. Viene utilizzato per gestire le logiche di buffering
