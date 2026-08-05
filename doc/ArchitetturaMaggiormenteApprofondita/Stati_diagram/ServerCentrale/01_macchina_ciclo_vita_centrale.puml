@@ -1,0 +1,122 @@
+@startuml M1 - Ciclo di Vita del Processo Centrale Operativa
+' =========================================================================
+'  MACCHINA M1 - Ciclo di vita del processo della Centrale Operativa
+'
+'  Codice astratto:
+'    it.uni.reti2.main                                (@QuarkusMain)
+'    it.uni.reti2.elaboration.TrafficLogicEngine#onStart  (@Observes StartupEvent)
+'    src/main/resources/application.properties        (canali MQTT e datasource)
+'
+'  E' la macchina RADICE: quando entra nello stato "Servizio Operativo"
+'  fa partire in parallelo tutte le altre macchine del componente.
+'  Indice generale: 00_mappa_delle_macchine.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M1 - Ciclo di Vita del Processo Centrale Operativa (main + TrafficLogicEngine)
+
+[*] --> AvvioProcesso
+
+state "Avvio Processo\n(main.main() -> Quarkus.run(main.class, args))" as AvvioProcesso
+
+state "Boot Quarkus\n(container CDI)" as BootQuarkus {
+    state "Apertura Datasource\njdbc:postgresql://localhost:5432/railway\n(hibernate generation = update)" as Datasource
+    state "Apertura connettori MQTT\nverso Mosquitto :1883\n(:8883 col profilo tls)" as Connettori
+    state "Pubblicazione endpoint\nREST :8781/api\nWebSocket /ws/realtime" as EndpointHttp
+
+    [*] --> Datasource
+    Datasource --> Connettori
+    Connettori --> EndpointHttp
+}
+
+AvvioProcesso --> BootQuarkus
+
+note right of BootQuarkus
+  I canali dichiarati in application.properties sono 10:
+   IN  validation-in, validation-station-in, telemetry-in,
+       heartbeat-in, transit-in, passaggio-in, alerts-in
+   OUT validation-response, validation-station-response,
+       alerts-out
+end note
+
+state "Inizializzazione Cache in RAM\n(TrafficLogicEngine.onStart, @Transactional)" as InitCache {
+    state "Carica Stazioni\n(stato runtime = OFFLINE,\nultimoHeartbeat = null)" as CaricaStazioni
+    state "Carica Treni\n(ultimoAggiornamento = now)" as CaricaTreni
+    state "Carica Guasti con risolto = false\n(default per le righe vecchie)" as CaricaGuasti
+
+    [*] --> CaricaStazioni
+    CaricaStazioni --> CaricaTreni
+    CaricaTreni --> CaricaGuasti
+}
+
+BootQuarkus --> InitCache : StartupEvent
+
+note left of InitCache
+  All'avvio nessuna stazione viene marcata ONLINE:
+  finche' non arriva il primo heartbeat resta OFFLINE
+  con ultimoHeartbeat nullo. Il watchdog (M8) salta
+  le stazioni che non hanno mai battuto, quindi non
+  apre falsi guasti. Vedi M12.
+end note
+
+' ===================== SERVIZIO A REGIME =====================
+state "Servizio Operativo\n(main.run() -> while(true) Thread.sleep(1000))" as ServizioOperativo {
+
+    state "Cache RAM condivisa\n(TrafficLogicEngine:\ntreni, stazioni, guastiAttivi -\nConcurrentHashMap)" as Cache
+    state "Database PostgreSQL\n(entita' Panache + storici)" as DatabaseCentrale
+
+    --
+
+    state "M2 - Validazione ID dei nodi di campo\n(02_macchina_validazione_id_edge.puml)" as M2 <<esterna>>
+    state "M3 - Ingestione telemetria treno\n(03_macchina_ingestione_telemetria.puml)" as M3 <<esterna>>
+    state "M4 - Ingestione heartbeat stazione\n(04_macchina_ingestione_heartbeat.puml)" as M4 <<esterna>>
+    state "M5 - Ingestione transiti e passaggi\n(05_macchina_ingestione_transiti.puml)" as M5 <<esterna>>
+    state "M6 - Ingestione allarmi dal campo\n(06_macchina_ingestione_allarmi.puml)" as M6 <<esterna>>
+
+    --
+
+    state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+    state "M9 - Sessione e autorizzazione\n(09_macchina_sessione_autorizzazione.puml)" as M9 <<esterna>>
+    state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+    state "M11 - Canale WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
+}
+
+InitCache --> ServizioOperativo : cache pronta\n(log: Centrale Operativa AVVIATA)
+
+note bottom of ServizioOperativo
+  Il main NON fa lavoro utile: il ciclo di sleep serve solo
+  a tenere vivo il processo. Tutta l'elaborazione avviene
+  nelle macchine da M2 a M11, che girano in parallelo sui
+  thread dei connettori reattivi, dello scheduler e delle
+  richieste HTTP, e comunicano solo attraverso la cache RAM
+  e il database.
+end note
+
+state "Arresto del processo\n(SIGTERM / Ctrl-C)" as Arresto
+ServizioOperativo --> Arresto : richiesta di spegnimento
+Arresto --> [*] : chiusura canali MQTT,\nsessioni WebSocket e datasource
+
+note right of Arresto
+  Le sessioni di login (M9) stanno solo in RAM:
+  allo spegnimento tutti i token vengono persi
+  e gli operatori devono rifare il login.
+end note
+
+@enduml

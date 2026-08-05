@@ -231,7 +231,9 @@ public class StationGateway {
      * Svuota il buffer locale reinviando ogni evento pendente sull'emitter corretto
      * (transit o alert) in ordine FIFO. Da chiamare quando la connessione verso
      * la Centrale torna disponibile. Se un invio fallisce l'evento viene rimesso
-     * in coda e il flush si interrompe (si riproverà al prossimo giro).
+     * IN TESTA al buffer e il flush si interrompe (si riproverà al prossimo giro):
+     * rimetterlo in fondo lo farebbe diventare il più recente e la Centrale
+     * potrebbe ricevere l'USCITA di un treno prima della sua ENTRATA.
      */
     public void flush() {
         while (!localBuffer.isEmpty()) {
@@ -247,9 +249,9 @@ public class StationGateway {
                 }
                 LOG.infof("📤 Re-invio dal buffer [%s]: %s", evento.canale(), evento.payload());
             } catch (Exception e) {
-                LOG.error("🔌 Flush interrotto: connessione ancora assente, evento rimesso in coda.");
-                // L'evento non è partito: torna in coda e si riproverà più avanti
-                localBuffer.add(evento.canale(), evento.payload());
+                LOG.error("🔌 Flush interrotto: connessione ancora assente, evento rimesso in testa.");
+                // L'evento non è partito: torna davanti a tutti (mantiene l'ordine cronologico)
+                localBuffer.addFirst(evento.canale(), evento.payload());
                 dbLocale.connessioneCentrale = false;
                 break;
             }

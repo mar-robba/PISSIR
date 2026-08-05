@@ -129,7 +129,7 @@ export default function DashboardPage() {
                   
                   return (
                     <tr key={train.id}>
-                      <td className="font-medium font-mono">{train.convoglio}</td>
+                      <td className="font-medium font-mono">{train.id}</td>
                       <td>
                         <div className="flex items-center gap-2">
                           <span className={`status-indicator status-pulse ${train.status === 'in_ritardo' ? 'status-guasta' : 'status-operativa'}`}></span>

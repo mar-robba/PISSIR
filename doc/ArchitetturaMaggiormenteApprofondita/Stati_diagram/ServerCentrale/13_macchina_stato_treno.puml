@@ -1,0 +1,136 @@
+@startuml M13 - Stato del Treno visto dalla Centrale
+' =========================================================================
+'  MACCHINA M13 - Stato di un TRENO come lo registra la Centrale
+'
+'  Codice astratto:
+'    it.uni.reti2.entity.Treno#stato (colonna Treni.stato, con CHECK)
+'    IngestionService#normalizzaStatoTreno, #salvaStatoTreno
+'    RestApiGateway#createTreno, #updateTreno, #sopprimiTreno, #deleteTreno
+'    FaultMonitor#controllaTreniFermi
+'
+'  Gli stati canonici sono i quattro ammessi dal CHECK sulla colonna:
+'    attivo | fermo | rotto | in manutenzione
+'  La macchina a stati "ricca" del convoglio (IN_VIAGGIO, BLOCCATO,
+'  EMERGENZA, ...) vive nel componente Treno: qui si vede solo la sua
+'  proiezione sul database centrale.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M13 - Stato del Treno registrato dalla Centrale (colonna Treni.stato)
+
+[*] --> fermo : M10 - POST /api/treni\n(creato dall'amministratore,\nstato di default "fermo")
+
+state "fermo\n(convoglio in sosta\no non ancora partito)" as fermo
+state "attivo\n(convoglio in marcia)" as attivo
+state "rotto\n(emergenza dichiarata\ndal digital twin)" as rotto
+state "in manutenzione\n(corsa soppressa)" as manutenzione
+
+' ---------- TRANSIZIONI GUIDATE DALLA TELEMETRIA (M3) ----------
+fermo --> attivo : M3 - telemetria stato = IN_VIAGGIO\n[normalizzato in "attivo"\n+ Storico_Stato_Treni]
+attivo --> fermo : M3 - telemetria stato = FERMO
+attivo --> rotto : M3 - telemetria stato = EMERGENZA
+fermo --> rotto : M3 - telemetria stato = EMERGENZA
+rotto --> attivo : M3 - guasto risolto,\nil treno riprende la marcia
+rotto --> fermo : M3 - guasto risolto,\ntreno ancora in sosta
+attivo --> manutenzione : M3 - telemetria stato = SOPPRESSO
+fermo --> manutenzione : M3 - telemetria stato = SOPPRESSO
+
+note right of attivo
+  Qualunque valore non riconosciuto (o il campo "stato"
+  assente nel frame) viene normalizzato in "fermo": la
+  colonna ha un CHECK e uno stato inventato avrebbe fatto
+  fallire il commit, con l'effetto - prima delle correzioni -
+  di spegnere l'intero canale telemetry-in.
+end note
+
+note left of fermo
+  Lo storico (Storico_Stato_Treni) si scrive SOLO quando lo
+  stato cambia davvero: altrimenti sarebbe una riga ogni
+  5 secondi per ogni convoglio.
+end note
+
+' ---------- COMANDO DELL'OPERATORE (M10) ----------
+attivo --> manutenzione : M10 - POST /api/treni/{id}/sopprimi\n[DB: "in manutenzione",\ncache: "SOPPRESSO", velocita = 0\n+ STOP su railway/alerts]
+fermo --> manutenzione : M10 - POST /api/treni/{id}/sopprimi
+rotto --> manutenzione : M10 - POST /api/treni/{id}/sopprimi
+
+note bottom of manutenzione
+  Attenzione alla doppia denominazione: il comando "sopprimi"
+  scrive "in manutenzione" sul DB (valore ammesso dal CHECK)
+  ma mette "SOPPRESSO" nella copia in cache, che e' quella
+  che le API REST restituiscono al frontend. Il valore torna
+  allineato al primo frame di telemetria successivo, perche'
+  M3 normalizza SOPPRESSO -> "in manutenzione".
+end note
+
+' ---------- MODIFICA DALL'AMMINISTRAZIONE ----------
+state "Forzatura dall'amministrazione\nPUT /api/treni/{id}\n(stato normalizzato in minuscolo,\nil nome del convoglio NON e' modificabile)" as Forzatura <<esterna>>
+Forzatura -[dashed]-> fermo
+Forzatura -[dashed]-> attivo
+
+' ---------- ANOMALIA RILEVATA DAL WATCHDOG ----------
+state "Anomalia 'treno fermo'\n(guasto warning aperto da M8)" as Anomalia <<esterna>>
+attivo -[dashed]-> Anomalia : attivo ma velocita = 0\n(o telemetria piu' vecchia di 90s)\nE fuori da ogni stazione
+
+note right of Anomalia
+  Il watchdog NON cambia lo stato del treno: apre solo un
+  guasto di tipo treno_fermo con severita' warning. Lo stato
+  resta "attivo" finche' non arriva una telemetria diversa
+  o un comando dell'operatore.
+end note
+
+' ---------- DATI DI CONTORNO ----------
+state "Dati aggiornati insieme allo stato\n(campi volatili, solo in cache)" as DatiVolatili {
+    state "posizione GPS, velocita,\nprogressPercent, ritardo,\npasseggeri, direzione\n(da M3)" as DaTelemetria
+    state "stazioneCorrente, prossimaStazione,\nposizioneAttualeTratta\n(da M5, quest'ultima persistita)" as DaPassaggi
+}
+
+attivo -[dotted]-> DatiVolatili
+fermo -[dotted]-> DatiVolatili
+
+' ---------- FINE VITA ----------
+state "Treno eliminato\nDELETE /api/treni/{id}\n(cancella a cascata gli storici\n+ STOP su railway/alerts)" as Eliminato
+fermo --> Eliminato : M10
+attivo --> Eliminato : M10
+manutenzione --> Eliminato : M10
+rotto --> Eliminato : M10
+Eliminato --> [*] : rimosso da DB e cache\n(da quel momento la sua telemetria\nviene scartata da M3)
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M3 - Ingestione telemetria\n(03_macchina_ingestione_telemetria.puml)" as M3 <<esterna>>
+state "M5 - Ingestione transiti e passaggi\n(05_macchina_ingestione_transiti.puml)" as M5 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+state "M2 - Validazione ID dei nodi\n(02_macchina_validazione_id_edge.puml)" as M2 <<esterna>>
+
+M3 -[hidden]right-> M5
+M5 -[hidden]right-> M8
+M8 -[hidden]right-> M10
+M10 -[hidden]right-> M2
+
+note bottom of M2
+  Un treno esiste per la Centrale solo se e' stato creato
+  dall'amministrazione (M10): e' questa riga che M2 cerca
+  quando il processo del convoglio chiede di essere ammesso,
+  ed e' la stessa che M3 pretende in cache per accettarne
+  la telemetria.
+end note
+
+@enduml

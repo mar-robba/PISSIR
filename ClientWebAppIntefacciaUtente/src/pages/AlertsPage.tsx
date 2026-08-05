@@ -98,7 +98,7 @@ export default function AlertsPage() {
                         <span>Stazione: <strong className="text-main">{station.name} ({station.code})</strong></span>
                       )}
                       {train && (
-                        <span>Treno: <strong className="text-main">{train.convoglio}</strong></span>
+                        <span>Treno: <strong className="text-main">{train.id}</strong></span>
                       )}
                     </div>
                   </div>

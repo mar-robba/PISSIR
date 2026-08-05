@@ -24,6 +24,9 @@ public class main implements QuarkusApplication {
     @Inject
     TrainDatabaseValidator trainDatabaseValidator;
 
+    @Inject
+    Sensori sensori;
+
     public static void main(String[] args) {
         // Validazione dei parametri di input: se l'ID non arriva dagli args
         // NON usciamo (in dev mode gli args non vengono passati) ma facciamo
@@ -89,6 +92,19 @@ public class main implements QuarkusApplication {
         LOG.info("🌐 Server REST disponibile su http://localhost:8082/treno/info");
         LOG.info("📡 Trasmissione telemetria su topic MQTT: railway/telemetry");
         LOG.info("🔴 Ascolto alert su topic MQTT: railway/alerts");
+
+        // Console dei sensori di bordo (guasto / passaggio in stazione): gira su un thread
+        // separato per non bloccare il ciclo di keep-alive qui sotto. La si avvia solo se
+        // esiste davvero un terminale interattivo, altrimenti (container, redirezione
+        // dell'output) lo Scanner leggerebbe a vuoto consumando CPU inutilmente.
+        if (System.console() != null) {
+            Thread consoleSensori = new Thread(sensori::avviaMenu, "console-sensori-treno");
+            consoleSensori.setDaemon(true); // non deve impedire la chiusura del processo
+            consoleSensori.start();
+            LOG.info("🎛️ Console dei sensori di bordo avviata su questo terminale");
+        } else {
+            LOG.info("🎛️ Nessun terminale interattivo: sensori attivabili via POST /treno/sensore/*");
+        }
 
         // Ciclo infinito per mantenere il processo in esecuzione
         // Le altre classi (TrainElab, TrainGateway, TrainIngestion) gestiscono

@@ -20,14 +20,17 @@ const STATUS_OPTIONS: { value: TrainStatus; label: string }[] = [
 ];
 
 /**
- * Modale amministrativo per creare un nuovo treno o modificare
- * i dati (convoglio, tratta, stato, passeggeri, ritardo) di uno esistente (UC8).
+ * Modale amministrativo per creare un nuovo treno o modificare i dati (tratta, stato,
+ * passeggeri, ritardo) di uno esistente (UC8).
+ *
+ * Il nome del convoglio si sceglie solo in creazione: è la chiave primaria del treno
+ * sulla Centrale, quindi in modifica il campo è in sola lettura.
  */
 export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: TrainEditorModalProps) {
   const { trains, routes, adminCreateTrain, adminUpdateTrain } = useRailwayStore();
 
   const [formData, setFormData] = useState<Partial<Train>>({
-    convoglio: '',
+    id: '',
     routeId: '',
     status: 'in_attesa',
     passengers: 0,
@@ -43,8 +46,7 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
         }
       } else {
         setFormData({
-          id: `tr-${Date.now()}`,
-          convoglio: '',
+          id: '',
           routeId: '',
           status: 'in_attesa',
           currentStationId: null,
@@ -69,21 +71,28 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
   if (!isOpen) return null;
 
   const handleSave = async () => {
-    if (!formData.convoglio) {
-      alert('Inserisci il codice del convoglio (es. IC 351).');
-      return;
-    }
-
     if (trainIdToEdit) {
+      // Il nome del convoglio non è tra i campi modificabili: è la chiave primaria
+      // del treno sulla Centrale, quindi si aggiornano solo stato e tratta.
       await adminUpdateTrain(trainIdToEdit, {
-        convoglio: formData.convoglio,
         routeId: formData.routeId,
         status: formData.status,
         passengers: formData.passengers,
         delayMinutes: formData.delayMinutes,
       });
     } else {
-      await adminCreateTrain(formData as Train);
+      // Il nome scritto nel form diventa l'identificativo del convoglio (chiave
+      // primaria Treni.id_convoglio): deve esserci e deve essere univoco.
+      const nomeConvoglio = (formData.id ?? '').trim();
+      if (!nomeConvoglio) {
+        alert('Inserisci il nome del convoglio (es. IC 351).');
+        return;
+      }
+      if (trains.some(t => t.id === nomeConvoglio)) {
+        alert('Esiste già un treno con questo nome di convoglio.');
+        return;
+      }
+      await adminCreateTrain({ ...formData, id: nomeConvoglio } as Train);
     }
     onClose();
   };
@@ -106,11 +115,19 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
               <label className="block text-sm font-medium text-muted mb-1">Convoglio</label>
               <input
                 type="text"
-                className="input-field w-full font-mono"
-                value={formData.convoglio || ''}
-                onChange={e => setFormData({ ...formData, convoglio: e.target.value })}
+                className="input-field w-full font-mono disabled:opacity-60 disabled:cursor-not-allowed"
+                value={formData.id || ''}
+                onChange={e => setFormData({ ...formData, id: e.target.value })}
                 placeholder="es. IC 351"
+                maxLength={50}
+                disabled={!!trainIdToEdit}
               />
+              {trainIdToEdit && (
+                <p className="text-xs text-muted mt-1">
+                  Il nome identifica il convoglio e non si può cambiare: per rinominarlo
+                  elimina il treno e ricrealo.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-muted mb-1">Stato</label>

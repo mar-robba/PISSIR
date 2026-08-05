@@ -12,10 +12,35 @@ import type {
 
 /**
  * L'URL di base del server backend Java Quarkus (RestApiGateway).
- * In un ambiente di produzione dovrebbe essere letto da file di ambiente (.env).?? 
+ * Non è più fisso nel codice: si legge dalla variabile d'ambiente di Vite
+ * VITE_API_BASE_URL (file .env), così lanciando la Centrale con il profilo tls
+ * basta puntare a https://localhost:8444/api senza ricompilare nulla.
+ * Default: HTTP sulla 8781, cioè il profilo di default (quarkus.http.port=8781).
  */
-// Usa la porta del backend (configurata in ServeCentraleOperativa: quarkus.http.port=8781)
-const API_BASE_URL = 'http://localhost:8781/api';
+const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8781/api';
+
+/**
+ * Token di sessione restituito dal login: la Centrale lo pretende nell'header
+ * Authorization su tutte le API (vedi FiltroAutorizzazione lato server), altrimenti
+ * risponde 401. Viene impostato dall'authStore al login e azzerato al logout.
+ */
+let authToken: string | null = null;
+
+/** Registra (o cancella) il token di sessione usato dalle chiamate successive. */
+export const setAuthToken = (token: string | null): void => {
+  authToken = token;
+};
+
+/**
+ * Header comuni a tutte le chiamate protette: il token di sessione e, quando la
+ * richiesta ha un corpo JSON, il Content-Type.
+ */
+const authHeaders = (conBody = false): Record<string, string> => {
+  const headers: Record<string, string> = {};
+  if (conBody) headers['Content-Type'] = 'application/json';
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+  return headers;
+};
 
 /**
  * Estrae il dettaglio di un errore restituito dalla Centrale. Le API usano
@@ -144,7 +169,7 @@ export const apiClient = {
    * @returns Un oggetto contente statistiche (treni in movimento, stazioni offline, etc.)
    */
   getDashboard: async (): Promise<DashboardKPI> => {
-    const res = await fetch(`${API_BASE_URL}/dashboard`);
+    const res = await fetch(`${API_BASE_URL}/dashboard`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch dashboard KPI');
     const data = await res.json() as ApiDashboardPayload;
     return data;
@@ -156,12 +181,13 @@ export const apiClient = {
    * @returns Promise<Train[]> Un array di oggetti Train front-end ready.
    */
   getTrains: async (): Promise<Train[]> => {
-    const res = await fetch(`${API_BASE_URL}/treni`);
+    const res = await fetch(`${API_BASE_URL}/treni`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch trains');
     const data = await res.json() as ApiTrainPayload[];
     return data.map((t) => ({
+      // L'id È il nome del convoglio (chiave primaria Treni.id_convoglio): la Centrale
+      // non espone più un campo "nome" separato.
       id: t.id,
-      convoglio: t.nome || t.id,
       status: mapBackendStatus(t.stato ?? ''),
       currentStationId: t.stazioneCorrente || null,
       nextStationId: t.prossimaStazione || t.posizioneAttualeTratta?.stazioneArrivo?.id || null,
@@ -183,7 +209,7 @@ export const apiClient = {
    * Richiede e mappa l'elenco delle stazioni e il relativo stato operativo.
    */
   getStations: async (): Promise<Station[]> => {
-    const res = await fetch(`${API_BASE_URL}/stazioni`);
+    const res = await fetch(`${API_BASE_URL}/stazioni`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch stations');
     const data = await res.json() as ApiStationPayload[];
     return data.map((s) => ({
@@ -203,21 +229,21 @@ export const apiClient = {
    * Ottiene le configurazioni delle tratte/itinerari.
    */
   getRoutes: async (): Promise<Route[]> => {
-    const res = await fetch(`${API_BASE_URL}/tratte`);
+    const res = await fetch(`${API_BASE_URL}/tratte`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch routes');
     const data = await res.json() as ApiRoutePayload[];
     return data.map(mapApiRoute);
   },
 
   getTrackSegments: async (): Promise<TrackSegment[]> => {
-    const res = await fetch(`${API_BASE_URL}/tratte-elementari`);
+    const res = await fetch(`${API_BASE_URL}/tratte-elementari`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch track segments');
     return (await res.json() as ApiTrackSegmentPayload[]).map(mapApiTrackSegment);
   },
 
   createTrackSegment: async (segment: TrackSegment): Promise<TrackSegment> => {
     const res = await fetch(`${API_BASE_URL}/tratte-elementari`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: authHeaders(true),
       body: JSON.stringify({ id: segment.id, stazionePartenzaId: segment.departureStationId, stazioneArrivoId: segment.arrivalStationId, tempoPercorrenzaMinuti: segment.travelTimeMinutes })
     });
     if (!res.ok) throw await createApiError(res);
@@ -226,7 +252,7 @@ export const apiClient = {
 
   updateTrackSegment: async (id: string, segment: Partial<TrackSegment>): Promise<TrackSegment> => {
     const res = await fetch(`${API_BASE_URL}/tratte-elementari/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: authHeaders(true),
       body: JSON.stringify({ stazionePartenzaId: segment.departureStationId, stazioneArrivoId: segment.arrivalStationId, tempoPercorrenzaMinuti: segment.travelTimeMinutes })
     });
     if (!res.ok) throw await createApiError(res);
@@ -234,7 +260,7 @@ export const apiClient = {
   },
 
   deleteTrackSegment: async (id: string): Promise<void> => {
-    const res = await fetch(`${API_BASE_URL}/tratte-elementari/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE_URL}/tratte-elementari/${id}`, { method: 'DELETE', headers: authHeaders() });
     if (!res.ok) throw await createApiError(res);
   },
 
@@ -244,7 +270,7 @@ export const apiClient = {
   createRoute: async (route: Route): Promise<Route> => {
     const res = await fetch(`${API_BASE_URL}/tratte`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({
         id: route.id,
         nome: route.name,
@@ -264,9 +290,9 @@ export const apiClient = {
    * Aggiorna parzialmente o totalmente una tratta esistente.
    */
   updateRoute: async (id: string, route: Partial<Route>): Promise<Route> => {
-    const res = await fetch(`${API_BASE_URL}/tratte/${id}`, {
+    const res = await fetch(`${API_BASE_URL}/tratte/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({
         nome: route.name,
         stazioni: route.stationIds,
@@ -284,7 +310,7 @@ export const apiClient = {
    * nota : quindi per una post basta aggiungere il parametro dei dati da inviare e usare sempre fetch:
    */
   deleteRoute: async (id: string): Promise<void> => {
-    const res = await fetch(`${API_BASE_URL}/tratte/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE_URL}/tratte/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
     if (!res.ok) throw await createApiError(res);
   },
 
@@ -292,7 +318,7 @@ export const apiClient = {
    * Preleva gli allarmi pendenti o passati (storico guasti).
    */
   getAlerts: async (): Promise<Alert[]> => {
-    const res = await fetch(`${API_BASE_URL}/allarmi`);
+    const res = await fetch(`${API_BASE_URL}/allarmi`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch alarms');
     const data = await res.json() as ApiAlertPayload[];
     return data.map((a) => ({
@@ -314,7 +340,7 @@ export const apiClient = {
    * Invia un comando al backend per segnalare un allarme come risolto (Acknowledged).
    */
   acknowledgeAlert: async (id: string): Promise<void> => {
-    const res = await fetch(`${API_BASE_URL}/allarmi/${id}/risolvi`, { method: 'POST' });
+    const res = await fetch(`${API_BASE_URL}/allarmi/${id}/risolvi`, { method: 'POST', headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to resolve alert');
   },
 
@@ -322,20 +348,21 @@ export const apiClient = {
    * Comando perentorio per l'emergenza: sopprime/blocca immediatamente la marcia di un treno.
    */
   suppressTrain: async (id: string): Promise<void> => {
-    const res = await fetch(`${API_BASE_URL}/treni/${id}/sopprimi`, { method: 'POST' });
+    const res = await fetch(`${API_BASE_URL}/treni/${encodeURIComponent(id)}/sopprimi`, { method: 'POST', headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to suppress train');
   },
 
   /**
    * Crea un nuovo treno (operazione riservata all'amministratore).
+   * L'id inviato è il nome del convoglio scritto nel form: lato Centrale diventa la
+   * chiave primaria del treno, quindi è l'unico momento in cui si può scegliere.
    */
   createTrain: async (train: Train): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/treni`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({
         id: train.id,
-        nome: train.convoglio,
         stato: mapFrontendStatus(train.status),
         itinerario: train.routeId ? { id: train.routeId } : null,
         passeggeri: train.passengers,
@@ -346,14 +373,15 @@ export const apiClient = {
   },
 
   /**
-   * Aggiorna i dati anagrafici/operativi di un treno esistente (amministratore).
+   * Aggiorna stato e tratta di un treno esistente (amministratore). Il nome del
+   * convoglio non è tra i campi inviati: è la chiave primaria del treno e non si
+   * modifica (per cambiarlo si elimina il treno e si ricrea).
    */
   updateTrain: async (id: string, train: Partial<Train>): Promise<void> => {
-    const res = await fetch(`${API_BASE_URL}/treni/${id}`, {
+    const res = await fetch(`${API_BASE_URL}/treni/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({
-        nome: train.convoglio,
         stato: train.status !== undefined ? mapFrontendStatus(train.status) : undefined,
         itinerario: train.routeId ? { id: train.routeId } : undefined,
         passeggeri: train.passengers,
@@ -367,7 +395,7 @@ export const apiClient = {
    * Elimina definitivamente un treno dalla flotta (amministratore).
    */
   deleteTrain: async (id: string): Promise<void> => {
-    const res = await fetch(`${API_BASE_URL}/treni/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE_URL}/treni/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
     if (!res.ok) throw await createApiError(res);
   },
 
@@ -377,7 +405,7 @@ export const apiClient = {
   createStation: async (station: Station): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/stazioni`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({
         id: station.id,
         nome: station.name,
@@ -394,9 +422,9 @@ export const apiClient = {
    * Aggiorna i dati di una stazione esistente (amministratore).
    */
   updateStation: async (id: string, station: Partial<Station>): Promise<void> => {
-    const res = await fetch(`${API_BASE_URL}/stazioni/${id}`, {
+    const res = await fetch(`${API_BASE_URL}/stazioni/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({
         nome: station.name,
         stato: station.status !== undefined ? mapFrontendStationStatus(station.status) : undefined,
@@ -412,7 +440,7 @@ export const apiClient = {
    * Elimina una stazione dalla rete (amministratore).
    */
   deleteStation: async (id: string): Promise<void> => {
-    const res = await fetch(`${API_BASE_URL}/stazioni/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE_URL}/stazioni/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
     if (!res.ok) throw await createApiError(res);
   },
 
@@ -422,7 +450,7 @@ export const apiClient = {
   login: async (username: string, password: string): Promise<ApiLoginResponse> => {
     const res = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(true),
       body: JSON.stringify({ username, password })
     });
     if (!res.ok) throw new Error('Invalid credentials');
@@ -431,10 +459,22 @@ export const apiClient = {
   },
 
   /**
+   * Chiude la sessione lato Centrale invalidando il token.
+   * Gli errori vengono ignorati: il logout locale deve avvenire comunque.
+   */
+  logout: async (): Promise<void> => {
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', headers: authHeaders() });
+    } catch {
+      // Centrale non raggiungibile: la sessione lato server scadrà al riavvio.
+    }
+  },
+
+  /**
    * Invia gli operatori in manutenzione per una stazione.
    */
   dispatchOperators: async (id: string): Promise<void> => {
-    const res = await fetch(`${API_BASE_URL}/stazioni/${id}/manutenzione`, { method: 'POST' });
+    const res = await fetch(`${API_BASE_URL}/stazioni/${encodeURIComponent(id)}/manutenzione`, { method: 'POST', headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to dispatch operators');
   },
 
@@ -442,7 +482,7 @@ export const apiClient = {
    * Recupera i transiti.
    */
   getTransits: async (): Promise<Transit[]> => {
-    const res = await fetch(`${API_BASE_URL}/transiti`);
+    const res = await fetch(`${API_BASE_URL}/transiti`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch transits');
     const data = await res.json() as ApiTransitPayload[];
     return data.map((t) => ({

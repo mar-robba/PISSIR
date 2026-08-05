@@ -1,0 +1,122 @@
+@startuml M4 - Ingestione degli Heartbeat delle Stazioni
+' =========================================================================
+'  MACCHINA M4 - Ingestione degli heartbeat delle stazioni
+'
+'  Codice astratto:
+'    it.uni.reti2.ingestion.IngestionService#onHeartbeat
+'    it.uni.reti2.ingestion.IngestionService#storicizzaStatoStazione
+'    it.uni.reti2.ingestion.IngestionService#chiudiGuastiHeartbeatPerso
+'
+'  Canale: heartbeat-in <- railway/station/+/heartbeat (un battito ogni 10s)
+'
+'  Avviata da:   M1  (01_macchina_ciclo_vita_centrale.puml)
+'  Fa transitare: M12 (12_macchina_stato_stazione.puml)
+'                 M7  (07_macchina_ciclo_vita_guasto.puml)
+'  E' il "contrappeso" del watchdog M8: qui si chiude cio' che M8 ha aperto.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M4 - Ingestione degli Heartbeat delle Stazioni (IngestionService.onHeartbeat)
+
+[*] --> InAscolto
+
+state "In Ascolto\n<- railway/station/+/heartbeat" as InAscolto
+
+state "Elaborazione del Battito\n(@Blocking)" as Elaborazione {
+
+    state "Parsing JSON\n(stazioneId, stato)" as Parsing
+
+    state "Ricerca della stazione in cache\n(TrafficLogicEngine.getStazione)" as LookupCache
+    state "Battito SCARTATO\n(stazione sconosciuta)" as Scartato
+
+    state "Confronto con lo stato precedente" as Confronto {
+        state "statoCambiato =\nstato precedente != stato ricevuto" as FlagCambio
+        state "tornataDalFailStop =\nstato precedente == OFFLINE" as FlagRientro
+
+        [*] --> FlagCambio
+        FlagCambio --> FlagRientro
+    }
+
+    state "Aggiornamento della cache RAM\n(stazione.stato = stato ricevuto,\nultimoHeartbeat = now)" as AggiornaCache
+
+    state "Transazione sul DB\nQuarkusTransaction.requiringNew()" as Transazione {
+        state "Storicizza lo stato\n(Storico_Stato_Stazioni.persist)" as Storicizza
+        state "Chiude i guasti automatici\n(messaggio che inizia con\n'Heartbeat assente:')" as ChiudiGuasti
+        state "Nessuna scrittura\n(battito ripetuto,\nstesso stato)" as NessunaScrittura
+
+        [*] --> Storicizza : statoCambiato = true
+        [*] --> NessunaScrittura : statoCambiato = false
+        Storicizza --> ChiudiGuasti : tornataDalFailStop = true
+        NessunaScrittura --> ChiudiGuasti : tornataDalFailStop = true
+    }
+
+    state "Notifica del rientro (dopo il commit)\nper ogni guasto chiuso:\n-> railway/alerts RESOLVED\n+ broadcast ALERT su WebSocket" as NotificaRientro
+
+    state "Broadcast WebSocket\neventType = HEARTBEAT\nstatus: operativa / guasta /\nmanutenzione / offline" as BroadcastWs
+
+    state "Errore di elaborazione\n(log dell'eccezione)" as Errore
+
+    [*] --> Parsing
+    Parsing --> LookupCache
+    Parsing --> Errore : payload malformato
+    LookupCache --> Scartato : getStazione == null
+    LookupCache --> Confronto : stazione in cache
+    Confronto --> AggiornaCache
+    AggiornaCache --> Transazione
+    Transazione --> NotificaRientro : ci sono guasti chiusi
+    Transazione --> BroadcastWs : nessun guasto da chiudere
+    NotificaRientro --> BroadcastWs
+    BroadcastWs --> [*]
+}
+
+InAscolto --> Elaborazione : heartbeat ricevuto
+
+state "Ack del messaggio" as Ack
+Elaborazione --> Ack : sempre
+Scartato -[dashed]-> Ack
+Ack --> InAscolto
+
+note right of Transazione
+  Lo storico si scrive SOLO al cambio di stato:
+  a ogni battito sarebbero circa 8.600 righe identiche
+  al giorno per ogni stazione.
+end note
+
+note left of ChiudiGuasti
+  Vengono chiusi solo i guasti aperti dal watchdog
+  (prefisso "Heartbeat assente:"): quelli dichiarati
+  dalla stazione stessa li chiude un operatore
+  attraverso M10. Il riconoscimento per prefisso e'
+  il modo in cui la Centrale distingue i guasti "suoi".
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M12 - Stato della Stazione\n(12_macchina_stato_stazione.puml)" as M12 <<esterna>>
+state "M7 - Ciclo di vita del Guasto\n(07_macchina_ciclo_vita_guasto.puml)" as M7 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M11 - WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
+
+AggiornaCache -[dashed]-> M12 : OFFLINE -> ONLINE\n(rientro del nodo)
+ChiudiGuasti -[dashed]-> M7 : Aperto -> Risolto
+M8 -[dashed]-> AggiornaCache : e' il watchdog che aveva\nportato la stazione a OFFLINE
+BroadcastWs -[dashed]-> M11 : evento HEARTBEAT
+NotificaRientro -[dashed]-> M11 : evento ALERT (risolto)
+
+@enduml

@@ -1,0 +1,21 @@
+__  ____  __  _____   ___  __ ____  ______ 
+ --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
+ -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
+--\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
+2026-08-05 18:22:31,458 INFO  [it.uni.reti2.main] (main) 🚂 Avvio processo Treno con ID: tr-1785881140084
+2026-08-05 18:22:32,317 INFO  [io.quarkus.scheduler.runtime.SimpleScheduler] (main) No scheduled business methods found - Simple scheduler will not be started
+2026-08-05 18:22:32,370 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[]
+2026-08-05 18:22:32,575 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-05 18:22:32,737 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/alerts, Max QoS 0.
+2026-08-05 18:22:32,737 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/train/+/validation-response, Max QoS 0.
+2026-08-05 18:22:32,795 INFO  [it.uni.reti2.TrainJourneyEngine] (main) 🧭 [TWIN] Motore di viaggio avviato (sosta=20s, fattore=10x, autostart=true)
+2026-08-05 18:22:32,848 INFO  [io.quarkus] (main) treno 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.37.3) started in 1.484s. Listening on: http://0.0.0.0:9083
+2026-08-05 18:22:32,848 INFO  [io.quarkus] (main) Profile prod activated. 
+2026-08-05 18:22:32,848 INFO  [io.quarkus] (main) Installed features: [cdi, messaging, messaging-mqtt, rest, rest-jackson, scheduler, smallrye-context-propagation, vertx]
+2026-08-05 18:22:33,114 INFO  [it.uni.reti2.main] (main) 🔎 Verifica ID treno 'tr-1785881140084' nel database centrale...
+2026-08-05 18:22:33,140 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tr-1785881140084
+2026-08-05 18:22:33,142 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-05 18:22:33,192 ERROR [it.uni.reti2.TrainDatabaseValidator] (vert.x-eventloop-thread-2) ❌ L'ID 'tr-1785881140084' non è presente nel database centrale: il treno non è registrato.
+2026-08-05 18:22:38,142 ERROR [it.uni.reti2.main] (main) ❌ ERRORE FATALE: ID del treno non presente nel database centrale. Il processo verrà terminato.
+2026-08-05 18:22:38,158 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: <unknown>
+2026-08-05 18:22:38,171 INFO  [io.quarkus] (main) treno stopped in 0.028s

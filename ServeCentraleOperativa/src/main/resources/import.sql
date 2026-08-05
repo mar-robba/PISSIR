@@ -51,7 +51,8 @@ INSERT INTO Itinerario_Tratta (id_itinerario, id_Tratta, ordine) VALUES
 ('IT3_MI_RM', 'T3_FI_RM', 3)
 ON CONFLICT (id_itinerario, id_Tratta) DO NOTHING;
 
--- Inserimento Treni
+-- Inserimento Treni: id_convoglio E' il nome del convoglio (il campo "Convoglio" del
+-- form di amministrazione), non c'e' piu' una colonna "nome" separata.
 INSERT INTO Treni (id_convoglio, stato, itinerario, PosizioneAttualeTrattaOStazione) VALUES
 ('TRN001', 'attivo', 'IT1_MI_NA', 'T1_MI_BO'),
 ('TRN002', 'attivo', 'IT2_NA_MI', 'T5_NA_RM'),

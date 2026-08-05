@@ -11,7 +11,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -90,10 +89,13 @@ public class TrainJourneyEngine {
     @ConfigProperty(name = "viaggio.autostart", defaultValue = "true")
     boolean autostart;
 
-    /** Client HTTP del JDK per parlare con la Centrale (nessuna dipendenza extra). */
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
+    /**
+     * Client HTTP per parlare con la Centrale. Sotto profilo tls l'URL è HTTPS e il
+     * certificato viene validato contro la CA privata del progetto; in profilo di
+     * default la stessa istanza fa normali richieste in chiaro sulla 8781.
+     */
+    @Inject
+    SecureHttpClient secureHttpClient;
 
     private final Random random = new Random();
 
@@ -231,7 +233,7 @@ public class TrainJourneyEngine {
                     .timeout(Duration.ofSeconds(5))
                     .GET()
                     .build();
-            HttpResponse<String> risposta = httpClient.send(richiesta, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> risposta = secureHttpClient.get().send(richiesta, HttpResponse.BodyHandlers.ofString());
 
             if (risposta.statusCode() != 200) {
                 LOG.warnf("⚠️ [TWIN] Itinerario non disponibile (HTTP %d da %s), riprovo tra %ds",
@@ -332,8 +334,20 @@ public class TrainJourneyEngine {
             return;
         }
 
-        // Trattenuto in stazione se la corrente o la prossima sono note come guaste
-        if (trainDB.stazioniGuaste.contains(corrente.id) || trainDB.stazioniGuaste.contains(prossima.id)) {
+        // Trattenuto in stazione se la corrente o la prossima sono note come guaste.
+        // Non basta un return "muto": si entra nella fase BLOCCATO_GUASTO_STAZIONE, così
+        // il treno accumula ritardo e /treno/viaggio dice anche QUALE stazione lo blocca.
+        // Serve quando l'alert di guasto è arrivato mentre il treno era altrove: in quel
+        // caso il gateway non aveva chiamato bloccaPerGuastoStazione perché la stazione
+        // non era né la corrente né la prossima.
+        String stazioneGuasta = null;
+        if (trainDB.stazioniGuaste.contains(corrente.id)) {
+            stazioneGuasta = corrente.id;
+        } else if (trainDB.stazioniGuaste.contains(prossima.id)) {
+            stazioneGuasta = prossima.id;
+        }
+        if (stazioneGuasta != null) {
+            bloccaPerGuastoStazione(stazioneGuasta);
             return;
         }
 

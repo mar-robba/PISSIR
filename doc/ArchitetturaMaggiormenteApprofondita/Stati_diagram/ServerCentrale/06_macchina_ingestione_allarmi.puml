@@ -1,0 +1,124 @@
+@startuml M6 - Ingestione degli Allarmi dal Campo
+' =========================================================================
+'  MACCHINA M6 - Ingestione degli allarmi provenienti dal campo
+'
+'  Codice astratto:
+'    it.uni.reti2.ingestion.IngestionService#onAlert
+'    it.uni.reti2.ingestion.IngestionService#tipoGuastoPerFrontend
+'    it.uni.reti2.ingestion.IngestionService#aggiornaMessaggioGuasto
+'
+'  Canale: alerts-in <- railway/alerts (topic CONDIVISO in ingresso e uscita)
+'
+'  Il punto delicato di questa macchina e' il FILTRO iniziale: sullo stesso
+'  topic viaggiano anche i messaggi che pubblica la Centrale stessa, quindi
+'  senza filtro la Centrale si riascolterebbe e creerebbe guasti doppi.
+'
+'  Avviata da:   M1 (01_macchina_ciclo_vita_centrale.puml)
+'  Fa transitare: M7 (07_macchina_ciclo_vita_guasto.puml)
+'                 M12 (12_macchina_stato_stazione.puml)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M6 - Ingestione degli Allarmi dal Campo (IngestionService.onAlert)
+
+[*] --> InAscolto
+
+state "In Ascolto\n<- railway/alerts" as InAscolto
+
+state "Filtro dei messaggi\n(il topic e' condiviso)" as Filtro {
+    state "Lettura di tipoEvento" as LeggiTipo
+    state "Messaggio IGNORATO\n(RESOLVED, STOP,\nMAINTENANCE_DISPATCHED,\nITINERARIO_AGGIORNATO)" as IgnoratoTipo
+    state "Lettura di origine" as LeggiOrigine
+    state "Messaggio IGNORATO\n(eco della Centrale:\norigine = CENTRALE)" as IgnoratoEco
+
+    [*] --> LeggiTipo
+    LeggiTipo --> IgnoratoTipo : tipoEvento != GUASTO
+    LeggiTipo --> LeggiOrigine : tipoEvento == GUASTO
+    LeggiOrigine --> IgnoratoEco : origine == CENTRALE\n(guasto gia' scritto da M8)
+}
+
+InAscolto --> Filtro : allarme ricevuto
+
+state "Elaborazione del Guasto" as Elaborazione {
+
+    state "Estrazione dei campi\n(sorgenteTipo, sorgenteId,\nseverita, messaggio, timestamp)" as Estrazione
+
+    state "Classificazione del tipo\nmessaggio contiene 'sensore' -> sensore_offline\nTRENO -> treno_fermo\nSTAZIONE -> stazione_guasta" as Classificazione
+
+    state "Deduplica\n(getGuastoApertoPerSorgente:\nstessa sorgente + stesso tipo)" as Deduplica
+
+    state "AGGIORNAMENTO del guasto esistente\n(solo il messaggio, in transazione)" as AggiornaEsistente
+
+    state "CREAZIONE di un nuovo guasto\nid = alert-{millis}-{uuid8}\nrisolto = false\n+ Storico_Guasti (tsApertura)" as CreaGuasto
+
+    state "Inserimento in cache\n(guastiAttivi)" as InserisciCache
+
+    state "Marcatura della stazione\ncome GUASTA in cache" as MarcaStazione
+
+    state "Broadcast WebSocket\neventType = ALERT" as BroadcastWs
+
+    [*] --> Estrazione
+    Estrazione --> Classificazione
+    Classificazione --> Deduplica
+    Deduplica --> AggiornaEsistente : guasto gia' aperto\nper quella sorgente
+    Deduplica --> CreaGuasto : nessun guasto aperto
+    AggiornaEsistente --> BroadcastWs
+    CreaGuasto --> InserisciCache
+    InserisciCache --> MarcaStazione : sorgenteTipo = STAZIONE\nE severita = CRITICAL
+    InserisciCache --> BroadcastWs : negli altri casi
+    MarcaStazione --> BroadcastWs
+    BroadcastWs --> [*]
+}
+
+LeggiOrigine --> Elaborazione : allarme vero,\nvenuto dal campo
+
+state "Ack del messaggio" as Ack
+Elaborazione --> Ack
+IgnoratoTipo -[dashed]-> Ack
+IgnoratoEco -[dashed]-> Ack
+Ack --> InAscolto
+
+note right of Deduplica
+  Una stazione guasta manda un alert per OGNI treno
+  che entra: senza deduplica la tabella si riempiva
+  di righe identiche e il comando "risolvi" ne
+  chiudeva una sola, lasciando la stazione guasta
+  per sempre agli occhi della dashboard.
+end note
+
+note bottom of MarcaStazione
+  Solo i guasti CRITICAL cambiano lo stato della stazione:
+  i WARNING restano allarmi informativi e non devono
+  contraddire gli heartbeat ONLINE che la stazione
+  continua a mandare (vedi M4 e M12).
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M7 - Ciclo di vita del Guasto\n(07_macchina_ciclo_vita_guasto.puml)" as M7 <<esterna>>
+state "M12 - Stato della Stazione\n(12_macchina_stato_stazione.puml)" as M12 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M11 - WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
+
+CreaGuasto -[dashed]-> M7 : Inesistente -> Aperto\n(sorgente: campo)
+MarcaStazione -[dashed]-> M12 : ONLINE -> GUASTA
+M8 -[dashed]-> IgnoratoEco : i guasti pubblicati dal\nwatchdog tornano qui e\nvengono scartati
+BroadcastWs -[dashed]-> M11 : evento ALERT
+
+@enduml

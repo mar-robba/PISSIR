@@ -291,7 +291,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
         id: `al-supp-${Date.now()}`,
         type: 'treno_soppresso',
         severity: 'warning',
-        message: `Treno ${get().trains.find((t) => t.id === trainId)?.convoglio ?? trainId} soppresso dall'amministratore.`,
+        message: `Treno ${trainId} soppresso dall'amministratore.`,
         trainId,
         timestamp: Date.now(),
         acknowledged: false,

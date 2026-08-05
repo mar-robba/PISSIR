@@ -51,13 +51,146 @@ Di Quanto il sistema è capace:
 ** Elenco maggiomente formale dei requisiti
 ** Diagrammi degli stati
 *** Del Treno
+**** Controllo e verifica Dell'id
 #+begin_src plantuml file: diobastardo.png
-@startuml Diagramma degli Stati – Microservizio Treno
+@startuml Diagramma degli Stati – Microservizio Treno (Avvio e Verifica ID)
 ' =========================================================================
-'  Diagramma degli stati del microservizio Treno
-'  Descrive l'intero ciclo di vita del processo: dall'avvio (con o senza ID)
-'  fino alla terminazione o al ciclo continuo di simulazione.
+'  Diagramma degli stati del microservizio Treno, limitato a:
+'   1) gestione dell'input del main (args CLI / property treno.id)
+'   2) verifica dell'ID sul database centrale (via MQTT)
+'  Tutto il resto (motore di viaggio, componenti in background) e' descritto
+'  nelle macchine a stati esterne del file diagramma_stati_esterni.puml
 ' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title Diagramma degli Stati – Avvio del Treno e Verifica dell'ID sul DB Centrale
+
+' ===================== AVVIO DEL PROCESSO =====================
+[*] --> AvvioProcesso
+
+state "Avvio Processo\n(main.main())" as AvvioProcesso {
+    state "Lettura args CLI" as LetturaArgs
+    state "ID da args" as IdDaArgs
+    state "Fallback su\nproperty treno.id" as FallbackProperty
+
+    [*] --> LetturaArgs
+    LetturaArgs --> IdDaArgs : args[0] presente\ne valido
+    LetturaArgs --> FallbackProperty : args vuoti / null /\nstringa \"null\"
+    IdDaArgs --> QuarkusBoot : System.setProperty("treno.id", id)
+    FallbackProperty --> QuarkusBoot : usa @ConfigProperty
+}
+
+state "Quarkus Boot\n(CDI + Reactive Messaging)" as QuarkusBoot
+note right of QuarkusBoot
+  Quarkus avvia il container CDI,
+  inietta i bean (@ApplicationScoped)
+  e apre le connessioni MQTT.
+end note
+
+QuarkusBoot --> ControlloID
+
+' ===================== VALIDAZIONE ID =====================
+state "Controllo ID Treno\n(main.run() + TrainDatabaseValidator)" as ControlloID {
+    state "ID presente?\n(trainDB.trenoId)" as CheckIDPresente
+    state "Verifica su DB Centrale\n(verificaSeNecessario())" as VerificaDB
+
+    state "Invio richiesta\nvalidazione MQTT\n-> railway/train/{id}/validation" as InvioValidazione
+    state "Attesa risposta\nCentrale" as AttesaRisposta
+    state "Treno riconosciuto\n(trenoRiconosciuto = true)" as Validato
+
+    [*] --> CheckIDPresente
+    CheckIDPresente --> TerminazioneErrore : ID null o vuoto\n(return 1)
+    CheckIDPresente --> VerificaDB : ID impostato
+
+    VerificaDB --> InvioValidazione : esito = RIPROVA\n(primo tentativo /\n>= 15s dall'ultimo)
+    InvioValidazione --> AttesaRisposta
+    AttesaRisposta --> Validato : risposta MQTT\n<- railway/train/{id}/validation-response\nesisteNelDb = true
+    AttesaRisposta --> InvioValidazione : timeout / centrale\nirraggiungibile\n(retry ogni 15s)
+    AttesaRisposta --> TerminazioneErrore : risposta MQTT:\nesisteNelDb = false\n(ID_NON_PRESENTE)
+}
+
+note right of ControlloID
+  Il loop di main.run() ripete il controllo ogni 5s;
+  TrainDatabaseValidator invia una nuova richiesta MQTT
+  solo ogni 15s (throttle interno) finche' non arriva
+  una risposta dalla Centrale Operativa.
+end note
+
+state "Terminazione con Errore\n(return 1)" as TerminazioneErrore
+TerminazioneErrore --> [*]
+
+' ===================== LATO CENTRALE: verifica dell'ID sul DB =====================
+state "Lato Centrale – Verifica ID Treno\n(ExistIdForEdge)" as CentraleVerifica {
+    state "Listener MQTT\n<- railway/train/+/validation" as RicezioneRichiesta
+    state "Treno.findById(id)\nsu DB centrale" as QueryDB
+    state "Publisher MQTT\n-> railway/train/{id}/validation-response\nesisteNelDb = true" as RispostaTrovata
+    state "Publisher MQTT\n-> railway/train/{id}/validation-response\nesisteNelDb = false" as RispostaNonTrovata
+
+    [*] --> RicezioneRichiesta
+    RicezioneRichiesta --> QueryDB
+    QueryDB --> RispostaTrovata : treno trovato
+    QueryDB --> RispostaNonTrovata : treno non trovato
+}
+ControlloID -[hidden]right-> CentraleVerifica
+
+' ===================== USCITA VERSO LE MACCHINE A STATI ESTERNE =====================
+state "Ciclo Infinito Keep-Alive\n(main.run() -> while(true) sleep 1s)" as KeepAlive
+Validato --> KeepAlive : processo avviato correttamente
+
+state "Motore di Viaggio + Componenti Background\n(macchine a stati ESTERNE)" as MacchineEsterne <<esterna>>
+KeepAlive -[dashed]-> MacchineEsterne : la logica di simulazione e di\ncomunicazione gira nei bean Quarkus
+
+note right of MacchineEsterne
+  Le macchine a stati del TrainJourneyEngine
+  (motore di viaggio) e dei componenti MQTT/REST
+  in background sono descritte nel file
+  diagramma_stati_esterni.puml
+end note
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-KFq2Fi/plantuml-hYdq9y.png]]
+**** Motore di simulazione del treno e stato di esso
+- nota : gli stati del treno sono simulati, al posto delle simulazioni degli eventi nella realta tali dovrebbero essere implementati attraverso l'ascolto dei sensori di bordo
+#+begin_src  plantuml file: SimulatoinEnginAndTrain
+
+' =========================================================================
+'  Macchine a stati ESTERNE, richiamate dai diagrammi di avvio dei processi
+'  (diagramma_stati_treno.puml e diagramma_stati_stazione.puml).
+'  Questi diagrammi partono dal punto in cui l'ID e' gia' stato validato
+'  sul database centrale e il processo e' entrato nel ciclo keep-alive.
+'
+'  Il file contiene tre diagrammi:
+'    1) Motore di Viaggio del Treno (TrainJourneyEngine)
+'    2) Componenti in background del Treno
+'    3) Componenti MQTT/REST della Stazione e della Centrale
+' =========================================================================
+
+@startuml Macchina a Stati Esterna – Motore di Viaggio del Treno
+' =========================================================================
+'  1) Motore di Viaggio – Digital Twin (TrainJourneyEngine)
+'     Richiamata da: diagramma_stati_treno.puml
+' =========================================================================
+
 skinparam backgroundColor #FEFEFE
 skinparam state {
     BackgroundColor #E8F0FE
@@ -71,47 +204,20 @@ skinparam note {
     BackgroundColor #FFF9C4
     BorderColor #F9A825
 }
-title Diagramma degli Stati – Ciclo di Vita del Microservizio Treno
-' ===================== AVVIO DEL PROCESSO =====================
-[*] --> AvvioProcesso
-state "Avvio Processo\n(main.java)" as AvvioProcesso {
-    state "Lettura args CLI" as LetturaArgs
-    state "ID da args" as IdDaArgs
-    state "Fallback su\nproperty treno.id" as FallbackProperty
-    [*] --> LetturaArgs
-    LetturaArgs --> IdDaArgs : args[0] presente\ne valido
-    LetturaArgs --> FallbackProperty : args vuoti / null /\nstringa \"null\"
-    IdDaArgs --> QuarkusBoot : System.setProperty("treno.id", id)
-    FallbackProperty --> QuarkusBoot : usa @ConfigProperty
-}
-state "Quarkus Boot\n(CDI + Reactive Messaging)" as QuarkusBoot
-note right of QuarkusBoot
-  Quarkus avvia il container CDI,
-  inietta i bean (@ApplicationScoped)
-  e apre le connessioni MQTT.
+
+title Macchina a Stati Esterna – Motore di Viaggio del Treno (TrainJourneyEngine)
+
+note as PuntoIngresso
+  INGRESSO: il treno e' stato riconosciuto
+  dal DB centrale (trenoRiconosciuto = true)
+  e il tick reattivo da 1s e' avviato.
+  Vedi diagramma_stati_treno.puml
 end note
-QuarkusBoot --> ControlloID
-' ===================== VALIDAZIONE ID =====================
-state "Controllo ID Treno\n(main.run())" as ControlloID {
-    state "ID presente?" as CheckIDPresente
-    state "Verifica su DB Centrale\n(TrainDatabaseValidator)" as VerificaDB
-    state "Invio richiesta\nvalidazione MQTT" as InvioValidazione
-    state "Attesa risposta\nCentrale" as AttesaRisposta
-    state "Treno riconosciuto\n(trenoRiconosciuto = true)" as Validato
-    [*] --> CheckIDPresente
-    CheckIDPresente --> TerminazioneErrore : ID null o vuoto\n(return 1)
-    CheckIDPresente --> VerificaDB : ID impostato
-    VerificaDB --> InvioValidazione : esito = RIPROVA\n(primo tentativo)
-    InvioValidazione --> AttesaRisposta
-    AttesaRisposta --> Validato : risposta MQTT:\nesisteNelDb = true
-    AttesaRisposta --> InvioValidazione : timeout / centrale\nirraggiungibile\n(retry ogni 15s)
-    AttesaRisposta --> TerminazioneErrore : risposta MQTT:\nesisteNelDb = false\n(ID_NON_PRESENTE)
-}
-state "Terminazione con Errore\n(return 1)" as TerminazioneErrore
-TerminazioneErrore --> [*]
-Validato --> MotoreDiViaggio : trenoRiconosciuto = true\nTick reattivo ogni 1s avviato
-' ===================== MOTORE DI VIAGGIO (TrainJourneyEngine) =====================
+
+[*] --> MotoreDiViaggio
+
 state "Motore di Viaggio – Digital Twin\n(TrainJourneyEngine)" as MotoreDiViaggio {
+
     ' --- Caricamento itinerario ---
     state "Attesa Itinerario" as AttesaItinerario
     note left of AttesaItinerario
@@ -119,7 +225,9 @@ state "Motore di Viaggio – Digital Twin\n(TrainJourneyEngine)" as MotoreDiViag
       verso la Centrale Operativa.
       Retry ogni 15s se fallisce.
     end note
-    state "Itinerario Caricato\n(≥ 2 stazioni)" as ItinerarioCaricato
+
+    state "Itinerario Caricato\n(>= 2 stazioni)" as ItinerarioCaricato
+
     state "Avvio Viaggio\n(avviaViaggio())" as AvvioViaggio
     note right of AvvioViaggio
       Posiziona il treno alla prima
@@ -127,8 +235,10 @@ state "Motore di Viaggio – Digital Twin\n(TrainJourneyEngine)" as MotoreDiViag
       faseViaggio = IN_STAZIONE,
       genera passeggeri iniziali.
     end note
+
     ' --- Ciclo di simulazione (macchina a stati) ---
     state "Ciclo di Simulazione\n(tick ogni 1s)" as CicloSimulazione {
+
         state "IN_STAZIONE\n(FERMO)" as InStazione
         note bottom of InStazione
           Attende scadenza sosta.
@@ -136,6 +246,7 @@ state "Motore di Viaggio – Digital Twin\n(TrainJourneyEngine)" as MotoreDiViag
           corrente/prossima guasta.
           Sosta doppia al capolinea.
         end note
+
         state "IN_VIAGGIO" as InViaggio
         note bottom of InViaggio
           Interpola GPS tra le due
@@ -144,6 +255,7 @@ state "Motore di Viaggio – Digital Twin\n(TrainJourneyEngine)" as MotoreDiViag
           tempo scalato dal fattore
           di accelerazione.
         end note
+
         state "BLOCCATO\nGUASTO STAZIONE" as Bloccato
         note bottom of Bloccato
           Treno fermo, accumula
@@ -151,6 +263,7 @@ state "Motore di Viaggio – Digital Twin\n(TrainJourneyEngine)" as MotoreDiViag
           progressPercent se
           bloccato a metà tratta.
         end note
+
         state "EMERGENZA\n(guasto di bordo)" as Emergenza
         note bottom of Emergenza
           Guasto rilevato dai sensori.
@@ -158,6 +271,7 @@ state "Motore di Viaggio – Digital Twin\n(TrainJourneyEngine)" as MotoreDiViag
           di tratta non avanza.
           Velocità = 0.
         end note
+
         state "SOPPRESSO" as Soppresso
         note bottom of Soppresso
           Stato definitivo.
@@ -165,46 +279,80 @@ state "Motore di Viaggio – Digital Twin\n(TrainJourneyEngine)" as MotoreDiViag
           Centrale (alert STOP).
           faseViaggio = TERMINATO.
         end note
+
         state "Inversione al\nCapolinea" as Inversione
+
         ' --- Transizioni principali ---
         [*] --> InStazione
+
         InStazione --> InViaggio : sosta scaduta\n+ stato = FERMO\n+ nessuna stazione guasta\n[pubblica USCITA MQTT]
-        InViaggio --> InStazione : progressPercent ≥ 100%\n(arrivo in stazione)\n[pubblica ENTRATA MQTT]
+        InViaggio --> InStazione : progressPercent >= 100%\n(arrivo in stazione)\n[pubblica ENTRATA MQTT]
+
         ' --- Inversione ---
         InStazione --> Inversione : arrivo al capolinea\n(ultimo/primo indice)
-        Inversione --> InStazione : direzione invertita\n(andata ↔ ritorno)\nsosta doppia
+        Inversione --> InStazione : direzione invertita\n(andata <-> ritorno)\nsosta doppia
+
         ' --- Guasto stazione ---
         InStazione --> Bloccato : alert GUASTO CRITICAL\nstazione corrente/prossima
         InViaggio --> Bloccato : alert GUASTO CRITICAL\nstazione corrente/prossima
         Bloccato --> InStazione : alert RESOLVED\n(ero IN_STAZIONE)
         Bloccato --> InViaggio : alert RESOLVED\n(ero IN_VIAGGIO)
+
         ' --- Emergenza di bordo ---
         InStazione --> Emergenza : sensore rileva guasto\n[inviaGuasto() MQTT]
         InViaggio --> Emergenza : sensore rileva guasto\n[inviaGuasto() MQTT]
-        Emergenza --> InStazione : alert RESOLVED\nper questo TRENO\n(stato → FERMO)
-        Emergenza --> InViaggio : alert RESOLVED\nper questo TRENO\n(stato → FERMO,\nriprende la marcia)
+        Emergenza --> InStazione : alert RESOLVED\nper questo TRENO\n(stato -> FERMO)
+        Emergenza --> InViaggio : alert RESOLVED\nper questo TRENO\n(stato -> FERMO,\nriprende la marcia)
+
         ' --- Soppressione ---
         InStazione --> Soppresso : alert STOP target = trenoId
         InViaggio --> Soppresso : alert STOP target = trenoId
         Bloccato --> Soppresso : alert STOP target = trenoId
         Emergenza --> Soppresso : alert STOP target = trenoId
-        Soppresso --> [*] : TERMINATO\n(il tick non fa più nulla)
+        Soppresso --> [*] : TERMINATO\n(il tick non fa piu' nulla)
     }
+
     ' --- Transizioni esterne al ciclo ---
     [*] --> AttesaItinerario
     AttesaItinerario --> AttesaItinerario : Centrale irraggiungibile /\nHTTP != 200 /\n< 2 stazioni\n(retry ogni 15s)
     AttesaItinerario --> ItinerarioCaricato : HTTP 200 +\nparsing JSON OK
     ItinerarioCaricato --> AvvioViaggio : autostart = true
     AvvioViaggio --> CicloSimulazione
+
     ' --- Ricarica itinerario ---
     CicloSimulazione --> AttesaItinerario : alert ITINERARIO_AGGIORNATO\n(reset completo,\nricarica dalla Centrale)
 }
-' ===================== COMPONENTI IN BACKGROUND =====================
-state "Componenti Attivi in Background\n(paralleli al ciclo di simulazione)" as Background {
-    state "TrainElab\n(telemetria MQTT\nogni 5s)" as Telemetria
-    state "TrainGateway\n(listener alert\nMQTT in ingresso)" as Gateway
-    state "TrainIngestion\n(API REST\nhttp://localhost:8082)" as Ingestion
+
+@enduml
+
+
+@startuml Macchina a Stati Esterna – Componenti in Background del Treno
+' =========================================================================
+'  2) Componenti attivi in background lato Treno
+'     Richiamata da: diagramma_stati_treno.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
 }
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title Macchina a Stati Esterna – Componenti in Background del Treno
+
+state "Componenti Attivi in Background\n(paralleli al ciclo di simulazione)" as Background {
+    state "TrainElab\n(telemetria MQTT\nogni 5s)\n-> railway/telemetry" as Telemetria
+    state "TrainGateway\n(listener alert MQTT\nin ingresso)\n<- railway/alerts" as Gateway
+    state "TrainGateway.inviaPassaggio()\n(publisher)\n-> railway/train/{id}/passaggio" as PassaggioOut
+    state "TrainIngestion (REST)\nGET localhost:8082/treno/info" as Ingestion
+}
+
 note bottom of Background
   Questi componenti girano in parallelo
   grazie a Quarkus Reactive Messaging.
@@ -212,22 +360,65 @@ note bottom of Background
   sul TrainDB condiviso e interagiscono
   con il TrainJourneyEngine.
 end note
-MotoreDiViaggio -[hidden]right-> Background
-' ===================== CICLO INFINITO KEEP-ALIVE =====================
-state "Ciclo Infinito Keep-Alive\n(main.run() → while(true) sleep 1s)" as KeepAlive
-note right of KeepAlive
-  Il thread principale resta in
-  vita con un loop infinito.
-  Tutta la logica è nei bean
-  Quarkus in background.
-end note
-MotoreDiViaggio -[hidden]down-> KeepAlive
+
 @enduml
+
+
+@startuml Macchina a Stati Esterna – Componenti Stazione e Centrale
+' =========================================================================
+'  3) Componenti MQTT/REST attivi dopo la validazione dell'ID
+'     Richiamata da: diagramma_stati_stazione.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title Macchina a Stati Esterna – Componenti MQTT/REST della Stazione e della Centrale
+
+state "Componenti Attivi in Background\n(paralleli, indipendenti dallo stato di validazione dell'ID)" as ComponentiAttivi {
+
+    state "LATO STAZIONE" as LatoStazione {
+        state "HeartbeatGenerator\n(publisher, ogni 10s)\n-> railway/station/{id}/heartbeat" as HBOut
+        state "StationGateway.inviaTransito()\n(publisher)\n-> railway/station/{id}/transit" as TransitOut
+        state "StationGateway.inviaGuasto()\n(publisher)\n-> railway/alerts" as AlertOut
+        state "StationGateway.riceviAlert()\n(listener)\n<- railway/alerts" as AlertIn
+        state "StationGateway.riceviPassaggio()\n(listener, wildcard)\n<- railway/train/+/passaggio" as PassaggioIn
+        state "StationIngestion (REST)\nGET localhost:8081/stazione/info" as StationRest
+    }
+
+    state "LATO CENTRALE" as LatoCentrale {
+        state "IngestionService.onHeartbeat()\n(listener)\n<- railway/station/+/heartbeat" as CentraleHBIn
+        state "IngestionService.onTransit()\n(listener)\n<- railway/station/+/transit" as CentraleTransitIn
+        state "IngestionService.onAlert()\n(listener, solo GUASTO)\n<- railway/alerts" as CentraleAlertIn
+        state "IngestionService.onPassaggio()\n(listener)\n<- railway/train/+/passaggio" as CentralePassaggioIn
+        state "RestApiGateway / FaultMonitor\n(publisher: RESOLVED, STOP,\nMAINTENANCE_DISPATCHED)\n-> railway/alerts" as CentraleAlertOut
+    }
+
+    LatoStazione -[hidden]right-> LatoCentrale
+}
+
+note bottom of ComponentiAttivi
+  Questi componenti girano in parallelo grazie a Quarkus
+  Reactive Messaging e non dipendono da uno stato proprio:
+  leggono/scrivono sul DBLocale (lato Stazione) o sul DB
+  centrale + cache RAM (TrafficLogicEngine, lato Centrale).
+  railway/alerts e' un topic CONDIVISO: sia la Stazione sia
+  la Centrale vi pubblicano e vi sono sottoscritte,
+  filtrando i messaggi tramite il campo "tipoEvento".
+end note
+
+@enduml
+
 #+end_src
-
-#+RESULTS:
-[[file:/tmp/babel-3T4YVM/plantuml-CHitGo.png]]
-
 
 *** Della Stazione
 #+begin_src plantuml file: StatiStazione
@@ -386,6 +577,1870 @@ ComponentiAttivi -[hidden]down-> KeepAlive
 #+RESULTS:
 [[file:/tmp/babel-Ew7jF5/plantuml-cZpx8S.png]]
 
+*** Del Server Centrale
+- nota: ci sono anche due macchine relative a stazione e treno sarebbero la proiezione lato della centrale operativa
+**** mappa delle macchine
+#+begin_src  plantuml file: 00_mappa_delle_macchine.png
+@startuml M0 - Mappa delle Macchine a Stati della Centrale Operativa
+' =========================================================================
+'  MAPPA DELLE MACCHINE ASTRATTE DEL COMPONENTE "SERVER CENTRALE"
+'  (modulo ServeCentraleOperativa, Quarkus)
+'
+'  Il componente e' stato astratto in 13 macchine a stati che si richiamano
+'  fra loro. Questo file NON descrive un comportamento: e' l'indice che dice
+'  quale macchina sta in quale file e chi chiama chi.
+'
+'  Ogni macchina ha il suo file:
+'    M1  01_macchina_ciclo_vita_centrale.puml      main + TrafficLogicEngine.onStart
+'    M2  02_macchina_validazione_id_edge.puml      ExistIdForEdge / ExistIdForEdgeStazione
+'    M3  03_macchina_ingestione_telemetria.puml    IngestionService.onTelemetry
+'    M4  04_macchina_ingestione_heartbeat.puml     IngestionService.onHeartbeat
+'    M5  05_macchina_ingestione_transiti.puml      IngestionService.onTransit / onPassaggio
+'    M6  06_macchina_ingestione_allarmi.puml       IngestionService.onAlert
+'    M7  07_macchina_ciclo_vita_guasto.puml        entita' Guasto (ciclo di vita)
+'    M8  08_macchina_watchdog_faultmonitor.puml    FaultMonitor (3 job schedulati)
+'    M9  09_macchina_sessione_autorizzazione.puml  AuthController + SessioniAttive + Filtro
+'    M10 10_macchina_gateway_rest.puml             RestApiGateway
+'    M11 11_macchina_websocket_realtime.puml       RealtimeWebSocket
+'    M12 12_macchina_stato_stazione.puml           stato runtime della Stazione in cache
+'    M13 13_macchina_stato_treno.puml              stato del Treno (cache + DB)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<radice>> {
+    BackgroundColor #D2E3FC
+    BorderColor #174EA6
+}
+skinparam state<<entita>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M0 - Mappa delle 13 macchine a stati della Centrale Operativa
+
+state "M1 - Ciclo di vita\ndel processo Centrale" as M1 <<radice>>
+
+state "M2 - Validazione ID\ndei nodi di campo" as M2
+state "M3 - Ingestione\ntelemetria treno" as M3
+state "M4 - Ingestione\nheartbeat stazione" as M4
+state "M5 - Ingestione\ntransiti e passaggi" as M5
+state "M6 - Ingestione\nallarmi dal campo" as M6
+state "M8 - Watchdog\nFaultMonitor" as M8
+state "M9 - Sessione e\nautorizzazione REST" as M9
+state "M10 - Gateway REST\n(CRUD e comandi)" as M10
+state "M11 - Canale\nWebSocket realtime" as M11
+
+state "M7 - Ciclo di vita\ndel Guasto" as M7 <<entita>>
+state "M12 - Stato runtime\ndella Stazione" as M12 <<entita>>
+state "M13 - Stato\ndel Treno" as M13 <<entita>>
+
+' --- M1 fa partire tutte le macchine concorrenti ---
+[*] --> M1
+M1 --> M2 : attiva i canali\ndi validazione
+M1 --> M3 : attiva il canale\ntelemetry-in
+M1 --> M4 : attiva il canale\nheartbeat-in
+M1 --> M5 : attiva i canali\ntransit-in / passaggio-in
+M1 --> M6 : attiva il canale\nalerts-in
+M1 --> M8 : avvia i job\nschedulati (10s)
+M1 --> M9 : pubblica /api/auth\ne il filtro JAX-RS
+M1 --> M11 : apre l'endpoint\n/ws/realtime
+
+' --- Riferimenti fra le macchine ---
+M9 -[dashed]-> M10 : richiesta autorizzata
+M10 -[dashed]-> M7 : risolvi allarme /\nmanutenzione
+M10 -[dashed]-> M13 : sopprimi treno,\nCRUD treni
+M10 -[dashed]-> M12 : manutenzione,\nCRUD stazioni
+
+M3 -[dashed]-> M13 : normalizza e\nstoricizza lo stato
+M4 -[dashed]-> M12 : ONLINE / rientro\ndal fail-stop
+M4 -[dashed]-> M7 : chiude i guasti\n"Heartbeat assente:"
+M6 -[dashed]-> M7 : apre / aggiorna\nil guasto
+M6 -[dashed]-> M12 : GUASTA se\nCRITICAL
+M8 -[dashed]-> M7 : apre i guasti\nautomatici
+M8 -[dashed]-> M12 : OFFLINE per\nsilenzio heartbeat
+M8 -[dashed]-> M13 : rileva i treni\nfermi fra stazioni
+M5 -[dashed]-> M13 : posizione su tratta\ne prossima stazione
+
+M3 -[dotted]-> M11 : evento TELEMETRY
+M4 -[dotted]-> M11 : evento HEARTBEAT
+M5 -[dotted]-> M11 : evento TRANSIT
+M6 -[dotted]-> M11 : evento ALERT
+M8 -[dotted]-> M11 : evento SNAPSHOT
+
+M2 -[dashed]-> M13 : conferma l'esistenza\ndel convoglio a DB
+M2 -[dashed]-> M12 : conferma l'esistenza\ndella stazione a DB
+
+note bottom of M1
+  Legenda delle frecce:
+    piena      = la macchina M1 avvia la macchina puntata
+    tratteggio = la macchina chiama / fa transitare l'altra
+    punteggio  = la macchina produce un evento sul WebSocket
+
+  Tutte le macchine da M2 a M11 girano IN PARALLELO
+  (thread dei connettori reattivi, worker dello scheduler,
+  thread delle richieste HTTP) e condividono due sole risorse:
+  la cache RAM del TrafficLogicEngine e il database PostgreSQL.
+end note
+
+@enduml
+
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-KFq2Fi/plantuml-8Tiljy.png]]
+
+**** M1 ciclo di vita del processo della centrale
+- e' la macchina radice: da qui partono in parallelo tutte le altre (main + TrafficLogicEngine.onStart)
+#+begin_src  plantuml file: 01_macchina_ciclo_vita_centrale.png
+@startuml M1 - Ciclo di Vita del Processo Centrale Operativa
+' =========================================================================
+'  MACCHINA M1 - Ciclo di vita del processo della Centrale Operativa
+'
+'  Codice astratto:
+'    it.uni.reti2.main                                (@QuarkusMain)
+'    it.uni.reti2.elaboration.TrafficLogicEngine#onStart  (@Observes StartupEvent)
+'    src/main/resources/application.properties        (canali MQTT e datasource)
+'
+'  E' la macchina RADICE: quando entra nello stato "Servizio Operativo"
+'  fa partire in parallelo tutte le altre macchine del componente.
+'  Indice generale: 00_mappa_delle_macchine.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M1 - Ciclo di Vita del Processo Centrale Operativa (main + TrafficLogicEngine)
+
+[*] --> AvvioProcesso
+
+state "Avvio Processo\n(main.main() -> Quarkus.run(main.class, args))" as AvvioProcesso
+
+state "Boot Quarkus\n(container CDI)" as BootQuarkus {
+    state "Apertura Datasource\njdbc:postgresql://localhost:5432/railway\n(hibernate generation = update)" as Datasource
+    state "Apertura connettori MQTT\nverso Mosquitto :1883\n(:8883 col profilo tls)" as Connettori
+    state "Pubblicazione endpoint\nREST :8781/api\nWebSocket /ws/realtime" as EndpointHttp
+
+    [*] --> Datasource
+    Datasource --> Connettori
+    Connettori --> EndpointHttp
+}
+
+AvvioProcesso --> BootQuarkus
+
+note right of BootQuarkus
+  I canali dichiarati in application.properties sono 10:
+   IN  validation-in, validation-station-in, telemetry-in,
+       heartbeat-in, transit-in, passaggio-in, alerts-in
+   OUT validation-response, validation-station-response,
+       alerts-out
+end note
+
+state "Inizializzazione Cache in RAM\n(TrafficLogicEngine.onStart, @Transactional)" as InitCache {
+    state "Carica Stazioni\n(stato runtime = OFFLINE,\nultimoHeartbeat = null)" as CaricaStazioni
+    state "Carica Treni\n(ultimoAggiornamento = now)" as CaricaTreni
+    state "Carica Guasti con risolto = false\n(default per le righe vecchie)" as CaricaGuasti
+
+    [*] --> CaricaStazioni
+    CaricaStazioni --> CaricaTreni
+    CaricaTreni --> CaricaGuasti
+}
+
+BootQuarkus --> InitCache : StartupEvent
+
+note left of InitCache
+  All'avvio nessuna stazione viene marcata ONLINE:
+  finche' non arriva il primo heartbeat resta OFFLINE
+  con ultimoHeartbeat nullo. Il watchdog (M8) salta
+  le stazioni che non hanno mai battuto, quindi non
+  apre falsi guasti. Vedi M12.
+end note
+
+' ===================== SERVIZIO A REGIME =====================
+state "Servizio Operativo\n(main.run() -> while(true) Thread.sleep(1000))" as ServizioOperativo {
+
+    state "Cache RAM condivisa\n(TrafficLogicEngine:\ntreni, stazioni, guastiAttivi -\nConcurrentHashMap)" as Cache
+    state "Database PostgreSQL\n(entita' Panache + storici)" as DatabaseCentrale
+
+    --
+
+    state "M2 - Validazione ID dei nodi di campo\n(02_macchina_validazione_id_edge.puml)" as M2 <<esterna>>
+    state "M3 - Ingestione telemetria treno\n(03_macchina_ingestione_telemetria.puml)" as M3 <<esterna>>
+    state "M4 - Ingestione heartbeat stazione\n(04_macchina_ingestione_heartbeat.puml)" as M4 <<esterna>>
+    state "M5 - Ingestione transiti e passaggi\n(05_macchina_ingestione_transiti.puml)" as M5 <<esterna>>
+    state "M6 - Ingestione allarmi dal campo\n(06_macchina_ingestione_allarmi.puml)" as M6 <<esterna>>
+
+    --
+
+    state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+    state "M9 - Sessione e autorizzazione\n(09_macchina_sessione_autorizzazione.puml)" as M9 <<esterna>>
+    state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+    state "M11 - Canale WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
+}
+
+InitCache --> ServizioOperativo : cache pronta\n(log: Centrale Operativa AVVIATA)
+
+note bottom of ServizioOperativo
+  Il main NON fa lavoro utile: il ciclo di sleep serve solo
+  a tenere vivo il processo. Tutta l'elaborazione avviene
+  nelle macchine da M2 a M11, che girano in parallelo sui
+  thread dei connettori reattivi, dello scheduler e delle
+  richieste HTTP, e comunicano solo attraverso la cache RAM
+  e il database.
+end note
+
+state "Arresto del processo\n(SIGTERM / Ctrl-C)" as Arresto
+ServizioOperativo --> Arresto : richiesta di spegnimento
+Arresto --> [*] : chiusura canali MQTT,\nsessioni WebSocket e datasource
+
+note right of Arresto
+  Le sessioni di login (M9) stanno solo in RAM:
+  allo spegnimento tutti i token vengono persi
+  e gli operatori devono rifare il login.
+end note
+
+@enduml
+
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-KFq2Fi/plantuml-ZHgj4A.png]]
+
+**** M2 validazione dell'id dei nodi di campo
+- lato centrale della verifica dell'id gia' vista nei diagrammi del treno e della stazione (ExistIdForEdge / ExistIdForEdgeStazione)
+#+begin_src  plantuml file: 02_macchina_validazione_id_edge.png
+@startuml M2 - Validazione dell'ID dei Nodi di Campo
+' =========================================================================
+'  MACCHINA M2 - Validazione dell'ID dei nodi di campo (treni e stazioni)
+'
+'  Codice astratto:
+'    it.uni.reti2.DbValidator.ExistIdForEdge         (treni)
+'    it.uni.reti2.DbValidator.ExistIdForEdgeStazione (stazioni)
+'
+'  E' l'unica forma di "autenticazione" dei nodi edge: un processo Treno o
+'  Stazione all'avvio chiede alla Centrale se il proprio ID esiste a DB e
+'  parte solo se riceve esisteNelDb = true.
+'
+'  Avviata da: M1 (01_macchina_ciclo_vita_centrale.puml)
+'  Lato campo: ../diagramma_stati_treno.puml e ../diagramma_stati_stazione.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M2 - Validazione dell'ID dei Nodi di Campo (ExistIdForEdge / ExistIdForEdgeStazione)
+
+note as Ingresso
+  INGRESSO: canali validation-in e validation-station-in
+  aperti dal boot di Quarkus (M1).
+  La macchina e' identica per il treno e per la stazione,
+  cambiano solo il topic e l'entita' interrogata.
+end note
+
+[*] --> InAscolto
+
+state "In Ascolto\n<- railway/train/+/validation\n<- railway/station/+/validation" as InAscolto
+
+state "Elaborazione della Richiesta\n(un messaggio per volta, @Blocking)" as Elaborazione {
+
+    state "Lettura del payload\n(new String(messaggio.getPayload()))" as LetturaPayload
+    state "Parsing JSON\n(ObjectMapper.readTree)" as Parsing
+    state "Estrazione dell'ID\n(campo trenoId / stazioneId)" as EstrazioneId
+
+    state "Interrogazione del DB\nQuarkusTransaction.requiringNew()\nTreno.findById / Stazione.findById" as QueryDb
+
+    state "Esito POSITIVO\nesisteNelDb = true" as EsitoPositivo
+    state "Esito NEGATIVO\nesisteNelDb = false" as EsitoNegativo
+
+    state "Pubblicazione della risposta\n(topic dinamico via Emitter,\nQoS AT_MOST_ONCE)" as Pubblicazione
+
+    state "Richiesta scartata\n(log su stderr,\nnessuna risposta pubblicata)" as Scartata
+
+    [*] --> LetturaPayload
+    LetturaPayload --> Parsing
+    Parsing --> EstrazioneId : JSON valido
+    Parsing --> Scartata : payload non JSON\n(eccezione catturata)
+    EstrazioneId --> QueryDb : ID presente
+    EstrazioneId --> Scartata : campo ID assente
+
+    QueryDb --> EsitoPositivo : findById != null
+    QueryDb --> EsitoNegativo : findById == null
+    QueryDb --> Scartata : errore sul DB\n(eccezione catturata)
+
+    EsitoPositivo --> Pubblicazione : -> railway/train/{id}/validation-response\n-> railway/station/{id}/validation-response
+    EsitoNegativo --> Pubblicazione : stesso topic,\nesisteNelDb = false
+}
+
+InAscolto --> Elaborazione : messaggio MQTT ricevuto
+
+state "Ack del messaggio\n(messaggio.ack())" as Ack
+Elaborazione --> Ack : in OGNI caso,\nanche dopo un errore
+Ack --> InAscolto : canale ancora vivo,\npronto per la richiesta successiva
+
+note right of Ack
+  Il try/catch che avvolge tutto il corpo e l'ack
+  incondizionato sono la parte importante di questa
+  macchina: senza, un solo payload malformato faceva
+  terminare in errore il canale reattivo e da quel
+  momento la Centrale non validava piu' NESSUN nodo
+  fino al riavvio (stato assorbente "canale morto").
+end note
+
+' ===================== CONSEGUENZE SUL NODO DI CAMPO =====================
+state "Effetto sul nodo di campo\n(macchine ESTERNE al componente)" as EffettoCampo <<esterna>> {
+    state "Nodo AMMESSO\n(riconosciuto = true,\nentra nel keep-alive)" as NodoAmmesso
+    state "Nodo RESPINTO\n(termina con codice 1)" as NodoRespinto
+    state "Nodo in ATTESA\n(riprova ogni 15s)" as NodoAttesa
+}
+
+EsitoPositivo -[dashed]-> NodoAmmesso
+EsitoNegativo -[dashed]-> NodoRespinto
+Scartata -[dashed]-> NodoAttesa : nessuna risposta:\nil nodo va in timeout\ne ritenta
+
+note bottom of EffettoCampo
+  Dettaglio nei diagrammi del componente Treno e Stazione:
+    ../diagramma_stati_treno.puml
+    ../diagramma_stati_stazione.puml
+  Un nodo ammesso diventa poi sorgente per le macchine
+  M3 (telemetria), M4 (heartbeat), M5 (transiti) e M6 (allarmi).
+end note
+
+@enduml
+
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-KFq2Fi/plantuml-Ymnk1D.png]]
+
+**** M3 ingestione della telemetria dei treni
+- consumo del topic railway/train/+/telemetry, aggiornamento della cache e storicizzazione solo al cambio di stato (IngestionService.onTelemetry)
+#+begin_src  plantuml file: 03_macchina_ingestione_telemetria.png
+@startuml M3 - Ingestione della Telemetria dei Treni
+' =========================================================================
+'  MACCHINA M3 - Ingestione della telemetria dei treni
+'
+'  Codice astratto:
+'    it.uni.reti2.ingestion.IngestionService#onTelemetry
+'    it.uni.reti2.ingestion.IngestionService#salvaStatoTreno
+'    it.uni.reti2.ingestion.IngestionService#normalizzaStatoTreno
+'
+'  Canale: telemetry-in  <- railway/train/+/telemetry (un frame ogni 5s per treno)
+'
+'  Avviata da:  M1  (01_macchina_ciclo_vita_centrale.puml)
+'  Fa transitare: M13 (13_macchina_stato_treno.puml)
+'  Produce eventi su: M11 (11_macchina_websocket_realtime.puml)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M3 - Ingestione della Telemetria dei Treni (IngestionService.onTelemetry)
+
+[*] --> InAscolto
+
+state "In Ascolto\n<- railway/train/+/telemetry" as InAscolto
+
+state "Elaborazione del Frame\n(@Blocking, un frame per volta)" as Elaborazione {
+
+    state "Parsing JSON\n(trenoId, stato, lat, lng, velocita,\nprogressPercent, ritardo, passeggeri,\nstazioneCorrente, prossimaStazione, direzione)" as Parsing
+
+    state "Normalizzazione dello stato\nIN_VIAGGIO -> attivo\nFERMO -> fermo\nEMERGENZA -> rotto\nSOPPRESSO -> in manutenzione\naltro -> fermo" as Normalizzazione
+
+    state "Ricerca del treno in cache\n(TrafficLogicEngine.getTreno)" as LookupCache
+
+    state "Frame SCARTATO\n(treno sconosciuto:\nlog di warning)" as FrameScartato
+
+    state "Aggiornamento della cache RAM\n(posizione, velocita, progresso,\nritardo, passeggeri, stazioni,\nultimoAggiornamento = now)" as AggiornaCache
+
+    state "Scrittura sul DB\nQuarkusTransaction.requiringNew()\n-> salvaStatoTreno" as ScritturaDb {
+        state "Treno.findById(trenoId)" as RicercaDb
+        state "Nessuna scrittura\n(riga non presente)" as NessunaScrittura
+        state "Aggiorna Treni.stato" as AggiornaStato
+        state "Storicizza\n(Storico_Stato_Treni.persist)" as Storicizza
+
+        [*] --> RicercaDb
+        RicercaDb --> NessunaScrittura : treno non a DB
+        RicercaDb --> AggiornaStato : treno trovato
+        AggiornaStato --> Storicizza : stato DIVERSO\nda quello precedente
+        AggiornaStato --> [*] : stato invariato\n(niente storico)
+        Storicizza --> [*]
+    }
+
+    state "Broadcast WebSocket\neventType = TELEMETRY\n(+ trainId, progressPercent,\ndelayMinutes, velocita, lat, lng)" as BroadcastWs
+
+    state "Errore di elaborazione\n(log dell'eccezione,\nframe perso)" as Errore
+
+    [*] --> Parsing
+    Parsing --> Normalizzazione
+    Parsing --> Errore : payload malformato
+    Normalizzazione --> LookupCache
+    LookupCache --> FrameScartato : getTreno == null
+    LookupCache --> AggiornaCache : treno in cache
+    AggiornaCache --> ScritturaDb
+    ScritturaDb --> BroadcastWs
+    ScritturaDb --> Errore : commit fallito\n(eccezione catturata)
+    BroadcastWs --> [*]
+}
+
+InAscolto --> Elaborazione : frame di telemetria ricevuto
+
+state "Ack del messaggio" as Ack
+Elaborazione --> Ack : sempre,\nanche su frame scartato o errore
+FrameScartato -[dashed]-> Ack
+Ack --> InAscolto
+
+note right of FrameScartato
+  La telemetria NON crea piu' il treno: la cache e' la
+  fotografia della tabella Treni, quindi un processo
+  lanciato con un ID inventato viene ignorato.
+  Altrimenti la verifica dell'ID di M2 si auto-validava,
+  perche' il primo frame creava da solo la riga a DB.
+end note
+
+note bottom of Elaborazione
+  La transazione si apre e si chiude DENTRO il try
+  (QuarkusTransaction.requiringNew) e non con @Transactional
+  sul metodo: cosi' una violazione di vincolo resta
+  catturabile e non spegne il canale reattivo.
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M13 - Stato del Treno\n(13_macchina_stato_treno.puml)" as M13 <<esterna>>
+state "M11 - WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+
+Storicizza -[dashed]-> M13 : transizione di stato\nregistrata
+BroadcastWs -[dashed]-> M11 : evento TELEMETRY\nai client connessi
+AggiornaCache -[dashed]-> M8 : velocita e ultimoAggiornamento\nsono i dati che il watchdog\nlegge per i treni fermi
+
+@enduml
+
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-KFq2Fi/plantuml-aOiaeU.png]]
+
+**** M4 ingestione degli heartbeat delle stazioni
+- consumo del topic railway/station/+/heartbeat e chiusura automatica dei guasti aperti dal watchdog quando il battito torna (IngestionService.onHeartbeat)
+#+begin_src  plantuml file: 04_macchina_ingestione_heartbeat.png
+@startuml M4 - Ingestione degli Heartbeat delle Stazioni
+' =========================================================================
+'  MACCHINA M4 - Ingestione degli heartbeat delle stazioni
+'
+'  Codice astratto:
+'    it.uni.reti2.ingestion.IngestionService#onHeartbeat
+'    it.uni.reti2.ingestion.IngestionService#storicizzaStatoStazione
+'    it.uni.reti2.ingestion.IngestionService#chiudiGuastiHeartbeatPerso
+'
+'  Canale: heartbeat-in <- railway/station/+/heartbeat (un battito ogni 10s)
+'
+'  Avviata da:   M1  (01_macchina_ciclo_vita_centrale.puml)
+'  Fa transitare: M12 (12_macchina_stato_stazione.puml)
+'                 M7  (07_macchina_ciclo_vita_guasto.puml)
+'  E' il "contrappeso" del watchdog M8: qui si chiude cio' che M8 ha aperto.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M4 - Ingestione degli Heartbeat delle Stazioni (IngestionService.onHeartbeat)
+
+[*] --> InAscolto
+
+state "In Ascolto\n<- railway/station/+/heartbeat" as InAscolto
+
+state "Elaborazione del Battito\n(@Blocking)" as Elaborazione {
+
+    state "Parsing JSON\n(stazioneId, stato)" as Parsing
+
+    state "Ricerca della stazione in cache\n(TrafficLogicEngine.getStazione)" as LookupCache
+    state "Battito SCARTATO\n(stazione sconosciuta)" as Scartato
+
+    state "Confronto con lo stato precedente" as Confronto {
+        state "statoCambiato =\nstato precedente != stato ricevuto" as FlagCambio
+        state "tornataDalFailStop =\nstato precedente == OFFLINE" as FlagRientro
+
+        [*] --> FlagCambio
+        FlagCambio --> FlagRientro
+    }
+
+    state "Aggiornamento della cache RAM\n(stazione.stato = stato ricevuto,\nultimoHeartbeat = now)" as AggiornaCache
+
+    state "Transazione sul DB\nQuarkusTransaction.requiringNew()" as Transazione {
+        state "Storicizza lo stato\n(Storico_Stato_Stazioni.persist)" as Storicizza
+        state "Chiude i guasti automatici\n(messaggio che inizia con\n'Heartbeat assente:')" as ChiudiGuasti
+        state "Nessuna scrittura\n(battito ripetuto,\nstesso stato)" as NessunaScrittura
+
+        [*] --> Storicizza : statoCambiato = true
+        [*] --> NessunaScrittura : statoCambiato = false
+        Storicizza --> ChiudiGuasti : tornataDalFailStop = true
+        NessunaScrittura --> ChiudiGuasti : tornataDalFailStop = true
+    }
+
+    state "Notifica del rientro (dopo il commit)\nper ogni guasto chiuso:\n-> railway/alerts RESOLVED\n+ broadcast ALERT su WebSocket" as NotificaRientro
+
+    state "Broadcast WebSocket\neventType = HEARTBEAT\nstatus: operativa / guasta /\nmanutenzione / offline" as BroadcastWs
+
+    state "Errore di elaborazione\n(log dell'eccezione)" as Errore
+
+    [*] --> Parsing
+    Parsing --> LookupCache
+    Parsing --> Errore : payload malformato
+    LookupCache --> Scartato : getStazione == null
+    LookupCache --> Confronto : stazione in cache
+    Confronto --> AggiornaCache
+    AggiornaCache --> Transazione
+    Transazione --> NotificaRientro : ci sono guasti chiusi
+    Transazione --> BroadcastWs : nessun guasto da chiudere
+    NotificaRientro --> BroadcastWs
+    BroadcastWs --> [*]
+}
+
+InAscolto --> Elaborazione : heartbeat ricevuto
+
+state "Ack del messaggio" as Ack
+Elaborazione --> Ack : sempre
+Scartato -[dashed]-> Ack
+Ack --> InAscolto
+
+note right of Transazione
+  Lo storico si scrive SOLO al cambio di stato:
+  a ogni battito sarebbero circa 8.600 righe identiche
+  al giorno per ogni stazione.
+end note
+
+note left of ChiudiGuasti
+  Vengono chiusi solo i guasti aperti dal watchdog
+  (prefisso "Heartbeat assente:"): quelli dichiarati
+  dalla stazione stessa li chiude un operatore
+  attraverso M10. Il riconoscimento per prefisso e'
+  il modo in cui la Centrale distingue i guasti "suoi".
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M12 - Stato della Stazione\n(12_macchina_stato_stazione.puml)" as M12 <<esterna>>
+state "M7 - Ciclo di vita del Guasto\n(07_macchina_ciclo_vita_guasto.puml)" as M7 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M11 - WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
+
+AggiornaCache -[dashed]-> M12 : OFFLINE -> ONLINE\n(rientro del nodo)
+ChiudiGuasti -[dashed]-> M7 : Aperto -> Risolto
+M8 -[dashed]-> AggiornaCache : e' il watchdog che aveva\nportato la stazione a OFFLINE
+BroadcastWs -[dashed]-> M11 : evento HEARTBEAT
+NotificaRientro -[dashed]-> M11 : evento ALERT (risolto)
+
+@enduml
+
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-KFq2Fi/plantuml-reQ1Oz.png]]
+
+**** M5 ingestione dei transiti e dei passaggi
+- lo stesso passaggio fisico arriva alla centrale da due strade, dal sensore di terra e dal treno: qui si vede chi fa cosa (onTransit / onPassaggio)
+#+begin_src  plantuml file: 05_macchina_ingestione_transiti.png
+@startuml M5 - Ingestione dei Transiti e dei Passaggi
+' =========================================================================
+'  MACCHINA M5 - Ingestione dei transiti (sensore di terra) e dei passaggi
+'                (dichiarazione del treno)
+'
+'  Codice astratto:
+'    it.uni.reti2.ingestion.IngestionService#onTransit / registraTransito
+'    it.uni.reti2.ingestion.IngestionService#onPassaggio / aggiornaPosizioneSuTratta
+'
+'  Canali: transit-in    <- railway/station/+/transit  (sorgente: STAZIONE)
+'          passaggio-in  <- railway/train/+/passaggio  (sorgente: TRENO)
+'
+'  Lo stesso passaggio fisico arriva alla Centrale per DUE strade: qui si
+'  vede chi fa cosa e perche' solo una delle due genera l'evento per la UI.
+'
+'  Avviata da:   M1  (01_macchina_ciclo_vita_centrale.puml)
+'  Fa transitare: M13 (13_macchina_stato_treno.puml, posizione sulla tratta)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam state<<entita>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M5 - Ingestione dei Transiti e dei Passaggi (IngestionService.onTransit / onPassaggio)
+
+' ===================== RAMO 1: SENSORE DI TERRA =====================
+state "Ramo STAZIONE - onTransit()\n<- railway/station/+/transit" as RamoStazione {
+
+    state "In Ascolto (transit)" as AscoltoTransit
+    state "Parsing JSON\n(trenoId, stazioneId, tipo)" as ParsingTransit
+
+    state "Registrazione sul DB\nQuarkusTransaction.requiringNew()" as RegistraTransito
+    state "Aggiornamento del contatore\ntreniInStazione in cache\n(+1 su ENTRATA, -1 su USCITA)" as Contatore
+    state "Broadcast WebSocket\neventType = TRANSIT\ntype: ingresso / uscita\n+ delayMinutes dalla cache" as BroadcastTransit
+    state "Errore di elaborazione" as ErroreTransit
+
+    [*] --> AscoltoTransit
+    AscoltoTransit --> ParsingTransit : messaggio ricevuto
+    ParsingTransit --> RegistraTransito
+    ParsingTransit --> ErroreTransit : payload malformato
+    RegistraTransito --> Contatore
+    Contatore --> BroadcastTransit
+    BroadcastTransit --> AscoltoTransit : ack
+    ErroreTransit --> AscoltoTransit : ack
+}
+
+note right of BroadcastTransit
+  La STAZIONE e' la sola sorgente degli eventi TRANSIT
+  per la dashboard: e' il sensore di terra a rilevare
+  il passaggio. Il ramo del treno (onPassaggio) non fa
+  broadcast, altrimenti ogni ingresso/uscita compariva
+  due volte nella pagina transiti.
+end note
+
+' ===================== CICLO DI VITA DEL TRANSITO =====================
+state "Ciclo di vita del TRANSITO a DB\n(entita' Transito + Storico_Transiti)" as CicloTransito <<entita>> {
+
+    state "Nessun transito aperto" as NessunTransito
+    state "Transito APERTO\n(tempoEntrata = now,\ntempoUscita = null)" as TransitoAperto
+    state "Transito CHIUSO\n(tempoUscita valorizzato)" as TransitoChiuso
+    state "Transito PUNTUALE\n(entrata = uscita)" as TransitoPuntuale
+
+    [*] --> NessunTransito
+    NessunTransito --> TransitoAperto : tipo = ENTRATA\n[persist + storicizza]
+    TransitoAperto --> TransitoChiuso : tipo = USCITA,\ntransito aperto trovato\n[storicizza]
+    NessunTransito --> TransitoPuntuale : tipo = USCITA senza\ntransito aperto\n(tipico della stazione\ndi partenza)
+    TransitoChiuso --> NessunTransito : il convoglio ha\nlasciato la stazione
+    TransitoPuntuale --> NessunTransito
+    NessunTransito --> NessunTransito : treno o stazione\nnon presenti a DB\n(transito ignorato)
+}
+
+RegistraTransito -[dashed]-> CicloTransito : apre o chiude\nil transito
+
+' ===================== RAMO 2: DICHIARAZIONE DEL TRENO =====================
+state "Ramo TRENO - onPassaggio()\n<- railway/train/+/passaggio" as RamoTreno {
+
+    state "In Ascolto (passaggio)" as AscoltoPassaggio
+    state "Parsing JSON\n(trenoId, stazioneId, tipo,\nritardoMinuti)" as ParsingPassaggio
+
+    state "Lettura della direzione\ndalla cache del treno\n(andata / ritorno)" as Direzione
+
+    state "Transazione di lettura/scrittura\nsull'itinerario" as TransazionePosizione {
+        state "Ricerca della tratta coerente\n(ENTRATA -> tratta appena percorsa,\nUSCITA -> tratta imboccata;\nruoli invertiti in ritorno)" as TrovaTratta
+        state "Aggiorna Treni.posizioneAttualeTratta" as AggiornaPosizione
+        state "Calcola la prossima stazione\n(indice +1 in andata,\n-1 in ritorno; null al capolinea)" as ProssimaStazione
+        state "Nessun aggiornamento\n(treno senza itinerario)" as SenzaItinerario
+
+        [*] --> TrovaTratta
+        TrovaTratta --> AggiornaPosizione : tratta trovata
+        TrovaTratta --> SenzaItinerario : treno inesistente\no senza itinerario
+        AggiornaPosizione --> ProssimaStazione : solo su ENTRATA
+    }
+
+    state "Aggiornamento della cache RAM\n(ritardo, stazioneCorrente,\nprossimaStazione, posizione,\nultimoAggiornamento)" as AggiornaCacheTreno
+    state "Errore di elaborazione" as ErrorePassaggio
+
+    [*] --> AscoltoPassaggio
+    AscoltoPassaggio --> ParsingPassaggio : messaggio ricevuto
+    ParsingPassaggio --> Direzione
+    ParsingPassaggio --> ErrorePassaggio : payload malformato
+    Direzione --> TransazionePosizione
+    TransazionePosizione --> AggiornaCacheTreno
+    AggiornaCacheTreno --> AscoltoPassaggio : ack\n(NESSUN broadcast)
+    ErrorePassaggio --> AscoltoPassaggio : ack
+}
+
+RamoStazione -[hidden]down-> CicloTransito
+CicloTransito -[hidden]down-> RamoTreno
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M13 - Stato del Treno\n(13_macchina_stato_treno.puml)" as M13 <<esterna>>
+state "M11 - WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
+state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+
+AggiornaCacheTreno -[dashed]-> M13 : posizione sulla tratta\ne prossima stazione
+BroadcastTransit -[dashed]-> M11 : evento TRANSIT
+M10 -[dashed]-> CicloTransito : GET /api/transiti legge\nlo storico (ultimi 200)
+
+@enduml
+
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-KFq2Fi/plantuml-1wPBLp.png]]
+
+**** M6 ingestione degli allarmi dal campo
+- railway/alerts e' un topic condiviso, quindi la centrale deve filtrare i messaggi che ha pubblicato lei stessa (IngestionService.onAlert)
+#+begin_src  plantuml file: 06_macchina_ingestione_allarmi.png
+@startuml M6 - Ingestione degli Allarmi dal Campo
+' =========================================================================
+'  MACCHINA M6 - Ingestione degli allarmi provenienti dal campo
+'
+'  Codice astratto:
+'    it.uni.reti2.ingestion.IngestionService#onAlert
+'    it.uni.reti2.ingestion.IngestionService#tipoGuastoPerFrontend
+'    it.uni.reti2.ingestion.IngestionService#aggiornaMessaggioGuasto
+'
+'  Canale: alerts-in <- railway/alerts (topic CONDIVISO in ingresso e uscita)
+'
+'  Il punto delicato di questa macchina e' il FILTRO iniziale: sullo stesso
+'  topic viaggiano anche i messaggi che pubblica la Centrale stessa, quindi
+'  senza filtro la Centrale si riascolterebbe e creerebbe guasti doppi.
+'
+'  Avviata da:   M1 (01_macchina_ciclo_vita_centrale.puml)
+'  Fa transitare: M7 (07_macchina_ciclo_vita_guasto.puml)
+'                 M12 (12_macchina_stato_stazione.puml)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M6 - Ingestione degli Allarmi dal Campo (IngestionService.onAlert)
+
+[*] --> InAscolto
+
+state "In Ascolto\n<- railway/alerts" as InAscolto
+
+state "Filtro dei messaggi\n(il topic e' condiviso)" as Filtro {
+    state "Lettura di tipoEvento" as LeggiTipo
+    state "Messaggio IGNORATO\n(RESOLVED, STOP,\nMAINTENANCE_DISPATCHED,\nITINERARIO_AGGIORNATO)" as IgnoratoTipo
+    state "Lettura di origine" as LeggiOrigine
+    state "Messaggio IGNORATO\n(eco della Centrale:\norigine = CENTRALE)" as IgnoratoEco
+
+    [*] --> LeggiTipo
+    LeggiTipo --> IgnoratoTipo : tipoEvento != GUASTO
+    LeggiTipo --> LeggiOrigine : tipoEvento == GUASTO
+    LeggiOrigine --> IgnoratoEco : origine == CENTRALE\n(guasto gia' scritto da M8)
+}
+
+InAscolto --> Filtro : allarme ricevuto
+
+state "Elaborazione del Guasto" as Elaborazione {
+
+    state "Estrazione dei campi\n(sorgenteTipo, sorgenteId,\nseverita, messaggio, timestamp)" as Estrazione
+
+    state "Classificazione del tipo\nmessaggio contiene 'sensore' -> sensore_offline\nTRENO -> treno_fermo\nSTAZIONE -> stazione_guasta" as Classificazione
+
+    state "Deduplica\n(getGuastoApertoPerSorgente:\nstessa sorgente + stesso tipo)" as Deduplica
+
+    state "AGGIORNAMENTO del guasto esistente\n(solo il messaggio, in transazione)" as AggiornaEsistente
+
+    state "CREAZIONE di un nuovo guasto\nid = alert-{millis}-{uuid8}\nrisolto = false\n+ Storico_Guasti (tsApertura)" as CreaGuasto
+
+    state "Inserimento in cache\n(guastiAttivi)" as InserisciCache
+
+    state "Marcatura della stazione\ncome GUASTA in cache" as MarcaStazione
+
+    state "Broadcast WebSocket\neventType = ALERT" as BroadcastWs
+
+    [*] --> Estrazione
+    Estrazione --> Classificazione
+    Classificazione --> Deduplica
+    Deduplica --> AggiornaEsistente : guasto gia' aperto\nper quella sorgente
+    Deduplica --> CreaGuasto : nessun guasto aperto
+    AggiornaEsistente --> BroadcastWs
+    CreaGuasto --> InserisciCache
+    InserisciCache --> MarcaStazione : sorgenteTipo = STAZIONE\nE severita = CRITICAL
+    InserisciCache --> BroadcastWs : negli altri casi
+    MarcaStazione --> BroadcastWs
+    BroadcastWs --> [*]
+}
+
+LeggiOrigine --> Elaborazione : allarme vero,\nvenuto dal campo
+
+state "Ack del messaggio" as Ack
+Elaborazione --> Ack
+IgnoratoTipo -[dashed]-> Ack
+IgnoratoEco -[dashed]-> Ack
+Ack --> InAscolto
+
+note right of Deduplica
+  Una stazione guasta manda un alert per OGNI treno
+  che entra: senza deduplica la tabella si riempiva
+  di righe identiche e il comando "risolvi" ne
+  chiudeva una sola, lasciando la stazione guasta
+  per sempre agli occhi della dashboard.
+end note
+
+note bottom of MarcaStazione
+  Solo i guasti CRITICAL cambiano lo stato della stazione:
+  i WARNING restano allarmi informativi e non devono
+  contraddire gli heartbeat ONLINE che la stazione
+  continua a mandare (vedi M4 e M12).
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M7 - Ciclo di vita del Guasto\n(07_macchina_ciclo_vita_guasto.puml)" as M7 <<esterna>>
+state "M12 - Stato della Stazione\n(12_macchina_stato_stazione.puml)" as M12 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M11 - WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
+
+CreaGuasto -[dashed]-> M7 : Inesistente -> Aperto\n(sorgente: campo)
+MarcaStazione -[dashed]-> M12 : ONLINE -> GUASTA
+M8 -[dashed]-> IgnoratoEco : i guasti pubblicati dal\nwatchdog tornano qui e\nvengono scartati
+BroadcastWs -[dashed]-> M11 : evento ALERT
+
+@enduml
+
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-KFq2Fi/plantuml-dAUdRt.png]]
+
+**** M7 ciclo di vita del guasto
+- macchina di entita': la storia di un singolo guasto, su cui agiscono M4, M6, M8 e M10
+#+begin_src  plantuml file: 07_macchina_ciclo_vita_guasto.png
+@startuml M7 - Ciclo di Vita del Guasto
+' =========================================================================
+'  MACCHINA M7 - Ciclo di vita dell'entita' Guasto
+'
+'  Codice astratto:
+'    it.uni.reti2.entity.Guasto / StoricoGuasto
+'    IngestionService#onAlert, #chiudiGuastiHeartbeatPerso
+'    FaultMonitor#creaGuastoAutomatico
+'    RestApiGateway#risolviAllarme, #dispacciaManutenzione, #chiudiGuasto
+'    TrafficLogicEngine#aggiungiGuasto, #risolviGuasto, #getGuastoApertoPerSorgente
+'
+'  E' una macchina di ENTITA': non descrive un thread ma la storia di un
+'  singolo guasto, su cui agiscono quattro macchine diverse (M4, M6, M8, M10).
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M7 - Ciclo di Vita del Guasto (entita' Guasto + Storico_Guasti + cache)
+
+[*] --> Inesistente
+
+state "Inesistente\n(nessuna riga aperta per\nquella sorgente e quel tipo)" as Inesistente
+
+state "APERTO\n(risolto = false,\npresente in guastiAttivi)" as Aperto {
+
+    state "Aperto dal CAMPO\n(alert MQTT di treno o stazione)" as ApertoCampo
+    state "Aperto dal WATCHDOG\n(fail-stop rilevato dalla Centrale)" as ApertoWatchdog
+
+    state "Aggiornamento del messaggio\n(deduplica: stessa sorgente,\nstesso tipo)" as Aggiornamento
+
+    ApertoCampo --> Aggiornamento : arriva un altro alert\nuguale dal campo
+    Aggiornamento --> ApertoCampo
+}
+
+' ===================== APERTURA =====================
+Inesistente --> ApertoCampo : M6 - onAlert()\ntipoEvento = GUASTO\norigine != CENTRALE\n[persist + Storico(tsApertura)\n+ cache]
+
+Inesistente --> ApertoWatchdog : M8 - controllaHeartbeat()\nsilenzio > 30s\ntipo = sensore_offline\nseverita = CRITICAL\nmsg = "Heartbeat assente: ..."
+
+Inesistente --> ApertoWatchdog : M8 - controllaTreniFermi()\ntreno attivo, immobile,\nfuori stazione\ntipo = treno_fermo\nseverita = warning
+
+note right of ApertoWatchdog
+  Il guasto aperto dal watchdog viene ANCHE ripubblicato
+  su railway/alerts con origine = CENTRALE, cosi' i treni
+  sanno che la stazione e' caduta e si fermano prima di
+  entrarci. M6 riconosce quell'origine e non lo riscrive.
+end note
+
+note left of Aperto
+  Un guasto e' identificato in modo logico dalla coppia
+  (sorgenteId, tipo): finche' ne esiste uno aperto per
+  quella coppia non se ne creano altri. E' il controllo
+  che fanno sia M6 sia M8 prima di scrivere.
+end note
+
+' ===================== CHIUSURA =====================
+state "RISOLTO\n(risolto = true,\ntimestampRisoluzione = now,\nStorico.tsChiusura valorizzato)" as Risolto
+
+Aperto --> Risolto : M10 - POST /api/allarmi/{id}/risolvi\n(operatore di centrale)\n[+ RESOLVED su MQTT,\nstazione riportata ONLINE]
+
+Aperto --> Risolto : M10 - POST /api/stazioni/{id}/manutenzione\n(chiude TUTTI i guasti aperti\ndi quella stazione)
+
+ApertoWatchdog --> Risolto : M4 - onHeartbeat()\nla stazione torna a battere\nE il messaggio inizia con\n"Heartbeat assente:"\n[+ RESOLVED su MQTT]
+
+note bottom of Risolto
+  Il guasto risolto NON viene tolto subito dalla cache
+  (TrafficLogicEngine.risolviGuasto lo lascia dentro con
+  risolto = true) cosi' il frontend fa in tempo a vedere
+  la transizione. Sparisce del tutto solo al riavvio
+  della Centrale, perche' M1 ricarica in cache soltanto
+  i guasti con risolto = false.
+end note
+
+Risolto --> [*] : riavvio della Centrale\n(non viene piu' ricaricato in cache)
+
+state "Nota sui guasti dichiarati dalla stazione" as NotaManuale
+Risolto -[hidden]down-> NotaManuale
+
+note bottom of NotaManuale
+  Un guasto arrivato dal campo NON si chiude da solo al
+  ritorno dell'heartbeat: il filtro sul prefisso del
+  messaggio lo esclude, e serve l'intervento esplicito
+  di un operatore (risolvi oppure manutenzione).
+  E' voluto: il fatto che una stazione respiri non
+  significa che il guasto segnalato sia stato riparato.
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M6 - Ingestione allarmi\n(06_macchina_ingestione_allarmi.puml)" as M6 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M4 - Ingestione heartbeat\n(04_macchina_ingestione_heartbeat.puml)" as M4 <<esterna>>
+state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+state "M12 - Stato della Stazione\n(12_macchina_stato_stazione.puml)" as M12 <<esterna>>
+
+M6 -[dashed]-> Inesistente
+M8 -[dashed]-> Inesistente
+M4 -[dashed]-> Risolto
+M10 -[dashed]-> Risolto
+Aperto -[dashed]-> M12 : un guasto CRITICAL di stazione\nla porta a GUASTA / OFFLINE
+
+@enduml
+
+#+end_src
+
+**** M8 watchdog faultmonitor
+- i tre job schedulati ogni 10 secondi che rilevano cio' che i nodi di campo non possono segnalare da soli, cioe' la propria caduta (FaultMonitor)
+#+begin_src  plantuml file: 08_macchina_watchdog_faultmonitor.png
+@startuml M8 - Watchdog FaultMonitor
+' =========================================================================
+'  MACCHINA M8 - Watchdog della Centrale (FaultMonitor)
+'
+'  Codice astratto:
+'    it.uni.reti2.elaboration.FaultMonitor#controllaHeartbeat
+'    it.uni.reti2.elaboration.FaultMonitor#controllaTreniFermi
+'    it.uni.reti2.elaboration.FaultMonitor#broadcastSnapshot
+'    it.uni.reti2.elaboration.FaultMonitor#creaGuastoAutomatico
+'    it.uni.reti2.elaboration.TrafficLogicEngine#kpiDashboard
+'
+'  Tre job schedulati ogni 10 secondi, indipendenti fra loro
+'  (concurrentExecution = SKIP: un giro che sfora non si sovrappone al
+'  successivo). Rilevano cio' che i nodi di campo non possono segnalare
+'  da soli, cioe' la propria stessa caduta.
+'
+'  Avviata da:   M1  (01_macchina_ciclo_vita_centrale.puml)
+'  Fa transitare: M7  (07_macchina_ciclo_vita_guasto.puml)
+'                 M12 (12_macchina_stato_stazione.puml)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M8 - Watchdog FaultMonitor (tre job schedulati ogni 10 secondi)
+
+[*] --> Watchdog
+
+state "Watchdog attivo\n(scheduler Quarkus, tick da 10s)" as Watchdog {
+
+    ' ---------- REGIONE 1: heartbeat delle stazioni ----------
+    state "Job 1 - controllaHeartbeat() @Transactional" as Job1 {
+        state "Attesa del tick\n(ogni 10s)" as Attesa1
+        state "Calcolo del limite\nnow - 30s\n(fault.heartbeat.timeout.secondi)" as Limite1
+        state "Scansione di tutte\nle stazioni in cache" as Scansione1
+        state "Stazione SALTATA\n(gia' OFFLINE\no in MANUTENZIONE)" as Saltata
+        state "Stazione VIVA\n(ultimoHeartbeat entro il limite\no mai battuto)" as Viva
+        state "FAIL-STOP rilevato\n(stazione -> OFFLINE in cache)" as FailStop
+        state "Apertura del guasto automatico\ntipo = sensore_offline\nseverita = CRITICAL\nmsg = 'Heartbeat assente: ...'\n+ EventoStazione HEARTBEAT_LOST" as GuastoStazione
+        state "Nessun guasto nuovo\n(ne esiste gia' uno aperto\nper quella sorgente)" as GiaAperto
+
+        note right of GuastoStazione
+          Severita' CRITICAL e non warning: e' il fail-stop della
+          stazione, e lato treno il blocco della marcia scatta solo
+          sui guasti CRITICAL. Il prefisso "Heartbeat assente:"
+          serve invece alla Centrale per riconoscere il guasto come
+          proprio e richiuderlo da sola quando il battito torna (M4).
+        end note
+
+        [*] --> Attesa1
+        Attesa1 --> Limite1 : tick
+        Limite1 --> Scansione1
+        Scansione1 --> Saltata : stato OFFLINE / MANUTENZIONE
+        Scansione1 --> Viva : ultimoHeartbeat >= limite\noppure null
+        Scansione1 --> FailStop : ultimoHeartbeat < limite
+        FailStop --> GuastoStazione : nessun sensore_offline\ngia' aperto
+        FailStop --> GiaAperto : guasto gia' aperto
+        Saltata --> Attesa1
+        Viva --> Attesa1
+        GuastoStazione --> Attesa1
+        GiaAperto --> Attesa1
+    }
+
+    ' ---------- REGIONE 2: treni fermi ----------
+    state "Job 2 - controllaTreniFermi() @Transactional" as Job2 {
+        state "Attesa del tick\n(ogni 10s)" as Attesa2
+        state "Calcolo del limite\nnow - 90s\n(fault.treno.fermo.timeout.secondi)" as Limite2
+        state "Scansione di tutti\ni treni in cache" as Scansione2
+        state "Treno IGNORATO\n(stato != attivo)" as Ignorato
+        state "Treno REGOLARE\n(in stazione oppure\nin movimento)" as Regolare
+        state "ANOMALIA rilevata\nattivo + immobile +\nfuori stazione" as Anomalia
+        state "Apertura del guasto automatico\ntipo = treno_fermo\nseverita = warning" as GuastoTreno
+
+        [*] --> Attesa2
+        Attesa2 --> Limite2 : tick
+        Limite2 --> Scansione2
+        Scansione2 --> Ignorato : stato non attivo
+        Scansione2 --> Regolare : stazioneCorrente valorizzata\noppure velocita > 0 e\ntelemetria recente
+        Scansione2 --> Anomalia : velocita = 0 oppure\nultimoAggiornamento < limite,\nfuori stazione
+        Anomalia --> GuastoTreno : nessun treno_fermo\ngia' aperto
+        Anomalia --> Attesa2 : guasto gia' aperto
+        Ignorato --> Attesa2
+        Regolare --> Attesa2
+        GuastoTreno --> Attesa2
+    }
+
+    ' ---------- REGIONE 3: snapshot KPI ----------
+    state "Job 3 - broadcastSnapshot()" as Job3 {
+        state "Attesa del tick\n(ogni 10s)" as Attesa3
+        state "Calcolo dei KPI\n(kpiDashboard: totalTrains,\ntrainsInMotion, trainsDelayed,\nstationsOperative, stationsFaulty,\nactiveAlerts, avgDelay)" as CalcoloKpi
+        state "Broadcast WebSocket\neventType = SNAPSHOT" as Snapshot
+        state "Errore\n(log, nessun invio)" as ErroreSnapshot
+
+        [*] --> Attesa3
+        Attesa3 --> CalcoloKpi : tick
+        CalcoloKpi --> Snapshot
+        CalcoloKpi --> ErroreSnapshot : eccezione
+        Snapshot --> Attesa3
+        ErroreSnapshot --> Attesa3
+    }
+
+    ' I tre job sono INDIPENDENTI: nessuna transizione li collega,
+    ' le frecce nascoste servono solo a metterli in fila nel disegno.
+    Job1 -[hidden]right-> Job2
+    Job2 -[hidden]right-> Job3
+}
+
+note bottom of Watchdog
+  I tre job girano IN PARALLELO su worker thread separati e leggono la
+  stessa cache che i consumer MQTT stanno aggiornando: per
+  questo la scrittura del guasto usa un id con suffisso
+  casuale (alert-{millis}-{uuid8}). Con il solo timestamp
+  due guasti creati nello stesso millisecondo dai due job
+  violavano la chiave primaria e facevano il rollback
+  dell'INTERO giro di controllo.
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M7 - Ciclo di vita del Guasto\n(07_macchina_ciclo_vita_guasto.puml)" as M7 <<esterna>>
+state "M12 - Stato della Stazione\n(12_macchina_stato_stazione.puml)" as M12 <<esterna>>
+state "M13 - Stato del Treno\n(13_macchina_stato_treno.puml)" as M13 <<esterna>>
+state "M11 - WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
+state "M4 - Ingestione heartbeat\n(04_macchina_ingestione_heartbeat.puml)" as M4 <<esterna>>
+
+GuastoStazione -[dashed]-> M7 : Inesistente -> Aperto\n(+ RESOLVED possibile solo\nal rientro del battito)
+GuastoTreno -[dashed]-> M7 : Inesistente -> Aperto
+FailStop -[dashed]-> M12 : ONLINE -> OFFLINE
+Anomalia -[dashed]-> M13 : legge stato, velocita,\nultimoAggiornamento
+Snapshot -[dashed]-> M11 : evento SNAPSHOT ogni 10s
+M4 -[dashed]-> FailStop : il ritorno del battito annulla\nil fail-stop e chiude il guasto
+
+@enduml
+
+#+end_src
+
+**** M9 sessione e autorizzazione delle api rest
+- autenticazione tradizionale (variante 2 al posto di OAUTH2) e filtro dei permessi tecnico/amministratore su ogni chiamata
+#+begin_src  plantuml file: 09_macchina_sessione_autorizzazione.png
+@startuml M9 - Sessione e Autorizzazione delle API REST
+' =========================================================================
+'  MACCHINA M9 - Sessione dell'operatore e autorizzazione delle richieste
+'
+'  Codice astratto:
+'    it.uni.reti2.gateway.AuthController     (login / logout)
+'    it.uni.reti2.gateway.SessioniAttive     (registro token -> ruolo)
+'    it.uni.reti2.gateway.FiltroAutorizzazione (filtro JAX-RS su ogni /api)
+'
+'  E' la variante 2 ammessa dal prof (autenticazione tradizionale al posto
+'  di OAUTH2/Keycloak). Le sessioni stanno in RAM e si perdono al riavvio.
+'
+'  Avviata da:  M1  (01_macchina_ciclo_vita_centrale.puml)
+'  Da' accesso a: M10 (10_macchina_gateway_rest.puml)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M9 - Sessione dell'Operatore e Autorizzazione delle Richieste REST
+
+' ===================== PARTE A: CICLO DI VITA DELLA SESSIONE =====================
+state "A) Ciclo di vita della SESSIONE\n(AuthController + SessioniAttive)" as CicloSessione {
+
+    state "Anonimo\n(nessun token)" as Anonimo
+    state "Verifica delle credenziali\n(Utente.find('matricola'),\nconfronto password in chiaro)" as Verifica
+    state "Credenziali RIFIUTATE\n(401 Invalid credentials)" as Rifiutato
+
+    state "Sessione APERTA\n(token UUID in ConcurrentHashMap)" as Aperta {
+        state "Ruolo AMMINISTRATORE\n(Utenti.tipo = admin)" as Amministratore
+        state "Ruolo TECNICO\n(qualunque altro tipo)" as Tecnico
+    }
+
+    state "Sessione CHIUSA\n(token rimosso)" as Chiusa
+
+    [*] --> Anonimo
+    Anonimo --> Verifica : POST /api/auth/login
+    Verifica --> Rifiutato : utente inesistente\no password errata
+    Rifiutato --> Anonimo
+    Verifica --> Amministratore : tipo = admin
+    Verifica --> Tecnico : tipo != admin
+    Aperta --> Chiusa : POST /api/auth/logout\n(Bearer token)
+    Aperta --> Chiusa : riavvio della Centrale\n(le sessioni sono solo in RAM)
+    Chiusa --> Anonimo
+}
+
+note right of Aperta
+  Il login restituisce token + profilo utente
+  (id, username, role, displayName, avatarInitials).
+  Il ruolo viene memorizzato lato server INSIEME al token:
+  prima viveva solo nello store React del frontend e un
+  semplice curl passava senza credenziali.
+end note
+
+' ===================== PARTE B: FILTRO SULLA SINGOLA RICHIESTA =====================
+state "B) Filtro di ogni richiesta HTTP\n(FiltroAutorizzazione, @Priority(AUTHENTICATION))" as Filtro {
+
+    state "Richiesta ricevuta\n(metodo + percorso normalizzato)" as Richiesta
+
+    state "Esenzioni\n(passano senza token)" as Esenzioni {
+        state "Preflight CORS\n(metodo OPTIONS)" as Preflight
+        state "Login\n(POST api/auth/login)" as Login
+        state "Fuori dalle API\n(percorso non api/...)" as FuoriApi
+        state "Endpoint DI CAMPO\nGET api/prossima-stazione\nGET api/treni/{id}/itinerario" as EndpointCampo
+    }
+
+    state "Controllo del token\n(header Authorization: Bearer)" as ControlloToken
+    state "RIFIUTO 401\n(token assente o non valido)" as Rifiuto401
+
+    state "Controllo del ruolo" as ControlloRuolo
+    state "RIFIUTO 403\n(serve l'amministratore)" as Rifiuto403
+
+    state "Richiesta AUTORIZZATA\n(prosegue verso la risorsa)" as Autorizzata
+
+    [*] --> Richiesta
+    Richiesta --> Preflight : OPTIONS
+    Richiesta --> Login : api/auth/login
+    Richiesta --> FuoriApi : percorso non applicativo
+    Richiesta --> EndpointCampo : GET usato dai nodi edge
+    Richiesta --> ControlloToken : tutti gli altri casi
+
+    Preflight --> Autorizzata
+    Login --> Autorizzata
+    FuoriApi --> Autorizzata
+    EndpointCampo --> Autorizzata
+
+    ControlloToken --> Rifiuto401 : sessione non trovata
+    ControlloToken --> ControlloRuolo : sessione valida
+
+    ControlloRuolo --> Autorizzata : GET / HEAD\n(lettura per tutti)
+    ControlloRuolo --> Autorizzata : comandi del tecnico:\n/sopprimi, /risolvi,\n/manutenzione, auth/logout
+    ControlloRuolo --> Autorizzata : scrittura CRUD\nE ruolo = amministratore
+    ControlloRuolo --> Rifiuto403 : scrittura CRUD\nE ruolo = tecnico
+}
+
+Aperta -[dashed]-> ControlloToken : il token trovato qui\ne' quello registrato al login
+
+note bottom of EndpointCampo
+  I processi Treno e Stazione non fanno login: la loro
+  "autenticazione" e' la validazione dell'ID sul DB
+  centrale via MQTT (macchina M2). Per questo le due
+  GET che usano restano aperte; sono di sola lettura
+  e non espongono nessuna scrittura.
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+state "M2 - Validazione ID dei nodi\n(02_macchina_validazione_id_edge.puml)" as M2 <<esterna>>
+
+Autorizzata -[dashed]-> M10 : la risorsa JAX-RS\nviene finalmente invocata
+M2 -[dashed]-> EndpointCampo : i nodi ammessi da M2 sono\ngli unici client senza token
+
+@enduml
+
+#+end_src
+
+**** M10 gateway rest, crud e comandi operativi
+- ciclo di vita di una richiesta gia' autorizzata: letture, crud, comandi e notifiche verso il campo (RestApiGateway)
+#+begin_src  plantuml file: 10_macchina_gateway_rest.png
+@startuml M10 - Gateway REST (CRUD e Comandi Operativi)
+' =========================================================================
+'  MACCHINA M10 - Trattamento di una richiesta REST autorizzata
+'
+'  Codice astratto:
+'    it.uni.reti2.gateway.RestApiGateway (tutti gli endpoint /api)
+'
+'  Descrive il ciclo di vita di UNA richiesta dopo che il filtro M9 l'ha
+'  lasciata passare: smistamento, esecuzione, allineamento della cache e
+'  notifiche verso il campo (MQTT) e la dashboard (WebSocket).
+'
+'  Ingresso da:   M9  (09_macchina_sessione_autorizzazione.puml)
+'  Fa transitare: M7  (07_macchina_ciclo_vita_guasto.puml)
+'                 M12 (12_macchina_stato_stazione.puml)
+'                 M13 (13_macchina_stato_treno.puml)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M10 - Gateway REST: ciclo di vita di una richiesta autorizzata
+
+[*] --> RichiestaAutorizzata
+
+state "Richiesta autorizzata da M9" as RichiestaAutorizzata
+
+state "Smistamento sull'endpoint" as Smistamento
+
+RichiestaAutorizzata --> Smistamento
+
+' ---------- LETTURE ----------
+state "1) LETTURE DALLA CACHE\n(nessun accesso al DB)" as LettureCache {
+    state "GET /api/dashboard\n(kpiDashboard)" as GetDashboard
+    state "GET /api/stazioni" as GetStazioni
+    state "GET /api/treni" as GetTreni
+}
+
+state "2) LETTURE DAL DATABASE\n(@Transactional)" as LettureDb {
+    state "GET /api/tratte\nGET /api/tratte-elementari" as GetTratte
+    state "GET /api/transiti\n(storico, ultimi 200)" as GetTransiti
+    state "GET /api/allarmi\n(tutti i guasti, dal piu' recente)" as GetAllarmi
+    state "GET /api/treni/{id}/itinerario\nGET /api/prossima-stazione\n(supporto al digital twin)" as GetItinerario
+}
+
+' ---------- SCRITTURE CRUD ----------
+state "3) CRUD - riservate all'AMMINISTRATORE" as Crud {
+
+    state "Validazione dell'input" as Validazione
+    state "Esito 400\n(id mancante, nome troppo lungo,\nmeno di due stazioni,\nrinomina del convoglio)" as Errore400
+    state "Esito 404\n(entita' inesistente)" as Errore404
+    state "Esito 409\n(gia' esistente oppure\nancora referenziata:\nstazione usata da tratte,\ntratta usata da itinerari o transiti)" as Errore409
+
+    state "Scrittura sul DB\n(persist / update / delete\n+ pulizia dei record collegati)" as ScritturaDb
+    state "Allineamento della cache RAM\n(SOLO dopo il commit)" as AllineamentoCache
+    state "Esito 200 / 201 / 204" as EsitoOk
+
+    [*] --> Validazione
+    Validazione --> Errore400 : input non valido
+    Validazione --> Errore404 : entita' non trovata
+    Validazione --> Errore409 : conflitto o vincolo\ndi integrita'
+    Validazione --> ScritturaDb : input valido
+    ScritturaDb --> AllineamentoCache : commit riuscito
+    AllineamentoCache --> EsitoOk
+}
+
+note right of AllineamentoCache
+  Sulle scritture dei treni la transazione si apre e si
+  CHIUDE prima di toccare la cache (QuarkusTransaction
+  .requiringNew + EsitoScritturaTreno): se l'allineamento
+  sta dentro la stessa transazione, un rollback lascia in
+  memoria - e quindi nelle risposte REST - valori che sul
+  database non sono mai stati scritti.
+end note
+
+' ---------- COMANDI OPERATIVI ----------
+state "4) COMANDI OPERATIVI\n(permessi anche al TECNICO)" as Comandi {
+
+    state "POST /api/treni/{id}/sopprimi" as Sopprimi {
+        state "Cache: stato = SOPPRESSO,\nvelocita = 0" as SoppCache
+        state "DB: stato = in manutenzione\n+ Storico_Stato_Treni" as SoppDb
+        state "MQTT -> railway/alerts\ntipoEvento = STOP" as SoppMqtt
+        [*] --> SoppCache
+        SoppCache --> SoppDb
+        SoppDb --> SoppMqtt
+    }
+
+    state "POST /api/allarmi/{id}/risolvi" as Risolvi {
+        state "Chiude guasto + storico + cache" as RisChiude
+        state "Se sorgente = STAZIONE:\nstato = ONLINE e\nultimoHeartbeat = now" as RisStazione
+        state "MQTT -> railway/alerts\ntipoEvento = RESOLVED" as RisMqtt
+        [*] --> RisChiude
+        RisChiude --> RisStazione
+        RisStazione --> RisMqtt
+    }
+
+    state "POST /api/stazioni/{id}/manutenzione" as Manutenzione {
+        state "Stazione -> MANUTENZIONE" as ManInizio
+        state "MQTT MAINTENANCE_DISPATCHED" as ManMqtt
+        state "Chiude TUTTI i guasti aperti\ndella stazione (+ RESOLVED)" as ManGuasti
+        state "Stazione -> ONLINE\n+ Storico_Stato_Stazioni" as ManFine
+        [*] --> ManInizio
+        ManInizio --> ManMqtt
+        ManMqtt --> ManGuasti
+        ManGuasti --> ManFine
+    }
+}
+
+note left of RisStazione
+  Rimettendo ONLINE la stazione si fa ripartire anche il
+  cronometro dell'heartbeat: senza, una stazione rimessa
+  in servizio dall'operatore ma in realta' ancora spenta
+  restava ONLINE per sempre, perche' il watchdog salta le
+  stazioni che non hanno mai battuto.
+end note
+
+' ---------- NOTIFICHE E CHIUSURA ----------
+state "Notifiche verso il campo\n-> railway/alerts\n(STOP, RESOLVED,\nMAINTENANCE_DISPATCHED,\nITINERARIO_AGGIORNATO)" as NotificheMqtt
+
+state "Risposta HTTP inviata\nal frontend" as Risposta
+
+Smistamento --> LettureCache
+Smistamento --> LettureDb
+Smistamento --> Crud
+Smistamento --> Comandi
+
+LettureCache --> Risposta
+LettureDb --> Risposta
+Crud --> NotificheMqtt : DELETE treno (STOP),\nPUT treno/tratta con\nitinerario cambiato
+Crud --> Risposta
+Comandi --> NotificheMqtt
+NotificheMqtt --> Risposta
+Risposta --> [*]
+
+note bottom of NotificheMqtt
+  ITINERARIO_AGGIORNATO va mandato anche ai treni SGANCIATI
+  dall'itinerario: per questo la lista dei destinatari si
+  legge PRIMA di riassegnare i treni, altrimenti quelli
+  tolti dalla tratta non venivano avvisati e continuavano
+  a girare sul percorso vecchio.
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M9 - Sessione e autorizzazione\n(09_macchina_sessione_autorizzazione.puml)" as M9 <<esterna>>
+state "M7 - Ciclo di vita del Guasto\n(07_macchina_ciclo_vita_guasto.puml)" as M7 <<esterna>>
+state "M12 - Stato della Stazione\n(12_macchina_stato_stazione.puml)" as M12 <<esterna>>
+state "M13 - Stato del Treno\n(13_macchina_stato_treno.puml)" as M13 <<esterna>>
+state "M5 - Ingestione transiti\n(05_macchina_ingestione_transiti.puml)" as M5 <<esterna>>
+
+M9 -[dashed]-> RichiestaAutorizzata
+Risolvi -[dashed]-> M7 : Aperto -> Risolto
+Manutenzione -[dashed]-> M7 : chiude in blocco i guasti\ndella stazione
+Manutenzione -[dashed]-> M12 : GUASTA/OFFLINE ->\nMANUTENZIONE -> ONLINE
+Sopprimi -[dashed]-> M13 : attivo -> in manutenzione
+GetTransiti -[dashed]-> M5 : legge lo storico\nprodotto dai transiti
+
+@enduml
+
+#+end_src
+
+**** M11 canale websocket realtime
+- punto di uscita comune di quasi tutte le altre macchine verso la dashboard (RealtimeWebSocket)
+#+begin_src  plantuml file: 11_macchina_websocket_realtime.png
+@startuml M11 - Canale WebSocket Realtime
+' =========================================================================
+'  MACCHINA M11 - Canale WebSocket verso la dashboard
+'
+'  Codice astratto:
+'    it.uni.reti2.gateway.RealtimeWebSocket (@ServerEndpoint /ws/realtime)
+'
+'  E' il punto di uscita comune di quasi tutte le altre macchine: qui si
+'  vede il ciclo di vita di una singola connessione e quali eventi la
+'  Centrale spinge verso il frontend.
+'
+'  Avviata da: M1 (01_macchina_ciclo_vita_centrale.puml)
+'  Alimentata da: M3, M4, M5, M6, M8, M10
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M11 - Canale WebSocket Realtime (/ws/realtime)
+
+' ===================== A) CICLO DI VITA DI UNA SESSIONE =====================
+state "A) Ciclo di vita di UNA connessione" as CicloSessione {
+
+    state "Nessuna connessione" as NonConnesso
+    state "CONNESSA\n(sessione nel Set thread-safe)" as Connessa
+    state "In invio (asincrono)\ngetAsyncRemote().sendObject" as InInvio
+    state "CHIUSA\n(onClose: sessione rimossa)" as ChiusaOk
+    state "IN ERRORE\n(onError: sessione rimossa\n+ log dell'eccezione)" as ChiusaErrore
+
+    [*] --> NonConnesso
+    NonConnesso --> Connessa : @OnOpen\n(il browser apre il canale)
+    Connessa --> InInvio : broadcast di un evento
+    InInvio --> Connessa : invio completato
+    InInvio --> Connessa : errore di invio sul singolo\nmessaggio (solo log,\nla sessione resta aperta)
+    Connessa --> ChiusaOk : @OnClose\n(chiusura o timeout)
+    Connessa --> ChiusaErrore : @OnError\n(errore di protocollo o di rete)
+    ChiusaOk --> NonConnesso
+    ChiusaErrore --> NonConnesso
+}
+
+note right of CicloSessione
+  Le sessioni stanno in un Set costruito su ConcurrentHashMap:
+  apertura e chiusura arrivano da thread diversi rispetto ai
+  broadcast, che partono dai consumer MQTT e dallo scheduler.
+  L'invio e' asincrono per non bloccare il thread che sta
+  elaborando il messaggio MQTT.
+end note
+
+' ===================== B) EVENTI PRODOTTI =====================
+state "B) Eventi spinti verso il frontend\n(broadcast a TUTTE le sessioni aperte)" as Eventi {
+
+    state "TELEMETRY\n(posizione, velocita, progresso,\nritardo del convoglio)" as EvTelemetry
+    state "HEARTBEAT\n(stato della stazione:\noperativa/guasta/\nmanutenzione/offline)" as EvHeartbeat
+    state "TRANSIT\n(ingresso/uscita dal\nsensore di terra)" as EvTransit
+    state "ALERT\n(guasto aperto, aggiornato\no risolto)" as EvAlert
+    state "SNAPSHOT\n(KPI della rete, ogni 10s)" as EvSnapshot
+}
+
+Connessa -[dashed]-> Eventi : finche' la sessione e' aperta\nriceve tutti gli eventi
+
+note bottom of Eventi
+  Non c'e' nessun filtro per destinatario ne' controllo del
+  token sul WebSocket: ogni client connesso riceve tutto.
+  L'autorizzazione (M9) protegge solo le API REST.
+end note
+
+' ===================== MACCHINE SORGENTE =====================
+state "M3 - Telemetria\n(03_macchina_ingestione_telemetria.puml)" as M3 <<esterna>>
+state "M4 - Heartbeat\n(04_macchina_ingestione_heartbeat.puml)" as M4 <<esterna>>
+state "M5 - Transiti\n(05_macchina_ingestione_transiti.puml)" as M5 <<esterna>>
+state "M6 - Allarmi\n(06_macchina_ingestione_allarmi.puml)" as M6 <<esterna>>
+state "M8 - Watchdog\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+
+M3 -[dashed]-> EvTelemetry
+M4 -[dashed]-> EvHeartbeat
+M5 -[dashed]-> EvTransit
+M6 -[dashed]-> EvAlert
+M8 -[dashed]-> EvAlert : guasti automatici
+M8 -[dashed]-> EvSnapshot
+M10 -[dashed]-> EvAlert : guasti risolti\ndall'operatore
+
+@enduml
+
+#+end_src
+
+**** M12 stato runtime della stazione
+- gli stati ONLINE / OFFLINE / GUASTA / MANUTENZIONE come li vede la centrale: stanno solo in cache, sul db ne resta la traccia nello storico
+#+begin_src  plantuml file: 12_macchina_stato_stazione.png
+@startuml M12 - Stato Runtime della Stazione visto dalla Centrale
+' =========================================================================
+'  MACCHINA M12 - Stato runtime di una STAZIONE come lo vede la Centrale
+'
+'  Codice astratto:
+'    it.uni.reti2.entity.Stazione#stato (@Transient, default "OFFLINE")
+'    IngestionService#onHeartbeat, #onAlert, #storicizzaStatoStazione
+'    FaultMonitor#controllaHeartbeat
+'    RestApiGateway#dispacciaManutenzione, #risolviAllarme, #updateStazione
+'
+'  E' una macchina di ENTITA': lo stato NON e' persistito (campo @Transient),
+'  vive solo nella cache del TrafficLogicEngine; sul database ne resta la
+'  traccia in Storico_Stato_Stazioni (flag funzionanteONo).
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M12 - Stato Runtime della Stazione (cache del TrafficLogicEngine)
+
+[*] --> OFFLINE : M1 - avvio della Centrale\n(stato = OFFLINE,\nultimoHeartbeat = null)
+
+state "OFFLINE\n(nodo non raggiungibile\no non ancora avviato)" as OFFLINE
+state "ONLINE\n(nodo che batte\nregolarmente)" as ONLINE
+state "GUASTA\n(guasto CRITICAL\ndichiarato dal campo)" as GUASTA
+state "MANUTENZIONE\n(squadra inviata\ndall'operatore)" as MANUTENZIONE
+
+' ---------- RIENTRO IN SERVIZIO ----------
+OFFLINE --> ONLINE : M4 - heartbeat ricevuto (stato ONLINE)\n[ultimoHeartbeat = now,\nStorico_Stato_Stazioni,\nchiude i guasti "Heartbeat assente:"\ne pubblica RESOLVED su MQTT]
+
+' ---------- FAIL-STOP ----------
+ONLINE --> OFFLINE : M8 - nessun heartbeat da oltre 30s\n[guasto automatico CRITICAL\n+ EventoStazione HEARTBEAT_LOST\n+ alert su railway/alerts]
+
+GUASTA --> OFFLINE : M8 - il nodo smette\nanche di battere
+
+' ---------- GUASTO DICHIARATO DAL CAMPO ----------
+ONLINE --> GUASTA : M6 - alert GUASTO\nsorgenteTipo = STAZIONE\nseverita = CRITICAL
+ONLINE --> GUASTA : M4 - la stazione stessa\nbatte con stato GUASTA
+
+GUASTA --> ONLINE : M10 - POST /api/allarmi/{id}/risolvi\n[ultimoHeartbeat = now\nper far ripartire il cronometro]
+GUASTA --> ONLINE : M4 - heartbeat con stato ONLINE\n(il nodo si dichiara guarito)
+
+' ---------- MANUTENZIONE ----------
+ONLINE --> MANUTENZIONE : M10 - POST /api/stazioni/{id}/manutenzione
+GUASTA --> MANUTENZIONE : M10 - POST /api/stazioni/{id}/manutenzione
+OFFLINE --> MANUTENZIONE : M10 - POST /api/stazioni/{id}/manutenzione
+
+MANUTENZIONE --> ONLINE : fine dello stesso comando\n[chiude tutti i guasti aperti,\nStorico funzionanteONo = true]
+
+note right of MANUTENZIONE
+  Lo stato MANUTENZIONE dura quanto la chiamata REST:
+  il metodo lo imposta, pubblica MAINTENANCE_DISPATCHED,
+  chiude i guasti e rimette subito ONLINE. Serve pero'
+  come stato "protetto": il watchdog salta le stazioni
+  in MANUTENZIONE e non le porta a OFFLINE.
+end note
+
+' ---------- FORZATURE DALL'AMMINISTRAZIONE ----------
+state "Forzatura dall'amministrazione\nPUT /api/stazioni/{id}\n(campo stato, sinonimo\nOPERATIVA -> ONLINE)" as Forzatura <<esterna>>
+Forzatura -[dashed]-> ONLINE
+Forzatura -[dashed]-> OFFLINE
+
+state "Stazione eliminata\nDELETE /api/stazioni/{id}\n(409 se referenziata da tratte)" as Eliminata
+ONLINE --> Eliminata : M10
+OFFLINE --> Eliminata : M10
+Eliminata --> [*] : rimossa da DB e cache
+
+note bottom of OFFLINE
+  All'avvio TUTTE le stazioni partono OFFLINE con
+  ultimoHeartbeat nullo: marcarle ONLINE faceva vedere
+  per 30 secondi una rete tutta operativa anche con i
+  nodi spenti. Con ultimoHeartbeat nullo il watchdog le
+  salta, quindi non apre falsi guasti finche' non arriva
+  il primo battito vero.
+end note
+
+note left of GUASTA
+  I guasti WARNING NON portano qui: restano allarmi
+  informativi e la stazione continua a operare, cosi'
+  i suoi heartbeat ONLINE non vengono contraddetti.
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M4 - Ingestione heartbeat\n(04_macchina_ingestione_heartbeat.puml)" as M4 <<esterna>>
+state "M6 - Ingestione allarmi\n(06_macchina_ingestione_allarmi.puml)" as M6 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+state "M7 - Ciclo di vita del Guasto\n(07_macchina_ciclo_vita_guasto.puml)" as M7 <<esterna>>
+
+M4 -[hidden]right-> M6
+M6 -[hidden]right-> M8
+M8 -[hidden]right-> M10
+M10 -[hidden]right-> M7
+
+note bottom of M7
+  Ogni transizione verso OFFLINE o GUASTA ha come effetto
+  collaterale l'apertura di un Guasto (M7), e ogni ritorno
+  a ONLINE ne comporta la chiusura: le due macchine vanno
+  lette insieme.
+end note
+
+@enduml
+
+#+end_src
+
+**** M13 stato del treno
+- proiezione sul database centrale della macchina a stati del convoglio: i quattro valori ammessi dal CHECK sulla colonna Treni.stato
+#+begin_src  plantuml file: 13_macchina_stato_treno.png
+@startuml M13 - Stato del Treno visto dalla Centrale
+' =========================================================================
+'  MACCHINA M13 - Stato di un TRENO come lo registra la Centrale
+'
+'  Codice astratto:
+'    it.uni.reti2.entity.Treno#stato (colonna Treni.stato, con CHECK)
+'    IngestionService#normalizzaStatoTreno, #salvaStatoTreno
+'    RestApiGateway#createTreno, #updateTreno, #sopprimiTreno, #deleteTreno
+'    FaultMonitor#controllaTreniFermi
+'
+'  Gli stati canonici sono i quattro ammessi dal CHECK sulla colonna:
+'    attivo | fermo | rotto | in manutenzione
+'  La macchina a stati "ricca" del convoglio (IN_VIAGGIO, BLOCCATO,
+'  EMERGENZA, ...) vive nel componente Treno: qui si vede solo la sua
+'  proiezione sul database centrale.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M13 - Stato del Treno registrato dalla Centrale (colonna Treni.stato)
+
+[*] --> fermo : M10 - POST /api/treni\n(creato dall'amministratore,\nstato di default "fermo")
+
+state "fermo\n(convoglio in sosta\no non ancora partito)" as fermo
+state "attivo\n(convoglio in marcia)" as attivo
+state "rotto\n(emergenza dichiarata\ndal digital twin)" as rotto
+state "in manutenzione\n(corsa soppressa)" as manutenzione
+
+' ---------- TRANSIZIONI GUIDATE DALLA TELEMETRIA (M3) ----------
+fermo --> attivo : M3 - telemetria stato = IN_VIAGGIO\n[normalizzato in "attivo"\n+ Storico_Stato_Treni]
+attivo --> fermo : M3 - telemetria stato = FERMO
+attivo --> rotto : M3 - telemetria stato = EMERGENZA
+fermo --> rotto : M3 - telemetria stato = EMERGENZA
+rotto --> attivo : M3 - guasto risolto,\nil treno riprende la marcia
+rotto --> fermo : M3 - guasto risolto,\ntreno ancora in sosta
+attivo --> manutenzione : M3 - telemetria stato = SOPPRESSO
+fermo --> manutenzione : M3 - telemetria stato = SOPPRESSO
+
+note right of attivo
+  Qualunque valore non riconosciuto (o il campo "stato"
+  assente nel frame) viene normalizzato in "fermo": la
+  colonna ha un CHECK e uno stato inventato avrebbe fatto
+  fallire il commit, con l'effetto - prima delle correzioni -
+  di spegnere l'intero canale telemetry-in.
+end note
+
+note left of fermo
+  Lo storico (Storico_Stato_Treni) si scrive SOLO quando lo
+  stato cambia davvero: altrimenti sarebbe una riga ogni
+  5 secondi per ogni convoglio.
+end note
+
+' ---------- COMANDO DELL'OPERATORE (M10) ----------
+attivo --> manutenzione : M10 - POST /api/treni/{id}/sopprimi\n[DB: "in manutenzione",\ncache: "SOPPRESSO", velocita = 0\n+ STOP su railway/alerts]
+fermo --> manutenzione : M10 - POST /api/treni/{id}/sopprimi
+rotto --> manutenzione : M10 - POST /api/treni/{id}/sopprimi
+
+note bottom of manutenzione
+  Attenzione alla doppia denominazione: il comando "sopprimi"
+  scrive "in manutenzione" sul DB (valore ammesso dal CHECK)
+  ma mette "SOPPRESSO" nella copia in cache, che e' quella
+  che le API REST restituiscono al frontend. Il valore torna
+  allineato al primo frame di telemetria successivo, perche'
+  M3 normalizza SOPPRESSO -> "in manutenzione".
+end note
+
+' ---------- MODIFICA DALL'AMMINISTRAZIONE ----------
+state "Forzatura dall'amministrazione\nPUT /api/treni/{id}\n(stato normalizzato in minuscolo,\nil nome del convoglio NON e' modificabile)" as Forzatura <<esterna>>
+Forzatura -[dashed]-> fermo
+Forzatura -[dashed]-> attivo
+
+' ---------- ANOMALIA RILEVATA DAL WATCHDOG ----------
+state "Anomalia 'treno fermo'\n(guasto warning aperto da M8)" as Anomalia <<esterna>>
+attivo -[dashed]-> Anomalia : attivo ma velocita = 0\n(o telemetria piu' vecchia di 90s)\nE fuori da ogni stazione
+
+note right of Anomalia
+  Il watchdog NON cambia lo stato del treno: apre solo un
+  guasto di tipo treno_fermo con severita' warning. Lo stato
+  resta "attivo" finche' non arriva una telemetria diversa
+  o un comando dell'operatore.
+end note
+
+' ---------- DATI DI CONTORNO ----------
+state "Dati aggiornati insieme allo stato\n(campi volatili, solo in cache)" as DatiVolatili {
+    state "posizione GPS, velocita,\nprogressPercent, ritardo,\npasseggeri, direzione\n(da M3)" as DaTelemetria
+    state "stazioneCorrente, prossimaStazione,\nposizioneAttualeTratta\n(da M5, quest'ultima persistita)" as DaPassaggi
+}
+
+attivo -[dotted]-> DatiVolatili
+fermo -[dotted]-> DatiVolatili
+
+' ---------- FINE VITA ----------
+state "Treno eliminato\nDELETE /api/treni/{id}\n(cancella a cascata gli storici\n+ STOP su railway/alerts)" as Eliminato
+fermo --> Eliminato : M10
+attivo --> Eliminato : M10
+manutenzione --> Eliminato : M10
+rotto --> Eliminato : M10
+Eliminato --> [*] : rimosso da DB e cache\n(da quel momento la sua telemetria\nviene scartata da M3)
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M3 - Ingestione telemetria\n(03_macchina_ingestione_telemetria.puml)" as M3 <<esterna>>
+state "M5 - Ingestione transiti e passaggi\n(05_macchina_ingestione_transiti.puml)" as M5 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+state "M2 - Validazione ID dei nodi\n(02_macchina_validazione_id_edge.puml)" as M2 <<esterna>>
+
+M3 -[hidden]right-> M5
+M5 -[hidden]right-> M8
+M8 -[hidden]right-> M10
+M10 -[hidden]right-> M2
+
+note bottom of M2
+  Un treno esiste per la Centrale solo se e' stato creato
+  dall'amministrazione (M10): e' questa riga che M2 cerca
+  quando il processo del convoglio chiede di essere ammesso,
+  ed e' la stessa che M3 pretende in cache per accettarne
+  la telemetria.
+end note
+
+@enduml
+
+#+end_src
 
 * Progettazione
 ** Modello dati

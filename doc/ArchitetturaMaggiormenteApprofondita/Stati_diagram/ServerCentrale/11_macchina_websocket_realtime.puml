@@ -1,0 +1,98 @@
+@startuml M11 - Canale WebSocket Realtime
+' =========================================================================
+'  MACCHINA M11 - Canale WebSocket verso la dashboard
+'
+'  Codice astratto:
+'    it.uni.reti2.gateway.RealtimeWebSocket (@ServerEndpoint /ws/realtime)
+'
+'  E' il punto di uscita comune di quasi tutte le altre macchine: qui si
+'  vede il ciclo di vita di una singola connessione e quali eventi la
+'  Centrale spinge verso il frontend.
+'
+'  Avviata da: M1 (01_macchina_ciclo_vita_centrale.puml)
+'  Alimentata da: M3, M4, M5, M6, M8, M10
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M11 - Canale WebSocket Realtime (/ws/realtime)
+
+' ===================== A) CICLO DI VITA DI UNA SESSIONE =====================
+state "A) Ciclo di vita di UNA connessione" as CicloSessione {
+
+    state "Nessuna connessione" as NonConnesso
+    state "CONNESSA\n(sessione nel Set thread-safe)" as Connessa
+    state "In invio (asincrono)\ngetAsyncRemote().sendObject" as InInvio
+    state "CHIUSA\n(onClose: sessione rimossa)" as ChiusaOk
+    state "IN ERRORE\n(onError: sessione rimossa\n+ log dell'eccezione)" as ChiusaErrore
+
+    [*] --> NonConnesso
+    NonConnesso --> Connessa : @OnOpen\n(il browser apre il canale)
+    Connessa --> InInvio : broadcast di un evento
+    InInvio --> Connessa : invio completato
+    InInvio --> Connessa : errore di invio sul singolo\nmessaggio (solo log,\nla sessione resta aperta)
+    Connessa --> ChiusaOk : @OnClose\n(chiusura o timeout)
+    Connessa --> ChiusaErrore : @OnError\n(errore di protocollo o di rete)
+    ChiusaOk --> NonConnesso
+    ChiusaErrore --> NonConnesso
+}
+
+note right of CicloSessione
+  Le sessioni stanno in un Set costruito su ConcurrentHashMap:
+  apertura e chiusura arrivano da thread diversi rispetto ai
+  broadcast, che partono dai consumer MQTT e dallo scheduler.
+  L'invio e' asincrono per non bloccare il thread che sta
+  elaborando il messaggio MQTT.
+end note
+
+' ===================== B) EVENTI PRODOTTI =====================
+state "B) Eventi spinti verso il frontend\n(broadcast a TUTTE le sessioni aperte)" as Eventi {
+
+    state "TELEMETRY\n(posizione, velocita, progresso,\nritardo del convoglio)" as EvTelemetry
+    state "HEARTBEAT\n(stato della stazione:\noperativa/guasta/\nmanutenzione/offline)" as EvHeartbeat
+    state "TRANSIT\n(ingresso/uscita dal\nsensore di terra)" as EvTransit
+    state "ALERT\n(guasto aperto, aggiornato\no risolto)" as EvAlert
+    state "SNAPSHOT\n(KPI della rete, ogni 10s)" as EvSnapshot
+}
+
+Connessa -[dashed]-> Eventi : finche' la sessione e' aperta\nriceve tutti gli eventi
+
+note bottom of Eventi
+  Non c'e' nessun filtro per destinatario ne' controllo del
+  token sul WebSocket: ogni client connesso riceve tutto.
+  L'autorizzazione (M9) protegge solo le API REST.
+end note
+
+' ===================== MACCHINE SORGENTE =====================
+state "M3 - Telemetria\n(03_macchina_ingestione_telemetria.puml)" as M3 <<esterna>>
+state "M4 - Heartbeat\n(04_macchina_ingestione_heartbeat.puml)" as M4 <<esterna>>
+state "M5 - Transiti\n(05_macchina_ingestione_transiti.puml)" as M5 <<esterna>>
+state "M6 - Allarmi\n(06_macchina_ingestione_allarmi.puml)" as M6 <<esterna>>
+state "M8 - Watchdog\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+
+M3 -[dashed]-> EvTelemetry
+M4 -[dashed]-> EvHeartbeat
+M5 -[dashed]-> EvTransit
+M6 -[dashed]-> EvAlert
+M8 -[dashed]-> EvAlert : guasti automatici
+M8 -[dashed]-> EvSnapshot
+M10 -[dashed]-> EvAlert : guasti risolti\ndall'operatore
+
+@enduml

@@ -1,0 +1,117 @@
+@startuml M7 - Ciclo di Vita del Guasto
+' =========================================================================
+'  MACCHINA M7 - Ciclo di vita dell'entita' Guasto
+'
+'  Codice astratto:
+'    it.uni.reti2.entity.Guasto / StoricoGuasto
+'    IngestionService#onAlert, #chiudiGuastiHeartbeatPerso
+'    FaultMonitor#creaGuastoAutomatico
+'    RestApiGateway#risolviAllarme, #dispacciaManutenzione, #chiudiGuasto
+'    TrafficLogicEngine#aggiungiGuasto, #risolviGuasto, #getGuastoApertoPerSorgente
+'
+'  E' una macchina di ENTITA': non descrive un thread ma la storia di un
+'  singolo guasto, su cui agiscono quattro macchine diverse (M4, M6, M8, M10).
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M7 - Ciclo di Vita del Guasto (entita' Guasto + Storico_Guasti + cache)
+
+[*] --> Inesistente
+
+state "Inesistente\n(nessuna riga aperta per\nquella sorgente e quel tipo)" as Inesistente
+
+state "APERTO\n(risolto = false,\npresente in guastiAttivi)" as Aperto {
+
+    state "Aperto dal CAMPO\n(alert MQTT di treno o stazione)" as ApertoCampo
+    state "Aperto dal WATCHDOG\n(fail-stop rilevato dalla Centrale)" as ApertoWatchdog
+
+    state "Aggiornamento del messaggio\n(deduplica: stessa sorgente,\nstesso tipo)" as Aggiornamento
+
+    ApertoCampo --> Aggiornamento : arriva un altro alert\nuguale dal campo
+    Aggiornamento --> ApertoCampo
+}
+
+' ===================== APERTURA =====================
+Inesistente --> ApertoCampo : M6 - onAlert()\ntipoEvento = GUASTO\norigine != CENTRALE\n[persist + Storico(tsApertura)\n+ cache]
+
+Inesistente --> ApertoWatchdog : M8 - controllaHeartbeat()\nsilenzio > 30s\ntipo = sensore_offline\nseverita = CRITICAL\nmsg = "Heartbeat assente: ..."
+
+Inesistente --> ApertoWatchdog : M8 - controllaTreniFermi()\ntreno attivo, immobile,\nfuori stazione\ntipo = treno_fermo\nseverita = warning
+
+note right of ApertoWatchdog
+  Il guasto aperto dal watchdog viene ANCHE ripubblicato
+  su railway/alerts con origine = CENTRALE, cosi' i treni
+  sanno che la stazione e' caduta e si fermano prima di
+  entrarci. M6 riconosce quell'origine e non lo riscrive.
+end note
+
+note left of Aperto
+  Un guasto e' identificato in modo logico dalla coppia
+  (sorgenteId, tipo): finche' ne esiste uno aperto per
+  quella coppia non se ne creano altri. E' il controllo
+  che fanno sia M6 sia M8 prima di scrivere.
+end note
+
+' ===================== CHIUSURA =====================
+state "RISOLTO\n(risolto = true,\ntimestampRisoluzione = now,\nStorico.tsChiusura valorizzato)" as Risolto
+
+Aperto --> Risolto : M10 - POST /api/allarmi/{id}/risolvi\n(operatore di centrale)\n[+ RESOLVED su MQTT,\nstazione riportata ONLINE]
+
+Aperto --> Risolto : M10 - POST /api/stazioni/{id}/manutenzione\n(chiude TUTTI i guasti aperti\ndi quella stazione)
+
+ApertoWatchdog --> Risolto : M4 - onHeartbeat()\nla stazione torna a battere\nE il messaggio inizia con\n"Heartbeat assente:"\n[+ RESOLVED su MQTT]
+
+note bottom of Risolto
+  Il guasto risolto NON viene tolto subito dalla cache
+  (TrafficLogicEngine.risolviGuasto lo lascia dentro con
+  risolto = true) cosi' il frontend fa in tempo a vedere
+  la transizione. Sparisce del tutto solo al riavvio
+  della Centrale, perche' M1 ricarica in cache soltanto
+  i guasti con risolto = false.
+end note
+
+Risolto --> [*] : riavvio della Centrale\n(non viene piu' ricaricato in cache)
+
+state "Nota sui guasti dichiarati dalla stazione" as NotaManuale
+Risolto -[hidden]down-> NotaManuale
+
+note bottom of NotaManuale
+  Un guasto arrivato dal campo NON si chiude da solo al
+  ritorno dell'heartbeat: il filtro sul prefisso del
+  messaggio lo esclude, e serve l'intervento esplicito
+  di un operatore (risolvi oppure manutenzione).
+  E' voluto: il fatto che una stazione respiri non
+  significa che il guasto segnalato sia stato riparato.
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M6 - Ingestione allarmi\n(06_macchina_ingestione_allarmi.puml)" as M6 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M4 - Ingestione heartbeat\n(04_macchina_ingestione_heartbeat.puml)" as M4 <<esterna>>
+state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+state "M12 - Stato della Stazione\n(12_macchina_stato_stazione.puml)" as M12 <<esterna>>
+
+M6 -[dashed]-> Inesistente
+M8 -[dashed]-> Inesistente
+M4 -[dashed]-> Risolto
+M10 -[dashed]-> Risolto
+Aperto -[dashed]-> M12 : un guasto CRITICAL di stazione\nla porta a GUASTA / OFFLINE
+
+@enduml

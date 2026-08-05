@@ -3,6 +3,7 @@ package it.uni.reti2;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
@@ -14,10 +15,16 @@ import java.security.KeyStore;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-// ???
-/** Client HTTPS che considera attendibile solo la CA privata del progetto. */
+/**
+ * Client HTTPS che considera attendibile solo la CA privata del progetto.
+ * Gemello di quello del Treno: oggi la Stazione parla con la Centrale solo via MQTT,
+ * ma la classe è pronta per le chiamate REST verso la Centrale
+ * (per esempio GET /api/prossima-stazione) sotto profilo tls.
+ */
 @ApplicationScoped
 public class SecureHttpClient {
+    private static final Logger LOG = Logger.getLogger(SecureHttpClient.class);
+
     @ConfigProperty(name = "centrale.tls.ca.path")
     String caPath;
 
@@ -36,7 +43,13 @@ public class SecureHttpClient {
             tls.init(null, trustManagers.getTrustManagers(), null);
             client = HttpClient.newBuilder().sslContext(tls).connectTimeout(Duration.ofSeconds(5)).build();
         } catch (Exception e) {
-            throw new IllegalStateException("Impossibile configurare la CA TLS della Centrale: " + caPath, e);
+            // Senza certificati generati (profilo di default, tutto in chiaro sulla 8781)
+            // la stazione deve comunque partire: si usa il client HTTP standard.
+            // Prima qui volava una IllegalStateException e il bean non si sarebbe
+            // nemmeno costruito, bloccando l'avvio del nodo.
+            LOG.warnf("⚠️ CA TLS della Centrale non caricata (%s): uso il client HTTP in chiaro. Dettaglio: %s",
+                    caPath, e.getMessage());
+            client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
         }
     }
 

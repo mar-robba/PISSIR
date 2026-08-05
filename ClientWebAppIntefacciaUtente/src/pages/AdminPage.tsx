@@ -190,7 +190,7 @@ export default function AdminPage() {
                     const route = routes.find(r => r.id === train.routeId);
                     return (
                       <tr key={train.id} className={train.status === 'soppresso' ? 'opacity-50' : ''}>
-                        <td className="font-mono font-bold text-primary">{train.convoglio}</td>
+                        <td className="font-mono font-bold text-primary">{train.id}</td>
                         <td className="text-sm">{route?.name || '-'}</td>
                         <td>
                           <Badge type={train.status === 'soppresso' ? 'danger' : 'info'}>

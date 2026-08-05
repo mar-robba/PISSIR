@@ -1,5 +1,6 @@
 package it.uni.reti2.gateway;
 
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.panache.common.Sort;
 import it.uni.reti2.entity.*;
 import it.uni.reti2.elaboration.TrafficLogicEngine;
@@ -11,11 +12,15 @@ import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 
+import org.jboss.logging.Logger;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -29,6 +34,11 @@ import java.util.UUID;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class RestApiGateway {
+
+    private static final Logger LOG = Logger.getLogger(RestApiGateway.class);
+
+    /** Lunghezza massima del nome del convoglio: è la chiave primaria Treni.id_convoglio VARCHAR(50). */
+    private static final int LUNGHEZZA_MAX_NOME_CONVOGLIO = 50;
 
     /** Referenza alla logica e cache di sistema. */
     @Inject
@@ -62,13 +72,29 @@ public class RestApiGateway {
         public String id;
     }
 
-    /** DTO per la creazione/modifica di un treno. */
+    /**
+     * DTO per la creazione/modifica di un treno. {@code id} è il nome del convoglio
+     * digitato dall'amministratore: è la chiave primaria della tabella Treni, quindi si
+     * accetta solo in creazione (in modifica un id diverso da quello nel path viene
+     * rifiutato con un 400).
+     */
     public static class TrenoDTO {
         public String id;
-        public String nome;
         public String stato;
         public ItinerarioRef itinerario;
         public String itinerarioId; // accettato anche il formato "itinerarioId":"IT1"
+    }
+
+    /**
+     * Esito della scrittura di un treno sul database: o l'errore REST da restituire al
+     * frontend (e allora sul DB non è stato modificato niente), oppure l'entità appena
+     * scritta. Serve perché la transazione viene chiusa PRIMA di toccare la cache in RAM:
+     * così la cache resta l'immagine esatta della tabella Treni anche se il commit fallisce.
+     */
+    private static class EsitoScritturaTreno {
+        Response errore;
+        Treno treno;
+        boolean itinerarioCambiato;
     }
 
     /** DTO per la creazione/modifica di una tratta (itinerario) dalla pagina Gestione Tratte. */
@@ -218,20 +244,46 @@ public class RestApiGateway {
 
     /**
      * Crea un nuovo treno (stato di default "fermo") ed eventualmente lo assegna a un itinerario.
+     * Il campo {@code id} del corpo è il nome del convoglio digitato dall'amministratore:
+     * diventa la chiave primaria del treno, quindi è l'unica occasione per deciderlo.
      * @param dto Dati del treno dal corpo JSON.
-     * @return 201 Created con il treno creato.
+     * @return 201 Created con il treno creato, 400 se il nome manca o è troppo lungo,
+     *         409 se un convoglio con quel nome esiste già.
      */
     @POST
     @Path("/treni")
-    @Transactional
     public Response createTreno(TrenoDTO dto) {
-        if (dto == null || dto.id == null || dto.id.isEmpty()) {
-            return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("errore", "id mancante")).build();
+        String nomeConvoglio = dto != null && dto.id != null ? dto.id.trim() : "";
+        if (nomeConvoglio.isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("errore", "Nome del convoglio mancante")).build();
         }
-        if (Treno.findById(dto.id) != null) {
-            return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Treno già esistente")).build();
+        // La chiave primaria è VARCHAR(50): meglio un 400 parlante che un errore SQL.
+        if (nomeConvoglio.length() > LUNGHEZZA_MAX_NOME_CONVOGLIO) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("errore", "Il nome del convoglio non può superare i "
+                            + LUNGHEZZA_MAX_NOME_CONVOGLIO + " caratteri")).build();
         }
-        Treno treno = new Treno(dto.id, dto.nome != null ? dto.nome : dto.id);
+        // La transazione si apre e si CHIUDE qui: la cache viene toccata solo dopo il
+        // commit (vedi nota su EsitoScritturaTreno).
+        EsitoScritturaTreno esito = QuarkusTransaction.requiringNew().call(() -> creaTrenoSuDb(nomeConvoglio, dto));
+        if (esito.errore != null) {
+            return esito.errore;
+        }
+        esito.treno.ultimoAggiornamento = Instant.now();
+        statoRete.aggiornaTreno(esito.treno);
+        return Response.status(Response.Status.CREATED).entity(esito.treno).build();
+    }
+
+    /** Inserisce il treno nella tabella Treni. Gira dentro la transazione aperta dal chiamante. */
+    private EsitoScritturaTreno creaTrenoSuDb(String nomeConvoglio, TrenoDTO dto) {
+        EsitoScritturaTreno esito = new EsitoScritturaTreno();
+        if (Treno.findById(nomeConvoglio) != null) {
+            esito.errore = Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of("errore", "Esiste già un treno con il nome '" + nomeConvoglio + "'")).build();
+            return esito;
+        }
+        Treno treno = new Treno(nomeConvoglio);
         treno.stato = dto.stato != null ? normalizzaStatoTreno(dto.stato) : "fermo";
 
         String itinerarioId = estraiItinerarioId(dto);
@@ -242,58 +294,84 @@ public class RestApiGateway {
             }
         }
         treno.persist();
-        treno.ultimoAggiornamento = Instant.now();
-        statoRete.aggiornaTreno(treno);
-        return Response.status(Response.Status.CREATED).entity(treno).build();
+        esito.treno = treno;
+        return esito;
     }
 
     /**
-     * Aggiorna un treno esistente. Se cambia l'itinerario, il digital twin
-     * viene avvisato con un evento ITINERARIO_AGGIORNATO via MQTT.
-     * @param id ID del convoglio.
-     * @param dto Campi da aggiornare.
-     * @return 200 OK oppure 404.
+     * Aggiorna stato e itinerario di un treno esistente. Se cambia l'itinerario, il digital
+     * twin viene avvisato con un evento ITINERARIO_AGGIORNATO via MQTT.
+     *
+     * <p>Il nome del convoglio NON si aggiorna qui: è la chiave primaria della tabella Treni
+     * e il riferimento delle FK degli storici, quindi è immutabile per costruzione. Per
+     * cambiarlo si elimina il treno e si ricrea (la UI infatti mostra il campo Convoglio in
+     * sola lettura in modifica).</p>
+     *
+     * @param id Nome del convoglio da aggiornare.
+     * @param dto Campi da aggiornare (stato, itinerario).
+     * @return 200 OK, 404 se il treno non esiste, 400 se si prova a cambiargli il nome.
      */
     @PUT
     @Path("/treni/{id}")
-    @Transactional
     public Response updateTreno(@PathParam("id") String id, TrenoDTO dto) {
+        TrenoDTO dati = dto != null ? dto : new TrenoDTO();
+        if (dati.id != null && !dati.id.trim().isEmpty() && !dati.id.trim().equals(id)) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("errore", "Il nome del convoglio identifica il treno e non è "
+                            + "modificabile: eliminare il treno e ricrearlo con il nome nuovo")).build();
+        }
+        // La scrittura sul DB gira in una transazione che si apre e si chiude qui dentro,
+        // così la cache RAM viene allineata SOLO a commit avvenuto: se l'allineamento sta
+        // dentro la stessa transazione, un rollback lascia in memoria (e quindi nelle
+        // risposte REST) valori che sul database non sono mai stati scritti.
+        EsitoScritturaTreno esito = QuarkusTransaction.requiringNew().call(() -> aggiornaTrenoSuDb(id, dati));
+        if (esito.errore != null) {
+            return esito.errore;
+        }
+
+        // Allinea la cache RAM ai valori effettivamente scritti sul database,
+        // conservando la telemetria volatile già presente in memoria.
+        Treno cache = statoRete.getTreno(id);
+        if (cache == null) {
+            cache = esito.treno;
+            cache.ultimoAggiornamento = Instant.now();
+        }
+        cache.stato = esito.treno.stato;
+        cache.itinerario = esito.treno.itinerario;
+        statoRete.aggiornaTreno(cache);
+
+        if (esito.itinerarioCambiato) {
+            pubblicaItinerarioAggiornato(id);
+        }
+        return Response.ok(cache).build();
+    }
+
+    /** Applica sul database i campi presenti nel DTO. Gira dentro la transazione aperta dal chiamante. */
+    private EsitoScritturaTreno aggiornaTrenoSuDb(String id, TrenoDTO dto) {
+        EsitoScritturaTreno esito = new EsitoScritturaTreno();
         Treno dbTreno = Treno.findById(id);
         if (dbTreno == null) {
-            return Response.status(Response.Status.NOT_FOUND).build();
+            esito.errore = Response.status(Response.Status.NOT_FOUND).build();
+            return esito;
         }
         if (dto.stato != null) dbTreno.stato = normalizzaStatoTreno(dto.stato);
 
-        boolean itinerarioCambiato = false;
         String itinerarioId = estraiItinerarioId(dto);
         if (itinerarioId != null) {
             String attuale = dbTreno.itinerario != null ? dbTreno.itinerario.id : null;
             if (!itinerarioId.equals(attuale)) {
                 Itinerario itinerario = Itinerario.findById(itinerarioId);
                 if (itinerario == null) {
-                    return Response.status(Response.Status.BAD_REQUEST)
+                    esito.errore = Response.status(Response.Status.BAD_REQUEST)
                             .entity(Map.of("errore", "Itinerario inesistente: " + itinerarioId)).build();
+                    return esito;
                 }
                 dbTreno.itinerario = itinerario;
-                itinerarioCambiato = true;
+                esito.itinerarioCambiato = true;
             }
         }
-
-        // Allinea la cache RAM
-        Treno cache = statoRete.getTreno(id);
-        if (cache == null) {
-            cache = dbTreno;
-            cache.ultimoAggiornamento = Instant.now();
-        }
-        if (dto.nome != null) cache.nome = dto.nome;
-        if (dto.stato != null) cache.stato = normalizzaStatoTreno(dto.stato);
-        cache.itinerario = dbTreno.itinerario;
-        statoRete.aggiornaTreno(cache);
-
-        if (itinerarioCambiato) {
-            pubblicaItinerarioAggiornato(id);
-        }
-        return Response.ok(cache).build();
+        esito.treno = dbTreno;
+        return esito;
     }
 
     /**
@@ -466,11 +544,23 @@ public class RestApiGateway {
             Response errore = componiItinerario(itinerario, dto.stazioni, dto.travelTimes);
             if (errore != null) return errore;
         }
-        assegnaTreni(itinerario, dto.treniIds, true);
 
-        // Ogni treno attualmente assegnato deve ricaricare l'itinerario dal server
+        // Gli id dei treni assegnati vanno letti PRIMA di toccare le assegnazioni:
+        // assegnaTreni(..., true) sgancia quelli non più in elenco e una query fatta
+        // dopo non li troverebbe più. Erano proprio i treni sganciati a non ricevere
+        // mai ITINERARIO_AGGIORNATO, continuando a girare sulla tratta vecchia.
+        Set<String> daNotificare = new LinkedHashSet<>();
         for (Treno t : Treno.<Treno>list("itinerario.id", id)) {
-            pubblicaItinerarioAggiornato(t.id);
+            daNotificare.add(t.id);
+        }
+        assegnaTreni(itinerario, dto.treniIds, true);
+        if (dto.treniIds != null) {
+            daNotificare.addAll(dto.treniIds); // anche i treni appena agganciati
+        }
+
+        // Ogni treno coinvolto (vecchio o nuovo) deve ricaricare l'itinerario dal server
+        for (String trenoId : daNotificare) {
+            pubblicaItinerarioAggiornato(trenoId);
         }
         return Response.ok(trattaToDto(itinerario)).build();
     }
@@ -585,11 +675,17 @@ public class RestApiGateway {
         }
         chiudiGuasto(guasto);
 
-        // Se il guasto proveniva da una stazione, questa torna operativa in cache
+        // Se il guasto proveniva da una stazione, questa torna operativa in cache.
+        // Si fa ripartire anche il cronometro dell'heartbeat: senza, una stazione
+        // rimessa ONLINE dall'operatore ma in realtà ancora spenta resterebbe
+        // ONLINE per sempre, perché il FaultMonitor salta le stazioni che non hanno
+        // mai battuto. Così invece, se il battito non arriva davvero, dopo il
+        // timeout il watchdog la rimette OFFLINE.
         if ("STAZIONE".equalsIgnoreCase(guasto.sorgenteTipo)) {
             Stazione stazione = statoRete.getStazione(guasto.sorgenteId);
             if (stazione != null) {
                 stazione.stato = "ONLINE";
+                stazione.ultimoHeartbeat = Instant.now();
                 statoRete.aggiornaStazione(stazione);
             }
         }
@@ -663,8 +759,12 @@ public class RestApiGateway {
                 id, Instant.now().toString());
         alertsEmitter.send(alertJson);
 
-        // Risolve TUTTI i guasti ancora aperti generati da questa stazione
-        List<Guasto> aperti = Guasto.list("sorgenteId = ?1 and risolto = false", id);
+        // Risolve TUTTI i guasti ancora aperti generati da questa stazione.
+        // Il filtro su sorgenteTipo serve perché sorgenteId da solo non è univoco:
+        // un treno con lo stesso identificativo di una stazione si vedrebbe chiudere
+        // i propri guasti insieme a quelli della stazione.
+        List<Guasto> aperti = Guasto.list(
+                "sorgenteId = ?1 and sorgenteTipo = 'STAZIONE' and risolto = false", id);
         for (Guasto guasto : aperti) {
             chiudiGuasto(guasto);
             if (guasto.sorgenteTipo == null) guasto.sorgenteTipo = "STAZIONE";
@@ -837,7 +937,19 @@ public class RestApiGateway {
                 tratta.tempoPercorrenzaMinuti = tempo != null ? tempo : 15;
                 tratta.persist();
             } else if (tempo != null) {
-                tratta.tempoPercorrenzaMinuti = tempo;
+                // La Tratta è un ARCO FISICO della rete, condiviso fra più itinerari
+                // (es. T1_MI_BO sta sia in IT1_MI_NA sia in IT3_MI_RM): sovrascriverne
+                // il tempo da qui cambierebbe di nascosto anche gli altri percorsi.
+                // Lo si aggiorna solo se nessun altro itinerario usa quell'arco;
+                // altrimenti il tempo si modifica dalla pagina "Tratte elementari".
+                long usataAltrove = ItinerarioTratta.count(
+                        "id.idTratta = ?1 and id.idItinerario <> ?2", tratta.id, itinerario.id);
+                if (usataAltrove == 0) {
+                    tratta.tempoPercorrenzaMinuti = tempo;
+                } else {
+                    LOG.warnf("⏱️ Tratta %s condivisa con altri %d itinerari: tempo di percorrenza lasciato a %d minuti",
+                            tratta.id, usataAltrove, tratta.tempoPercorrenzaMinuti);
+                }
             }
 
             ItinerarioTratta riga = new ItinerarioTratta();

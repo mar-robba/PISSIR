@@ -4,9 +4,22 @@ import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+/**
+ * Convoglio della flotta. La chiave primaria è il nome del convoglio: è quello che
+ * l'amministratore digita nel campo "Convoglio" dell'interfaccia (es. "IC 351") ed è
+ * l'unico identificativo del treno in tutto il sistema (tabella Treni, storici, topic
+ * MQTT del digital twin, API REST). Prima esisteva anche una colonna "nome" separata,
+ * duplicato dell'id che si poteva rinominare: è stata eliminata perché teneva due
+ * identità per lo stesso convoglio.
+ *
+ * <p>Essendo la chiave primaria e il riferimento delle FK degli storici, il nome NON è
+ * modificabile: per cambiarlo si elimina il treno e lo si ricrea (vedi
+ * {@code RestApiGateway.updateTreno}).</p>
+ */
 @Entity
 @Table(name = "Treni")
 public class Treno extends PanacheEntityBase {
+    /** Nome/codice del convoglio (es. "IC 351"): chiave primaria, immutabile. */
     @Id
     @Column(name = "id_convoglio", length = 50)
     public String id;
@@ -26,8 +39,6 @@ public class Treno extends PanacheEntityBase {
 // allora il db ha una immagine esatta della chash
     // Campi volatili in-memory (per UI e logica), NON presenti in schema.sql.
     // I nomi sono quelli ESATTI attesi dal frontend nella serializzazione JSON.
-    @Transient
-    public String nome;
     @Transient
     public double latitudine;
     @Transient
@@ -57,9 +68,10 @@ public class Treno extends PanacheEntityBase {
 
 
     public Treno() {}
-    public Treno(String id, String nome) {
+
+    /** @param id Nome del convoglio inserito dall'amministratore, cioè la chiave primaria. */
+    public Treno(String id) {
         this.id = id;
-        this.nome = nome;
         this.stato = "attivo";
     }
 }

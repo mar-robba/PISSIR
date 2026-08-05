@@ -1,0 +1,114 @@
+@startuml M0 - Mappa delle Macchine a Stati della Centrale Operativa
+' =========================================================================
+'  MAPPA DELLE MACCHINE ASTRATTE DEL COMPONENTE "SERVER CENTRALE"
+'  (modulo ServeCentraleOperativa, Quarkus)
+'
+'  Il componente e' stato astratto in 13 macchine a stati che si richiamano
+'  fra loro. Questo file NON descrive un comportamento: e' l'indice che dice
+'  quale macchina sta in quale file e chi chiama chi.
+'
+'  Ogni macchina ha il suo file:
+'    M1  01_macchina_ciclo_vita_centrale.puml      main + TrafficLogicEngine.onStart
+'    M2  02_macchina_validazione_id_edge.puml      ExistIdForEdge / ExistIdForEdgeStazione
+'    M3  03_macchina_ingestione_telemetria.puml    IngestionService.onTelemetry
+'    M4  04_macchina_ingestione_heartbeat.puml     IngestionService.onHeartbeat
+'    M5  05_macchina_ingestione_transiti.puml      IngestionService.onTransit / onPassaggio
+'    M6  06_macchina_ingestione_allarmi.puml       IngestionService.onAlert
+'    M7  07_macchina_ciclo_vita_guasto.puml        entita' Guasto (ciclo di vita)
+'    M8  08_macchina_watchdog_faultmonitor.puml    FaultMonitor (3 job schedulati)
+'    M9  09_macchina_sessione_autorizzazione.puml  AuthController + SessioniAttive + Filtro
+'    M10 10_macchina_gateway_rest.puml             RestApiGateway
+'    M11 11_macchina_websocket_realtime.puml       RealtimeWebSocket
+'    M12 12_macchina_stato_stazione.puml           stato runtime della Stazione in cache
+'    M13 13_macchina_stato_treno.puml              stato del Treno (cache + DB)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<radice>> {
+    BackgroundColor #D2E3FC
+    BorderColor #174EA6
+}
+skinparam state<<entita>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M0 - Mappa delle 13 macchine a stati della Centrale Operativa
+
+state "M1 - Ciclo di vita\ndel processo Centrale" as M1 <<radice>>
+
+state "M2 - Validazione ID\ndei nodi di campo" as M2
+state "M3 - Ingestione\ntelemetria treno" as M3
+state "M4 - Ingestione\nheartbeat stazione" as M4
+state "M5 - Ingestione\ntransiti e passaggi" as M5
+state "M6 - Ingestione\nallarmi dal campo" as M6
+state "M8 - Watchdog\nFaultMonitor" as M8
+state "M9 - Sessione e\nautorizzazione REST" as M9
+state "M10 - Gateway REST\n(CRUD e comandi)" as M10
+state "M11 - Canale\nWebSocket realtime" as M11
+
+state "M7 - Ciclo di vita\ndel Guasto" as M7 <<entita>>
+state "M12 - Stato runtime\ndella Stazione" as M12 <<entita>>
+state "M13 - Stato\ndel Treno" as M13 <<entita>>
+
+' --- M1 fa partire tutte le macchine concorrenti ---
+[*] --> M1
+M1 --> M2 : attiva i canali\ndi validazione
+M1 --> M3 : attiva il canale\ntelemetry-in
+M1 --> M4 : attiva il canale\nheartbeat-in
+M1 --> M5 : attiva i canali\ntransit-in / passaggio-in
+M1 --> M6 : attiva il canale\nalerts-in
+M1 --> M8 : avvia i job\nschedulati (10s)
+M1 --> M9 : pubblica /api/auth\ne il filtro JAX-RS
+M1 --> M11 : apre l'endpoint\n/ws/realtime
+
+' --- Riferimenti fra le macchine ---
+M9 -[dashed]-> M10 : richiesta autorizzata
+M10 -[dashed]-> M7 : risolvi allarme /\nmanutenzione
+M10 -[dashed]-> M13 : sopprimi treno,\nCRUD treni
+M10 -[dashed]-> M12 : manutenzione,\nCRUD stazioni
+
+M3 -[dashed]-> M13 : normalizza e\nstoricizza lo stato
+M4 -[dashed]-> M12 : ONLINE / rientro\ndal fail-stop
+M4 -[dashed]-> M7 : chiude i guasti\n"Heartbeat assente:"
+M6 -[dashed]-> M7 : apre / aggiorna\nil guasto
+M6 -[dashed]-> M12 : GUASTA se\nCRITICAL
+M8 -[dashed]-> M7 : apre i guasti\nautomatici
+M8 -[dashed]-> M12 : OFFLINE per\nsilenzio heartbeat
+M8 -[dashed]-> M13 : rileva i treni\nfermi fra stazioni
+M5 -[dashed]-> M13 : posizione su tratta\ne prossima stazione
+
+M3 -[dotted]-> M11 : evento TELEMETRY
+M4 -[dotted]-> M11 : evento HEARTBEAT
+M5 -[dotted]-> M11 : evento TRANSIT
+M6 -[dotted]-> M11 : evento ALERT
+M8 -[dotted]-> M11 : evento SNAPSHOT
+
+M2 -[dashed]-> M13 : conferma l'esistenza\ndel convoglio a DB
+M2 -[dashed]-> M12 : conferma l'esistenza\ndella stazione a DB
+
+note bottom of M1
+  Legenda delle frecce:
+    piena      = la macchina M1 avvia la macchina puntata
+    tratteggio = la macchina chiama / fa transitare l'altra
+    punteggio  = la macchina produce un evento sul WebSocket
+
+  Tutte le macchine da M2 a M11 girano IN PARALLELO
+  (thread dei connettori reattivi, worker dello scheduler,
+  thread delle richieste HTTP) e condividono due sole risorse:
+  la cache RAM del TrafficLogicEngine e il database PostgreSQL.
+end note
+
+@enduml

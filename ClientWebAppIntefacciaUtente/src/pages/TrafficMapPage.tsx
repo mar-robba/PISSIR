@@ -262,7 +262,7 @@ export default function TrafficMapPage() {
             className="text-[10px] font-mono font-bold select-none"
             style={{ textShadow: '0 1px 2px rgba(255,255,255,0.9)' }}
           >
-            {train.convoglio}
+            {train.id}
           </text>
         </g>
       );
@@ -331,7 +331,7 @@ export default function TrafficMapPage() {
             </div>
           ) : selectedTrain ? (
             <div className="animate-fade-in">
-              <h3 className="text-xl mb-1">{selectedTrain.convoglio}</h3>
+              <h3 className="text-xl mb-1">{selectedTrain.id}</h3>
               
               <div className="mb-4 flex gap-2">
                 <Badge type={selectedTrain.status === 'in_viaggio' ? 'info' : selectedTrain.status === 'in_ritardo' ? 'warning' : 'neutral'}>

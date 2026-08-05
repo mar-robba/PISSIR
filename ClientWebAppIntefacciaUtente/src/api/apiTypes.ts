@@ -11,8 +11,8 @@ export interface ApiDashboardPayload {
 }
 
 export interface ApiTrainPayload {
+  /** Nome del convoglio: è la chiave primaria del treno sulla Centrale. */
   id: string;
-  nome?: string;
   stato?: string;
   posizioneAttualeTratta?: {
     stazioneArrivo?: { id: string };

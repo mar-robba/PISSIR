@@ -3,6 +3,7 @@ package it.uni.reti2;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
@@ -27,6 +28,8 @@ Nel vostro progetto, la Centrale usa probabilmente un certificato autofirmato o 
 /** Client HTTPS che considera attendibile solo la CA privata del progetto. */
 @ApplicationScoped
 public class SecureHttpClient {
+    private static final Logger LOG = Logger.getLogger(SecureHttpClient.class);
+
     @ConfigProperty(name = "centrale.tls.ca.path")
     String caPath;
 
@@ -45,7 +48,11 @@ public class SecureHttpClient {
             tls.init(null, trustManagers.getTrustManagers(), null);
             client = HttpClient.newBuilder().sslContext(tls).connectTimeout(Duration.ofSeconds(5)).build();
         } catch (Exception e) {
-            throw new IllegalStateException("Impossibile configurare la CA TLS della Centrale: " + caPath, e);
+            // Senza certificati generati (profilo di default, tutto in chiaro sulla 8781)
+            // il treno deve comunque partire: si usa il client HTTP standard.
+            LOG.warnf("⚠️ CA TLS della Centrale non caricata (%s): uso il client HTTP in chiaro. Dettaglio: %s",
+                    caPath, e.getMessage());
+            client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
         }
     }
 

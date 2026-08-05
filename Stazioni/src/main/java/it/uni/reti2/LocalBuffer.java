@@ -1,8 +1,10 @@
 package it.uni.reti2;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
 
 /**
  * LocalBuffer implementa un meccanismo di persistenza temporanea (coda FIFO in-memory)
@@ -26,9 +28,12 @@ public class LocalBuffer {
 
     /**
      * La coda vera e propria dove vengono stoccati gli eventi.
-     * L'uso di LinkedList implementa nativamente l'interfaccia Queue (FIFO).
+     * Si usa un ArrayDeque (e non una LinkedList vista come Queue) perché serve
+     * poter reinserire un evento anche IN TESTA: se il reinvio fallisce a metà
+     * flush l'evento più vecchio deve restare il più vecchio, altrimenti la
+     * Centrale riceverebbe una USCITA prima della relativa ENTRATA.
      */
-    private final Queue<EventoBufferizzato> bufferEventi = new LinkedList<>();
+    private final Deque<EventoBufferizzato> bufferEventi = new ArrayDeque<>();
 
     /**
      * Aggiunge un nuovo evento in coda al buffer.
@@ -38,7 +43,19 @@ public class LocalBuffer {
      * @param payload Il payload JSON dell'evento non recapitato.
      */
     public synchronized void add(String canale, String payload) {
-        bufferEventi.add(new EventoBufferizzato(canale, payload));
+        bufferEventi.addLast(new EventoBufferizzato(canale, payload));
+    }
+
+    /**
+     * Rimette un evento IN TESTA al buffer, davanti a tutti gli altri.
+     * Serve al flush: l'evento che non è riuscito a partire deve essere
+     * ritentato per primo, così l'ordine cronologico (FIFO) è rispettato.
+     *
+     * @param canale  Canale di destinazione dell'evento ("transit" o "alert").
+     * @param payload Il payload JSON dell'evento non recapitato.
+     */
+    public synchronized void addFirst(String canale, String payload) {
+        bufferEventi.addFirst(new EventoBufferizzato(canale, payload));
     }
 
     /**
@@ -47,7 +64,7 @@ public class LocalBuffer {
      * @return L'evento più vecchio nel buffer, oppure null se il buffer è vuoto.
      */
     public synchronized EventoBufferizzato poll() {
-        return bufferEventi.poll();
+        return bufferEventi.pollFirst();
     }
 
     /**
@@ -69,12 +86,14 @@ public class LocalBuffer {
     }
 
     /**
-     * Espone la coda sottostante.
-     * Utile per scopi diagnostici (es. restituzione in un'API di stato).
+     * Espone una COPIA della coda (non la struttura interna) per scopi diagnostici,
+     * es. la GET /stazione/buffer. Il metodo è synchronized come tutti gli altri:
+     * senza, la serializzazione JSON dell'endpoint poteva girare mentre il job di
+     * manutenzione modificava la coda (ConcurrentModificationException).
      *
-     * @return La struttura dati Queue.
+     * @return La lista degli eventi pendenti, dal più vecchio al più recente.
      */
-    public Queue<EventoBufferizzato> getBuffer() {
-        return bufferEventi;
+    public synchronized List<EventoBufferizzato> getBuffer() {
+        return new ArrayList<>(bufferEventi);
     }
 }

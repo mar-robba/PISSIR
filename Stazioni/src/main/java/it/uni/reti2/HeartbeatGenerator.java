@@ -1,5 +1,6 @@
 package it.uni.reti2;
 
+import io.quarkus.scheduler.Scheduled;
 import io.smallrye.mutiny.Multi;
 import it.uni.reti2.DBLocale;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -55,11 +56,32 @@ public class HeartbeatGenerator implements HeartbeatKA {
     }
 
     /**
-     * Producer reattivo che emette l'heartbeat sul canale MQTT dedicato ("heartbeat-out").
-     * Viene eseguito ogni 10 secondi in background. A ogni tick, oltre al battito:
+     * Job periodico di manutenzione del nodo, volutamente SEPARATO dal flusso di heartbeat:
      * - controlla i keepalive dei sensori di binario;
      * - se la connessione è attiva e ci sono eventi pendenti, svuota il buffer
-     *   tramite il flush reale del Gateway.
+     *   tramite il flush reale del Gateway (store and forward).
+     *
+     * Prima queste due operazioni giravano dentro l'.invoke() del Multi dell'heartbeat:
+     * siccome un Multi che fallisce termina, al primo errore MQTT si fermava anche lo
+     * store-and-forward e gli eventi bufferizzati non sarebbero mai più partiti.
+     * Con un job schedulato indipendente il buffer continua a svuotarsi comunque.
+     */
+    @Scheduled(every = "10s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    void manutenzionePeriodica() {
+        // Verifica dei sensori che non mandano più il keepalive
+        controllaSensori();
+
+        // Se la connessione è attiva e ci sono eventi che non erano stati inviati...
+        if (dbLocale.connessioneCentrale && !localBuffer.isEmpty()) {
+            LOG.infof("📡 Connessione ok, svuoto il buffer (%d eventi)...", localBuffer.size());
+            // Reinvia effettivamente gli eventi sugli emitter corretti
+            stationGateway.flush();
+        }
+    }
+
+    /**
+     * Producer reattivo che emette l'heartbeat sul canale MQTT dedicato ("heartbeat-out").
+     * Viene eseguito ogni 10 secondi in background.
      * Se la connessione verso la Centrale è simulata come assente, il battito
      * NON viene emesso (così la Centrale rileva la stazione come OFFLINE).
      * Allo stesso modo, finché l'ID della stazione non è stato riconosciuto dal
@@ -78,17 +100,6 @@ public class HeartbeatGenerator implements HeartbeatKA {
         return Multi.createFrom()
                 .ticks()
                 .every(Duration.ofSeconds(10))
-                .invoke(tick -> {
-                    // Verifica dei sensori che non mandano più il keepalive
-                    controllaSensori();
-
-                    // Se la connessione è attiva e ci sono eventi che non erano stati inviati...
-                    if (dbLocale.connessioneCentrale && !localBuffer.isEmpty()) {
-                        LOG.infof("📡 Connessione ok, svuoto il buffer (%d eventi)...", localBuffer.size());
-                        // Reinvia effettivamente gli eventi sugli emitter corretti
-                        stationGateway.flush();
-                    }
-                })
                 .filter(tick -> {
                     // ID non ancora validato dalla Centrale: nessun battito finché non arriva
                     // la conferma via MQTT (StationDatabaseValidator.gestisciRispostaValidazione).
@@ -118,7 +129,12 @@ public class HeartbeatGenerator implements HeartbeatKA {
                     // Contrassegna la connessione come persa in modo che Gateway sappia
                     // che deve usare il buffer per i prossimi eventi.
                     dbLocale.connessioneCentrale = false;
-                });
+                })
+                // invoke() esegue solo l'effetto collaterale: il flusso resterebbe comunque
+                // terminato e la stazione non batterebbe MAI più (per la Centrale sarebbe
+                // OFFLINE per sempre). Il retry con backoff riaggancia il canale da solo
+                // quando il broker torna disponibile.
+                .onFailure().retry().withBackOff(Duration.ofSeconds(1), Duration.ofSeconds(10)).indefinitely();
     }
 
    //boh
@@ -126,15 +142,19 @@ public class HeartbeatGenerator implements HeartbeatKA {
     /**
      * Controlla la mappa dei sensori monitorati: quelli il cui ultimo battito
      * è più vecchio del timeout configurato vengono segnalati alla Centrale
-     * con un guasto di severità WARNING (la stazione resta ONLINE) e rimossi
-     * dalla mappa, così la segnalazione avviene una sola volta.
+     * e rimossi dalla mappa, così la segnalazione avviene una sola volta.
+     *
+     * La severità è CRITICAL perché il PDF chiede che una stazione che non riceve
+     * più i keepalive dai propri sensori "segnali lo stato di guasta alla Centrale
+     * Operativa": inviaGuasto con CRITICAL porta dbLocale.stato a GUASTA, quindi i
+     * treni in arrivo vengono trattenuti finché non arriva la squadra di manutenzione.
      */
     private void controllaSensori() {
         Instant limite = Instant.now().minusSeconds(timeoutSensoriSecondi);
         for (Map.Entry<String, Instant> sensore : dbLocale.sensoriUltimoBattito.entrySet()) {
             if (sensore.getValue().isBefore(limite)) {
-                LOG.warnf("⚠️ Sensore %s silente da oltre %d secondi!", sensore.getKey(), timeoutSensoriSecondi);
-                stationGateway.inviaGuasto("Sensore " + sensore.getKey() + " non invia keepalive", "WARNING");
+                LOG.warnf("⚠️ Sensore %s silente da oltre %d secondi: stazione GUASTA!", sensore.getKey(), timeoutSensoriSecondi);
+                stationGateway.inviaGuasto("Sensore " + sensore.getKey() + " non invia keepalive", "CRITICAL");
                 // Rimozione dalla mappa: evita di rigenerare lo stesso alert a ogni tick
                 dbLocale.sensoriUltimoBattito.remove(sensore.getKey());
             }

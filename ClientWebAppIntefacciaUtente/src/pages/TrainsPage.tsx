@@ -11,7 +11,7 @@ export default function TrainsPage() {
   const [selectedTrainId, setSelectedTrainId] = useState<string | null>(null);
 
   const filteredTrains = trains.filter(t => 
-    t.convoglio.toLowerCase().includes(search.toLowerCase())
+    t.id.toLowerCase().includes(search.toLowerCase())
   );
 
   const selectedTrain = trains.find(t => t.id === selectedTrainId);
@@ -66,7 +66,7 @@ export default function TrainsPage() {
                     <td className="font-mono text-sm font-bold text-primary">
                       <div className="flex items-center gap-2">
                         <TrainIcon size={16} />
-                        {train.convoglio}
+                        {train.id}
                       </div>
                     </td>
                     <td>
@@ -116,7 +116,7 @@ export default function TrainsPage() {
                 <div>
                   <h3 className="text-2xl font-mono text-primary mb-1 flex items-center gap-2">
                     <TrainIcon size={24} />
-                    {selectedTrain.convoglio}
+                    {selectedTrain.id}
                   </h3>
                   <Badge type={getStatusBadgeType(selectedTrain.status)} className="mt-2">
                     {selectedTrain.status.replace('_', ' ').toUpperCase()}

@@ -1,0 +1,117 @@
+@startuml M12 - Stato Runtime della Stazione visto dalla Centrale
+' =========================================================================
+'  MACCHINA M12 - Stato runtime di una STAZIONE come lo vede la Centrale
+'
+'  Codice astratto:
+'    it.uni.reti2.entity.Stazione#stato (@Transient, default "OFFLINE")
+'    IngestionService#onHeartbeat, #onAlert, #storicizzaStatoStazione
+'    FaultMonitor#controllaHeartbeat
+'    RestApiGateway#dispacciaManutenzione, #risolviAllarme, #updateStazione
+'
+'  E' una macchina di ENTITA': lo stato NON e' persistito (campo @Transient),
+'  vive solo nella cache del TrafficLogicEngine; sul database ne resta la
+'  traccia in Storico_Stato_Stazioni (flag funzionanteONo).
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title M12 - Stato Runtime della Stazione (cache del TrafficLogicEngine)
+
+[*] --> OFFLINE : M1 - avvio della Centrale\n(stato = OFFLINE,\nultimoHeartbeat = null)
+
+state "OFFLINE\n(nodo non raggiungibile\no non ancora avviato)" as OFFLINE
+state "ONLINE\n(nodo che batte\nregolarmente)" as ONLINE
+state "GUASTA\n(guasto CRITICAL\ndichiarato dal campo)" as GUASTA
+state "MANUTENZIONE\n(squadra inviata\ndall'operatore)" as MANUTENZIONE
+
+' ---------- RIENTRO IN SERVIZIO ----------
+OFFLINE --> ONLINE : M4 - heartbeat ricevuto (stato ONLINE)\n[ultimoHeartbeat = now,\nStorico_Stato_Stazioni,\nchiude i guasti "Heartbeat assente:"\ne pubblica RESOLVED su MQTT]
+
+' ---------- FAIL-STOP ----------
+ONLINE --> OFFLINE : M8 - nessun heartbeat da oltre 30s\n[guasto automatico CRITICAL\n+ EventoStazione HEARTBEAT_LOST\n+ alert su railway/alerts]
+
+GUASTA --> OFFLINE : M8 - il nodo smette\nanche di battere
+
+' ---------- GUASTO DICHIARATO DAL CAMPO ----------
+ONLINE --> GUASTA : M6 - alert GUASTO\nsorgenteTipo = STAZIONE\nseverita = CRITICAL
+ONLINE --> GUASTA : M4 - la stazione stessa\nbatte con stato GUASTA
+
+GUASTA --> ONLINE : M10 - POST /api/allarmi/{id}/risolvi\n[ultimoHeartbeat = now\nper far ripartire il cronometro]
+GUASTA --> ONLINE : M4 - heartbeat con stato ONLINE\n(il nodo si dichiara guarito)
+
+' ---------- MANUTENZIONE ----------
+ONLINE --> MANUTENZIONE : M10 - POST /api/stazioni/{id}/manutenzione
+GUASTA --> MANUTENZIONE : M10 - POST /api/stazioni/{id}/manutenzione
+OFFLINE --> MANUTENZIONE : M10 - POST /api/stazioni/{id}/manutenzione
+
+MANUTENZIONE --> ONLINE : fine dello stesso comando\n[chiude tutti i guasti aperti,\nStorico funzionanteONo = true]
+
+note right of MANUTENZIONE
+  Lo stato MANUTENZIONE dura quanto la chiamata REST:
+  il metodo lo imposta, pubblica MAINTENANCE_DISPATCHED,
+  chiude i guasti e rimette subito ONLINE. Serve pero'
+  come stato "protetto": il watchdog salta le stazioni
+  in MANUTENZIONE e non le porta a OFFLINE.
+end note
+
+' ---------- FORZATURE DALL'AMMINISTRAZIONE ----------
+state "Forzatura dall'amministrazione\nPUT /api/stazioni/{id}\n(campo stato, sinonimo\nOPERATIVA -> ONLINE)" as Forzatura <<esterna>>
+Forzatura -[dashed]-> ONLINE
+Forzatura -[dashed]-> OFFLINE
+
+state "Stazione eliminata\nDELETE /api/stazioni/{id}\n(409 se referenziata da tratte)" as Eliminata
+ONLINE --> Eliminata : M10
+OFFLINE --> Eliminata : M10
+Eliminata --> [*] : rimossa da DB e cache
+
+note bottom of OFFLINE
+  All'avvio TUTTE le stazioni partono OFFLINE con
+  ultimoHeartbeat nullo: marcarle ONLINE faceva vedere
+  per 30 secondi una rete tutta operativa anche con i
+  nodi spenti. Con ultimoHeartbeat nullo il watchdog le
+  salta, quindi non apre falsi guasti finche' non arriva
+  il primo battito vero.
+end note
+
+note left of GUASTA
+  I guasti WARNING NON portano qui: restano allarmi
+  informativi e la stazione continua a operare, cosi'
+  i suoi heartbeat ONLINE non vengono contraddetti.
+end note
+
+' ===================== MACCHINE COLLEGATE =====================
+state "M4 - Ingestione heartbeat\n(04_macchina_ingestione_heartbeat.puml)" as M4 <<esterna>>
+state "M6 - Ingestione allarmi\n(06_macchina_ingestione_allarmi.puml)" as M6 <<esterna>>
+state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
+state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
+state "M7 - Ciclo di vita del Guasto\n(07_macchina_ciclo_vita_guasto.puml)" as M7 <<esterna>>
+
+M4 -[hidden]right-> M6
+M6 -[hidden]right-> M8
+M8 -[hidden]right-> M10
+M10 -[hidden]right-> M7
+
+note bottom of M7
+  Ogni transizione verso OFFLINE o GUASTA ha come effetto
+  collaterale l'apertura di un Guasto (M7), e ogni ritorno
+  a ONLINE ne comporta la chiusura: le due macchine vanno
+  lette insieme.
+end note
+
+@enduml

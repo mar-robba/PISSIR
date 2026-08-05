@@ -117,7 +117,7 @@ export default function StationsPage() {
                   getExpectedTrains(selectedStation.id).map(train => (
                     <div key={train.id} className="p-3 bg-black/20 border border-border-color rounded-md flex flex-col gap-2">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold font-mono text-primary">{train.convoglio}</span>
+                        <span className="font-bold font-mono text-primary">{train.id}</span>
                         <Badge type={train.type === 'arrivo' ? 'info' : 'warning'}>
                           {train.type.toUpperCase()}
                         </Badge>

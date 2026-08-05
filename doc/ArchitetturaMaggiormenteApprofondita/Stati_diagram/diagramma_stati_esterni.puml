@@ -1,0 +1,244 @@
+' =========================================================================
+'  Macchine a stati ESTERNE, richiamate dai diagrammi di avvio dei processi
+'  (diagramma_stati_treno.puml e diagramma_stati_stazione.puml).
+'  Questi diagrammi partono dal punto in cui l'ID e' gia' stato validato
+'  sul database centrale e il processo e' entrato nel ciclo keep-alive.
+'
+'  Il file contiene tre diagrammi:
+'    1) Motore di Viaggio del Treno (TrainJourneyEngine)
+'    2) Componenti in background del Treno
+'    3) Componenti MQTT/REST della Stazione e della Centrale
+' =========================================================================
+
+@startuml Macchina a Stati Esterna – Motore di Viaggio del Treno
+' =========================================================================
+'  1) Motore di Viaggio – Digital Twin (TrainJourneyEngine)
+'     Richiamata da: diagramma_stati_treno.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title Macchina a Stati Esterna – Motore di Viaggio del Treno (TrainJourneyEngine)
+
+note as PuntoIngresso
+  INGRESSO: il treno e' stato riconosciuto
+  dal DB centrale (trenoRiconosciuto = true)
+  e il tick reattivo da 1s e' avviato.
+  Vedi diagramma_stati_treno.puml
+end note
+
+[*] --> MotoreDiViaggio
+
+state "Motore di Viaggio – Digital Twin\n(TrainJourneyEngine)" as MotoreDiViaggio {
+
+    ' --- Caricamento itinerario ---
+    state "Attesa Itinerario" as AttesaItinerario
+    note left of AttesaItinerario
+      GET /api/treni/{id}/itinerario
+      verso la Centrale Operativa.
+      Retry ogni 15s se fallisce.
+    end note
+
+    state "Itinerario Caricato\n(>= 2 stazioni)" as ItinerarioCaricato
+
+    state "Avvio Viaggio\n(avviaViaggio())" as AvvioViaggio
+    note right of AvvioViaggio
+      Posiziona il treno alla prima
+      stazione, stato = FERMO,
+      faseViaggio = IN_STAZIONE,
+      genera passeggeri iniziali.
+    end note
+
+    ' --- Ciclo di simulazione (macchina a stati) ---
+    state "Ciclo di Simulazione\n(tick ogni 1s)" as CicloSimulazione {
+
+        state "IN_STAZIONE\n(FERMO)" as InStazione
+        note bottom of InStazione
+          Attende scadenza sosta.
+          Non parte se stazione
+          corrente/prossima guasta.
+          Sosta doppia al capolinea.
+        end note
+
+        state "IN_VIAGGIO" as InViaggio
+        note bottom of InViaggio
+          Interpola GPS tra le due
+          stazioni, avanza il
+          progressPercent con il
+          tempo scalato dal fattore
+          di accelerazione.
+        end note
+
+        state "BLOCCATO\nGUASTO STAZIONE" as Bloccato
+        note bottom of Bloccato
+          Treno fermo, accumula
+          ritardo. Congela il
+          progressPercent se
+          bloccato a metà tratta.
+        end note
+
+        state "EMERGENZA\n(guasto di bordo)" as Emergenza
+        note bottom of Emergenza
+          Guasto rilevato dai sensori.
+          Viaggio congelato: il tempo
+          di tratta non avanza.
+          Velocità = 0.
+        end note
+
+        state "SOPPRESSO" as Soppresso
+        note bottom of Soppresso
+          Stato definitivo.
+          Corsa cancellata dalla
+          Centrale (alert STOP).
+          faseViaggio = TERMINATO.
+        end note
+
+        state "Inversione al\nCapolinea" as Inversione
+
+        ' --- Transizioni principali ---
+        [*] --> InStazione
+
+        InStazione --> InViaggio : sosta scaduta\n+ stato = FERMO\n+ nessuna stazione guasta\n[pubblica USCITA MQTT]
+        InViaggio --> InStazione : progressPercent >= 100%\n(arrivo in stazione)\n[pubblica ENTRATA MQTT]
+
+        ' --- Inversione ---
+        InStazione --> Inversione : arrivo al capolinea\n(ultimo/primo indice)
+        Inversione --> InStazione : direzione invertita\n(andata <-> ritorno)\nsosta doppia
+
+        ' --- Guasto stazione ---
+        InStazione --> Bloccato : alert GUASTO CRITICAL\nstazione corrente/prossima
+        InViaggio --> Bloccato : alert GUASTO CRITICAL\nstazione corrente/prossima
+        Bloccato --> InStazione : alert RESOLVED\n(ero IN_STAZIONE)
+        Bloccato --> InViaggio : alert RESOLVED\n(ero IN_VIAGGIO)
+
+        ' --- Emergenza di bordo ---
+        InStazione --> Emergenza : sensore rileva guasto\n[inviaGuasto() MQTT]
+        InViaggio --> Emergenza : sensore rileva guasto\n[inviaGuasto() MQTT]
+        Emergenza --> InStazione : alert RESOLVED\nper questo TRENO\n(stato -> FERMO)
+        Emergenza --> InViaggio : alert RESOLVED\nper questo TRENO\n(stato -> FERMO,\nriprende la marcia)
+
+        ' --- Soppressione ---
+        InStazione --> Soppresso : alert STOP target = trenoId
+        InViaggio --> Soppresso : alert STOP target = trenoId
+        Bloccato --> Soppresso : alert STOP target = trenoId
+        Emergenza --> Soppresso : alert STOP target = trenoId
+        Soppresso --> [*] : TERMINATO\n(il tick non fa piu' nulla)
+    }
+
+    ' --- Transizioni esterne al ciclo ---
+    [*] --> AttesaItinerario
+    AttesaItinerario --> AttesaItinerario : Centrale irraggiungibile /\nHTTP != 200 /\n< 2 stazioni\n(retry ogni 15s)
+    AttesaItinerario --> ItinerarioCaricato : HTTP 200 +\nparsing JSON OK
+    ItinerarioCaricato --> AvvioViaggio : autostart = true
+    AvvioViaggio --> CicloSimulazione
+
+    ' --- Ricarica itinerario ---
+    CicloSimulazione --> AttesaItinerario : alert ITINERARIO_AGGIORNATO\n(reset completo,\nricarica dalla Centrale)
+}
+
+@enduml
+
+
+@startuml Macchina a Stati Esterna – Componenti in Background del Treno
+' =========================================================================
+'  2) Componenti attivi in background lato Treno
+'     Richiamata da: diagramma_stati_treno.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title Macchina a Stati Esterna – Componenti in Background del Treno
+
+state "Componenti Attivi in Background\n(paralleli al ciclo di simulazione)" as Background {
+    state "TrainElab\n(telemetria MQTT\nogni 5s)\n-> railway/telemetry" as Telemetria
+    state "TrainGateway\n(listener alert MQTT\nin ingresso)\n<- railway/alerts" as Gateway
+    state "TrainGateway.inviaPassaggio()\n(publisher)\n-> railway/train/{id}/passaggio" as PassaggioOut
+    state "TrainIngestion (REST)\nGET localhost:8082/treno/info" as Ingestion
+}
+
+note bottom of Background
+  Questi componenti girano in parallelo
+  grazie a Quarkus Reactive Messaging.
+  Non hanno stati propri: leggono/scrivono
+  sul TrainDB condiviso e interagiscono
+  con il TrainJourneyEngine.
+end note
+
+@enduml
+
+
+@startuml Macchina a Stati Esterna – Componenti Stazione e Centrale
+' =========================================================================
+'  3) Componenti MQTT/REST attivi dopo la validazione dell'ID
+'     Richiamata da: diagramma_stati_stazione.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title Macchina a Stati Esterna – Componenti MQTT/REST della Stazione e della Centrale
+
+state "Componenti Attivi in Background\n(paralleli, indipendenti dallo stato di validazione dell'ID)" as ComponentiAttivi {
+
+    state "LATO STAZIONE" as LatoStazione {
+        state "HeartbeatGenerator\n(publisher, ogni 10s)\n-> railway/station/{id}/heartbeat" as HBOut
+        state "StationGateway.inviaTransito()\n(publisher)\n-> railway/station/{id}/transit" as TransitOut
+        state "StationGateway.inviaGuasto()\n(publisher)\n-> railway/alerts" as AlertOut
+        state "StationGateway.riceviAlert()\n(listener)\n<- railway/alerts" as AlertIn
+        state "StationGateway.riceviPassaggio()\n(listener, wildcard)\n<- railway/train/+/passaggio" as PassaggioIn
+        state "StationIngestion (REST)\nGET localhost:8081/stazione/info" as StationRest
+    }
+
+    state "LATO CENTRALE" as LatoCentrale {
+        state "IngestionService.onHeartbeat()\n(listener)\n<- railway/station/+/heartbeat" as CentraleHBIn
+        state "IngestionService.onTransit()\n(listener)\n<- railway/station/+/transit" as CentraleTransitIn
+        state "IngestionService.onAlert()\n(listener, solo GUASTO)\n<- railway/alerts" as CentraleAlertIn
+        state "IngestionService.onPassaggio()\n(listener)\n<- railway/train/+/passaggio" as CentralePassaggioIn
+        state "RestApiGateway / FaultMonitor\n(publisher: RESOLVED, STOP,\nMAINTENANCE_DISPATCHED)\n-> railway/alerts" as CentraleAlertOut
+    }
+
+    LatoStazione -[hidden]right-> LatoCentrale
+}
+
+note bottom of ComponentiAttivi
+  Questi componenti girano in parallelo grazie a Quarkus
+  Reactive Messaging e non dipendono da uno stato proprio:
+  leggono/scrivono sul DBLocale (lato Stazione) o sul DB
+  centrale + cache RAM (TrafficLogicEngine, lato Centrale).
+  railway/alerts e' un topic CONDIVISO: sia la Stazione sia
+  la Centrale vi pubblicano e vi sono sottoscritte,
+  filtrando i messaggi tramite il campo "tipoEvento".
+end note
+
+@enduml

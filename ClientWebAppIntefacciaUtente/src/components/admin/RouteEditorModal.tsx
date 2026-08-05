@@ -32,7 +32,7 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
       } else {
         // Init empty
         setFormData({
-          id: `rt-${Date.now()}`,
+          id: '',
           name: '',
           code: '',
           stationIds: [],
@@ -43,7 +43,11 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
         });
       }
     }
-  }, [isOpen, routeIdToEdit, routes]);
+    // Non includiamo "routes" tra le dipendenze: altrimenti l'effetto si
+    // rieseguirebbe ad ogni aggiornamento dello store, azzerando i dati che
+    // l'utente sta ancora digitando nel form (stesso problema di TrainEditorModal).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, routeIdToEdit]);
 
   if (!isOpen) return null;
 
@@ -56,7 +60,13 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
     if (routeIdToEdit) {
       await updateRoute(routeIdToEdit, formData);
     } else {
-      await addRoute(formData as Route);
+      // L'id della nuova tratta è il Nome Tratta così come inserito in UI
+      // (non più generato automaticamente): deve quindi essere univoco.
+      if (routes.some(r => r.id === formData.name)) {
+        alert('Esiste già una tratta con questo nome.');
+        return;
+      }
+      await addRoute({ ...formData, id: formData.name } as Route);
     }
     onClose();
   };
@@ -186,7 +196,17 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
                 </select>
               </div>
             </h3>
-            
+
+            {/* Le tratte elementari sono archi FISICI della rete e possono essere
+                condivise da più itinerari (es. Milano-Bologna sta sia sull'itinerario
+                per Napoli sia su quello per Roma): il tempo di percorrenza di un arco
+                già usato altrove si modifica dalla pagina "Tratte", non da qui. */}
+            <p className="text-xs text-muted mb-3">
+              Il tempo indicato vale per il singolo arco fisico fra due stazioni. Se quell'arco è già
+              usato da un altro itinerario, il valore resta quello impostato nella pagina Tratte
+              (altrimenti si modificherebbero anche gli altri percorsi).
+            </p>
+
             {formData.stationIds?.length === 0 ? (
               <div className="text-center p-6 bg-black/20 rounded-md border border-dashed border-border-color text-muted">
                 Nessuna stazione presente in questa tratta. Aggiungine almeno due.

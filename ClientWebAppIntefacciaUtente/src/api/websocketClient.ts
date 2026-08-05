@@ -139,5 +139,9 @@ class WebSocketClient {
 }
 
 // Esporta un'istanza singoletto (Singleton pattern) per essere riusata nell'intera Web App.
-// Allinea l'URL WebSocket alla porta del backend (8781)
-export const wsClient = new WebSocketClient('ws://localhost:8781/ws/realtime');
+// L'URL non è fisso: si legge da VITE_WS_URL (file .env di Vite), così con la Centrale
+// avviata in profilo tls basta puntare a wss://localhost:8444/ws/realtime.
+// Default: ws:// sulla porta del backend in profilo normale (8781).
+const WS_URL: string = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8781/ws/realtime';
+
+export const wsClient = new WebSocketClient(WS_URL);

@@ -41,6 +41,10 @@ CREATE TABLE Itinerari (
 );
 
 -- --- Treni ---
+-- id_convoglio E' il nome del convoglio (es. "IC 351"): e' il valore che l'amministratore
+-- digita nel campo "Convoglio" dell'interfaccia. Non esiste una colonna "nome" separata:
+-- il nome coincide con la chiave primaria, quindi e' univoco per costruzione e immutabile
+-- (per rinominare un convoglio si elimina il treno e si ricrea).
 CREATE TABLE Treni (
     id_convoglio                    VARCHAR(50) PRIMARY KEY,
     stato                           VARCHAR(30) NOT NULL
@@ -91,6 +95,19 @@ CREATE TABLE Guasti_Pervenuti_da_treni_o_Staz (
     ts_risoluzione  TIMESTAMP,     -- ESTENSIONE: istante di risoluzione (null se aperto)
     FOREIGN KEY (OperatoreCheSeNeStaOccupandoFK)
         REFERENCES Utenti(id_utente)
+);
+
+-- --- Eventi delle Stazioni (audit log) ---
+-- Tabella usata dall'entita' EventoStazione: non era prevista dallo schema iniziale
+-- e in esecuzione la crea Hibernate (quarkus.hibernate-orm.database.generation=update).
+-- E' riportata qui perche' questo file e' il DDL di riferimento allegato alla relazione.
+CREATE TABLE eventi_stazioni (
+    id           BIGINT PRIMARY KEY,   -- generato da Hibernate (sequenza dedicata)
+    stazione_id  VARCHAR(50),          -- FK logica verso Stazione(id_stazione), non vincolata
+    stato        VARCHAR(50),          -- stato della stazione al momento dell'evento
+    tipo_evento  VARCHAR(50),          -- es. 'HEARTBEAT_LOST', 'GUASTO', 'MANUTENZIONE'
+    descrizione  VARCHAR(500),
+    timestamp    TIMESTAMP
 );
 
 -- ================================================================

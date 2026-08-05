@@ -19,6 +19,7 @@ import org.jboss.logging.Logger;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Watchdog della Centrale Operativa: controlla periodicamente lo stato della rete
@@ -94,10 +95,15 @@ public class FaultMonitor {
 
                 // Evita duplicati: un solo guasto aperto per episodio di silenzio
                 if (statoRete.getGuastoApertoPerSorgente(stazione.id, "sensore_offline") == null) {
+                    // Severità CRITICAL (non warning): è il fail-stop della stazione, e
+                    // TrainGateway.riceviAlert blocca i treni solo sui guasti CRITICAL.
+                    // Il messaggio parte con MSG_HEARTBEAT_PERSO così la Centrale
+                    // riconosce il guasto come "suo" e lo richiude da sola quando il
+                    // battito torna (vedi IngestionService.onHeartbeat).
                     Guasto guasto = creaGuastoAutomatico(
-                            "sensore_offline", "warning", "STAZIONE", stazione.id,
-                            "Stazione " + stazione.id + " non invia heartbeat da oltre "
-                                    + heartbeatTimeoutSecondi + " secondi");
+                            "sensore_offline", "CRITICAL", "STAZIONE", stazione.id,
+                            IngestionService.MSG_HEARTBEAT_PERSO + " la stazione " + stazione.id
+                                    + " non invia heartbeat da oltre " + heartbeatTimeoutSecondi + " secondi");
 
                     // Audit log dell'evento sulla tabella eventi_stazioni
                     EventoStazione evento = new EventoStazione();
@@ -156,13 +162,21 @@ public class FaultMonitor {
 
     /**
      * Crea, persiste e notifica un guasto rilevato automaticamente dalla centrale.
+     * La notifica va su DUE strade: la WebSocket per la dashboard e il topic MQTT
+     * railway/alerts per il campo (senza quest'ultima i treni non saprebbero mai
+     * che una stazione è caduta e continuerebbero ad andarci dentro).
      *
      * @return Il guasto appena creato.
      */
     private Guasto creaGuastoAutomatico(String tipo, String severita, String sorgenteTipo,
                                         String sorgenteId, String messaggio) {
         Guasto guasto = new Guasto();
-        guasto.id = "alert-" + Instant.now().toEpochMilli();
+        // Il suffisso casuale è indispensabile: i due job schedulati girano entrambi ogni
+        // 10 secondi e ciclano su tutte le sorgenti, quindi due guasti generati nello stesso
+        // millisecondo avrebbero avuto la stessa chiave primaria (violazione di PK al commit
+        // e rollback dell'INTERO giro di controllo).
+        guasto.id = "alert-" + Instant.now().toEpochMilli() + "-"
+                + UUID.randomUUID().toString().substring(0, 8);
         guasto.tipo = tipo;
         guasto.severita = severita;
         guasto.sorgenteTipo = sorgenteTipo;
@@ -179,7 +193,8 @@ public class FaultMonitor {
         storico.persist();
 
         statoRete.aggiungiGuasto(guasto);
-        ingestion.broadcastAlert(guasto);
+        ingestion.broadcastAlert(guasto);       // dashboard (WebSocket)
+        ingestion.pubblicaGuastoSuMqtt(guasto); // campo (topic railway/alerts)
         return guasto;
     }
 }

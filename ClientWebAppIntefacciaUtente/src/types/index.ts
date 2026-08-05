@@ -45,8 +45,12 @@ export type TrainStatus =
   | 'in_attesa';
 
 export interface Train {
+  /**
+   * Nome del convoglio (es. "IC 351"): è l'identificativo del treno in tutto il
+   * sistema (chiave primaria Treni.id_convoglio sulla Centrale, topic MQTT del
+   * digital twin). Non esiste un campo "convoglio" separato: era un doppione.
+   */
   id: string;
-  convoglio: string; // numero identificativo o matricola es. "IC 351"
   status: TrainStatus;
   currentStationId: string | null;
   nextStationId: string | null;

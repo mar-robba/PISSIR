@@ -34,6 +34,11 @@ public class TrainElab {
      * progresso della tratta, ritardo, passeggeri) sul canale d'uscita "telemetry-out"
      * verso la Centrale Operativa.
      *
+     * Come l'heartbeat della stazione, il flusso è filtrato su trenoRiconosciuto: finché
+     * la Centrale non conferma che l'ID esiste nel database centrale non parte nemmeno un
+     * frame. Senza questo filtro un treno lanciato con un ID inventato avrebbe potuto
+     * farsi creare a DB dalla telemetria e poi auto-validarsi, rendendo inutile la verifica.
+     *
      * @return Multi (flusso reattivo di SmallRye Mutiny) che emette una stringa JSON periodicamente.
      */
     @Outgoing("telemetry-out")
@@ -42,6 +47,14 @@ public class TrainElab {
         return Multi.createFrom()
                 .ticks()                 // qui avviene ogni 5 sec
                 .every(Duration.ofSeconds(5))
+                .filter(tick -> {
+                    // ID non ancora validato dalla Centrale: nessuna telemetria
+                    if (!trainDB.trenoRiconosciuto) {
+                        LOG.debug("⏳ Treno non ancora validato dalla Centrale: telemetria sospesa.");
+                        return false;
+                    }
+                    return true;
+                })
                 .map(tick -> {
                     // La velocità è l'unico dato ancora simulato dai sensori:
                     // 0 se il treno è fermo, altrimenti un valore realistico tra 80 e 160 km/h
@@ -71,6 +84,11 @@ public class TrainElab {
 
                     // Ritorna il payload che verrà poi processato dal connettore (es. inviato ad un broker)
                     return json;
-                });
+                })
+                // Un Multi che fallisce TERMINA: senza retry, al primo errore sul canale
+                // (broker riavviato, rete che sfarfalla) il treno non manderebbe mai più
+                // telemetria. Con il backoff il flusso si riaggancia da solo.
+                .onFailure().invoke(e -> LOG.errorf("🔌 Errore sul canale telemetria: %s", e.getMessage()))
+                .onFailure().retry().withBackOff(Duration.ofSeconds(1), Duration.ofSeconds(10)).indefinitely();
     }
 }

@@ -59,19 +59,19 @@ public class TrafficLogicEngine {
         System.out.println("TrafficLogicEngine: Inizializzazione cache dal DB...");
 
         // Popola Stazioni: i campi persistiti (nome, coordinate, binari, tipo)
-        // arrivano direttamente dal DB, quelli volatili vengono inizializzati qui.
+        // arrivano direttamente dal DB. Lo stato runtime NON viene inventato: resta
+        // il default OFFLINE dell'entità con ultimoHeartbeat a null, perché all'avvio
+        // nessuna stazione ha ancora battuto (marcarle ONLINE faceva vedere per 30
+        // secondi una rete tutta operativa anche a nodi spenti). Il FaultMonitor
+        // salta le stazioni con heartbeat nullo, quindi non apre falsi guasti.
         for (Stazione s : Stazione.<Stazione>listAll()) {
-            s.stato = "ONLINE";
-            s.ultimoHeartbeat = Instant.now();
             stazioni.put(s.id, s);
         }
         System.out.println("Caricate " + stazioni.size() + " stazioni.");
 
-        // Popola Treni
+        // Popola Treni: l'id del convoglio è il nome scelto dall'amministratore,
+        // non c'è nessun altro campo anagrafico da ricostruire.
         for (Treno t : Treno.<Treno>listAll()) {
-            if (t.nome == null || t.nome.isEmpty()) {
-                t.nome = t.id; // Usa ID come nome solo se assente
-            }
             t.ultimoAggiornamento = Instant.now();
             treni.put(t.id, t);
         }

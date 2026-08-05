@@ -1,7 +1,9 @@
 package it.uni.reti2.gateway;
 
 import it.uni.reti2.entity.Utente;
+import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -10,17 +12,21 @@ import jakarta.ws.rs.core.Response;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Controller REST per l'autenticazione degli operatori della Centrale.
  * Verifica le credenziali contro la tabella Utenti e restituisce al frontend
  * un token di sessione con il profilo utente nel formato atteso.
+ * Il token non è più un UUID buttato via: viene registrato in {@link SessioniAttive}
+ * ed è quello che {@link FiltroAutorizzazione} pretende su ogni chiamata protetta.
  */
 @Path("/api/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthController {
+
+    @Inject
+    SessioniAttive sessioni;
 
     public static class LoginRequest {
         public String username;
@@ -65,9 +71,26 @@ public class AuthController {
         userPayload.put("avatarInitials", initials);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("token", UUID.randomUUID().toString());
+        // Il token viene registrato lato server insieme al ruolo: da qui in poi ogni
+        // chiamata REST dovrà presentarlo nell'header Authorization.
+        payload.put("token", sessioni.apri(utente.matricola, role));
         payload.put("user", userPayload);
 
         return Response.ok(payload).build();
+    }
+
+    /**
+     * Chiude la sessione invalidando il token: da quel momento le API rispondono 401.
+     *
+     * @param authorization Header "Bearer <token>" della sessione da chiudere.
+     * @return 200 con la conferma.
+     */
+    @POST
+    @Path("/logout")
+    public Response logout(@HeaderParam("Authorization") String authorization) {
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            sessioni.chiudi(authorization.substring("Bearer ".length()).trim());
+        }
+        return Response.ok(Map.of("success", true)).build();
     }
 }

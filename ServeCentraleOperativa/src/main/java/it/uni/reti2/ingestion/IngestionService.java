@@ -3,7 +3,9 @@ package it.uni.reti2.ingestion;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.panache.common.Sort;
+import io.smallrye.common.annotation.Blocking;
 // quindi Anche Treno
 import it.uni.reti2.entity.*;
 import it.uni.reti2.elaboration.TrafficLogicEngine;
@@ -11,7 +13,6 @@ import it.uni.reti2.gateway.RealtimeWebSocket;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
@@ -19,6 +20,7 @@ import org.eclipse.microprofile.reactive.messaging.Message;
 import org.jboss.logging.Logger;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 //è un bean CDI (@ApplicationScoped) che riceve i messaggi MQTT e poi aggiorna sia la cache interna sia il database.
@@ -32,15 +34,50 @@ CDI sta per Contexts and Dependency Injection, ed è lo standard ufficiale di Ja
 /**
  * IngestionService è il cuore reattivo per la consumazione e memorizzazione (sink)
  * dei messaggi MQTT provenienti dai nodi sul campo (Edge), ovvero Treni e Stazioni.
+ *
+ * <p><b>Nota sulle transazioni.</b> I consumer NON sono più annotati {@code @Transactional}:
+ * con quell'annotazione il commit avviene all'uscita del metodo, cioè FUORI dal try/catch,
+ * quindi una violazione di vincolo risaliva fino al connettore reattivo e spegneva il canale
+ * (da quel momento la Centrale smetteva di ricevere su quel topic fino al riavvio).
+ * Adesso ogni scrittura gira dentro {@code QuarkusTransaction.requiringNew()} chiamato
+ * DENTRO il try: il commit avviene lì e l'eventuale eccezione resta catturabile.
+ * I metodi restano {@code @Blocking} perché usano JDBC (prima lo erano implicitamente,
+ * essendo annotati {@code @Transactional}).</p>
  */
 @ApplicationScoped
 public class IngestionService {
 
     private static final Logger LOG = Logger.getLogger(IngestionService.class);
 
+    /**
+     * Valori ammessi dal CHECK sulla colonna Treni.stato: qualunque altra cosa
+     * farebbe fallire il commit (e per il motivo spiegato sopra è meglio evitarlo).
+     */
+    private static final List<String> STATI_TRENO_VALIDI =
+            List.of("attivo", "fermo", "rotto", "in manutenzione");
+
+    /**
+     * Marcatore inserito negli alert che la Centrale pubblica su railway/alerts.
+     * Il topic è condiviso e la Centrale è sottoscritta anche in ingresso: senza
+     * questo campo si riascolterebbe da sola e creerebbe un secondo Guasto per un
+     * allarme che ha appena scritto lei.
+     */
+    public static final String ORIGINE_CENTRALE = "CENTRALE";
+
+    /**
+     * Prefisso dei messaggi dei guasti aperti automaticamente dal watchdog quando una
+     * stazione smette di battere: permette alla Centrale di riconoscerli e chiuderli da
+     * sola al ritorno dell'heartbeat, senza toccare i guasti segnalati dalla stazione.
+     */
+    public static final String MSG_HEARTBEAT_PERSO = "Heartbeat assente:";
+
     @Inject
     ObjectMapper mapper;
 
+    /**
+     * Canale verso railway/alerts: serve alla Centrale per propagare sul campo
+     * i guasti che rileva da sola (vedi pubblicaGuastoSuMqtt, usato dal FaultMonitor).
+     */
     @Inject
     @Channel("alerts-out")
     Emitter<String> alertsEmitter;
@@ -51,26 +88,20 @@ public class IngestionService {
     @Inject
     RealtimeWebSocket webSocket;
 
-    /**
-     * Sostituisce le virgole che appaiono fra cifre con il punto decimale.
-     * Esempio: "latitudine":44,912444  -> "latitudine":44.912444
-     */
-    private String normalizeDecimalComma(String s) {
-        if (s == null) return null;
-        // Sostituisce solo le virgole che sono fra due cifre (lookbehind/lookahead)
-        return s.replaceAll("(?<=\\d),(?=\\d)", ".");
-    }
 // Ste conversioni vanno messe a posto, bisogna fare solo un unico tipo di dato
     /**
      * Converte lo stato MQTT del treno nello stato canonico usato dal DB.
      * IN_VIAGGIO→attivo, FERMO→fermo, EMERGENZA→rotto, SOPPRESSO→in manutenzione.
+     * Qualunque valore non riconosciuto (compreso il campo "stato" assente) diventa
+     * "fermo": la colonna ha un CHECK e uno stato inventato farebbe saltare il commit.
      */
     private String normalizzaStatoTreno(String rawStato) {
         if ("IN_VIAGGIO".equalsIgnoreCase(rawStato)) return "attivo";
         if ("FERMO".equalsIgnoreCase(rawStato)) return "fermo";
         if ("EMERGENZA".equalsIgnoreCase(rawStato)) return "rotto";
         if ("SOPPRESSO".equalsIgnoreCase(rawStato)) return "in manutenzione";
-        return rawStato == null ? "fermo" : rawStato.toLowerCase();
+        String normalizzato = rawStato == null ? "" : rawStato.trim().toLowerCase();
+        return STATI_TRENO_VALIDI.contains(normalizzato) ? normalizzato : "fermo";
     }
 
     /**
@@ -103,16 +134,13 @@ public class IngestionService {
     // lo fa per ogni treno ?
 
     @Incoming("telemetry-in")
-    @Transactional
+    @Blocking
     public CompletionStage<Void> onTelemetry(Message<byte[]> message) {
         String payload = new String(message.getPayload());
-        // Normalizza eventuali numeri con virgola (es. 44,912444) → 44.912444
-        payload = normalizeDecimalComma(payload);
         try {
 
             JsonNode root = mapper.readTree(payload);
             String trenoId = root.has("trenoId") ? root.get("trenoId").asText() : "N/A";
-            String nome = root.has("nome") ? root.get("nome").asText() : trenoId;
 
             String rawStato = root.has("stato") ? root.get("stato").asText() : "UNKNOWN";
             String stato = normalizzaStatoTreno(rawStato);
@@ -128,10 +156,15 @@ public class IngestionService {
             String direzione = root.has("direzione") ? root.get("direzione").asText("andata") : "andata";
 
             // in base a quali dati sono arrivati in input si pesca il treno giusto e gli si aggiornano i valori
+            // assoluzione del todo di emacs : cosa succede se inserisco un nuoovo treno nella rete?
+            // Risposta: la telemetria NON crea più il treno. Un convoglio che non è in cache
+            // (la cache è la fotografia della tabella Treni) semplicemente non esiste, quindi
+            // il frame viene scartato. Altrimenti un processo lanciato con un ID inventato si
+            // faceva creare la riga dalla telemetria e la verifica dell'ID si auto-validava.
             Treno treno = statoRete.getTreno(trenoId);
-            // assoluzione del todo di emacs : cosa succede se inserisco un nuoovo treno nella rete
             if (treno == null) {
-                treno = new Treno(trenoId, nome);
+                LOG.warnf("🚫 Telemetria dal treno sconosciuto '%s': frame scartato (i treni si creano dall'amministrazione)", trenoId);
+                return message.ack();
             }
             treno.stato = stato;
             treno.latitudine = lat;
@@ -146,31 +179,9 @@ public class IngestionService {
             treno.ultimoAggiornamento = Instant.now();
 
             statoRete.aggiornaTreno(treno);
-            //
-                            // è una operazione a postregras? si ed è fornita dal framework come metodo statico della classe entità dunque sarebbe un metodo statico della class Treno
-            Treno dbTreno = Treno.findById(trenoId);
-            boolean statoCambiato;
-                // stato del treno nel dib
-            if (dbTreno == null) {
-                // ?
-                treno.persist();
-                dbTreno = treno;
-                statoCambiato = true;
-            } else {
-                statoCambiato = !stato.equals(dbTreno.stato);
-                dbTreno.stato = stato;
-            }
 
-            // Storicizza SOLO quando lo stato del treno è effettivamente cambiato
-            // (evita un record ad ogni frame telemetrico ricevuto ogni 5 secondi).
-            if (statoCambiato) {
-                StoricoStatoTreno storico = new StoricoStatoTreno();
-                storico.treno = dbTreno;
-                storico.stato = stato;
-                storico.itinerarioId = dbTreno.itinerario != null ? dbTreno.itinerario.id : null;
-                storico.posizioneId = dbTreno.posizioneAttualeTratta != null ? dbTreno.posizioneAttualeTratta.id : null;
-                storico.persist();
-            }
+            // Scrittura su DB in una transazione aperta qui dentro (vedi nota di classe)
+            QuarkusTransaction.requiringNew().run(() -> salvaStatoTreno(trenoId, stato));
 
             ObjectNode wsEvent = root.deepCopy();
             wsEvent.put("eventType", "TELEMETRY");
@@ -190,38 +201,76 @@ public class IngestionService {
         return message.ack();
     }
 
+    /**
+     * Allinea sul database lo stato del treno e lo storicizza SOLO quando cambia
+     * davvero (altrimenti sarebbe un record ogni 5 secondi per ogni convoglio).
+     * Gira dentro la transazione aperta dal chiamante.
+     */
+    private void salvaStatoTreno(String trenoId, String stato) {
+        // è una operazione a postgres? sì ed è fornita dal framework come metodo statico
+        // della classe entità, dunque sarebbe un metodo statico della classe Treno
+        Treno dbTreno = Treno.findById(trenoId);
+        if (dbTreno == null) {
+            LOG.warnf("🚫 Il treno '%s' non è nella tabella Treni: nessuna scrittura", trenoId);
+            return;
+        }
+        boolean statoCambiato = !stato.equals(dbTreno.stato);
+        dbTreno.stato = stato;
+
+        if (statoCambiato) {
+            StoricoStatoTreno storico = new StoricoStatoTreno();
+            storico.treno = dbTreno;
+            storico.stato = stato;
+            storico.itinerarioId = dbTreno.itinerario != null ? dbTreno.itinerario.id : null;
+            storico.posizioneId = dbTreno.posizioneAttualeTratta != null ? dbTreno.posizioneAttualeTratta.id : null;
+            storico.persist();
+        }
+    }
+
     @Incoming("heartbeat-in")
-    @Transactional
+    @Blocking
     public CompletionStage<Void> onHeartbeat(Message<byte[]> message) {
         String payload = new String(message.getPayload());
-        payload = normalizeDecimalComma(payload);
         try {
             JsonNode root = mapper.readTree(payload);
             String stazioneId = root.has("stazioneId") ? root.get("stazioneId").asText() : "N/A";
-            String nome = root.has("nome") ? root.get("nome").asText() : stazioneId;
             String stato = root.has("stato") ? root.get("stato").asText() : "ONLINE";
 
+            // Come per i treni: una stazione che non è in cache non è nella tabella
+            // Stazione, quindi non avrebbe nemmeno superato la validazione dell'ID.
             Stazione stazione = statoRete.getStazione(stazioneId);
             if (stazione == null) {
-                stazione = new Stazione(stazioneId, nome, 0, 0, 1);
+                LOG.warnf("🚫 Heartbeat dalla stazione sconosciuta '%s': scartato", stazioneId);
+                return message.ack();
             }
+
+            String statoPrecedente = stazione.stato;
+            boolean statoCambiato = statoPrecedente == null || !statoPrecedente.equalsIgnoreCase(stato);
+            // Se la Centrale l'aveva marcata OFFLINE (fail-stop) e il battito è tornato,
+            // il guasto automatico va chiuso e i treni vanno sbloccati.
+            boolean tornataDalFailStop = "OFFLINE".equalsIgnoreCase(statoPrecedente);
+
             stazione.stato = stato;
             stazione.ultimoHeartbeat = Instant.now();
-
             statoRete.aggiornaStazione(stazione);
 
-            Stazione dbStazione = Stazione.findById(stazioneId);
-            if (dbStazione == null) {
-                stazione.persist();
-                dbStazione = stazione;
+            // I guasti chiusi qui dentro vengono notificati sul campo dopo il commit
+            List<Guasto> guastiChiusi = new ArrayList<>();
+            QuarkusTransaction.requiringNew().run(() -> {
+                // Storicizza solo al cambio di stato, come già si fa per i treni:
+                // a ogni battito sarebbero ~8.600 righe identiche al giorno per stazione.
+                if (statoCambiato) {
+                    storicizzaStatoStazione(stazioneId, stato);
+                }
+                if (tornataDalFailStop) {
+                    guastiChiusi.addAll(chiudiGuastiHeartbeatPerso(stazioneId));
+                }
+            });
+            for (Guasto guasto : guastiChiusi) {
+                LOG.infof("✅ [FAIL-STOP] Stazione %s di nuovo raggiungibile: chiuso il guasto %s", stazioneId, guasto.id);
+                pubblicaRisoluzioneSuMqtt(guasto);
+                broadcastAlert(guasto);
             }
-
-            StoricoStatoStazione storico = new StoricoStatoStazione();
-            storico.stazione = dbStazione;
-            storico.nome = dbStazione.nome;
-            storico.tipo = dbStazione.tipoCapolineaPartenzaoNormale;
-            storico.funzionanteONo = !stato.equals("GUASTA") && !stato.equals("OFFLINE");
-            storico.persist();
 
             ObjectNode wsEvent = root.deepCopy();
             wsEvent.put("eventType", "HEARTBEAT");
@@ -236,58 +285,60 @@ public class IngestionService {
         return message.ack();
     }
 
+    /** Scrive una riga di Storico_Stato_Stazioni per la stazione indicata. */
+    private void storicizzaStatoStazione(String stazioneId, String stato) {
+        Stazione dbStazione = Stazione.findById(stazioneId);
+        if (dbStazione == null) {
+            return;
+        }
+        StoricoStatoStazione storico = new StoricoStatoStazione();
+        storico.stazione = dbStazione;
+        storico.nome = dbStazione.nome;
+        storico.tipo = dbStazione.tipoCapolineaPartenzaoNormale;
+        storico.funzionanteONo = !"GUASTA".equalsIgnoreCase(stato) && !"OFFLINE".equalsIgnoreCase(stato);
+        storico.persist();
+    }
+
+    /**
+     * Chiude i guasti automatici aperti dal FaultMonitor per heartbeat mancante
+     * relativi alla stazione indicata (li riconosce dal prefisso del messaggio,
+     * così non tocca i guasti veri segnalati dalla stazione stessa).
+     *
+     * @return I guasti chiusi, da notificare poi su MQTT e WebSocket.
+     */
+    private List<Guasto> chiudiGuastiHeartbeatPerso(String stazioneId) {
+        List<Guasto> chiusi = new ArrayList<>();
+        List<Guasto> aperti = Guasto.list("sorgenteId = ?1 and sorgenteTipo = 'STAZIONE' and risolto = false", stazioneId);
+        for (Guasto guasto : aperti) {
+            if (guasto.messaggio == null || !guasto.messaggio.startsWith(MSG_HEARTBEAT_PERSO)) {
+                continue; // guasto dichiarato dalla stazione: lo chiude un operatore
+            }
+            guasto.risolto = true;
+            guasto.timestampRisoluzione = Instant.now();
+
+            StoricoGuasto storico = StoricoGuasto.find("guasto", guasto).firstResult();
+            if (storico != null) {
+                storico.risolto = true;
+                storico.tsChiusura = guasto.timestampRisoluzione;
+            }
+            statoRete.risolviGuasto(guasto.id);
+            chiusi.add(guasto);
+        }
+        return chiusi;
+    }
+
     @Incoming("transit-in")
-    @Transactional
+    @Blocking
     public CompletionStage<Void> onTransit(Message<byte[]> message) {
         String payload = new String(message.getPayload());
-        payload = normalizeDecimalComma(payload);
         try {
             JsonNode root = mapper.readTree(payload);
 
             String trenoId = root.has("trenoId") ? root.get("trenoId").asText() : "";
             String stazioneId = root.has("stazioneId") ? root.get("stazioneId").asText() : "";
             String tipo = root.has("tipo") ? root.get("tipo").asText() : "ENTRATA";
-            Instant adesso = Instant.now();
 
-            Treno dbTreno = Treno.findById(trenoId);
-            Stazione dbStazione = Stazione.findById(stazioneId);
-
-            if (dbTreno != null && dbStazione != null) {
-                if ("ENTRATA".equalsIgnoreCase(tipo)) {
-                    // Apre un nuovo transito: il treno è entrato in stazione
-                    Transito transito = new Transito();
-                    transito.id = "TR-" + adesso.toEpochMilli() + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
-                    transito.treno = dbTreno;
-                    transito.stazione = dbStazione;
-                    transito.tratta = dbTreno.posizioneAttualeTratta;
-                    transito.tempoEntrata = adesso;
-                    transito.persist();
-
-                    // Storicizza subito l'apertura (record con tempoUscita null)
-                    storicizzaTransito(transito);
-                } else {
-                    // USCITA: chiude il transito aperto per stesso treno+stazione
-                    Transito aperto = Transito.find(
-                            "treno.id = ?1 and stazione.id = ?2 and tempoUscita is null",
-                            trenoId, stazioneId).firstResult();
-                    if (aperto != null) {
-                        aperto.tempoUscita = adesso;
-                        storicizzaTransito(aperto);
-                    } else {
-                        // Caso "esce senza entrare": tipico della stazione di partenza,
-                        // si registra un transito puntuale con entrata = uscita
-                        Transito transito = new Transito();
-                        transito.id = "TR-" + adesso.toEpochMilli() + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
-                        transito.treno = dbTreno;
-                        transito.stazione = dbStazione;
-                        transito.tratta = dbTreno.posizioneAttualeTratta;
-                        transito.tempoEntrata = adesso;
-                        transito.tempoUscita = adesso;
-                        transito.persist();
-                        storicizzaTransito(transito);
-                    }
-                }
-            }
+            QuarkusTransaction.requiringNew().run(() -> registraTransito(trenoId, stazioneId, tipo));
 
             // Aggiorna il contatore dei treni presenti nella stazione (cache RAM)
             Stazione cacheStazione = statoRete.getStazione(stazioneId);
@@ -300,11 +351,63 @@ public class IngestionService {
                 statoRete.aggiornaStazione(cacheStazione);
             }
 
+            // La stazione è la SOLA sorgente degli eventi TRANSIT per la UI: è il sensore
+            // di terra a rilevare il passaggio. onPassaggio() non fa più il broadcast,
+            // altrimenti il frontend riceveva due volte lo stesso ingresso/uscita.
             broadcastTransit(root, trenoId, stazioneId, tipo);
         } catch (Exception e) {
             LOG.error("❌ Errore parsing transito: " + payload, e);
         }
         return message.ack();
+    }
+
+    /**
+     * Apre o chiude il transito sul database, storicizzandolo.
+     * Gira dentro la transazione aperta dal chiamante.
+     */
+    private void registraTransito(String trenoId, String stazioneId, String tipo) {
+        Instant adesso = Instant.now();
+        Treno dbTreno = Treno.findById(trenoId);
+        Stazione dbStazione = Stazione.findById(stazioneId);
+        if (dbTreno == null || dbStazione == null) {
+            LOG.warnf("🚫 Transito ignorato: treno '%s' o stazione '%s' non presenti a DB", trenoId, stazioneId);
+            return;
+        }
+
+        if ("ENTRATA".equalsIgnoreCase(tipo)) {
+            // Apre un nuovo transito: il treno è entrato in stazione
+            Transito transito = new Transito();
+            transito.id = "TR-" + adesso.toEpochMilli() + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+            transito.treno = dbTreno;
+            transito.stazione = dbStazione;
+            transito.tratta = dbTreno.posizioneAttualeTratta;
+            transito.tempoEntrata = adesso;
+            transito.persist();
+
+            // Storicizza subito l'apertura (record con tempoUscita null)
+            storicizzaTransito(transito);
+        } else {
+            // USCITA: chiude il transito aperto per stesso treno+stazione
+            Transito aperto = Transito.find(
+                    "treno.id = ?1 and stazione.id = ?2 and tempoUscita is null",
+                    trenoId, stazioneId).firstResult();
+            if (aperto != null) {
+                aperto.tempoUscita = adesso;
+                storicizzaTransito(aperto);
+            } else {
+                // Caso "esce senza entrare": tipico della stazione di partenza,
+                // si registra un transito puntuale con entrata = uscita
+                Transito transito = new Transito();
+                transito.id = "TR-" + adesso.toEpochMilli() + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+                transito.treno = dbTreno;
+                transito.stazione = dbStazione;
+                transito.tratta = dbTreno.posizioneAttualeTratta;
+                transito.tempoEntrata = adesso;
+                transito.tempoUscita = adesso;
+                transito.persist();
+                storicizzaTransito(transito);
+            }
+        }
     }
 
     /**
@@ -338,10 +441,9 @@ public class IngestionService {
     }
 
     @Incoming("alerts-in")
-    @Transactional
+    @Blocking
     public CompletionStage<Void> onAlert(Message<byte[]> message) {
         String payload = new String(message.getPayload());
-        payload = normalizeDecimalComma(payload);
         try {
             JsonNode root = mapper.readTree(payload);
 
@@ -352,34 +454,58 @@ public class IngestionService {
             if (!"GUASTO".equalsIgnoreCase(tipoEvento)) {
                 return message.ack();
             }
+            // Nemmeno per i GUASTO che ha pubblicato la Centrale stessa (fail-stop di una
+            // stazione): sono già stati scritti a DB dal FaultMonitor, qui tornano solo
+            // perché siamo sottoscritti al nostro stesso topic.
+            if (ORIGINE_CENTRALE.equalsIgnoreCase(root.path("origine").asText(""))) {
+                return message.ack();
+            }
 
             String sorgenteTipo = root.path("sorgenteTipo").asText("");
             String sorgenteId = root.path("sorgenteId").asText("");
             String severita = root.path("severita").asText("CRITICAL");
             String messaggio = root.hasNonNull("messaggio") ? root.get("messaggio").asText() : payload;
+            String tipo = tipoGuastoPerFrontend(sorgenteTipo, messaggio);
+            Instant quando = parseTimestamp(root);
+
+            // Deduplica: la stazione guasta manda un alert per OGNI treno che entra.
+            // Se un guasto dello stesso tipo per la stessa sorgente è già aperto si
+            // aggiorna il messaggio invece di riempire la tabella di righe identiche
+            // (con N righe aperte, "risolvi" ne chiuderebbe una sola).
+            Guasto giaAperto = statoRete.getGuastoApertoPerSorgente(sorgenteId, tipo);
+            if (giaAperto != null) {
+                final Guasto daAggiornare = giaAperto;
+                QuarkusTransaction.requiringNew().run(() -> aggiornaMessaggioGuasto(daAggiornare.id, messaggio));
+                giaAperto.messaggio = messaggio;
+                LOG.infof("♻️ Guasto già aperto per %s (%s): aggiornato il messaggio invece di crearne un altro", sorgenteId, tipo);
+                broadcastAlert(giaAperto);
+                return message.ack();
+            }
 
             Guasto guasto = new Guasto();
             guasto.id = "alert-" + Instant.now().toEpochMilli() + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
-            guasto.tipo = tipoGuastoPerFrontend(sorgenteTipo, messaggio);
+            guasto.tipo = tipo;
             guasto.severita = severita;
             guasto.sorgenteTipo = sorgenteTipo;
             guasto.sorgenteId = sorgenteId;
             guasto.messaggio = messaggio;
-            guasto.timestamp = parseTimestamp(root);
+            guasto.timestamp = quando;
             guasto.risolto = false;
 
-            guasto.persist();
+            QuarkusTransaction.requiringNew().run(() -> {
+                guasto.persist();
+
+                StoricoGuasto storico = new StoricoGuasto();
+                storico.guasto = guasto;
+                storico.risolto = false;
+                storico.tsApertura = guasto.timestamp;
+                storico.persist();
+            });
             statoRete.aggiungiGuasto(guasto);
 
-            StoricoGuasto storico = new StoricoGuasto();
-            storico.guasto = guasto;
-            storico.risolto = false;
-            storico.tsApertura = guasto.timestamp;
-            storico.persist();
-
             // Una stazione che segnala un guasto CRITICO viene marcata GUASTA nella cache.
-            // I guasti WARNING (es. keepalive sensore mancante) restano solo allarmi:
-            // la stazione continua a operare e i suoi heartbeat ONLINE non vanno contraddetti.
+            // I guasti WARNING restano solo allarmi: la stazione continua a operare
+            // e i suoi heartbeat ONLINE non vanno contraddetti.
             if ("STAZIONE".equalsIgnoreCase(sorgenteTipo) && "CRITICAL".equalsIgnoreCase(severita)) {
                 Stazione stazione = statoRete.getStazione(sorgenteId);
                 if (stazione != null) {
@@ -393,6 +519,14 @@ public class IngestionService {
             LOG.error("❌ Errore parsing alert: " + payload, e);
         }
         return message.ack();
+    }
+
+    /** Aggiorna il testo di un guasto già aperto (deduplica degli alert ripetuti). */
+    private void aggiornaMessaggioGuasto(String guastoId, String messaggio) {
+        Guasto dbGuasto = Guasto.findById(guastoId);
+        if (dbGuasto != null) {
+            dbGuasto.messaggio = messaggio;
+        }
     }
 
     /**
@@ -436,11 +570,53 @@ public class IngestionService {
         webSocket.broadcast(wsEvent.toString());
     }
 
+    /**
+     * Pubblica su railway/alerts un guasto rilevato dalla Centrale, nello stesso formato
+     * usato dai nodi edge. È il pezzo che mancava al requisito del fail-stop: prima il
+     * FaultMonitor si limitava alla WebSocket, quindi i treni non sapevano nulla della
+     * stazione caduta e ci andavano dentro lo stesso. Con severità CRITICAL entra in
+     * funzione la logica di blocco già scritta in TrainGateway/TrainJourneyEngine.
+     *
+     * @param guasto Il guasto appena aperto dalla Centrale.
+     */
+    public void pubblicaGuastoSuMqtt(Guasto guasto) {
+        ObjectNode alert = mapper.createObjectNode();
+        alert.put("tipoEvento", "GUASTO");
+        alert.put("origine", ORIGINE_CENTRALE); // evita che la Centrale si riascolti da sola
+        alert.put("sorgenteTipo", guasto.sorgenteTipo);
+        alert.put("sorgenteId", guasto.sorgenteId);
+        alert.put("severita", guasto.severita);
+        alert.put("messaggio", guasto.messaggio);
+        alert.put("guastoId", guasto.id);
+        alert.put("timestamp", guasto.timestamp != null ? guasto.timestamp.toString() : Instant.now().toString());
+        inviaSuMqtt(alert.toString());
+    }
+
+    /** Pubblica su railway/alerts la chiusura di un guasto aperto dalla Centrale. */
+    public void pubblicaRisoluzioneSuMqtt(Guasto guasto) {
+        ObjectNode alert = mapper.createObjectNode();
+        alert.put("tipoEvento", "RESOLVED");
+        alert.put("origine", ORIGINE_CENTRALE);
+        alert.put("sorgenteTipo", guasto.sorgenteTipo != null ? guasto.sorgenteTipo : "STAZIONE");
+        alert.put("sorgenteId", guasto.sorgenteId != null ? guasto.sorgenteId : "");
+        alert.put("guastoId", guasto.id);
+        alert.put("timestamp", Instant.now().toString());
+        inviaSuMqtt(alert.toString());
+    }
+
+    /** Invio difensivo sul canale MQTT: un broker giù non deve far cadere il chiamante. */
+    private void inviaSuMqtt(String payload) {
+        try {
+            alertsEmitter.send(payload);
+        } catch (Exception e) {
+            LOG.errorf("Impossibile pubblicare l'alert su railway/alerts: %s", e.getMessage());
+        }
+    }
+
     @Incoming("passaggio-in")
-    @Transactional
+    @Blocking
     public CompletionStage<Void> onPassaggio(Message<byte[]> message) {
         String payload = new String(message.getPayload());
-        payload = normalizeDecimalComma(payload);
         try {
             JsonNode root = mapper.readTree(payload);
             String trenoId = root.path("trenoId").asText("");
@@ -452,38 +628,58 @@ public class IngestionService {
             String direzione = cacheTreno != null && cacheTreno.direzione != null
                     ? cacheTreno.direzione : "andata";
 
+            // Letture sull'itinerario e aggiornamento della posizione: tutto in una
+            // transazione, perché senza non ci sarebbe nessuna sessione JPA attiva.
+            EsitoPassaggio esito = QuarkusTransaction.requiringNew()
+                    .call(() -> aggiornaPosizioneSuTratta(trenoId, stazioneId, tipo, direzione));
+
             if (cacheTreno != null) {
                 cacheTreno.ritardo = ritardo;
                 if ("ENTRATA".equalsIgnoreCase(tipo)) {
                     cacheTreno.stazioneCorrente = stazioneId;
-                    cacheTreno.prossimaStazione = calcolaProssimaStazione(cacheTreno, stazioneId, direzione);
+                    cacheTreno.prossimaStazione = esito.prossimaStazione();
                 } else {
                     cacheTreno.stazioneCorrente = null;
                 }
-                cacheTreno.ultimoAggiornamento = Instant.now();
-            }
-
-            // Aggiorna sul DB la posizione del treno rispetto alla tratta percorsa,
-            // rispettando la direzione di marcia (andata = tratte nell'ordine originario)
-            Treno dbTreno = Treno.findById(trenoId);
-            if (dbTreno != null && dbTreno.itinerario != null) {
-                Tratta trattaPosizione = trovaTratta(dbTreno.itinerario.id, stazioneId, tipo, direzione);
-                if (trattaPosizione != null) {
-                    dbTreno.posizioneAttualeTratta = trattaPosizione;
-                    if (cacheTreno != null) {
-                        cacheTreno.posizioneAttualeTratta = trattaPosizione;
-                    }
+                if (esito.posizione() != null) {
+                    cacheTreno.posizioneAttualeTratta = esito.posizione();
                 }
-            }
-            if (cacheTreno != null) {
+                cacheTreno.ultimoAggiornamento = Instant.now();
                 statoRete.aggiornaTreno(cacheTreno);
             }
 
-            broadcastTransit(root, trenoId, stazioneId, tipo);
+            // NIENTE broadcastTransit qui: l'evento TRANSIT per la UI lo genera la
+            // stazione (onTransit). Lo stesso passaggio fisico arriva alla Centrale
+            // per due strade (dal treno e dalla stazione) e la sorgente ufficiale
+            // per il frontend è il sensore di terra, altrimenti ogni ingresso/uscita
+            // compariva due volte nella pagina transiti.
         } catch (Exception e) {
             LOG.error("❌ Errore parsing passaggio: " + payload, e);
         }
         return message.ack();
+    }
+
+    /** Dati letti dal DB durante un passaggio, che poi servono alla cache in RAM. */
+    private record EsitoPassaggio(String prossimaStazione, Tratta posizione) {}
+
+    /**
+     * Aggiorna sul DB la posizione del treno rispetto alla tratta percorsa,
+     * rispettando la direzione di marcia (andata = tratte nell'ordine originario),
+     * e calcola quale sarà la prossima stazione.
+     */
+    private EsitoPassaggio aggiornaPosizioneSuTratta(String trenoId, String stazioneId, String tipo, String direzione) {
+        Treno dbTreno = Treno.findById(trenoId);
+        if (dbTreno == null || dbTreno.itinerario == null) {
+            return new EsitoPassaggio(null, null);
+        }
+        Tratta trattaPosizione = trovaTratta(dbTreno.itinerario.id, stazioneId, tipo, direzione);
+        if (trattaPosizione != null) {
+            dbTreno.posizioneAttualeTratta = trattaPosizione;
+        }
+        String prossima = "ENTRATA".equalsIgnoreCase(tipo)
+                ? calcolaProssimaStazione(dbTreno.itinerario.id, stazioneId, direzione)
+                : null;
+        return new EsitoPassaggio(prossima, trattaPosizione);
     }
 
     /**
@@ -492,11 +688,8 @@ public class IngestionService {
      *
      * @return ID della prossima stazione, o null se capolinea/itinerario non noto.
      */
-    private String calcolaProssimaStazione(Treno treno, String stazioneId, String direzione) {
-        Treno dbTreno = Treno.findById(treno.id);
-        if (dbTreno == null || dbTreno.itinerario == null) return null;
-
-        List<String> stazioni = stazioniOrdinateDiItinerario(dbTreno.itinerario.id);
+    private String calcolaProssimaStazione(String itinerarioId, String stazioneId, String direzione) {
+        List<String> stazioni = stazioniOrdinateDiItinerario(itinerarioId);
         int idx = stazioni.indexOf(stazioneId);
         if (idx < 0) return null;
 
@@ -513,7 +706,7 @@ public class IngestionService {
     private List<String> stazioniOrdinateDiItinerario(String itinerarioId) {
         List<ItinerarioTratta> tratte = ItinerarioTratta
                 .find("itinerario.id", Sort.by("ordine"), itinerarioId).list();
-        List<String> stazioni = new java.util.ArrayList<>();
+        List<String> stazioni = new ArrayList<>();
         if (!tratte.isEmpty()) {
             stazioni.add(tratte.get(0).tratta.stazionePartenza.id);
             for (ItinerarioTratta it : tratte) {
