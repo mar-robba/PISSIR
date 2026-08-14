@@ -1,59 +1,66 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Train, LogIn, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import './LoginPage.css';
 
+/**
+ * Pagina di accesso.
+ *
+ * Non c'e' piu' nessun campo password: da quando l'autenticazione e' passata a
+ * Keycloak questa pagina fa due cose sole.
+ *   - Se ci si arriva normalmente, mostra il pulsante che manda il browser sulla
+ *     pagina di login dell'Identity Provider (flusso Authorization Code + PKCE).
+ *   - Se ci si arriva di ritorno da Keycloak, cioe' con "?code=..." nella query
+ *     string, scambia quel codice con i token e entra nell'applicazione.
+ * Il redirect_uri registrato nel client railway-webapp punta proprio qui.
+ */
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, loginError } = useAuthStore();
+  const { login, completaAccesso, loginError, isAuthenticated } = useAuthStore();
+  const [parametri, setParametri] = useSearchParams();
   const navigate = useNavigate();
 
-  // Auto-login temporaneo: invia credenziali hardcodate MAT001 e reindirizza
-  // Questo è un comportamento temporaneo per evitare la schermata di login.
-  // Rimuovere quando non più necessario.
+  // In sviluppo React monta i componenti due volte (StrictMode): senza questa
+  // guardia si proverebbe a spendere lo stesso codice di autorizzazione due volte
+  // e la seconda Keycloak risponderebbe con un errore.
+  const scambioAvviato = useRef(false);
+
+  const code = parametri.get('code');
+  const state = parametri.get('state');
+  // Keycloak segnala qui gli errori del flusso (per esempio redirect_uri sbagliata).
+  const errore = parametri.get('error_description') ?? parametri.get('error');
+
   useEffect(() => {
-    let mounted = true;
+    if (!code || scambioAvviato.current) return;
+    scambioAvviato.current = true;
+
     (async () => {
-      try {
-        setIsLoading(true);
-        // username: MAT001 (admin demo), password: 'password' come nel demo autofill
-        const success = await login('MAT001', 'password');
-        if (!mounted) return;
-        if (success) navigate('/');
-      } catch (e) {
-        // fall back: mostra la pagina di login se l'autologin fallisce
-        console.error('Auto-login failed', e);
-      } finally {
-        if (mounted) setIsLoading(false);
-      }
+      setIsLoading(true);
+      const ok = await completaAccesso(code, state);
+      // Il codice e' monouso: si ripulisce la barra degli indirizzi comunque,
+      // sia per non lasciarlo nella cronologia sia per non riprovarci a un F5.
+      setParametri({}, { replace: true });
+      setIsLoading(false);
+      if (ok) navigate('/', { replace: true });
     })();
+  }, [code, state, completaAccesso, navigate, setParametri]);
 
-    return () => { mounted = false; };
-  }, [login, navigate]);
+  // Sessione gia' aperta (per esempio si e' tornati su /login a mano): si rientra.
+  useEffect(() => {
+    if (isAuthenticated && !code) navigate('/', { replace: true });
+  }, [isAuthenticated, code, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async () => {
     setIsLoading(true);
-    const success = await login(username, password);
-    setIsLoading(false);
-    
-    if (success) {
-      navigate('/');
-    }
-  };
-
-  const autofill = (role: 'tecnico' | 'admin') => {
-    setUsername(role === 'tecnico' ? 'MAT003' : 'MAT001');
-    setPassword('password');
+    // Da qui in poi la pagina viene sostituita da quella di Keycloak.
+    await login();
   };
 
   return (
     <div className="login-container">
       <div className="login-background"></div>
-      
+
       <div className="login-card glass-panel animate-fade-in">
         <div className="login-header">
           <div className="logo-container">
@@ -63,64 +70,35 @@ export default function LoginPage() {
           <p>Sistema di Gestione Traffico Ferroviario</p>
         </div>
 
-        {loginError && (
+        {(loginError || errore) && (
           <div className="login-error">
             <ShieldAlert size={20} />
-            <span>{loginError}</span>
+            <span>{loginError ?? errore}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="input-group">
-            <label className="input-label" htmlFor="username">Username</label>
-            <input
-              id="username"
-              type="text"
-              className="input-field"
-              placeholder="Inserisci username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="input-group">
-            <label className="input-label" htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              className="input-field"
-              placeholder="Inserisci password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn btn-primary w-full mt-4 login-submit-btn"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Autenticazione...' : (
-              <>
-                <LogIn size={20} />
-                <span>Accedi al Sistema</span>
-              </>
-            )}
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={handleLogin}
+          className="btn btn-primary w-full mt-4 login-submit-btn"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Autenticazione in corso...' : (
+            <>
+              <LogIn size={20} />
+              <span>Accedi con Keycloak</span>
+            </>
+          )}
+        </button>
 
         <div className="login-demo-actions">
-          <p className="text-sm text-muted mb-2 text-center">Credenziali Demo Rapide</p>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => autofill('tecnico')} className="btn btn-outline flex-1 text-xs">
-              Usa Tecnico
-            </button>
-            <button type="button" onClick={() => autofill('admin')} className="btn btn-outline flex-1 text-xs">
-              Usa Admin
-            </button>
-          </div>
+          <p className="text-sm text-muted mb-2 text-center">
+            Le credenziali si inseriscono sulla pagina di Keycloak, non qui.
+          </p>
+          <p className="text-sm text-muted text-center">
+            Utenti di prova: <strong>mat001</strong> (amministratore),
+            {' '}<strong>mat003</strong> (tecnico) &mdash; password <strong>password</strong>
+          </p>
         </div>
       </div>
     </div>

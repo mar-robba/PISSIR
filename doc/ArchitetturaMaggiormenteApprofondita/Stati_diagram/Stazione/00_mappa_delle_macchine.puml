@@ -1,0 +1,102 @@
+@startuml S0 - Mappa delle macchine a stati della Stazione
+' =========================================================================
+'  MAPPA DELLE MACCHINE A STATI DEL COMPONENTE "STAZIONE"
+'  (modulo Stazioni, Quarkus, una istanza per ogni nodo di campo)
+'
+'  Questo file non descrive un comportamento: dice chi avvia chi e quali
+'  macchine fanno cambiare stato al nodo.
+'
+'    S1  01_macchina_ciclo_vita_stazione.puml     main + ciclo keep-alive
+'    S2  02_macchina_validazione_id.puml          StationDatabaseValidator
+'    S3  03_macchina_heartbeat.puml               HeartbeatGenerator.generaHeartbeat
+'    S4  04_macchina_connettivita_centrale.puml   connessioneCentrale + flush
+'    S5  05_macchina_evento_bufferizzato.puml     entita' LocalBuffer.EventoBufferizzato
+'    S6  06_macchina_sensori_rest.puml            StationIngestion (REST :8081)
+'    S7  07_macchina_keepalive_sensori.puml       HeartbeatGenerator.manutenzionePeriodica
+'    S8  08_macchina_ingestione_passaggi.puml     StationGateway.riceviPassaggio
+'    S9  09_macchina_alert_in_ingresso.puml       StationGateway.riceviAlert
+'    S10 10_macchina_stato_stazione.puml          DBLocale.stato
+'    S11 11_macchina_presenza_treno.puml          DBLocale.treniPresenti
+'
+'  Lato Centrale le stesse conversazioni sono descritte in
+'  ../ServerCentrale/00_mappa_delle_macchine.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+}
+skinparam state<<radice>> {
+    BackgroundColor #D2E3FC
+    BorderColor #174EA6
+}
+skinparam state<<dominio>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+hide empty description
+
+title S0 - Mappa delle 11 macchine a stati della Stazione
+
+[*] --> S1
+state "S1 - ciclo di vita del processo" as S1 <<radice>>
+
+state "Aggancio alla Centrale" as Aggancio {
+    state "S2 - validazione dell'ID" as S2
+}
+
+state "Verso la Centrale (MQTT)" as VersoCentrale {
+    state "S3 - heartbeat" as S3
+    state "S4 - connettivita' e\nstore and forward" as S4
+    state "S5 - evento bufferizzato" as S5
+}
+
+state "Dal campo (REST dei sensori e MQTT dei treni)" as DalCampo {
+    state "S6 - API dei sensori" as S6
+    state "S7 - keepalive dei sensori" as S7
+    state "S8 - passaggi dei treni" as S8
+}
+
+state "Dalla Centrale (MQTT)" as DallaCentrale {
+    state "S9 - alert in ingresso" as S9
+}
+
+state "Stato del nodo" as Dominio <<dominio>> {
+    state "S10 - stato della stazione" as S10
+    state "S11 - treni presenti" as S11
+}
+
+S1 --> Aggancio : chiede alla Centrale\nse l'ID esiste
+S1 --> VersoCentrale : apre i canali MQTT in uscita
+S1 --> DalCampo : pubblica REST :8081 e\navvia il job da 10s
+S1 --> DallaCentrale : si sottoscrive a railway/alerts
+
+DalCampo --> Dominio : guasti dei sensori,\ntransiti dei treni
+DallaCentrale --> Dominio : ripristini decisi\ndall'operatore
+
+Aggancio -[dashed]-> S3 : finche' l'ID non e' validato\nil battito resta filtrato
+Dominio -[dotted]-> VersoCentrale : lo stato viaggia dentro\nogni heartbeat
+DalCampo -[dotted]-> S4 : ogni evento passa dal\ncontrollo di connettivita'
+
+note bottom of Dominio
+  Il nodo di campo tiene in RAM pochissimo stato: se e' guasto
+  o no, chi sta sui binari e quali eventi non sono ancora
+  partiti. Tutto il resto vive sulla Centrale.
+end note
+
+note right of S1
+  Da S3 a S9 girano in parallelo sui thread dei connettori
+  reattivi, dello scheduler e delle richieste HTTP, e
+  condividono una sola risorsa: il DBLocale in RAM
+  (piu' la coda del LocalBuffer).
+end note
+
+@enduml

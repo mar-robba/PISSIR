@@ -1,18 +1,12 @@
-@startuml M10 - Gateway REST (CRUD e Comandi Operativi)
+@startuml M10 - Gateway REST, CRUD e comandi operativi
 ' =========================================================================
 '  MACCHINA M10 - Trattamento di una richiesta REST autorizzata
 '
 '  Codice astratto:
 '    it.uni.reti2.gateway.RestApiGateway (tutti gli endpoint /api)
 '
-'  Descrive il ciclo di vita di UNA richiesta dopo che il filtro M9 l'ha
-'  lasciata passare: smistamento, esecuzione, allineamento della cache e
-'  notifiche verso il campo (MQTT) e la dashboard (WebSocket).
-'
-'  Ingresso da:   M9  (09_macchina_sessione_autorizzazione.puml)
-'  Fa transitare: M7  (07_macchina_ciclo_vita_guasto.puml)
-'                 M12 (12_macchina_stato_stazione.puml)
-'                 M13 (13_macchina_stato_treno.puml)
+'  Ciclo di vita di una richiesta dopo che il filtro di M9 l'ha lasciata
+'  passare. Fa transitare M7 (guasto), M12 (stazione) e M13 (treno).
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -24,148 +18,53 @@ skinparam state {
     StartColor #34A853
     EndColor #EA4335
 }
-skinparam state<<esterna>> {
-    BackgroundColor #F1F3F4
-    BorderColor #5F6368
-}
 skinparam note {
     BackgroundColor #FFF9C4
     BorderColor #F9A825
 }
+hide empty description
 
-title M10 - Gateway REST: ciclo di vita di una richiesta autorizzata
+title M10 - Ciclo di vita di una richiesta REST autorizzata
 
-[*] --> RichiestaAutorizzata
+[*] --> Autorizzata
 
-state "Richiesta autorizzata da M9" as RichiestaAutorizzata
+state "Richiesta autorizzata\n(da M9)" as Autorizzata
+state "Lettura" as Lettura
+state "Scrittura CRUD" as Scrittura
+state "Comando operativo" as Comando
+state "Risposta inviata" as Risposta
 
-state "Smistamento sull'endpoint" as Smistamento
+Autorizzata --> Lettura : GET
+Autorizzata --> Scrittura : POST, PUT o DELETE su\nstazioni, treni, tratte e itinerari
+Autorizzata --> Comando : sopprimi un treno, risolvi un allarme,\ninvia la manutenzione
 
-RichiestaAutorizzata --> Smistamento
+Lettura --> Risposta : / 200 dalla cache RAM (dashboard, treni,\nstazioni) o dal database (transiti,\nallarmi, tratte, itinerario del treno)
 
-' ---------- LETTURE ----------
-state "1) LETTURE DALLA CACHE\n(nessun accesso al DB)" as LettureCache {
-    state "GET /api/dashboard\n(kpiDashboard)" as GetDashboard
-    state "GET /api/stazioni" as GetStazioni
-    state "GET /api/treni" as GetTreni
-}
+Scrittura --> Risposta : [dati non validi, entita' inesistente,\noppure ancora referenziata] /\n400, 404 oppure 409
+Scrittura --> Risposta : [dati validi] /\nscrive a DB, poi allinea la cache,\npubblica STOP o ITINERARIO_AGGIORNATO\nse serve, 200 / 201 / 204
 
-state "2) LETTURE DAL DATABASE\n(@Transactional)" as LettureDb {
-    state "GET /api/tratte\nGET /api/tratte-elementari" as GetTratte
-    state "GET /api/transiti\n(storico, ultimi 200)" as GetTransiti
-    state "GET /api/allarmi\n(tutti i guasti, dal piu' recente)" as GetAllarmi
-    state "GET /api/treni/{id}/itinerario\nGET /api/prossima-stazione\n(supporto al digital twin)" as GetItinerario
-}
+Comando --> Risposta : /\naggiorna DB e cache, storicizza,\npubblica sul campo, 200
 
-' ---------- SCRITTURE CRUD ----------
-state "3) CRUD - riservate all'AMMINISTRATORE" as Crud {
-
-    state "Validazione dell'input" as Validazione
-    state "Esito 400\n(id mancante, nome troppo lungo,\nmeno di due stazioni,\nrinomina del convoglio)" as Errore400
-    state "Esito 404\n(entita' inesistente)" as Errore404
-    state "Esito 409\n(gia' esistente oppure\nancora referenziata:\nstazione usata da tratte,\ntratta usata da itinerari o transiti)" as Errore409
-
-    state "Scrittura sul DB\n(persist / update / delete\n+ pulizia dei record collegati)" as ScritturaDb
-    state "Allineamento della cache RAM\n(SOLO dopo il commit)" as AllineamentoCache
-    state "Esito 200 / 201 / 204" as EsitoOk
-
-    [*] --> Validazione
-    Validazione --> Errore400 : input non valido
-    Validazione --> Errore404 : entita' non trovata
-    Validazione --> Errore409 : conflitto o vincolo\ndi integrita'
-    Validazione --> ScritturaDb : input valido
-    ScritturaDb --> AllineamentoCache : commit riuscito
-    AllineamentoCache --> EsitoOk
-}
-
-note right of AllineamentoCache
-  Sulle scritture dei treni la transazione si apre e si
-  CHIUDE prima di toccare la cache (QuarkusTransaction
-  .requiringNew + EsitoScritturaTreno): se l'allineamento
-  sta dentro la stessa transazione, un rollback lascia in
-  memoria - e quindi nelle risposte REST - valori che sul
-  database non sono mai stati scritti.
-end note
-
-' ---------- COMANDI OPERATIVI ----------
-state "4) COMANDI OPERATIVI\n(permessi anche al TECNICO)" as Comandi {
-
-    state "POST /api/treni/{id}/sopprimi" as Sopprimi {
-        state "Cache: stato = SOPPRESSO,\nvelocita = 0" as SoppCache
-        state "DB: stato = in manutenzione\n+ Storico_Stato_Treni" as SoppDb
-        state "MQTT -> railway/alerts\ntipoEvento = STOP" as SoppMqtt
-        [*] --> SoppCache
-        SoppCache --> SoppDb
-        SoppDb --> SoppMqtt
-    }
-
-    state "POST /api/allarmi/{id}/risolvi" as Risolvi {
-        state "Chiude guasto + storico + cache" as RisChiude
-        state "Se sorgente = STAZIONE:\nstato = ONLINE e\nultimoHeartbeat = now" as RisStazione
-        state "MQTT -> railway/alerts\ntipoEvento = RESOLVED" as RisMqtt
-        [*] --> RisChiude
-        RisChiude --> RisStazione
-        RisStazione --> RisMqtt
-    }
-
-    state "POST /api/stazioni/{id}/manutenzione" as Manutenzione {
-        state "Stazione -> MANUTENZIONE" as ManInizio
-        state "MQTT MAINTENANCE_DISPATCHED" as ManMqtt
-        state "Chiude TUTTI i guasti aperti\ndella stazione (+ RESOLVED)" as ManGuasti
-        state "Stazione -> ONLINE\n+ Storico_Stato_Stazioni" as ManFine
-        [*] --> ManInizio
-        ManInizio --> ManMqtt
-        ManMqtt --> ManGuasti
-        ManGuasti --> ManFine
-    }
-}
-
-note left of RisStazione
-  Rimettendo ONLINE la stazione si fa ripartire anche il
-  cronometro dell'heartbeat: senza, una stazione rimessa
-  in servizio dall'operatore ma in realta' ancora spenta
-  restava ONLINE per sempre, perche' il watchdog salta le
-  stazioni che non hanno mai battuto.
-end note
-
-' ---------- NOTIFICHE E CHIUSURA ----------
-state "Notifiche verso il campo\n-> railway/alerts\n(STOP, RESOLVED,\nMAINTENANCE_DISPATCHED,\nITINERARIO_AGGIORNATO)" as NotificheMqtt
-
-state "Risposta HTTP inviata\nal frontend" as Risposta
-
-Smistamento --> LettureCache
-Smistamento --> LettureDb
-Smistamento --> Crud
-Smistamento --> Comandi
-
-LettureCache --> Risposta
-LettureDb --> Risposta
-Crud --> NotificheMqtt : DELETE treno (STOP),\nPUT treno/tratta con\nitinerario cambiato
-Crud --> Risposta
-Comandi --> NotificheMqtt
-NotificheMqtt --> Risposta
 Risposta --> [*]
 
-note bottom of NotificheMqtt
-  ITINERARIO_AGGIORNATO va mandato anche ai treni SGANCIATI
-  dall'itinerario: per questo la lista dei destinatari si
-  legge PRIMA di riassegnare i treni, altrimenti quelli
-  tolti dalla tratta non venivano avvisati e continuavano
-  a girare sul percorso vecchio.
+note right of Comando
+  I tre comandi e il loro effetto sul campo:
+    sopprimi       treno in manutenzione a DB, SOPPRESSO in
+                   cache, STOP su railway/alerts
+    risolvi        chiude il guasto (M7), riporta la stazione
+                   ONLINE, RESOLVED su railway/alerts
+    manutenzione   MAINTENANCE_DISPATCHED, chiude tutti i
+                   guasti aperti della stazione, poi ONLINE
 end note
 
-' ===================== MACCHINE COLLEGATE =====================
-state "M9 - Sessione e autorizzazione\n(09_macchina_sessione_autorizzazione.puml)" as M9 <<esterna>>
-state "M7 - Ciclo di vita del Guasto\n(07_macchina_ciclo_vita_guasto.puml)" as M7 <<esterna>>
-state "M12 - Stato della Stazione\n(12_macchina_stato_stazione.puml)" as M12 <<esterna>>
-state "M13 - Stato del Treno\n(13_macchina_stato_treno.puml)" as M13 <<esterna>>
-state "M5 - Ingestione transiti\n(05_macchina_ingestione_transiti.puml)" as M5 <<esterna>>
-
-M9 -[dashed]-> RichiestaAutorizzata
-Risolvi -[dashed]-> M7 : Aperto -> Risolto
-Manutenzione -[dashed]-> M7 : chiude in blocco i guasti\ndella stazione
-Manutenzione -[dashed]-> M12 : GUASTA/OFFLINE ->\nMANUTENZIONE -> ONLINE
-Sopprimi -[dashed]-> M13 : attivo -> in manutenzione
-GetTransiti -[dashed]-> M5 : legge lo storico\nprodotto dai transiti
+note bottom of Scrittura
+  Sulle scritture dei treni la transazione si apre e si chiude
+  prima di toccare la cache: se l'allineamento sta dentro la
+  stessa transazione, un rollback lascia in memoria - e quindi
+  nelle risposte REST - valori mai scritti sul database.
+  L'evento ITINERARIO_AGGIORNATO va mandato anche ai treni
+  sganciati dall'itinerario, quindi i destinatari si leggono
+  prima di riassegnare le corse.
+end note
 
 @enduml

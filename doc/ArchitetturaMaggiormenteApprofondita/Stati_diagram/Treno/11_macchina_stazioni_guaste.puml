@@ -1,0 +1,71 @@
+@startuml T11 - Stazione guasta vista dal treno
+' =========================================================================
+'  MACCHINA T11 - Stato di una stazione come lo conosce il treno
+'
+'  Codice astratto:
+'    it.uni.reti2.TrainDB#stazioniGuaste      (Set concorrente)
+'    it.uni.reti2.TrainDB#stazioneBloccante
+'    it.uni.reti2.TrainGateway#riceviAlert
+'    it.uni.reti2.TrainJourneyEngine#tickInStazione
+'
+'  E' una macchina di entita': la storia di UNA stazione nella memoria di
+'  QUESTO convoglio. Lo stato vero del nodo e' in ../Stazione/10_macchina_stato_stazione.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+hide empty description
+
+title T11 - Stazione guasta vista dal treno (insieme stazioniGuaste)
+
+[*] --> Agibile
+
+state "Agibile\nnon e' nell'insieme" as Agibile
+state "Guasta\nnell'insieme delle guaste" as Guasta
+state "Bloccante\nmi sta trattenendo" as Bloccante
+state "T5 - fase del viaggio" as T5 <<esterna>>
+
+Agibile --> Guasta : T9 - GUASTO CRITICAL\ncon sorgenteTipo STAZIONE
+Guasta --> Bloccante : T9 - e' la mia corrente\noppure la mia prossima /\nblocco immediato
+Guasta --> Bloccante : T5 - provo a ripartire\ne la trovo ancora guasta /\nblocco alla partenza
+Guasta --> Agibile : T9 - RESOLVED\ncon sorgenteTipo STAZIONE
+Bloccante --> Agibile : T9 - RESOLVED /\nsblocco e ripresa della fase
+Bloccante -[dashed]-> T5 : fase BLOCCATO_GUASTO_STAZIONE\ne ritardo che cresce
+
+note right of Guasta
+  Il treno ricorda anche le stazioni guaste che non sono sulla sua
+  rotta immediata: quando arrivera' a doverle affrontare le trovera'
+  ancora nell'insieme e si fermera' prima di partire. Se dimenticasse
+  gli allarmi "non miei" partirebbe verso un binario inagibile solo
+  perche' l'annuncio e' arrivato mentre era altrove.
+end note
+
+note bottom of Bloccante
+  Bloccante non e' un valore memorizzato nell'insieme: e' la
+  stazione registrata in stazioneBloccante, cioe' quella per cui il
+  motore ha cambiato fase. Serve perche' allo sblocco si riparta
+  solo se a tornare agibile e' proprio quella che trattiene il
+  convoglio, non una qualsiasi.
+end note
+
+note left of Agibile
+  L'insieme e' concorrente perche' lo scrive il thread MQTT degli
+  alert e lo legge il tick del motore ogni secondo: sono due thread
+  diversi sullo stesso dato.
+end note
+
+@enduml

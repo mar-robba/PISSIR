@@ -1,17 +1,14 @@
-@startuml M9 - Sessione e Autorizzazione delle API REST
+@startuml M9 - Sessione e autorizzazione delle API REST
 ' =========================================================================
 '  MACCHINA M9 - Sessione dell'operatore e autorizzazione delle richieste
 '
 '  Codice astratto:
-'    it.uni.reti2.gateway.AuthController     (login / logout)
-'    it.uni.reti2.gateway.SessioniAttive     (registro token -> ruolo)
+'    it.uni.reti2.gateway.AuthController       (login / logout)
+'    it.uni.reti2.gateway.SessioniAttive       (registro token -> ruolo)
 '    it.uni.reti2.gateway.FiltroAutorizzazione (filtro JAX-RS su ogni /api)
 '
-'  E' la variante 2 ammessa dal prof (autenticazione tradizionale al posto
-'  di OAUTH2/Keycloak). Le sessioni stanno in RAM e si perdono al riavvio.
-'
-'  Avviata da:  M1  (01_macchina_ciclo_vita_centrale.puml)
-'  Da' accesso a: M10 (10_macchina_gateway_rest.puml)
+'  E' la variante 2 ammessa dal prof: autenticazione tradizionale al posto
+'  di OAUTH2/Keycloak. Da' accesso a M10 (10_macchina_gateway_rest.puml).
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -31,98 +28,55 @@ skinparam note {
     BackgroundColor #FFF9C4
     BorderColor #F9A825
 }
+hide empty description
 
-title M9 - Sessione dell'Operatore e Autorizzazione delle Richieste REST
+title M9 - Sessione dell'operatore e autorizzazione delle richieste REST
 
-' ===================== PARTE A: CICLO DI VITA DELLA SESSIONE =====================
-state "A) Ciclo di vita della SESSIONE\n(AuthController + SessioniAttive)" as CicloSessione {
-
-    state "Anonimo\n(nessun token)" as Anonimo
-    state "Verifica delle credenziali\n(Utente.find('matricola'),\nconfronto password in chiaro)" as Verifica
-    state "Credenziali RIFIUTATE\n(401 Invalid credentials)" as Rifiutato
-
-    state "Sessione APERTA\n(token UUID in ConcurrentHashMap)" as Aperta {
-        state "Ruolo AMMINISTRATORE\n(Utenti.tipo = admin)" as Amministratore
-        state "Ruolo TECNICO\n(qualunque altro tipo)" as Tecnico
+' ---------- A) la sessione ----------
+state "A - Ciclo di vita della sessione" as A {
+    state "Anonimo" as Anonimo
+    state "Sessione aperta" as Sessione {
+        state "ruolo amministratore" as Amministratore
+        state "ruolo tecnico" as Tecnico
     }
-
-    state "Sessione CHIUSA\n(token rimosso)" as Chiusa
 
     [*] --> Anonimo
-    Anonimo --> Verifica : POST /api/auth/login
-    Verifica --> Rifiutato : utente inesistente\no password errata
-    Rifiutato --> Anonimo
-    Verifica --> Amministratore : tipo = admin
-    Verifica --> Tecnico : tipo != admin
-    Aperta --> Chiusa : POST /api/auth/logout\n(Bearer token)
-    Aperta --> Chiusa : riavvio della Centrale\n(le sessioni sono solo in RAM)
-    Chiusa --> Anonimo
+    Anonimo --> Amministratore : login corretto [Utenti.tipo = admin] /\ntoken UUID registrato col ruolo
+    Anonimo --> Tecnico : login corretto [altro tipo] /\ntoken UUID registrato col ruolo
+    Anonimo --> Anonimo : [utente inesistente o password errata] / 401
+    Sessione --> Anonimo : logout, oppure riavvio della Centrale\n(le sessioni stanno solo in RAM)
 }
 
-note right of Aperta
-  Il login restituisce token + profilo utente
-  (id, username, role, displayName, avatarInitials).
-  Il ruolo viene memorizzato lato server INSIEME al token:
-  prima viveva solo nello store React del frontend e un
-  semplice curl passava senza credenziali.
-end note
-
-' ===================== PARTE B: FILTRO SULLA SINGOLA RICHIESTA =====================
-state "B) Filtro di ogni richiesta HTTP\n(FiltroAutorizzazione, @Priority(AUTHENTICATION))" as Filtro {
-
-    state "Richiesta ricevuta\n(metodo + percorso normalizzato)" as Richiesta
-
-    state "Esenzioni\n(passano senza token)" as Esenzioni {
-        state "Preflight CORS\n(metodo OPTIONS)" as Preflight
-        state "Login\n(POST api/auth/login)" as Login
-        state "Fuori dalle API\n(percorso non api/...)" as FuoriApi
-        state "Endpoint DI CAMPO\nGET api/prossima-stazione\nGET api/treni/{id}/itinerario" as EndpointCampo
-    }
-
-    state "Controllo del token\n(header Authorization: Bearer)" as ControlloToken
-    state "RIFIUTO 401\n(token assente o non valido)" as Rifiuto401
-
-    state "Controllo del ruolo" as ControlloRuolo
-    state "RIFIUTO 403\n(serve l'amministratore)" as Rifiuto403
-
-    state "Richiesta AUTORIZZATA\n(prosegue verso la risorsa)" as Autorizzata
+' ---------- B) la singola richiesta ----------
+state "B - Filtro della singola richiesta" as B {
+    state "Richiesta in arrivo" as Richiesta
+    state "Autorizzata" as Autorizzata
+    state "Rifiutata" as Rifiutata
+    state "M10 - gateway REST" as M10 <<esterna>>
 
     [*] --> Richiesta
-    Richiesta --> Preflight : OPTIONS
-    Richiesta --> Login : api/auth/login
-    Richiesta --> FuoriApi : percorso non applicativo
-    Richiesta --> EndpointCampo : GET usato dai nodi edge
-    Richiesta --> ControlloToken : tutti gli altri casi
-
-    Preflight --> Autorizzata
-    Login --> Autorizzata
-    FuoriApi --> Autorizzata
-    EndpointCampo --> Autorizzata
-
-    ControlloToken --> Rifiuto401 : sessione non trovata
-    ControlloToken --> ControlloRuolo : sessione valida
-
-    ControlloRuolo --> Autorizzata : GET / HEAD\n(lettura per tutti)
-    ControlloRuolo --> Autorizzata : comandi del tecnico:\n/sopprimi, /risolvi,\n/manutenzione, auth/logout
-    ControlloRuolo --> Autorizzata : scrittura CRUD\nE ruolo = amministratore
-    ControlloRuolo --> Rifiuto403 : scrittura CRUD\nE ruolo = tecnico
+    Richiesta --> Autorizzata : [caso esente] /\nnessun token richiesto
+    Richiesta --> Rifiutata : [token assente\no non valido] / 401
+    Richiesta --> Autorizzata : [token valido e\npermesso sufficiente]
+    Richiesta --> Rifiutata : [permesso\ninsufficiente] / 403
+    Autorizzata --> M10
 }
 
-Aperta -[dashed]-> ControlloToken : il token trovato qui\ne' quello registrato al login
+Sessione -[dashed]-> Richiesta : il token presentato nell'header\nAuthorization e' quello del login
 
-note bottom of EndpointCampo
+note bottom of B
+  Casi esenti dal token: preflight OPTIONS, il login stesso, i
+  percorsi fuori da /api e le due GET usate dai nodi di campo
+  (itinerario del treno e prossima stazione).
+
+  Permesso sufficiente: le letture e i tre comandi operativi che
+  il PDF assegna al tecnico (sopprimi una corsa, risolvi un
+  allarme, invia la manutenzione) valgono per entrambi i ruoli;
+  le CRUD di stazioni, treni e tratte solo per l'amministratore.
+
   I processi Treno e Stazione non fanno login: la loro
-  "autenticazione" e' la validazione dell'ID sul DB
-  centrale via MQTT (macchina M2). Per questo le due
-  GET che usano restano aperte; sono di sola lettura
-  e non espongono nessuna scrittura.
+  autenticazione e' la validazione dell'ID di M2, per questo le
+  due GET che usano restano aperte.
 end note
-
-' ===================== MACCHINE COLLEGATE =====================
-state "M10 - Gateway REST\n(10_macchina_gateway_rest.puml)" as M10 <<esterna>>
-state "M2 - Validazione ID dei nodi\n(02_macchina_validazione_id_edge.puml)" as M2 <<esterna>>
-
-Autorizzata -[dashed]-> M10 : la risorsa JAX-RS\nviene finalmente invocata
-M2 -[dashed]-> EndpointCampo : i nodi ammessi da M2 sono\ngli unici client senza token
 
 @enduml

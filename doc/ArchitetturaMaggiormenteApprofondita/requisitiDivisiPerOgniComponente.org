@@ -1,0 +1,188 @@
+* Ripasso UML differenza tra diagramma a stati e di sequenza
+nota : diobastardo comprendere in modo completo tutti questi livelli è infinito
+** Scenari Vs RF
+Un RF è una dichiarazione generalistica di cosa il sistema deve fare, è astratta, lo scenario è un caso particolare che può effettuare il sistema
+Uno sviluppo gerarchico degli RF porta a la trattazione di tutti casi possibili secondo condizioni fino a quelle atomiche, definire dunque in questa maniera attraverso tale albero tutte i casi d'uso e le condizioni e le situazioni che si devono gestire per implementarli
+una dipendenza è una specificazione, la gestione dei guasti dipende dalla gestione se un treno si trova dentro una tratta o no e a sua volta si specializza nella gestione se un treno si trova su una tratta o no
+Il criterio è il test di eliminazione: A dipende da B se togliendo B il requisito A non è più soddisfacibile. Prova:
+Gli scenari servono:
+1. ad aumentare la comprensione del sistema per la modellazione dei diagrammi
+2. far comprendere immediatamente al lettore cosa è capace di fare il letto
+Attenzione: il titolo di uno scenario può tranquillamente essere un RF
+
+In sintesi, i requisiti funzionali sono le regole del gioco, mentre gli scenari sono le partite giocate per dimostrare che quelle regole funzionano.
+
+
+- Scenari ancora più in particolare:
+La regola d'oro è: si modellano gli scenari significativi e rappresentativi, che coprono le casistiche più importanti. In pratica, si segue questa strategia:
+
+    Lo Scenaro Principale ("Happy Path" / Percorso Felice): Quello che funziona tutto bene, senza intoppi. È la sequenza "standard" che l'utente medio segue per raggiungere il suo obiettivo.
+
+    Gli Scenari Alternativi ("Sad Path" / Percorsi Tristi): Le varianti più comuni o più critiche. Ad esempio: "Cosa succede se la password è sbagliata?", "Cosa succede se l'utente clicca su 'Recupera password'?".
+
+    Gli Scenari di Eccezione ("Corner Cases" / Casi limite): Quelli che mettono alla prova i confini del sistema. Ad esempio: "Cosa succede se il campo email è vuoto?", "Cosa succede se l'utente ha il profilo bloccato?".
+
+    Gli Scenari ad Alto Rischio: Quelli che, se falliscono, causerebbero danni enormi (perdita di dati, problemi di sicurezza, violazioni legali). Questi vanno sempre modellati, anche se sono rari.
+
+La strategia vincente: "Copertura, non esaustività"
+
+** UML differenza tra diagramma a stati e di sequenza
+
+nel diagramma i messaggi tra i vari componenti si possono mettere ma sarebbero dei normali cambi di stato e non vengono messi in risalto
+nel diagramma di secuenza gli stati di un programma: i puti di esecuzione del codice divisi per il  salto stesso che possono fare non sono messi in risalto perche non mostra i salti fra gli stati
+inoltre fare un albero tipo:
+A
+- B
+- C
+idica che A si specifica / dipende dalle seguenti distinte parti dunque tutto l'edge dipende da D quindi anche se tutte le parti di A dipendono da D allora A dipende da D A-->D
+la matematica delle dipendenze è delle generalizzazioni è tosta.
+Cosa dice Gemini
+1. Diagramma di Sequenza (Sequence Diagram)
+
+    Domanda a cui risponde: "Chi parla con chi, e in quale ordine temporale?"
+
+    Cosa mette in risalto: Le linee di vita (lifelines) degli oggetti, la sequenza dei messaggi (chiamate di metodi, eventi, risposte) e la durata delle attivazioni.
+
+    Perché ignora il codice interno: Se dovessi mostrare ogni if, switch, salto di codice o cambio di stato interno, il diagramma diventerebbe illeggibile. Per gestire i salti condizionali si usano al massimo i frammenti combinati (come alt, opt, loop), ma sempre mantenendo l'attenzione sui messaggi scambiati tra oggetti.
+
+2. Diagramma di Stato (Statechart Diagram)
+
+    Domanda a cui risponde: "In che stato si trova il sistema o l'oggetto e come reagisce agli eventi?"
+
+    Cosa mette in risalto: Gli stati (es. In attesa, In elaborazione, Errore) e le transizioni causate da eventi o condizioni.
+
+    Perché i messaggi sono secondari: I messaggi o le azioni intermedie esistono solo come "effetti collaterali" delle transizioni, ma il protagonista assoluto è l'evoluzione dello stato dell'entità.
+
+** Esercizio
+#+begin_src plantuml file: diagramma.png
+@startuml
+actor Utente
+participant "Interfaccia ATM" as ATM
+participant "Server Banca" as Banca
+
+Utente -> ATM : Inserisce Carta
+ATM -> Utente : Richiedi PIN
+Utente -> ATM : Inserisce PIN
+ATM -> Banca : Valida PIN(pin)
+Banca --> ATM : PIN Valido
+
+ATM -> Utente : Richiedi Importo
+Utente -> ATM : Inserisce Importo
+ATM -> Banca : Verifica Fondi(importo)
+Banca --> ATM : Fondi Sufficienti
+
+ATM -> Utente : Eroga Contanti
+ATM -> Utente : Restituisce Carta
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m8y22I/plantuml-eObirx.png]]
+#+begin_src  plantuml file diagramma2.png
+
+@startuml
+[*] --> InAttesa : Accensione
+
+InAttesa --> InserimentoPIN : Inserimento Carta
+InserimentoPIN --> ValidazionePIN : PIN inserito
+
+state ValidazionePIN <<choice>>
+ValidazionePIN --> InserimentoImporto : [PIN Corretto]
+ValidazionePIN --> InAttesa : [PIN Errato / Espelli Carta]
+
+InserimentoImporto --> VerificaDisponibilità : Importo inserito
+
+state VerificaDisponibilità <<choice>>
+VerificaDisponibilità --> Erogazione : [Fondi OK]
+VerificaDisponibilità --> InserimentoImporto : [Fondi Insufficienti]
+
+Erogazione --> RestituzioneCarta : Soldi prelevati
+RestituzioneCarta --> InAttesa : Carta ritirata
+@enduml
+
+
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m8y22I/plantuml-od2EsK.png]]
+
+* nuovo (è incompleto il resto è nella doc finale)
+Basato da dove parte l'evento
+** RF
+Il numero organico è troppo alto provare una riduzione col grafo delle dipendenze
+aggiungendo le dipendenze si possono aggiungere le specificazioni a diamante
+RF01: casi d'uso (dipende da  Correttezza del sistema gestionale)
+  - visualizzazione dei dati in tempo reale e corretti
+  - visualizzazione dei guasti dipende
+  - modifica dei dati da parte esclusiva dell'aministratore
+  - costruzione di uno storico (funzionalità non richiesta)
+RF02: Correttezza del sistema gestionale
+- gestione guasti(stazioni, treni)
+  - guasto stazione
+    - guasto di perdità di connessione
+      - chashare i dati prodotti fino alla ripresa della nuova connessione quali verranno reinviati in massa
+    - guasto che ne impedisce la percorrenza dei treni
+      - sensibile al treno il treno si deve fermare se la prossima stazione ha il guasto
+  - guasto treno
+    - memorizzarlo nel db
+    - gestione alle conseguenze
+      - g. sensibilità alla stazione stazione: il treno si guasta nella stazione si vuole che la stazione risulterà in'usabile(Guasta)
+      - g. sensibile tratta: se il treno si guasta nella tratta si vuole che la stazione trattà risulterà in'usabile(Guasta)
+- gestione treni
+  - gestione ritardi
+    - se il treno è fermo quando dovrebbe circolare accumulo del ritardo
+      - per guasto (dipende da gestione dei guasti)
+      - per ordinamento dell'amiministratore.(non implementato)
+  - servire le informazioni di stato (simulazione del treno)(dipende dalla gestione dei guasti)
+    - posizione puramente a quale tratta si trova/stazione
+    - ritardo (dipende da 'gestione ritardi')
+- gestione stazioni
+  - informazioni da rendere alla visualizzazione
+    - attraverso la gestione della chash
+    - treni attualmente presenti nella stazione
+    - treno e tempo di entrata nella stazione
+    - treno e tempo di uscita dalla stazione
+- Validazione nodo: si vuole che il nodo una volta entrato nel sistema il proprio id che dichiara venga
+  validato attraverso la voce del db
+  - se è presente è ok, se non è presente non può entrare nel sistema
+- modifica tratta
+  - il treno non è fuori dalla tratta il treno viene fermato in attesa di essere soppresso
+  - il treno è dentro la tratta, la tratta deve essere seguita dal punto in cui è il treno
+
+
+
+
+
+* precedente
+** microservizio treno
+- aggiornamento tratta
+  - salvarla in ram per il proprio uso e sul db
+- gestione causa guasti alla prossima fermata stazione o binario (tratatta ovvero copia di stazioeni)
+  - ricezione dai sesori --> modifica della percorrenza della tratta, sincronizzazione sui topic di allarme delle
+    nuove stazioni
+    - se arrivano evendi del tipo la prossima stazione è fuori uso aggiornare variabile in rame e il database
+      che il treno si è femato e
+    - se l'evento è il ripristino della funzionalità della stazione allora riaggiornare la ram e il db che il
+      treno è partito
+- Ritardi la tratta possiede orari corretti di percorrenza
+- inviare in certrale l'entrata e uscita da una stazione topic treni/+/passaggio
+  formato : boh lo fa l'ai
+- invio se il treno si guasta alla centrale
+** microservizio stazione
+- invio alla centrale i dati del passaggio dei treni
+  - i sensori della stazione informano id treno e se è in entrata o in uscita,
+    poi si aggiorna la ram e si inviano i dati alla stazione centrale per la storicizzazione
+- la staione può perdere la connessione
+     con la centrale nel caso seguire il diagramma degli stati che ne
+    descrive la dinamica di gestione
+** Centrale
+ - deve rispondere alle richieste di visualizzazione
+   - montare su il motore in tepo reale, cicli continui che inviano i dati se la richiesta è ancora attiva
+ - formattare e storicizzare i dati
+ L'unica crud a cui serve la propagazinone ai microservizzi è la
+ - gestione guasti
+   - se i microservizzi avvertono guasti , aggiornamento del db,
+   - se il tecnico invia l'operatore aggiornare il db di modo che ormai il guasto sia terminato e
+     pubblicare sul topic degli allert generale per tutti i treni o tutte le stazioni che quel tale microservizio è stato risolto
+ interrogare il database ogni 10 secondi per ogni tipo di visualizzazione di modo da rendere il "tempo reale"
+

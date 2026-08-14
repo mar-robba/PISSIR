@@ -6,17 +6,11 @@
 '    it.uni.reti2.elaboration.FaultMonitor#controllaHeartbeat
 '    it.uni.reti2.elaboration.FaultMonitor#controllaTreniFermi
 '    it.uni.reti2.elaboration.FaultMonitor#broadcastSnapshot
-'    it.uni.reti2.elaboration.FaultMonitor#creaGuastoAutomatico
 '    it.uni.reti2.elaboration.TrafficLogicEngine#kpiDashboard
 '
-'  Tre job schedulati ogni 10 secondi, indipendenti fra loro
-'  (concurrentExecution = SKIP: un giro che sfora non si sovrappone al
-'  successivo). Rilevano cio' che i nodi di campo non possono segnalare
-'  da soli, cioe' la propria stessa caduta.
-'
-'  Avviata da:   M1  (01_macchina_ciclo_vita_centrale.puml)
-'  Fa transitare: M7  (07_macchina_ciclo_vita_guasto.puml)
-'                 M12 (12_macchina_stato_stazione.puml)
+'  Tre job schedulati ogni 10 secondi che rilevano cio' che i nodi di campo
+'  non possono segnalare da soli, cioe' la propria stessa caduta.
+'  Fa transitare: M7 (guasti), M12 (stazione), M13 (letto, non modificato)
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -26,122 +20,60 @@ skinparam state {
     FontColor #202124
     ArrowColor #5F6368
     StartColor #34A853
-    EndColor #EA4335
-}
-skinparam state<<esterna>> {
-    BackgroundColor #F1F3F4
-    BorderColor #5F6368
 }
 skinparam note {
     BackgroundColor #FFF9C4
     BorderColor #F9A825
 }
+hide empty description
 
 title M8 - Watchdog FaultMonitor (tre job schedulati ogni 10 secondi)
 
 [*] --> Watchdog
 
-state "Watchdog attivo\n(scheduler Quarkus, tick da 10s)" as Watchdog {
+state "Watchdog attivo" as Watchdog {
 
-    ' ---------- REGIONE 1: heartbeat delle stazioni ----------
-    state "Job 1 - controllaHeartbeat() @Transactional" as Job1 {
-        state "Attesa del tick\n(ogni 10s)" as Attesa1
-        state "Calcolo del limite\nnow - 30s\n(fault.heartbeat.timeout.secondi)" as Limite1
-        state "Scansione di tutte\nle stazioni in cache" as Scansione1
-        state "Stazione SALTATA\n(gia' OFFLINE\no in MANUTENZIONE)" as Saltata
-        state "Stazione VIVA\n(ultimoHeartbeat entro il limite\no mai battuto)" as Viva
-        state "FAIL-STOP rilevato\n(stazione -> OFFLINE in cache)" as FailStop
-        state "Apertura del guasto automatico\ntipo = sensore_offline\nseverita = CRITICAL\nmsg = 'Heartbeat assente: ...'\n+ EventoStazione HEARTBEAT_LOST" as GuastoStazione
-        state "Nessun guasto nuovo\n(ne esiste gia' uno aperto\nper quella sorgente)" as GiaAperto
-
-        note right of GuastoStazione
-          Severita' CRITICAL e non warning: e' il fail-stop della
-          stazione, e lato treno il blocco della marcia scatta solo
-          sui guasti CRITICAL. Il prefisso "Heartbeat assente:"
-          serve invece alla Centrale per riconoscere il guasto come
-          proprio e richiuderlo da sola quando il battito torna (M4).
-        end note
-
-        [*] --> Attesa1
-        Attesa1 --> Limite1 : tick
-        Limite1 --> Scansione1
-        Scansione1 --> Saltata : stato OFFLINE / MANUTENZIONE
-        Scansione1 --> Viva : ultimoHeartbeat >= limite\noppure null
-        Scansione1 --> FailStop : ultimoHeartbeat < limite
-        FailStop --> GuastoStazione : nessun sensore_offline\ngia' aperto
-        FailStop --> GiaAperto : guasto gia' aperto
-        Saltata --> Attesa1
-        Viva --> Attesa1
-        GuastoStazione --> Attesa1
-        GiaAperto --> Attesa1
+    state "Job 1 - heartbeat delle stazioni" as Job1 {
+        state "in attesa del tick" as Attesa1
+        state "scansione delle stazioni" as Scan1
+        Attesa1 --> Scan1 : ogni 10s
+        Scan1 --> Attesa1 : [battito entro 30s]\noppure [gia' OFFLINE o in MANUTENZIONE] /\nnessuna azione
+        Scan1 --> Attesa1 : [silenzio oltre 30s] /\nstazione OFFLINE, guasto CRITICAL se non\ngia' aperto, alert sul campo, evento di audit
     }
 
-    ' ---------- REGIONE 2: treni fermi ----------
-    state "Job 2 - controllaTreniFermi() @Transactional" as Job2 {
-        state "Attesa del tick\n(ogni 10s)" as Attesa2
-        state "Calcolo del limite\nnow - 90s\n(fault.treno.fermo.timeout.secondi)" as Limite2
-        state "Scansione di tutti\ni treni in cache" as Scansione2
-        state "Treno IGNORATO\n(stato != attivo)" as Ignorato
-        state "Treno REGOLARE\n(in stazione oppure\nin movimento)" as Regolare
-        state "ANOMALIA rilevata\nattivo + immobile +\nfuori stazione" as Anomalia
-        state "Apertura del guasto automatico\ntipo = treno_fermo\nseverita = warning" as GuastoTreno
-
-        [*] --> Attesa2
-        Attesa2 --> Limite2 : tick
-        Limite2 --> Scansione2
-        Scansione2 --> Ignorato : stato non attivo
-        Scansione2 --> Regolare : stazioneCorrente valorizzata\noppure velocita > 0 e\ntelemetria recente
-        Scansione2 --> Anomalia : velocita = 0 oppure\nultimoAggiornamento < limite,\nfuori stazione
-        Anomalia --> GuastoTreno : nessun treno_fermo\ngia' aperto
-        Anomalia --> Attesa2 : guasto gia' aperto
-        Ignorato --> Attesa2
-        Regolare --> Attesa2
-        GuastoTreno --> Attesa2
+    state "Job 2 - treni fermi" as Job2 {
+        state "in attesa del tick" as Attesa2
+        state "scansione dei treni" as Scan2
+        Attesa2 --> Scan2 : ogni 10s
+        Scan2 --> Attesa2 : [non attivo] oppure [in stazione]\noppure [in movimento] / nessuna azione
+        Scan2 --> Attesa2 : [attivo, immobile o telemetria piu'\nvecchia di 90s, fuori da ogni stazione] /\nguasto warning se non gia' aperto
     }
 
-    ' ---------- REGIONE 3: snapshot KPI ----------
-    state "Job 3 - broadcastSnapshot()" as Job3 {
-        state "Attesa del tick\n(ogni 10s)" as Attesa3
-        state "Calcolo dei KPI\n(kpiDashboard: totalTrains,\ntrainsInMotion, trainsDelayed,\nstationsOperative, stationsFaulty,\nactiveAlerts, avgDelay)" as CalcoloKpi
-        state "Broadcast WebSocket\neventType = SNAPSHOT" as Snapshot
-        state "Errore\n(log, nessun invio)" as ErroreSnapshot
-
-        [*] --> Attesa3
-        Attesa3 --> CalcoloKpi : tick
-        CalcoloKpi --> Snapshot
-        CalcoloKpi --> ErroreSnapshot : eccezione
-        Snapshot --> Attesa3
-        ErroreSnapshot --> Attesa3
+    state "Job 3 - snapshot dei KPI" as Job3 {
+        state "in attesa del tick" as Attesa3
+        state "calcolo dei KPI" as Calcolo
+        Attesa3 --> Calcolo : ogni 10s
+        Calcolo --> Attesa3 : / broadcast SNAPSHOT\n(treni in moto, in ritardo, stazioni\noperative e guaste, allarmi, ritardo medio)
     }
 
-    ' I tre job sono INDIPENDENTI: nessuna transizione li collega,
-    ' le frecce nascoste servono solo a metterli in fila nel disegno.
-    Job1 -[hidden]right-> Job2
-    Job2 -[hidden]right-> Job3
+    Job1 -[hidden]down-> Job2
+    Job2 -[hidden]down-> Job3
 }
 
-note bottom of Watchdog
-  I tre job girano IN PARALLELO su worker thread separati e leggono la
-  stessa cache che i consumer MQTT stanno aggiornando: per
-  questo la scrittura del guasto usa un id con suffisso
-  casuale (alert-{millis}-{uuid8}). Con il solo timestamp
-  due guasti creati nello stesso millisecondo dai due job
-  violavano la chiave primaria e facevano il rollback
-  dell'INTERO giro di controllo.
+note right of Job1
+  Il job non tocca lo stato del treno (Job 2) ne' chiude
+  quello che apre: la stazione torna ONLINE e il guasto si
+  chiude quando riprende il battito, cioe' in M4.
 end note
 
-' ===================== MACCHINE COLLEGATE =====================
-state "M7 - Ciclo di vita del Guasto\n(07_macchina_ciclo_vita_guasto.puml)" as M7 <<esterna>>
-state "M12 - Stato della Stazione\n(12_macchina_stato_stazione.puml)" as M12 <<esterna>>
-state "M13 - Stato del Treno\n(13_macchina_stato_treno.puml)" as M13 <<esterna>>
-state "M11 - WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
-state "M4 - Ingestione heartbeat\n(04_macchina_ingestione_heartbeat.puml)" as M4 <<esterna>>
-
-GuastoStazione -[dashed]-> M7 : Inesistente -> Aperto\n(+ RESOLVED possibile solo\nal rientro del battito)
-GuastoTreno -[dashed]-> M7 : Inesistente -> Aperto
-FailStop -[dashed]-> M12 : ONLINE -> OFFLINE
-Anomalia -[dashed]-> M13 : legge stato, velocita,\nultimoAggiornamento
-Snapshot -[dashed]-> M11 : evento SNAPSHOT ogni 10s
-M4 -[dashed]-> FailStop : il ritorno del battito annulla\nil fail-stop e chiude il guasto
+note bottom of Watchdog
+  I tre job girano in parallelo su worker thread separati, con
+  concurrentExecution = SKIP perche' un giro che sfora non si
+  sovrapponga al successivo, e leggono la stessa cache che i
+  consumer MQTT stanno aggiornando. L'id dei guasti porta un
+  suffisso casuale: due guasti creati nello stesso millisecondo
+  dai due job violavano la chiave primaria e facevano il rollback
+  dell'intero giro di controllo.
+end note
 
 @enduml

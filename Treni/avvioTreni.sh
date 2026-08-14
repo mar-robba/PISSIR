@@ -1,7 +1,22 @@
 #!/usr/bin/env bash
-# Lista degli argomenti da passare al main() del JAR
-ARGS=("Mario" "tenoAmmazzaRicchi" "tr-1785881107516" "tr-1785881140084" "tr-1785881169606")
-# Numero di istanze (deve corrispondere a ${#ARGS[@]})
+# File con i nomi dei treni da avviare (uno per riga)
+NODI_FILE="$(dirname "$0")/treni.conf"
+if [[ ! -f "$NODI_FILE" ]]; then
+    echo "❌ Non trovo il file $NODI_FILE"
+    exit 1
+fi
+# Lista degli argomenti da passare al main() del JAR, letta dal file
+ARGS=()
+while IFS= read -r riga || [[ -n "$riga" ]]; do
+    # salto le righe vuote e i commenti
+    [[ -z "${riga// }" || "$riga" == \#* ]] && continue
+    ARGS+=("$riga")
+done < "$NODI_FILE"
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+    echo "❌ Il file $NODI_FILE non contiene nessun treno"
+    exit 1
+fi
+# Numero di istanze (una per ogni riga letta dal file)
 N_INSTANCES=${#ARGS[@]}
 # Comando base
 JAR_CMD="java -jar target/quarkus-app/quarkus-run.jar"

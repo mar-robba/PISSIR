@@ -1,0 +1,71 @@
+@startuml S5 - Ciclo di vita di un evento della stazione
+' =========================================================================
+'  MACCHINA S5 - Ciclo di vita di un evento prodotto dalla stazione
+'
+'  Codice astratto:
+'    it.uni.reti2.LocalBuffer                        (coda ArrayDeque)
+'    it.uni.reti2.LocalBuffer.EventoBufferizzato     (canale + payload)
+'    it.uni.reti2.StationGateway#inviaOppureBufferizza, #flush
+'
+'  E' una macchina di entita': non descrive un thread ma la storia di un
+'  singolo transito o di un singolo allarme, dalla generazione fino alla
+'  consegna alla Centrale. Stato del canale: 04_macchina_connettivita_centrale.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+hide empty description
+
+title S5 - Ciclo di vita di un evento (transito o allarme)
+
+[*] --> Generato : S8 - transito di un treno\noppure S6/S7 - guasto rilevato
+
+state "Generato\ncanale transit oppure alert" as Generato
+state "In coda nel buffer locale" as InCoda
+state "In testa alla coda" as InTesta
+state "Consegnato alla Centrale" as Consegnato
+
+Generato --> Consegnato : [connessioneCentrale = true] /\nemitter.send() riuscito
+Generato --> InCoda : [connessioneCentrale = false] /\naddLast, nessun tentativo di invio
+Generato --> InCoda : eccezione dell'emitter /\naddLast e connessione marcata persa
+
+InCoda --> Consegnato : S4 - flush /\nreinvio sull'emitter del suo canale
+InCoda --> InTesta : S4 - flush fallito /\naddFirst e flush interrotto
+InTesta --> Consegnato : S4 - flush successivo
+InTesta --> InTesta : S4 - flush fallito ancora
+
+Consegnato --> [*] : la Centrale storicizza\nil transito o apre il guasto
+
+note right of InTesta
+  L'evento che non e' riuscito a partire torna DAVANTI a tutti,
+  non in fondo. Rimetterlo in coda lo avrebbe reso il piu' recente
+  e la Centrale avrebbe potuto ricevere l'USCITA di un treno prima
+  della sua ENTRATA: uno storico impossibile da leggere.
+end note
+
+note bottom of InCoda
+  Ogni evento in coda si porta dietro il proprio canale logico
+  ("transit" oppure "alert"), altrimenti al momento del flush non
+  si saprebbe piu' su quale topic rimandarlo. La coda e' un
+  ArrayDeque proprio perche' serve poter inserire in testa.
+end note
+
+note left of Generato
+  La coda vive in RAM: un riavvio del nodo perde gli eventi non
+  ancora consegnati. Nel codice e' segnato come lavoro futuro il
+  passaggio a un SQLite locale, che renderebbe il caching
+  resistente anche a una caduta di alimentazione della stazione.
+end note
+
+@enduml

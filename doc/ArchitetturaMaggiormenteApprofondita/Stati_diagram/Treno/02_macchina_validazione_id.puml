@@ -1,0 +1,70 @@
+@startuml T2 - Validazione dell'ID del treno
+' =========================================================================
+'  MACCHINA T2 - Validazione dell'ID del treno sul database centrale
+'
+'  Codice astratto:
+'    it.uni.reti2.TrainDatabaseValidator#verificaSeNecessario
+'    it.uni.reti2.TrainDatabaseValidator#inviaRichiestaValidazione
+'    it.uni.reti2.TrainDatabaseValidator#gestisciRispostaValidazione
+'
+'  Canali: validation-request-out  -> railway/train/{id}/validation
+'          validation-response-in  <- railway/train/+/validation-response
+'  Interlocutore: M2 della Centrale (ExistIdForEdge)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+    EndColor #EA4335
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+hide empty description
+
+title T2 - Validazione dell'ID del treno (richiesta e risposta MQTT)
+
+[*] --> NonVerificato
+
+state "Non verificato\n(esito = RIPROVA)" as NonVerificato
+state "Richiesta pubblicata" as Richiesta
+state "Riconosciuto\n(trenoRiconosciuto = true)" as Riconosciuto
+state "ID non presente\n(esito = ID_NON_PRESENTE)" as NonPresente
+state "M2 - validazione lato Centrale" as M2 <<esterna>>
+
+NonVerificato --> NonVerificato : T1 - chiede l'esito ogni 5s\n[meno di 15s dall'ultimo invio] /\nnessuna richiesta, esito RIPROVA
+NonVerificato --> Richiesta : T1 - chiede l'esito ogni 5s\n[primo giro oppure 15s passati] /\npubblica {"trenoId": id}
+Richiesta --> NonVerificato : nessuna risposta /\nl'esito resta RIPROVA
+Richiesta --> Riconosciuto : risposta con il mio trenoId\ne esisteNelDb = true
+Richiesta --> NonPresente : risposta con il mio trenoId\ne esisteNelDb = false
+Richiesta -[dashed]-> M2 : richiesta di validazione
+
+Riconosciuto --> [*] : T1 - il processo prosegue,\nsblocca il motore (T4)\ne la telemetria (T8)
+NonPresente --> [*] : T1 - errore fatale, return 1
+
+note right of Richiesta
+  Il main ripete la domanda ogni 5 secondi, ma il validatore
+  pubblica sul broker al massimo una richiesta ogni 15: sono due
+  ritmi diversi, e il secondo serve a non intasare il broker
+  quando la Centrale e' spenta e i convogli accesi sono tanti.
+end note
+
+note bottom of Riconosciuto
+  E' l'unica forma di autenticazione dei nodi: un processo lanciato
+  con un ID inventato non entra nella rete. Il flag trenoRiconosciuto
+  non ferma solo il main, filtra anche la telemetria e il motore di
+  viaggio: senza quei filtri il primo frame telemetrico avrebbe
+  potuto farsi creare la riga a database e il treno si sarebbe
+  auto-validato, rendendo inutile tutto il controllo.
+end note
+
+@enduml

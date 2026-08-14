@@ -1,9 +1,27 @@
 #!/usr/bin/env bash
 
-# Lista degli argomenti da passare al main() del JAR
-ARGS=("MI" "PA" "Padova" "stazzaDellaMadonnaTroia" "TO")
+# File con i nomi delle stazioni da avviare (uno per riga)
+NODI_FILE="$(dirname "$0")/stazioni.conf"
 
-# Numero di istanze (deve corrispondere a ${#ARGS[@]})
+if [[ ! -f "$NODI_FILE" ]]; then
+    echo "❌ Non trovo il file $NODI_FILE"
+    exit 1
+fi
+
+# Lista degli argomenti da passare al main() del JAR, letta dal file
+ARGS=()
+while IFS= read -r riga || [[ -n "$riga" ]]; do
+    # salto le righe vuote e i commenti
+    [[ -z "${riga// }" || "$riga" == \#* ]] && continue
+    ARGS+=("$riga")
+done < "$NODI_FILE"
+
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+    echo "❌ Il file $NODI_FILE non contiene nessuna stazione"
+    exit 1
+fi
+
+# Numero di istanze (una per ogni riga letta dal file)
 N_INSTANCES=${#ARGS[@]}
 
 # Comando base

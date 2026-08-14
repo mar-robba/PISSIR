@@ -147,28 +147,22 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
     }));
   },
 
-  /** Crea una nuova tratta sul backend e la aggiunge allo stato locale (UC6). */
+  /**
+   * Crea una nuova tratta sul backend e la aggiunge allo stato locale (UC6).
+   * A differenza delle altre azioni l'errore NON viene fermato qui: lo deve vedere
+   * il form, che in caso di rifiuto azzera l'editing e mostra quali tratte mancano.
+   */
   addRoute: async (route) => {
-    try {
-      const creata = await apiClient.createRoute(route);
-      set((s) => ({ routes: [...s.routes, creata] }));
-    } catch (err) {
-      console.error('Failed to create route', err);
-      alert(`Errore: impossibile creare la tratta sul server.${dettaglioErrore(err)}`);
-    }
+    const creata = await apiClient.createRoute(route);
+    set((s) => ({ routes: [...s.routes, creata] }));
   },
 
-  /** Aggiorna una tratta sul backend e nello stato locale (UC7). */
+  /** Aggiorna una tratta sul backend e nello stato locale (UC7). Errori: vedi addRoute. */
   updateRoute: async (id, update) => {
-    try {
-      const aggiornata = await apiClient.updateRoute(id, update);
-      set((s) => ({
-        routes: s.routes.map((r) => (r.id === id ? aggiornata : r)),
-      }));
-    } catch (err) {
-      console.error('Failed to update route', err);
-      alert(`Errore: impossibile aggiornare la tratta sul server.${dettaglioErrore(err)}`);
-    }
+    const aggiornata = await apiClient.updateRoute(id, update);
+    set((s) => ({
+      routes: s.routes.map((r) => (r.id === id ? aggiornata : r)),
+    }));
   },
 
   /** Elimina una tratta sul backend e dallo stato locale (UC7). */

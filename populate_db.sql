@@ -24,12 +24,16 @@ INSERT INTO Tratte (id_Tratta, StazionePartenzaFK, StazioneArrivoFK, tempoPercor
 ('T8_BO_MI', 'S2', 'S1', 65)
 ON CONFLICT (id_Tratta) DO NOTHING;
 
--- Inserimento Utenti (con password per il login)
-INSERT INTO Utenti (id_utente, tipo, nome, cognome, matricola, password) VALUES
-('U1', 'admin', 'Mario', 'Rossi', 'MAT001', 'password'),
-('U2', 'operatore', 'Luigi', 'Verdi', 'MAT002', 'password'),
-('U3', 'tecnico', 'Giovanni', 'Bianchi', 'MAT003', 'password'),
-('U4', 'operatore', 'Anna', 'Neri', 'MAT004', 'password')
+-- Inserimento Utenti: solo anagrafica degli operatori, NIENTE password.
+-- Le credenziali e i ruoli stanno in Keycloak (realm "railway", vedi
+-- Keycloak/realm-railway.json); qui restano nome, cognome e matricola perche' i
+-- guasti puntano all'operatore che se ne occupa. La matricola e' cio' che lega la
+-- riga all'utente Keycloak corrispondente (mat001 -> MAT001).
+INSERT INTO Utenti (id_utente, tipo, nome, cognome, matricola) VALUES
+('U1', 'admin', 'Mario', 'Rossi', 'MAT001'),
+('U2', 'operatore', 'Luigi', 'Verdi', 'MAT002'),
+('U3', 'tecnico', 'Giovanni', 'Bianchi', 'MAT003'),
+('U4', 'operatore', 'Anna', 'Neri', 'MAT004')
 ON CONFLICT (id_utente) DO NOTHING;
 
 -- Inserimento Itinerari

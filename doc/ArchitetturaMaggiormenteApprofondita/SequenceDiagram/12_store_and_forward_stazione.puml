@@ -1,0 +1,125 @@
+@startuml SQ12 - Store and forward della stazione
+' =========================================================================
+'  SEQUENZA SQ12 - Il collegamento cade: niente si perde e l'ordine regge
+'
+'  Codice astratto:
+'    it.uni.reti2.StationIngestion#reteOffline, #reteOnline   (POST /stazione/rete/*)
+'    it.uni.reti2.StationGateway#inviaOppureBufferizza
+'    it.uni.reti2.StationGateway#flush
+'    it.uni.reti2.LocalBuffer#add, #addFirst, #poll          (ArrayDeque)
+'    it.uni.reti2.HeartbeatGenerator#manutenzionePeriodica    (@Scheduled 10s)
+'
+'  Macchine a stati corrispondenti: S4, S5, S7 (stazione)
+'
+'  Il punto del diagramma e' l'addFirst: se il reinvio fallisce a meta'
+'  flush l'evento torna IN TESTA, non in fondo, se no la Centrale
+'  riceverebbe l'USCITA di un convoglio prima della sua ENTRATA.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam sequence {
+    ArrowColor #5F6368
+    LifeLineBorderColor #1A73E8
+    LifeLineBackgroundColor #E8F0FE
+    ParticipantBorderColor #1A73E8
+    ParticipantBackgroundColor #E8F0FE
+    ParticipantFontColor #202124
+    ActorBorderColor #137333
+    ActorBackgroundColor #E6F4EA
+    BoxBorderColor #9AA0A6
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title SQ12 - Interruzione del collegamento con la Centrale: caching locale e reinvio ordinato
+
+actor "Operatore\ndi prova" as USER
+
+box "Processo Stazione (:8081)" #F8F9FA
+    participant "StationIngestion" as REST
+    participant "DBLocale" as DBL
+    participant "StationGateway" as SGW
+    participant "LocalBuffer" as BUF
+    participant "HeartbeatGenerator" as HB
+end box
+
+participant "Broker\nMosquitto" as BROKER #F1F3F4
+participant "IngestionService\n(Centrale)" as ING
+
+== Il collegamento cade ==
+
+USER -> REST : POST /stazione/rete/offline
+activate REST
+REST -> DBL : connessioneCentrale = false
+REST --> USER : 200
+deactivate REST
+
+note over HB
+  Da qui l'heartbeat non parte piu' (secondo filtro del Multi):
+  passati 30 secondi la Centrale apre il fail-stop di SQ10.
+end note
+
+== Gli eventi continuano ad accadere ==
+
+loop ogni transito o guasto rilevato mentre si e' offline
+    SGW -> SGW : inviaTransito(...) oppure inviaGuasto(...)
+    activate SGW
+    SGW -> DBL : connessioneCentrale?
+    activate DBL
+    DBL --> SGW : false
+    deactivate DBL
+    SGW -> BUF : add(canale, payload)
+    note right of SGW
+      Offline non si tenta nemmeno l'invio: l'evento va dritto in
+      coda. Il canale ("transit" o "alert") viaggia insieme al
+      payload, se no al flush non si saprebbe su quale emitter
+      rimandarlo.
+    end note
+    deactivate SGW
+end
+
+== Il collegamento torna ==
+
+alt ripristino comandato
+    USER -> REST : POST /stazione/rete/online
+    activate REST
+    REST -> DBL : connessioneCentrale = true
+    REST -> SGW : flush()
+    deactivate REST
+else ripristino notato dal job periodico
+    HB -> HB : manutenzionePeriodica() ogni 10s
+    HB -> DBL : connessioneCentrale && buffer non vuoto?
+    HB -> SGW : flush()
+end
+
+activate SGW
+loop finche' il buffer non e' vuoto
+    SGW -> BUF : poll()
+    activate BUF
+    BUF --> SGW : EventoBufferizzato(canale, payload)\nil piu' vecchio per primo
+    deactivate BUF
+    alt invio riuscito
+        SGW -> BROKER : alertsEmitter oppure transitEmitter
+        BROKER -> ING : onAlert / onTransit
+    else invio fallito
+        SGW -> BUF : addFirst(canale, payload)
+        SGW -> DBL : connessioneCentrale = false
+        SGW -> SGW : break, si riprovera' al prossimo giro
+        note right of SGW
+          Rimetterlo in fondo lo renderebbe l'evento piu' recente
+          e l'ordine cronologico salterebbe.
+        end note
+    end
+end
+deactivate SGW
+
+note over BUF, ING
+  Il buffer sta in RAM (ArrayDeque in un bean ApplicationScoped): sopravvive
+  alla caduta del collegamento, non a quella del processo. Per resistere anche
+  a un blackout del nodo servirebbe un SQLite locale, ed e' scritto come
+  limite noto nella parte di critica delle scelte progettuali.
+end note
+
+@enduml

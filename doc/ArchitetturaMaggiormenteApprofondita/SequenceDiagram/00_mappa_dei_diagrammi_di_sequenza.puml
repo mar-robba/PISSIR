@@ -1,0 +1,118 @@
+@startuml SQ0 - Mappa dei diagrammi di sequenza
+' =========================================================================
+'  MAPPA DEI 18 DIAGRAMMI DI SEQUENZA DEL SISTEMA
+'
+'  Questo file non descrive una conversazione: dice quali conversazioni
+'  esistono, in che ordine si presentano nella vita del sistema e quali
+'  sono le due sole strade con cui i nodi parlano fra loro (MQTT e REST).
+'
+'    SQ01 01_avvio_validazione_id_treno.puml            TrainDatabaseValidator <-> ExistIdForEdge
+'    SQ02 02_avvio_validazione_id_stazione.puml         StationDatabaseValidator <-> ExistIdForEdgeStazione
+'    SQ03 03_caricamento_itinerario_treno.puml          TrainJourneyEngine -> RestApiGateway
+'    SQ04 04_telemetria_treno_verso_mappa.puml          TrainElab -> IngestionService -> WebSocket
+'    SQ05 05_heartbeat_stazione.puml                    HeartbeatGenerator -> IngestionService
+'    SQ06 06_passaggio_in_stazione_due_sorgenti.puml    TrainGateway -> StationGateway -> IngestionService
+'    SQ07 07_keepalive_sensori_stazione.puml            sensore -> StationIngestion -> HeartbeatGenerator
+'    SQ08 08_treno_trattenuto_da_stazione_guasta.puml   railway/alerts -> TrainGateway -> TrainJourneyEngine
+'    SQ09 09_guasto_di_bordo_del_convoglio.puml         Sensori -> TrainGateway -> IngestionService
+'    SQ10 10_failstop_stazione_e_chiusura_automatica.puml FaultMonitor -> campo -> IngestionService
+'    SQ11 11_treno_fermo_fuori_stazione.puml            FaultMonitor.controllaTreniFermi
+'    SQ12 12_store_and_forward_stazione.puml            StationGateway + LocalBuffer
+'    SQ13 13_login_sessione_e_ruoli.puml                AuthController + FiltroAutorizzazione
+'    SQ14 14_comandi_di_ripristino_operatore.puml       RestApiGateway (manutenzione / risolvi)
+'    SQ15 15_soppressione_convoglio.puml                RestApiGateway (sopprimi)
+'    SQ16 16_modifica_itinerario_a_caldo.puml           RestApiGateway (PUT /api/tratte/{id})
+'    SQ17 17_amministrazione_anagrafica.puml            RestApiGateway (CRUD)
+'    SQ18 18_dashboard_realtime_e_snapshot.puml         RealtimeWebSocket + FaultMonitor
+'
+'  Le macchine a stati sorelle stanno in ../Stati_diagram/
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+}
+skinparam state<<ingresso>> {
+    BackgroundColor #D2E3FC
+    BorderColor #174EA6
+}
+skinparam state<<operatore>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+hide empty description
+
+title SQ0 - Mappa dei 18 diagrammi di sequenza
+
+[*] --> Ingresso
+
+state "1. Ingresso in servizio" as Ingresso <<ingresso>> {
+    state "SQ01 - validazione ID del treno" as SQ01
+    state "SQ02 - validazione ID della stazione" as SQ02
+    state "SQ03 - caricamento dell'itinerario" as SQ03
+}
+
+state "2. Esercizio normale" as Esercizio {
+    state "SQ04 - telemetria" as SQ04
+    state "SQ05 - heartbeat" as SQ05
+    state "SQ06 - passaggio in stazione" as SQ06
+    state "SQ07 - keepalive dei sensori" as SQ07
+}
+
+state "3. Guasti e anomalie" as Guasti {
+    state "SQ08 - treno trattenuto" as SQ08
+    state "SQ09 - guasto di bordo" as SQ09
+    state "SQ10 - fail-stop della stazione" as SQ10
+    state "SQ11 - treno fermo fuori stazione" as SQ11
+}
+
+state "4. Resilienza" as Resilienza {
+    state "SQ12 - store and forward" as SQ12
+}
+
+state "5. Verso l'operatore" as Operatore <<operatore>> {
+    state "SQ13 - login e ruoli" as SQ13
+    state "SQ14 - comandi di ripristino" as SQ14
+    state "SQ15 - soppressione del convoglio" as SQ15
+    state "SQ16 - itinerario cambiato a caldo" as SQ16
+    state "SQ17 - anagrafica della rete" as SQ17
+    state "SQ18 - dashboard in tempo reale" as SQ18
+}
+
+Ingresso --> Esercizio : il nodo e' riconosciuto\ne puo' parlare
+Esercizio --> Guasti : quello che va storto\n(segnalato o dedotto)
+Esercizio --> Resilienza : quando cade il\ncollegamento
+Guasti --> Operatore : l'allarme arriva\nsulla dashboard
+Operatore --> Guasti : i comandi tornano\nsul campo
+Esercizio --> Operatore : lo stato corrente\nva a schermo
+
+note bottom of Ingresso
+  Nessun nodo entra in servizio dichiarando soltanto chi e':
+  SQ01 e SQ02 sono la stessa conversazione (richiesta e risposta
+  su due topic dedicati) fatta da due processi diversi.
+end note
+
+note right of Esercizio
+  SQ06 e' l'unico caso in cui lo STESSO fatto fisico arriva alla
+  Centrale per due strade indipendenti: quella dichiarata dal treno
+  e quella rilevata dai sensori di terra.
+end note
+
+legend bottom
+  |= gruppo |= chi apre la conversazione |
+  | 1. ingresso | il nodo di campo che si accende |
+  | 2. esercizio | un tempo che scade (5s, 10s, 1s) o un sensore |
+  | 3. guasti | un sensore, oppure il watchdog della Centrale |
+  | 4. resilienza | la caduta del collegamento |
+  | 5. operatore | il browser dell'utente |
+end legend
+
+@enduml

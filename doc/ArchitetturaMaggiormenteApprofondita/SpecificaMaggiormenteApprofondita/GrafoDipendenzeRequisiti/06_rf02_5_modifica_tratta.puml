@@ -1,0 +1,58 @@
+@startuml G6 - RF02.5 modifica tratta
+' =========================================================================
+'  G6 - RF02.5 : MODIFICA DELLA TRATTA
+'  Vista d'insieme: ../00_grafo_dipendenze_requisiti.puml
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam shadowing false
+skinparam ArrowColor #5F6368
+skinparam rectangle {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+}
+skinparam rectangle<<dominio>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam rectangle<<altrove>> {
+    BackgroundColor #FFFFFF
+    BorderColor #BDBDBD
+    FontColor #757575
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title G6 - RF02.5 : modifica della tratta
+
+rectangle "RF02.5 - Modifica tratta" as RF0205 <<dominio>>
+rectangle "RF02.5.1 - Treno fuori dalla tratta:\nviene fermato in attesa\ndi essere soppresso" as RF020501
+rectangle "RF02.5.2 - Treno dentro la tratta:\nla nuova tratta va seguita dal punto\nin cui si trova il treno" as RF020502
+
+RF0205 *-- RF020501
+RF0205 *-- RF020502
+
+' ---- quello che sta fuori da questo grafo ----
+rectangle "RF02.2.2.1 - Posizione: su quale\ntratta o in quale stazione si trova\n<size:11>dettaglio: G3</size>" as RF02020201 <<altrove>>
+
+RF020501 ..> RF02020201 : dipende
+RF020502 ..> RF02020201 : dipende
+
+note bottom of RF02020201
+  I due casi sono lo stesso caso letto in due modi:
+  per sapere se il treno e' dentro o fuori dalla nuova
+  tratta bisogna prima sapere dove si trova. Senza
+  RF02.2.2.1 quest'area non e' soddisfacibile per niente.
+end note
+
+legend bottom
+  |= arco |= significato |
+  | linea piena (*--) | decomposizione: il requisito si specifica nelle sue parti |
+  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
+  | riquadro bianco bordato di grigio | requisito dettagliato in un altro grafo |
+end legend
+
+@enduml

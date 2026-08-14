@@ -1,96 +1,128 @@
 package it.uni.reti2.gateway;
 
+import io.quarkus.security.identity.SecurityIdentity;
 import it.uni.reti2.entity.Utente;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.HeaderParam;
-import jakarta.ws.rs.POST;
+import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 
+import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Controller REST per l'autenticazione degli operatori della Centrale.
- * Verifica le credenziali contro la tabella Utenti e restituisce al frontend
- * un token di sessione con il profilo utente nel formato atteso.
- * Il token non è più un UUID buttato via: viene registrato in {@link SessioniAttive}
- * ed è quello che {@link FiltroAutorizzazione} pretende su ogni chiamata protetta.
+ * Profilo dell'operatore collegato.
+ *
+ * <p>Qui prima c'erano il {@code POST /api/auth/login} che confrontava la password
+ * con la colonna della tabella Utenti e il {@code /logout} che buttava via il token:
+ * con il passaggio a Keycloak sono spariti tutti e due. Le credenziali le verifica
+ * Keycloak, il logout si fa sul suo endpoint di fine sessione, e la Centrale riceve
+ * soltanto un JWT firmato di cui controlla la firma (vedi {@code quarkus.oidc.*}).</p>
+ *
+ * <p>Resta un solo endpoint, {@code GET /api/auth/me}: la web app lo chiama appena
+ * ottenuto il token per sapere chi e' l'utente e cosa puo' fare. Il payload e' lo
+ * stesso di prima (id, username, role, displayName, avatarInitials) perche' il
+ * frontend non doveva cambiare struttura dati, ma i valori adesso vengono per meta'
+ * dal token e per meta' dalla tabella Utenti, che e' rimasta come anagrafica degli
+ * operatori (i guasti hanno una chiave esterna verso di lei).</p>
  */
 @Path("/api/auth")
 @Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
 public class AuthController {
 
+    /** Identita' ricavata dal token: contiene username e ruoli di realm. */
     @Inject
-    SessioniAttive sessioni;
+    SecurityIdentity identita;
 
-    public static class LoginRequest {
-        public String username;
-        public String password;
-    }
-
-    @POST
-    @Path("/login")
-    public Response login(LoginRequest request) {
-        if (request == null || request.username == null) {
-            return Response.status(Response.Status.BAD_REQUEST).entity("Missing username").build();
+    /**
+     * Restituisce il profilo dell'utente che ha presentato il token.
+     *
+     * @return 200 con il profilo, 401 se la chiamata arriva senza token valido.
+     */
+    @GET
+    @Path("/me")
+    public Response profilo() {
+        if (identita == null || identita.isAnonymous()) {
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity(Map.of("errore", "Autenticazione richiesta: effettuare il login"))
+                    .build();
         }
 
-        String usernameToSearch = request.username.trim();
-        Utente utente = Utente.find("matricola", usernameToSearch).firstResult();
-        if (utente == null) {
-            return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid credentials").build();
+        // Keycloak salva gli username in minuscolo (mat001), mentre in tutto il resto
+        // del sistema l'operatore e' identificato dalla matricola (MAT001). Il claim
+        // "matricola" arriva dal protocol mapper del realm; se qualcuno crea un utente
+        // a mano dalla console senza quell'attributo si ripiega sullo username.
+        String matricola = claimTestuale("matricola");
+        if (matricola == null || matricola.isBlank()) {
+            matricola = identita.getPrincipal().getName().toUpperCase();
         }
 
-        // Verifica della password contro la colonna dedicata della tabella Utenti
-        if (utente.password == null || request.password == null
-                || !utente.password.equals(request.password)) {
-            return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid credentials").build();
-        }
+        // Riga di anagrafica corrispondente: serve per restituire lo stesso id_utente
+        // (U1, U2, ...) usato dalle chiavi esterne dei guasti.
+        Utente utente = Utente.find("upper(matricola) = ?1", matricola.toUpperCase()).firstResult();
 
-        // Mapping del ruolo DB → ruolo frontend: admin→amministratore, tutto il resto→tecnico
-        String role = "admin".equalsIgnoreCase(utente.tipo) ? "amministratore" : "tecnico";
+        String nome = utente != null ? utente.nome : claimTestuale("given_name");
+        String cognome = utente != null ? utente.cognome : claimTestuale("family_name");
 
-        Map<String, Object> userPayload = new HashMap<>();
-        userPayload.put("id", utente.id);
-        userPayload.put("username", utente.matricola);
-        userPayload.put("role", role);
-        userPayload.put("displayName", utente.nome + " " + utente.cognome);
+        // Il ruolo applicativo non si deduce piu' dalla colonna "tipo" del database:
+        // e' il ruolo di realm che Keycloak ha messo dentro il token.
+        String ruolo = identita.hasRole(FiltroAutorizzazione.RUOLO_AMMINISTRATORE)
+                ? FiltroAutorizzazione.RUOLO_AMMINISTRATORE
+                : FiltroAutorizzazione.RUOLO_TECNICO;
 
-        String initials = "";
-        if (utente.nome != null && !utente.nome.isEmpty()) {
-            initials += utente.nome.substring(0, 1).toUpperCase();
-        }
-        if (utente.cognome != null && !utente.cognome.isEmpty()) {
-            initials += utente.cognome.substring(0, 1).toUpperCase();
-        }
-        userPayload.put("avatarInitials", initials);
+        Map<String, Object> profilo = new HashMap<>();
+        profilo.put("id", utente != null ? utente.id : matricola);
+        profilo.put("username", matricola);
+        profilo.put("role", ruolo);
+        profilo.put("displayName", componiNomeCompleto(nome, cognome, matricola));
+        profilo.put("avatarInitials", iniziali(nome, cognome, matricola));
 
-        Map<String, Object> payload = new HashMap<>();
-        // Il token viene registrato lato server insieme al ruolo: da qui in poi ogni
-        // chiamata REST dovrà presentarlo nell'header Authorization.
-        payload.put("token", sessioni.apri(utente.matricola, role));
-        payload.put("user", userPayload);
-
-        return Response.ok(payload).build();
+        return Response.ok(profilo).build();
     }
 
     /**
-     * Chiude la sessione invalidando il token: da quel momento le API rispondono 401.
+     * Legge un claim di testo dal token.
      *
-     * @param authorization Header "Bearer <token>" della sessione da chiudere.
-     * @return 200 con la conferma.
+     * <p>Il principal e' un {@link JsonWebToken} solo quando l'identita' arriva
+     * davvero da Keycloak: nei test viene simulata con {@code @TestSecurity} e il
+     * principal e' un oggetto qualsiasi, quindi il controllo di tipo serve per non
+     * far esplodere i test.</p>
+     *
+     * @param nomeClaim Nome del claim dentro il JWT.
+     * @return Il valore del claim, oppure null se assente.
      */
-    @POST
-    @Path("/logout")
-    public Response logout(@HeaderParam("Authorization") String authorization) {
-        if (authorization != null && authorization.startsWith("Bearer ")) {
-            sessioni.chiudi(authorization.substring("Bearer ".length()).trim());
+    private String claimTestuale(String nomeClaim) {
+        Principal principal = identita.getPrincipal();
+        if (principal instanceof JsonWebToken jwt) {
+            Object valore = jwt.getClaim(nomeClaim);
+            return valore != null ? valore.toString() : null;
         }
-        return Response.ok(Map.of("success", true)).build();
+        return null;
+    }
+
+    /** "Mario Rossi", oppure la matricola se l'anagrafica non ha nome e cognome. */
+    private String componiNomeCompleto(String nome, String cognome, String matricola) {
+        String completo = ((nome != null ? nome : "") + " " + (cognome != null ? cognome : "")).trim();
+        return completo.isEmpty() ? matricola : completo;
+    }
+
+    /** Iniziali per l'avatar della sidebar: "MR" per Mario Rossi. */
+    private String iniziali(String nome, String cognome, String matricola) {
+        String risultato = "";
+        if (nome != null && !nome.isEmpty()) {
+            risultato += nome.substring(0, 1).toUpperCase();
+        }
+        if (cognome != null && !cognome.isEmpty()) {
+            risultato += cognome.substring(0, 1).toUpperCase();
+        }
+        // Utente senza nome in anagrafica: si usano le prime due lettere della matricola.
+        if (risultato.isEmpty() && matricola != null && !matricola.isEmpty()) {
+            risultato = matricola.substring(0, Math.min(2, matricola.length())).toUpperCase();
+        }
+        return risultato;
     }
 }

@@ -1,0 +1,161 @@
+@startuml SQ17 - Amministrazione dell'anagrafica della rete
+' =========================================================================
+'  SEQUENZA SQ17 - CRUD di stazioni, convogli e tratte, e i rifiuti
+'
+'  Codice astratto:
+'    it.uni.reti2.gateway.RestApiGateway#createStazione, #updateStazione, #deleteStazione
+'    it.uni.reti2.gateway.RestApiGateway#createTreno, #updateTreno, #deleteTreno
+'    it.uni.reti2.gateway.RestApiGateway#creaTrenoSuDb, #aggiornaTrenoSuDb (EsitoScritturaTreno)
+'    it.uni.reti2.gateway.RestApiGateway#deleteTrattaElemento, #deleteTratta
+'    it.uni.reti2.gateway.FiltroAutorizzazione#richiedeAmministratore
+'
+'  Macchine a stati corrispondenti: M9, M10 (centrale)
+'
+'  Il diagramma mostra i tre rifiuti che il sistema oppone davvero, perche'
+'  sono la parte osservabile del requisito sull'integrita' dei dati.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam sequence {
+    ArrowColor #5F6368
+    LifeLineBorderColor #1A73E8
+    LifeLineBackgroundColor #E8F0FE
+    ParticipantBorderColor #1A73E8
+    ParticipantBackgroundColor #E8F0FE
+    ParticipantFontColor #202124
+    ActorBorderColor #137333
+    ActorBackgroundColor #E6F4EA
+    BoxBorderColor #9AA0A6
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title SQ17 - Anagrafica della rete: creazione, modifica ed eliminazioni rifiutate
+
+actor "Amministratore" as USER
+participant "railwayStore\n(apiClient)" as API
+participant "FiltroAutorizzazione" as FILTRO
+
+box "Centrale Operativa" #F8F9FA
+    participant "RestApiGateway" as REST
+    participant "TrafficLogicEngine" as CACHE
+    database "PostgreSQL" as PG
+end box
+
+participant "Broker\nrailway/alerts" as BROKER #F1F3F4
+
+USER -> API : operazione sull'anagrafica
+API -> FILTRO : POST / PUT / DELETE  con Bearer <token>
+FILTRO -> FILTRO : richiedeAmministratore(metodo, percorso) == true
+alt ruolo "tecnico"
+    FILTRO --> API : 403
+    API --> USER : messaggio di rifiuto in interfaccia
+else ruolo "amministratore"
+    FILTRO -> REST : la richiesta prosegue
+end
+
+== Creazione di un convoglio ==
+
+activate REST
+REST -> REST : nome del convoglio vuoto?
+alt vuoto oppure piu' lungo di 50 caratteri
+    REST --> API : 400 {"errore":"..."}
+    note right of REST
+      La chiave primaria Treni.id_convoglio e' VARCHAR(50):
+      meglio un 400 parlante che un errore SQL in faccia.
+    end note
+else nome accettabile
+    REST -> PG : QuarkusTransaction.requiringNew()\ncreaTrenoSuDb(nome, dto)
+    activate PG
+    alt esiste gia' un convoglio con quel nome
+        PG --> REST : EsitoScritturaTreno.errore = 409
+        REST --> API : 409
+    else nome libero
+        PG --> REST : Treno persistito
+        deactivate PG
+        REST -> CACHE : aggiornaTreno(treno)
+        note right of REST
+          La transazione si chiude PRIMA di toccare la cache: se
+          l'allineamento sta dentro la stessa transazione, un
+          rollback lascia in RAM (e quindi nelle risposte REST)
+          valori che sul database non sono mai stati scritti.
+        end note
+        REST --> API : 201 con il convoglio creato
+    end
+end
+deactivate REST
+
+== Modifica di un convoglio ==
+
+USER -> API : cambia stato o itinerario
+API -> REST : PUT /api/treni/{id}
+activate REST
+alt il corpo prova a cambiare il nome
+    REST --> API : 400 "il nome identifica il treno e non e' modificabile"
+    note right of REST
+      E' la chiave primaria e il riferimento delle FK degli storici:
+      per cambiarlo si elimina il convoglio e lo si ricrea. Infatti
+      l'interfaccia mostra quel campo in sola lettura in modifica.
+    end note
+else itinerario indicato inesistente
+    REST --> API : 400 "Itinerario inesistente"
+else modifica valida
+    REST -> PG : aggiornaTrenoSuDb(id, dto)
+    REST -> CACHE : allinea stato e itinerario,\nconservando la telemetria gia' in memoria
+    opt l'itinerario e' cambiato
+        REST -> BROKER : ITINERARIO_AGGIORNATO (SQ16)
+    end
+    REST --> API : 200
+end
+deactivate REST
+
+== Eliminazioni: cosa il sistema rifiuta ==
+
+USER -> API : elimina una stazione
+API -> REST : DELETE /api/stazioni/{id}
+activate REST
+REST -> PG : Tratta.count("stazionePartenza.id = ?1\nor stazioneArrivo.id = ?1")
+alt la stazione e' estremo di almeno una tratta
+    REST --> API : 409 "Stazione referenziata da N tratte: eliminarle prima"
+else nessuna tratta la usa
+    REST -> PG : cancella prima StoricoTransito, Transito,\nStoricoStatoStazione, EventoStazione\npoi la Stazione
+    REST -> CACHE : rimuoviStazione(id)
+    REST --> API : 204
+end
+deactivate REST
+
+USER -> API : elimina una tratta elementare
+API -> REST : DELETE /api/tratte-elementari/{id}
+activate REST
+alt la tratta e' dentro qualche itinerario
+    REST --> API : 409 "Tratta usata da N itinerari"
+else compare nei transiti storici
+    REST --> API : 409 "Tratta presente nei transiti storici"
+    note right of REST
+      Qui il rifiuto protegge la memoria storica: cancellarla
+      vorrebbe dire perdere il percorso di transiti gia' avvenuti.
+    end note
+else libera
+    REST --> API : 204
+end
+deactivate REST
+
+USER -> API : elimina un convoglio
+API -> REST : DELETE /api/treni/{id}
+activate REST
+REST -> PG : cancellazione a cascata di StoricoStatoTreno,\nStoricoTransito, Transito, StoricoItinerario\npoi il Treno
+REST -> CACHE : rimuoviTreno(id)
+REST -> BROKER : {"tipoEvento":"STOP","target":"<id>",\n"motivo":"Treno eliminato da operatore"}
+REST --> API : 204
+deactivate REST
+
+note over PG
+  Per il convoglio si sceglie la cascata invece del rifiuto: senza
+  itinerario un treno non esiste piu' come entita' del dominio, mentre
+  una stazione tolta spezzerebbe archi ancora usati da altri percorsi.
+  Sono due decisioni diverse prese apposta.
+end note
+
+@enduml

@@ -5,16 +5,24 @@ import { useMemo, useState } from 'react';
 import { Route, Station, TrackSegment, Train as TrainType } from '../types';
 
 type DiagramPoint = { x: number; y: number };
-type GraphEdge = { fromId: string; toId: string; key: string };
+type GraphEdge = { fromId: string; toId: string; key: string; doppioSenso: boolean };
 
 const MAP_WIDTH = 600;
 const MAP_HEIGHT = 800;
 const MAP_PADDING = 70;
+// Quanto la linea si ferma prima del centro della stazione: la punta della freccia
+// deve restare fuori dal cerchio (r 12, 16 se selezionata), se no ci finisce sotto.
+const STATION_EDGE_GAP = 22;
 
 /**
  * Restituisce tutti gli archi della rete, senza duplicati e senza dipendere
  * dalle coordinate GPS. Le tratte fisiche hanno priorità; gli itinerari attivi
  * completano il grafo quando non esiste ancora una tratta fisica corrispondente.
+ *
+ * <p>Le tratte sono ORIENTATE (il server rifiuta un itinerario che usa A-&gt;B se
+ * in tabella c'è solo B-&gt;A), quindi ogni arco tiene il verso in cui si può
+ * percorrere. Le due righe A-&gt;B e B-&gt;A restano un solo segmento sulla mappa,
+ * marcato come doppio senso: due linee sovrapposte sarebbero indistinguibili.
  */
 function buildGraphEdges(
   stations: Station[],
@@ -27,9 +35,16 @@ function buildGraphEdges(
   const addEdge = (fromId: string, toId: string) => {
     if (fromId === toId || !stationIds.has(fromId) || !stationIds.has(toId)) return;
 
-    // Il grafo della mappa è non orientato: A-B è lo stesso arco di B-A.
+    // La chiave ignora il verso, così i due sensi di marcia finiscono sulla stessa
+    // riga; il verso vero e proprio resta in fromId/toId e in doppioSenso.
     const key = [fromId, toId].sort().join('::');
-    edges.set(key, { fromId, toId, key });
+    const esistente = edges.get(key);
+    if (!esistente) {
+      edges.set(key, { fromId, toId, key, doppioSenso: false });
+      return;
+    }
+    // Stesso arco già visto ma partendo dall'altra stazione: si percorre in entrambi i sensi.
+    if (esistente.fromId !== fromId) esistente.doppioSenso = true;
   };
 
   trackSegments.forEach(({ departureStationId, arrivalStationId }) => {
@@ -198,12 +213,35 @@ export default function TrafficMapPage() {
     });
   };
 
-  // Disegna gli archi usati anche dal layout automatico delle stazioni.
+  // Disegna gli archi usati anche dal layout automatico delle stazioni. La freccia
+  // indica il verso percorribile: una punta sola per il senso unico, una punta per
+  // parte quando la tratta esiste in tabella in entrambi i versi.
   const renderConnections = () => {
-    return graphEdges.map(({ fromId, toId, key }) => {
+    return graphEdges.map(({ fromId, toId, key, doppioSenso }) => {
       const from = getCoordinates(fromId);
       const to = getCoordinates(toId);
-      return <line key={key} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#cbd5e1" strokeWidth="4" strokeLinecap="round" />;
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const distanza = Math.max(1, Math.hypot(dx, dy));
+      // Su stazioni molto vicine si accorcia meno, se no la linea si annullerebbe.
+      const scarto = Math.min(STATION_EDGE_GAP, distanza / 2 - 1);
+      const offsetX = (dx / distanza) * scarto;
+      const offsetY = (dy / distanza) * scarto;
+
+      return (
+        <line
+          key={key}
+          x1={from.x + offsetX}
+          y1={from.y + offsetY}
+          x2={to.x - offsetX}
+          y2={to.y - offsetY}
+          stroke="#cbd5e1"
+          strokeWidth="4"
+          strokeLinecap="round"
+          markerEnd="url(#punta-tratta)"
+          markerStart={doppioSenso ? 'url(#punta-tratta)' : undefined}
+        />
+      );
     });
   };
 
@@ -279,6 +317,23 @@ export default function TrafficMapPage() {
               <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
                 <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="1" />
               </pattern>
+              {/* Punta di freccia delle tratte. orient="auto-start-reverse" fa sì che
+                  lo stesso marker si giri da solo quando è usato come markerStart,
+                  così il doppio senso è una linea con due punte e non due linee.
+                  markerUnits="userSpaceOnUse" la tiene della stessa misura a
+                  prescindere dallo spessore della linea. */}
+              <marker
+                id="punta-tratta"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="13"
+                markerHeight="13"
+                markerUnits="userSpaceOnUse"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
+              </marker>
             </defs>
             <rect x="0" y="0" width="2000" height="2000" fill="url(#grid)" />
             

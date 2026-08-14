@@ -1,8 +1,10 @@
 import { Train, Station, Route, TrackSegment, Alert, DashboardKPI, Transit, TrainStatus, User, UserRole } from '../types';
 import type {
   ApiAlertPayload,
+  ApiCoppiaMancante,
   ApiDashboardPayload,
-  ApiLoginResponse,
+  ApiErrorPayload,
+  ApiProfiloResponse,
   ApiRoutePayload,
   ApiTrackSegmentPayload,
   ApiStationPayload,
@@ -20,13 +22,15 @@ import type {
 const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8781/api';
 
 /**
- * Token di sessione restituito dal login: la Centrale lo pretende nell'header
- * Authorization su tutte le API (vedi FiltroAutorizzazione lato server), altrimenti
- * risponde 401. Viene impostato dall'authStore al login e azzerato al logout.
+ * Access token OAuth2 rilasciato da Keycloak: la Centrale lo pretende nell'header
+ * Authorization su tutte le API (lo verifica quarkus-oidc e ne legge i ruoli
+ * FiltroAutorizzazione), altrimenti risponde 401. Non e' piu' un UUID inventato
+ * dalla Centrale ma un JWT firmato dall'Identity Provider; lo imposta l'authStore
+ * dopo lo scambio del codice di autorizzazione e a ogni rinnovo.
  */
 let authToken: string | null = null;
 
-/** Registra (o cancella) il token di sessione usato dalle chiamate successive. */
+/** Registra (o cancella) il token usato dalle chiamate successive. */
 export const setAuthToken = (token: string | null): void => {
   authToken = token;
 };
@@ -43,19 +47,36 @@ const authHeaders = (conBody = false): Record<string, string> => {
 };
 
 /**
+ * Errore di una chiamata REST rifiutata dalla Centrale. Oltre al messaggio porta,
+ * quando c'è, l'elenco delle coppie di stazioni senza tratta in rete: serve al form
+ * degli itinerari per dire all'operatore quali collegamenti deve ancora registrare.
+ */
+export class ErroreApi extends Error {
+  readonly coppieMancanti: ApiCoppiaMancante[];
+
+  constructor(messaggio: string, coppieMancanti: ApiCoppiaMancante[] = []) {
+    super(messaggio);
+    this.name = 'ErroreApi';
+    this.coppieMancanti = coppieMancanti;
+  }
+}
+
+/**
  * Estrae il dettaglio di un errore restituito dalla Centrale. Le API usano
  * normalmente `{ "errore": "..." }`, ma sono gestiti anche gli altri formati
  * JSON e le risposte testuali, così l'interfaccia può spiegare il rifiuto.
  */
-const createApiError = async (res: Response): Promise<Error> => {
+const createApiError = async (res: Response): Promise<ErroreApi> => {
   let dettaglio = '';
+  let coppieMancanti: ApiCoppiaMancante[] = [];
 
   try {
     const contentType = res.headers.get('content-type') ?? '';
     if (contentType.includes('application/json')) {
-      const body = await res.json() as Record<string, unknown>;
+      const body = await res.json() as ApiErrorPayload;
       const value = body.errore ?? body.message ?? body.detail;
       if (typeof value === 'string') dettaglio = value;
+      if (Array.isArray(body.coppieMancanti)) coppieMancanti = body.coppieMancanti;
     } else {
       dettaglio = (await res.text()).trim();
     }
@@ -63,7 +84,7 @@ const createApiError = async (res: Response): Promise<Error> => {
     // Una risposta di errore senza body rimane comunque gestibile dal chiamante.
   }
 
-  return new Error(dettaglio || `Il server ha risposto con HTTP ${res.status}.`);
+  return new ErroreApi(dettaglio || `Il server ha risposto con HTTP ${res.status}.`, coppieMancanti);
 };
 
 /** Converte il ruolo restituito dal backend nel vocabolario del frontend. */
@@ -73,24 +94,14 @@ const mapBackendRole = (role: string | undefined): UserRole => {
   return 'tecnico';
 };
 
-/**
- * Normalizza la risposta login: supporta il formato nuovo `{ token, user }`
- * e quello legacy con i campi utente in cima al JSON.
- */
-const normalizeLoginResponse = (data: Record<string, unknown>): ApiLoginResponse => {
-  const rawUser = (data.user ?? data) as Record<string, unknown>;
-  const user: User = {
-    id: String(rawUser.id ?? ''),
-    username: String(rawUser.username ?? ''),
-    role: mapBackendRole(String(rawUser.role ?? '')),
-    displayName: String(rawUser.displayName ?? rawUser.username ?? ''),
-    avatarInitials: String(rawUser.avatarInitials ?? ''),
-  };
-  return {
-    token: String(data.token ?? ''),
-    user,
-  };
-};
+/** Converte il profilo restituito da /api/auth/me nella shape User del frontend. */
+const mapProfilo = (dati: ApiProfiloResponse): User => ({
+  id: String(dati.id ?? ''),
+  username: String(dati.username ?? ''),
+  role: mapBackendRole(dati.role),
+  displayName: String(dati.displayName ?? dati.username ?? ''),
+  avatarInitials: String(dati.avatarInitials ?? ''),
+});
 
 /** Converte il DTO tratta del backend nella shape Route usata dal frontend. */
 const mapApiRoute = (r: ApiRoutePayload): Route => ({
@@ -445,29 +456,17 @@ export const apiClient = {
   },
 
   /**
-   * Effettua il login verificando le credenziali.
+   * Chiede alla Centrale chi è l'utente che possiede il token corrente.
+   *
+   * Con Keycloak il login non passa più da qui (username e password li raccoglie
+   * l'Identity Provider): la web app arriva già con il token in mano e usa questa
+   * chiamata per sapere nome, matricola e ruolo da mostrare in interfaccia. È anche
+   * la prova che il token è buono, perché se non lo fosse la Centrale direbbe 401.
    */
-  login: async (username: string, password: string): Promise<ApiLoginResponse> => {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: authHeaders(true),
-      body: JSON.stringify({ username, password })
-    });
-    if (!res.ok) throw new Error('Invalid credentials');
-    const data = await res.json() as Record<string, unknown>;
-    return normalizeLoginResponse(data);
-  },
-
-  /**
-   * Chiude la sessione lato Centrale invalidando il token.
-   * Gli errori vengono ignorati: il logout locale deve avvenire comunque.
-   */
-  logout: async (): Promise<void> => {
-    try {
-      await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', headers: authHeaders() });
-    } catch {
-      // Centrale non raggiungibile: la sessione lato server scadrà al riavvio.
-    }
+  getProfilo: async (): Promise<User> => {
+    const res = await fetch(`${API_BASE_URL}/auth/me`, { headers: authHeaders() });
+    if (!res.ok) throw await createApiError(res);
+    return mapProfilo(await res.json() as ApiProfiloResponse);
   },
 
   /**

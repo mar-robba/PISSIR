@@ -1,4 +1,4 @@
-@startuml M2 - Validazione dell'ID dei Nodi di Campo
+@startuml M2 - Validazione dell'ID dei nodi di campo
 ' =========================================================================
 '  MACCHINA M2 - Validazione dell'ID dei nodi di campo (treni e stazioni)
 '
@@ -6,12 +6,13 @@
 '    it.uni.reti2.DbValidator.ExistIdForEdge         (treni)
 '    it.uni.reti2.DbValidator.ExistIdForEdgeStazione (stazioni)
 '
-'  E' l'unica forma di "autenticazione" dei nodi edge: un processo Treno o
-'  Stazione all'avvio chiede alla Centrale se il proprio ID esiste a DB e
-'  parte solo se riceve esisteNelDb = true.
+'  E' l'unica forma di autenticazione dei nodi edge: all'avvio un processo
+'  Treno o Stazione chiede se il proprio ID esiste a database e parte solo
+'  se riceve esisteNelDb = true. La macchina e' la stessa per i due tipi di
+'  nodo, cambiano soltanto il topic e la tabella interrogata.
 '
-'  Avviata da: M1 (01_macchina_ciclo_vita_centrale.puml)
-'  Lato campo: ../diagramma_stati_treno.puml e ../diagramma_stati_stazione.puml
+'  Lato campo: ../Treno/02_macchina_validazione_id.puml
+'              ../Stazione/02_macchina_validazione_id.puml
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -21,92 +22,38 @@ skinparam state {
     FontColor #202124
     ArrowColor #5F6368
     StartColor #34A853
-    EndColor #EA4335
-}
-skinparam state<<esterna>> {
-    BackgroundColor #F1F3F4
-    BorderColor #5F6368
 }
 skinparam note {
     BackgroundColor #FFF9C4
     BorderColor #F9A825
 }
+hide empty description
 
-title M2 - Validazione dell'ID dei Nodi di Campo (ExistIdForEdge / ExistIdForEdgeStazione)
+title M2 - Validazione dell'ID dei nodi di campo
 
-note as Ingresso
-  INGRESSO: canali validation-in e validation-station-in
-  aperti dal boot di Quarkus (M1).
-  La macchina e' identica per il treno e per la stazione,
-  cambiano solo il topic e l'entita' interrogata.
+[*] --> Ascolto
+
+state "In ascolto\n<- railway/train/+/validation\n<- railway/station/+/validation" as Ascolto
+state "Verifica sul database" as Verifica
+state "Risposta pubblicata\n-> .../validation-response" as Risposta
+
+Ascolto --> Verifica : richiesta di validazione
+Verifica --> Ascolto : [payload non JSON o ID assente] /\nlog di errore, ack
+Verifica --> Risposta : [ID presente] /\nfindById in transazione,\nesisteNelDb = true oppure false
+Risposta --> Ascolto : / ack
+
+note right of Risposta
+  Effetto sul nodo di campo:
+    esisteNelDb = true   il nodo parte
+    esisteNelDb = false  il nodo termina con codice 1
+    nessuna risposta     il nodo riprova ogni 15 secondi
 end note
 
-[*] --> InAscolto
-
-state "In Ascolto\n<- railway/train/+/validation\n<- railway/station/+/validation" as InAscolto
-
-state "Elaborazione della Richiesta\n(un messaggio per volta, @Blocking)" as Elaborazione {
-
-    state "Lettura del payload\n(new String(messaggio.getPayload()))" as LetturaPayload
-    state "Parsing JSON\n(ObjectMapper.readTree)" as Parsing
-    state "Estrazione dell'ID\n(campo trenoId / stazioneId)" as EstrazioneId
-
-    state "Interrogazione del DB\nQuarkusTransaction.requiringNew()\nTreno.findById / Stazione.findById" as QueryDb
-
-    state "Esito POSITIVO\nesisteNelDb = true" as EsitoPositivo
-    state "Esito NEGATIVO\nesisteNelDb = false" as EsitoNegativo
-
-    state "Pubblicazione della risposta\n(topic dinamico via Emitter,\nQoS AT_MOST_ONCE)" as Pubblicazione
-
-    state "Richiesta scartata\n(log su stderr,\nnessuna risposta pubblicata)" as Scartata
-
-    [*] --> LetturaPayload
-    LetturaPayload --> Parsing
-    Parsing --> EstrazioneId : JSON valido
-    Parsing --> Scartata : payload non JSON\n(eccezione catturata)
-    EstrazioneId --> QueryDb : ID presente
-    EstrazioneId --> Scartata : campo ID assente
-
-    QueryDb --> EsitoPositivo : findById != null
-    QueryDb --> EsitoNegativo : findById == null
-    QueryDb --> Scartata : errore sul DB\n(eccezione catturata)
-
-    EsitoPositivo --> Pubblicazione : -> railway/train/{id}/validation-response\n-> railway/station/{id}/validation-response
-    EsitoNegativo --> Pubblicazione : stesso topic,\nesisteNelDb = false
-}
-
-InAscolto --> Elaborazione : messaggio MQTT ricevuto
-
-state "Ack del messaggio\n(messaggio.ack())" as Ack
-Elaborazione --> Ack : in OGNI caso,\nanche dopo un errore
-Ack --> InAscolto : canale ancora vivo,\npronto per la richiesta successiva
-
-note right of Ack
-  Il try/catch che avvolge tutto il corpo e l'ack
-  incondizionato sono la parte importante di questa
-  macchina: senza, un solo payload malformato faceva
-  terminare in errore il canale reattivo e da quel
-  momento la Centrale non validava piu' NESSUN nodo
-  fino al riavvio (stato assorbente "canale morto").
-end note
-
-' ===================== CONSEGUENZE SUL NODO DI CAMPO =====================
-state "Effetto sul nodo di campo\n(macchine ESTERNE al componente)" as EffettoCampo <<esterna>> {
-    state "Nodo AMMESSO\n(riconosciuto = true,\nentra nel keep-alive)" as NodoAmmesso
-    state "Nodo RESPINTO\n(termina con codice 1)" as NodoRespinto
-    state "Nodo in ATTESA\n(riprova ogni 15s)" as NodoAttesa
-}
-
-EsitoPositivo -[dashed]-> NodoAmmesso
-EsitoNegativo -[dashed]-> NodoRespinto
-Scartata -[dashed]-> NodoAttesa : nessuna risposta:\nil nodo va in timeout\ne ritenta
-
-note bottom of EffettoCampo
-  Dettaglio nei diagrammi del componente Treno e Stazione:
-    ../diagramma_stati_treno.puml
-    ../diagramma_stati_stazione.puml
-  Un nodo ammesso diventa poi sorgente per le macchine
-  M3 (telemetria), M4 (heartbeat), M5 (transiti) e M6 (allarmi).
+note bottom of Ascolto
+  Il corpo sta tutto in un try/catch e l'ack parte in ogni caso.
+  Senza, un solo payload malformato faceva terminare in errore il
+  canale reattivo e da quel momento la Centrale non validava piu'
+  nessun nodo fino al riavvio.
 end note
 
 @enduml

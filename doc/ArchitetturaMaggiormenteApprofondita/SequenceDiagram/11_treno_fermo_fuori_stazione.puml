@@ -1,0 +1,93 @@
+@startuml SQ11 - Convoglio fermo fuori stazione
+' =========================================================================
+'  SEQUENZA SQ11 - Il watchdog si accorge di un convoglio immobile in linea
+'
+'  Codice astratto:
+'    it.uni.reti2.elaboration.FaultMonitor#controllaTreniFermi   (@Scheduled 10s)
+'    it.uni.reti2.elaboration.FaultMonitor#creaGuastoAutomatico
+'    it.uni.reti2.elaboration.TrafficLogicEngine#getGuastoApertoPerSorgente
+'    fault.treno.fermo.timeout.secondi = 90
+'
+'  Macchine a stati corrispondenti: M8, M7 (centrale)
+'
+'  A differenza di SQ10 la severita' e' "warning": e' un'anomalia da
+'  guardare, non un fail-stop, e infatti non blocca nessuno.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam sequence {
+    ArrowColor #5F6368
+    LifeLineBorderColor #1A73E8
+    LifeLineBackgroundColor #E8F0FE
+    ParticipantBorderColor #1A73E8
+    ParticipantBackgroundColor #E8F0FE
+    ParticipantFontColor #202124
+    ActorBorderColor #137333
+    ActorBackgroundColor #E6F4EA
+    BoxBorderColor #9AA0A6
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title SQ11 - Convoglio dichiarato attivo ma fermo fra due stazioni
+
+participant "TrainElab\n(convoglio)" as ELAB
+
+box "Centrale Operativa" #F8F9FA
+    participant "IngestionService" as ING
+    participant "TrafficLogicEngine" as CACHE
+    participant "FaultMonitor" as FM
+    database "PostgreSQL" as PG
+    participant "RealtimeWebSocket" as WS
+end box
+
+participant "Broker\nrailway/alerts" as BROKER #F1F3F4
+actor "Tecnico" as USER
+
+ELAB -> ING : telemetria: stato "attivo",\nvelocita 0, stazioneCorrente vuota
+ING -> CACHE : aggiornaTreno(...)
+
+loop ogni 10 secondi
+    FM -> FM : controllaTreniFermi()
+    activate FM
+    FM -> CACHE : getTuttiTreni()
+    activate CACHE
+    CACHE --> FM : elenco
+    deactivate CACHE
+
+    alt stato diverso da "attivo"
+        FM -> FM : salta: un convoglio fermo\nche si dichiara fermo non e' un'anomalia
+    else stato "attivo"
+        FM -> FM : inStazione = stazioneCorrente non vuota\nimmobile = velocita == 0\n  oppure ultimoAggiornamento piu' vecchio di 90s
+        alt immobile e NON in stazione e nessun guasto "treno_fermo" gia' aperto
+            FM -> FM : creaGuastoAutomatico("treno_fermo", "warning",\n"TRENO", trenoId, "fermo tra stazioni con stato attivo")
+            FM -> PG : Guasto.persist() + StoricoGuasto.persist()
+            FM -> CACHE : aggiungiGuasto(guasto)
+            FM -> ING : broadcastAlert(guasto)
+            ING -> WS : {"eventType":"ALERT","type":"treno_fermo",\n"severity":"warning","trainId",...}
+            WS -> USER : compare nell'elenco degli allarmi aperti
+            FM -> ING : pubblicaGuastoSuMqtt(guasto)
+            ING -> BROKER : {"tipoEvento":"GUASTO","origine":"CENTRALE",\n"sorgenteTipo":"TRENO","severita":"warning",...}
+        else gia' segnalato
+            FM -> FM : niente, un solo guasto per episodio
+        end
+    end
+    deactivate FM
+end
+
+note over BROKER
+  L'alert finisce anche sul campo, ma nessun convoglio reagisce:
+  TrainGateway blocca solo sui GUASTO di STAZIONE con severita'
+  CRITICAL. Qui e' TRENO e warning, quindi la tratta resta
+  percorribile: e' il limite dichiarato per RF02.1.2.2.2.
+end note
+
+note over FM, CACHE
+  Il guasto viene aperto una sola volta per episodio grazie a
+  getGuastoApertoPerSorgente: senza quel controllo il job ne
+  creerebbe uno nuovo ogni dieci secondi.
+end note
+
+@enduml

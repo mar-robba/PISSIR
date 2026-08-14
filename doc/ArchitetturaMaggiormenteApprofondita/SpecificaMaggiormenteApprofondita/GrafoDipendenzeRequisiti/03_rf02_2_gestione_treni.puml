@@ -1,0 +1,91 @@
+@startuml G3 - RF02.2 gestione treni
+' =========================================================================
+'  G3 - RF02.2 : GESTIONE DEI TRENI (ritardi e simulazione)
+'  Vista d'insieme: ../00_grafo_dipendenze_requisiti.puml
+'
+'  Qui dentro sta RF02.2.2.1, il nodo a diamante di tutto il grafo:
+'  le frecce che gli arrivano da fuori sono raccolte in G7.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam shadowing false
+skinparam ArrowColor #5F6368
+skinparam rectangle {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+}
+skinparam rectangle<<dominio>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam rectangle<<fuoriambito>> {
+    BackgroundColor #ECEFF1
+    BorderColor #90A4AE
+    FontColor #607D8B
+}
+skinparam rectangle<<altrove>> {
+    BackgroundColor #FFFFFF
+    BorderColor #BDBDBD
+    FontColor #757575
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title G3 - RF02.2 : gestione dei treni (ritardi e simulazione)
+
+rectangle "RF02.2 - Gestione treni" as RF0202 <<dominio>>
+
+' ---- i ritardi ----
+rectangle "RF02.2.1 - Gestione ritardi" as RF020201
+rectangle "RF02.2.1.1 - Se il treno e' fermo quando\ndovrebbe circolare, accumula ritardo" as RF02020101
+rectangle "RF02.2.1.1.1 - Ritardo per guasto" as RF0202010101
+rectangle "RF02.2.1.1.2 - Ritardo per ordine\ndell'amministratore (non implementato)" as RF0202010102 <<fuoriambito>>
+
+' ---- la simulazione ----
+rectangle "RF02.2.2 - Servire le informazioni di stato\n(simulazione del treno)" as RF020202
+rectangle "RF02.2.2.1 - Posizione: su quale\ntratta o in quale stazione si trova" as RF02020201
+rectangle "RF02.2.2.2 - Ritardo accumulato" as RF02020202
+
+RF0202 *-- RF020201
+RF020201 *-- RF02020101
+RF02020101 *-- RF0202010101
+RF02020101 *-- RF0202010102
+RF0202 *-- RF020202
+RF020202 *-- RF02020201
+RF020202 *-- RF02020202
+
+' dipendenza interna all'area: il ritardo accumulato da servire e' quello
+' che la gestione dei ritardi calcola
+RF02020202 ..> RF020201 : dipende
+
+' ---- quello che sta fuori da questo grafo ----
+rectangle "RF02.1 - Gestione guasti\n<size:11>dettaglio: G2</size>" as RF0201 <<altrove>>
+rectangle "RF02.4 - Validazione del nodo\n<size:11>dettaglio: G5</size>" as RF0204 <<altrove>>
+
+RF0202 ..> RF0204 : dipende
+RF0202010101 ..> RF0201 : dipende
+RF020202 ..> RF0201 : la simulazione si ferma\nsui guasti
+
+note bottom of RF02020201
+  Questo e' il nodo a diamante del grafo.
+  "Dove si trova il treno" e' il predicato da cui
+  dipendono sia la gestione dei guasti (stazione
+  inusabile o tratta inusabile) sia la modifica
+  della tratta (treno dentro o fuori).
+  Toglilo e cadono cinque requisiti in una volta:
+  RF02.1.1.2.1, RF02.1.2.2.1, RF02.1.2.2.2,
+  RF02.5.1 e RF02.5.2. Il quadro completo e' in G7.
+end note
+
+legend bottom
+  |= arco |= significato |
+  | linea piena (*--) | decomposizione: il requisito si specifica nelle sue parti |
+  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
+  | riquadro grigio scuro | fuori ambito: non richiesto o non implementato |
+  | riquadro bianco bordato di grigio | requisito dettagliato in un altro grafo |
+end legend
+
+@enduml

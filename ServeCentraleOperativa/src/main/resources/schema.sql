@@ -26,13 +26,15 @@ CREATE TABLE Tratte (
 );
 
 -- --- Utenti ---
+-- Solo anagrafica: credenziali e ruoli stanno in Keycloak (realm "railway"), il
+-- database centrale non conserva nessuna password. La matricola e' il campo che
+-- lega la riga all'utente Keycloak (claim "matricola" del token).
 CREATE TABLE Utenti (
     id_utente  VARCHAR(50) PRIMARY KEY,
     tipo       VARCHAR(50) NOT NULL,   -- es. 'operatore','tecnico','admin'
     nome       VARCHAR(100) NOT NULL,
     cognome    VARCHAR(100) NOT NULL,
-    matricola  VARCHAR(50)  UNIQUE NOT NULL,
-    password   VARCHAR(100)            -- ESTENSIONE: password verificata al login
+    matricola  VARCHAR(50)  UNIQUE NOT NULL
 );
 
 -- --- Itinerari ---

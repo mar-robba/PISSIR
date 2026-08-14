@@ -1,4 +1,4 @@
-@startuml M3 - Ingestione della Telemetria dei Treni
+@startuml M3 - Ingestione della telemetria dei treni
 ' =========================================================================
 '  MACCHINA M3 - Ingestione della telemetria dei treni
 '
@@ -7,11 +7,8 @@
 '    it.uni.reti2.ingestion.IngestionService#salvaStatoTreno
 '    it.uni.reti2.ingestion.IngestionService#normalizzaStatoTreno
 '
-'  Canale: telemetry-in  <- railway/train/+/telemetry (un frame ogni 5s per treno)
-'
-'  Avviata da:  M1  (01_macchina_ciclo_vita_centrale.puml)
+'  Canale: telemetry-in <- railway/train/+/telemetry (un frame ogni 5s per treno)
 '  Fa transitare: M13 (13_macchina_stato_treno.puml)
-'  Produce eventi su: M11 (11_macchina_websocket_realtime.puml)
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -21,7 +18,6 @@ skinparam state {
     FontColor #202124
     ArrowColor #5F6368
     StartColor #34A853
-    EndColor #EA4335
 }
 skinparam state<<esterna>> {
     BackgroundColor #F1F3F4
@@ -31,84 +27,37 @@ skinparam note {
     BackgroundColor #FFF9C4
     BorderColor #F9A825
 }
+hide empty description
 
-title M3 - Ingestione della Telemetria dei Treni (IngestionService.onTelemetry)
+title M3 - Ingestione della telemetria dei treni
 
-[*] --> InAscolto
+[*] --> Ascolto
 
-state "In Ascolto\n<- railway/train/+/telemetry" as InAscolto
+state "In ascolto\n<- railway/train/+/telemetry" as Ascolto
+state "Frame in elaborazione" as Elaborazione
+state "Treno aggiornato in cache" as Aggiornato
+state "M13 - stato del treno" as M13 <<esterna>>
 
-state "Elaborazione del Frame\n(@Blocking, un frame per volta)" as Elaborazione {
+Ascolto --> Elaborazione : frame di telemetria
+Elaborazione --> Ascolto : [JSON malformato o treno sconosciuto] /\nscarta il frame, log, ack
+Elaborazione --> Aggiornato : [treno in cache] /\nnormalizza lo stato, aggiorna posizione,\nvelocita, ritardo e passeggeri
+Aggiornato --> Ascolto : /\nscrive lo stato a DB, broadcast TELEMETRY, ack
+Aggiornato -[dashed]-> M13 : [stato diverso dal precedente] /\nriga di Storico_Stato_Treni
 
-    state "Parsing JSON\n(trenoId, stato, lat, lng, velocita,\nprogressPercent, ritardo, passeggeri,\nstazioneCorrente, prossimaStazione, direzione)" as Parsing
-
-    state "Normalizzazione dello stato\nIN_VIAGGIO -> attivo\nFERMO -> fermo\nEMERGENZA -> rotto\nSOPPRESSO -> in manutenzione\naltro -> fermo" as Normalizzazione
-
-    state "Ricerca del treno in cache\n(TrafficLogicEngine.getTreno)" as LookupCache
-
-    state "Frame SCARTATO\n(treno sconosciuto:\nlog di warning)" as FrameScartato
-
-    state "Aggiornamento della cache RAM\n(posizione, velocita, progresso,\nritardo, passeggeri, stazioni,\nultimoAggiornamento = now)" as AggiornaCache
-
-    state "Scrittura sul DB\nQuarkusTransaction.requiringNew()\n-> salvaStatoTreno" as ScritturaDb {
-        state "Treno.findById(trenoId)" as RicercaDb
-        state "Nessuna scrittura\n(riga non presente)" as NessunaScrittura
-        state "Aggiorna Treni.stato" as AggiornaStato
-        state "Storicizza\n(Storico_Stato_Treni.persist)" as Storicizza
-
-        [*] --> RicercaDb
-        RicercaDb --> NessunaScrittura : treno non a DB
-        RicercaDb --> AggiornaStato : treno trovato
-        AggiornaStato --> Storicizza : stato DIVERSO\nda quello precedente
-        AggiornaStato --> [*] : stato invariato\n(niente storico)
-        Storicizza --> [*]
-    }
-
-    state "Broadcast WebSocket\neventType = TELEMETRY\n(+ trainId, progressPercent,\ndelayMinutes, velocita, lat, lng)" as BroadcastWs
-
-    state "Errore di elaborazione\n(log dell'eccezione,\nframe perso)" as Errore
-
-    [*] --> Parsing
-    Parsing --> Normalizzazione
-    Parsing --> Errore : payload malformato
-    Normalizzazione --> LookupCache
-    LookupCache --> FrameScartato : getTreno == null
-    LookupCache --> AggiornaCache : treno in cache
-    AggiornaCache --> ScritturaDb
-    ScritturaDb --> BroadcastWs
-    ScritturaDb --> Errore : commit fallito\n(eccezione catturata)
-    BroadcastWs --> [*]
-}
-
-InAscolto --> Elaborazione : frame di telemetria ricevuto
-
-state "Ack del messaggio" as Ack
-Elaborazione --> Ack : sempre,\nanche su frame scartato o errore
-FrameScartato -[dashed]-> Ack
-Ack --> InAscolto
-
-note right of FrameScartato
-  La telemetria NON crea piu' il treno: la cache e' la
+note right of Elaborazione
+  La telemetria non crea piu' il treno: la cache e' la
   fotografia della tabella Treni, quindi un processo
-  lanciato con un ID inventato viene ignorato.
-  Altrimenti la verifica dell'ID di M2 si auto-validava,
-  perche' il primo frame creava da solo la riga a DB.
+  lanciato con un ID inventato viene ignorato. Altrimenti
+  la verifica dell'ID di M2 si auto-validava, perche' il
+  primo frame creava da solo la riga a database.
 end note
 
-note bottom of Elaborazione
-  La transazione si apre e si chiude DENTRO il try
-  (QuarkusTransaction.requiringNew) e non con @Transactional
-  sul metodo: cosi' una violazione di vincolo resta
-  catturabile e non spegne il canale reattivo.
+note bottom of Aggiornato
+  Stati normalizzati verso i valori ammessi dal CHECK sulla colonna:
+  IN_VIAGGIO/attivo, FERMO/fermo, EMERGENZA/rotto,
+  SOPPRESSO/in manutenzione, qualunque altra cosa/fermo.
+  Lo storico si scrive solo al cambio di stato: altrimenti sarebbe
+  una riga ogni 5 secondi per ogni convoglio.
 end note
-
-' ===================== MACCHINE COLLEGATE =====================
-state "M13 - Stato del Treno\n(13_macchina_stato_treno.puml)" as M13 <<esterna>>
-state "M11 - WebSocket realtime\n(11_macchina_websocket_realtime.puml)" as M11 <<esterna>>
-state "M8 - Watchdog FaultMonitor\n(08_macchina_watchdog_faultmonitor.puml)" as M8 <<esterna>>
-
-Storicizza -[dashed]-> M13 : transizione di stato\nregistrata
-BroadcastWs -[dashed]-> M11 : evento TELEMETRY\nai client connessi
-AggiornaCache -[dashed]-> M8 : velocita e ultimoAggiornamento\nsono i dati che il watchdog\nlegge per i treni fermi
 
 @enduml

@@ -1,0 +1,95 @@
+@startuml G2 - RF02.1 gestione guasti
+' =========================================================================
+'  G2 - RF02.1 : GESTIONE DEI GUASTI (stazioni, treni)
+'  Vista d'insieme: ../00_grafo_dipendenze_requisiti.puml
+'
+'  Convenzioni:
+'   *--   decomposizione       ..>   dipendenza
+'   riquadro bianco bordato di grigio: requisito che sta in un altro grafo
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam shadowing false
+skinparam ArrowColor #5F6368
+skinparam rectangle {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+}
+skinparam rectangle<<dominio>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam rectangle<<altrove>> {
+    BackgroundColor #FFFFFF
+    BorderColor #BDBDBD
+    FontColor #757575
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title G2 - RF02.1 : gestione dei guasti (stazioni, treni)
+
+rectangle "RF02.1 - Gestione guasti\n(stazioni, treni)" as RF0201 <<dominio>>
+
+' ---- il ramo della stazione ----
+rectangle "RF02.1.1 - Guasto stazione" as RF020101
+rectangle "RF02.1.1.1 - Guasto di perdita\ndella connessione" as RF02010101
+rectangle "RF02.1.1.1.1 - Cache locale dei dati prodotti\nfino alla ripresa della connessione,\npoi reinvio in massa" as RF0201010101
+rectangle "RF02.1.1.2 - Guasto che impedisce\nla percorrenza dei treni" as RF02010102
+rectangle "RF02.1.1.2.1 - Sensibilita' al treno:\nil treno si ferma se la prossima\nstazione e' guasta" as RF0201010201
+
+' ---- il ramo del treno ----
+rectangle "RF02.1.2 - Guasto treno" as RF020102
+rectangle "RF02.1.2.1 - Memorizzazione\ndel guasto nel DB" as RF02010201
+rectangle "RF02.1.2.2 - Gestione delle conseguenze" as RF02010202
+rectangle "RF02.1.2.2.1 - Sensibilita' alla stazione:\ntreno guasto in stazione =>\nstazione inusabile (Guasta)" as RF0201020201
+rectangle "RF02.1.2.2.2 - Sensibilita' alla tratta:\ntreno guasto in tratta =>\ntratta inusabile (Guasta)" as RF0201020202
+
+RF0201 *-- RF020101
+RF0201 *-- RF020102
+RF020101 *-- RF02010101
+RF02010101 *-- RF0201010101
+RF020101 *-- RF02010102
+RF02010102 *-- RF0201010201
+RF020102 *-- RF02010201
+RF020102 *-- RF02010202
+RF02010202 *-- RF0201020201
+RF02010202 *-- RF0201020202
+
+' ---- quello che sta fuori da questo grafo ----
+rectangle "RF02.2.2.1 - Posizione: su quale\ntratta o in quale stazione si trova\n<size:11>dettaglio: G3</size>" as RF02020201 <<altrove>>
+rectangle "RF02.4 - Validazione del nodo\n<size:11>dettaglio: G5</size>" as RF0204 <<altrove>>
+
+' senza validazione del nodo non arriva nessuna telemetria: la freccia si
+' fattorizza sulla radice del ramo invece di ripeterla su ogni foglia
+RF0201 ..> RF0204 : dipende
+
+' i due guasti "con conseguenze" hanno bisogno di sapere dov'e' il treno
+RF0201010201 ..> RF02020201 : dipende
+RF0201020201 ..> RF02020201 : dipende
+RF0201020202 ..> RF02020201 : dipende
+
+note bottom of RF0201010101
+  Questa cache e' una sola in tutto il sistema: nasce qui,
+  per sopravvivere alla disconnessione, e viene riusata da
+  RF02.3.1.1 per servire le informazioni della stazione (G4).
+end note
+
+note top of RF0201
+  Chi dipende da quest'area, dagli altri grafi:
+  - RF02.2.1.1.1 ritardo per guasto (G3)
+  - RF02.2.2   la simulazione si ferma sui guasti (G3)
+  - RF02.3.1.1 la cache e' quella di RF02.1.1.1.1 (G4)
+end note
+
+legend bottom
+  |= arco |= significato |
+  | linea piena (*--) | decomposizione: il requisito si specifica nelle sue parti |
+  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
+  | riquadro bianco bordato di grigio | requisito dettagliato in un altro grafo |
+end legend
+
+@enduml

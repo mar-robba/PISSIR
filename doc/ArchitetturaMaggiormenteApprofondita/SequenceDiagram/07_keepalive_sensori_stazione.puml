@@ -1,0 +1,113 @@
+@startuml SQ07 - Keepalive dei sensori di binario
+' =========================================================================
+'  SEQUENZA SQ07 - I sensori dicono di essere vivi, e quando smettono
+'
+'  Codice astratto:
+'    it.uni.reti2.StationIngestion#heartbeatSensore    (POST /stazione/sensore/heartbeat)
+'    it.uni.reti2.DBLocale#sensoriUltimoBattito
+'    it.uni.reti2.HeartbeatGenerator#manutenzionePeriodica  (@Scheduled 10s)
+'    it.uni.reti2.HeartbeatGenerator#controllaSensori
+'    it.uni.reti2.StationGateway#inviaGuasto
+'    it.uni.reti2.ingestion.IngestionService#onAlert        (Centrale)
+'
+'  Canali: REST :8081 (sensore -> stazione), MQTT railway/alerts (stazione -> Centrale)
+'  Macchine a stati corrispondenti: S6, S7, S10 (stazione), M6, M7 (centrale)
+'
+'  I sensori parlano SOLO con l'interfaccia pubblica del nodo: non toccano
+'  mai il modello interno, e' la scelta scritta in RF03.4.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam sequence {
+    ArrowColor #5F6368
+    LifeLineBorderColor #1A73E8
+    LifeLineBackgroundColor #E8F0FE
+    ParticipantBorderColor #1A73E8
+    ParticipantBackgroundColor #E8F0FE
+    ParticipantFontColor #202124
+    ActorBorderColor #137333
+    ActorBackgroundColor #E6F4EA
+    BoxBorderColor #9AA0A6
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title SQ07 - Keepalive dei sensori di binario e stazione dichiarata guasta
+
+actor "Sensore\ndi binario" as SENS
+
+box "Processo Stazione (:8081)" #F8F9FA
+    participant "StationIngestion" as REST
+    participant "DBLocale" as DBL
+    participant "HeartbeatGenerator" as HB
+    participant "StationGateway" as SGW
+end box
+
+participant "Broker\nrailway/alerts" as BROKER #F1F3F4
+
+box "Centrale Operativa" #F8F9FA
+    participant "IngestionService" as ING
+    database "PostgreSQL" as PG
+    participant "RealtimeWebSocket" as WS
+end box
+
+== Finche' il sensore e' vivo ==
+
+loop periodicamente
+    SENS -> REST : POST /stazione/sensore/heartbeat\n{"sensoreId":"SEN-01"}
+    activate REST
+    alt sensoreId mancante o vuoto
+        REST --> SENS : 400
+    else
+        REST -> DBL : sensoriUltimoBattito.put(sensoreId, now)
+        REST --> SENS : 200 {"success":true}
+    end
+    deactivate REST
+end
+
+== Il sensore smette di parlare ==
+
+loop ogni 10 secondi
+    HB -> HB : manutenzionePeriodica()
+    activate HB
+    HB -> HB : controllaSensori()
+    HB -> DBL : sensoriUltimoBattito
+    activate DBL
+    DBL --> HB : mappa sensore -> ultimo battito
+    deactivate DBL
+    alt ultimo battito piu' vecchio di 30s (sensori.timeout.secondi)
+        HB -> SGW : inviaGuasto("Sensore SEN-01 non invia keepalive", "CRITICAL")
+        activate SGW
+        SGW -> DBL : stato = "GUASTA"
+        note right of SGW
+          Severita' CRITICAL e non WARNING: il testo del progetto
+          chiede che una stazione senza keepalive dei sensori si
+          dichiari guasta, e solo i CRITICAL trattengono i treni.
+        end note
+        SGW -> BROKER : {"tipoEvento":"GUASTO","sorgenteTipo":"STAZIONE",\n"sorgenteId","severita":"CRITICAL","messaggio","timestamp"}
+        deactivate SGW
+        HB -> DBL : sensoriUltimoBattito.remove(sensoreId)
+        note right of HB
+          Rimosso dalla mappa: senza, lo stesso allarme sarebbe
+          rigenerato a ogni giro da 10 secondi.
+        end note
+    end
+    deactivate HB
+end
+
+BROKER -> ING : onAlert(Message)
+activate ING
+ING -> ING : tipoEvento == "GUASTO" e origine != CENTRALE\ntipoGuastoPerFrontend -> "sensore_offline"\n(il messaggio contiene "sensore")
+ING -> PG : Guasto.persist() + StoricoGuasto.persist()
+ING -> WS : broadcast({"eventType":"ALERT", ...})
+deactivate ING
+
+note over SENS, DBL
+  La stazione non sa quanti sensori esistono: li conosce solo quando
+  la chiamano. Un sensore che non ha mai battuto non puo' risultare
+  guasto, ed e' il limite dichiarato di questo meccanismo.
+end note
+
+@enduml

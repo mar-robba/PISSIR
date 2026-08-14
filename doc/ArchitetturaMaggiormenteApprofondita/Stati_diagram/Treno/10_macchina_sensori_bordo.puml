@@ -1,0 +1,82 @@
+@startuml T10 - Sensori di bordo e API REST del treno
+' =========================================================================
+'  MACCHINA T10 - Sensori di bordo e API REST del treno
+'
+'  Codice astratto:
+'    it.uni.reti2.Sensori#avviaMenu        (console interattiva, thread daemon)
+'    it.uni.reti2.TrainIngestion           (@Path "/treno", porta 8082)
+'    it.uni.reti2.TrainGateway#inviaGuasto, #notificaPassaggioStazione
+'
+'  I sensori di bordo non toccano il modello direttamente: passano sempre
+'  dalle API REST, come farebbe un vero computer di bordo esterno.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+hide empty description
+
+title T10 - Sensori di bordo e API REST (http://localhost:8082/treno)
+
+state "Console dei sensori\n(solo con un terminale interattivo)" as Console {
+    state "menu a video" as Menu
+    state "POST verso le API del treno" as Post
+    Menu --> Post : 1 - sensore guasto\noppure 2 - sensore passaggio
+    Post --> Menu : esito stampato a video
+    Menu --> [*] : 0 - esci
+}
+
+state "API REST" as Api {
+    state "In ascolto sulla 8082" as Ascolto
+    state "Richiesta in esame" as Esame
+    state "Campi mancanti\n(400 Bad Request)" as Errore
+    state "Effetto applicato\n(200 OK)" as Applicato
+
+    [*] --> Ascolto
+    Ascolto --> Esame : richiesta HTTP
+    Esame --> Ascolto : GET /info, /stato, /viaggio, /tratta /\nsola lettura del TrainDB
+    Esame --> Errore : POST /sensore/passaggio\nsenza stazioneId o tipo
+    Esame --> Applicato : POST /sensore/guasto /\nstato EMERGENZA e GUASTO CRITICAL\nsu railway/alerts (T6)
+    Esame --> Applicato : POST /sensore/passaggio /\npassaggio pubblicato su MQTT
+    Esame --> Applicato : POST /tratta /\nsovrascrive stazioniTratta\ne prossimaStazione
+    Errore --> Ascolto
+    Applicato --> Ascolto
+}
+
+Console -[dashed]-> Api : localhost:8082
+
+note bottom of Api
+  Il passaggio forzato via REST pubblica il messaggio ma non muove
+  il motore di viaggio: la Centrale vedrebbe un convoglio in una
+  stazione dove il twin non e'. E' segnato nel codice come punto
+  fragile, resta perche' e' comodo per provare la catena dei
+  transiti senza aspettare il viaggio simulato.
+end note
+
+note right of Console
+  La console e' solo una comodita' da terminale: non modifica il
+  modello di nascosto, fa le stesse POST che farebbe un sensore
+  esterno. Cosi' la simulazione manuale e quella automatica
+  passano esattamente per lo stesso codice.
+end note
+
+note left of Api
+  Nessun endpoint del treno e' protetto: il nodo si fida di chi sta
+  sulla sua rete di bordo. L'autenticazione esiste solo verso
+  l'operatore, sulla Centrale (M9).
+end note
+
+@enduml

@@ -1,0 +1,22 @@
+__  ____  __  _____   ___  __ ____  ______ 
+ --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
+ -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
+--\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
+2026-08-13 23:00:47,721 INFO  [it.uni.reti2.main] (main) 🚉 Avvio processo Stazione con ID: ocklam
+2026-08-13 23:00:48,629 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[]
+2026-08-13 23:00:49,012 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-13 23:00:49,125 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/station/+/validation-response, Max QoS 0.
+2026-08-13 23:00:49,125 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/alerts, Max QoS 0.
+2026-08-13 23:00:49,125 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/train/+/passaggio, Max QoS 0.
+2026-08-13 23:00:49,181 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
+2026-08-13 23:00:49,186 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-2) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
+2026-08-13 23:00:49,261 INFO  [io.quarkus] (main) stazione 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.37.3) started in 1.682s. Listening on: http://0.0.0.0:8086
+2026-08-13 23:00:49,261 INFO  [io.quarkus] (main) Profile prod activated. 
+2026-08-13 23:00:49,261 INFO  [io.quarkus] (main) Installed features: [cdi, messaging, messaging-mqtt, rest, rest-jackson, scheduler, smallrye-context-propagation, vertx]
+2026-08-13 23:00:49,268 INFO  [it.uni.reti2.main] (main) 🔎 Verifica ID stazione 'ocklam' nel database centrale...
+2026-08-13 23:00:49,354 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
+2026-08-13 23:00:49,355 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-13 23:00:49,478 ERROR [it.uni.reti2.StationDatabaseValidator] (vert.x-eventloop-thread-2) ❌ L'ID 'ocklam' non è presente nel database centrale: la stazione non è registrata.
+2026-08-13 23:00:54,355 ERROR [it.uni.reti2.main] (main) ❌ ERRORE FATALE: ID della stazione non presente nel database centrale. Il processo verrà terminato.
+2026-08-13 23:00:54,370 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: <unknown>
+2026-08-13 23:00:54,374 INFO  [io.quarkus] (main) stazione stopped in 0.019s

@@ -1,0 +1,75 @@
+@startuml S3 - Heartbeat della stazione verso la Centrale
+' =========================================================================
+'  MACCHINA S3 - Heartbeat della stazione verso la Centrale
+'
+'  Codice astratto:
+'    it.uni.reti2.HeartbeatGenerator#generaHeartbeat  (@Outgoing heartbeat-out)
+'    it.uni.reti2.HeartbeatGenerator#generatePayload  (interfaccia HeartbeatKA)
+'
+'  Canale: heartbeat-out -> railway/station/{id}/heartbeat (un battito ogni 10s)
+'  Fa transitare: M4 e M12 lato Centrale (stazione ONLINE / OFFLINE)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam state {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+    StartColor #34A853
+}
+skinparam state<<esterna>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+hide empty description
+
+title S3 - Heartbeat della stazione (tick reattivo da 10 secondi)
+
+[*] --> Attesa
+
+state "In attesa del tick" as Attesa
+state "Battito soppresso" as Soppresso
+state "Battito pubblicato\n-> railway/station/{id}/heartbeat" as Pubblicato
+state "Canale in errore" as Errore
+state "M4 - ingestione heartbeat" as M4 <<esterna>>
+
+Attesa --> Soppresso : tick ogni 10s\n[stazioneRiconosciuta = false] /\nlog di attesa, nessun invio
+Attesa --> Soppresso : tick ogni 10s\n[connessioneCentrale = false] /\nlog di offline, nessun invio
+Attesa --> Pubblicato : tick ogni 10s [ID validato e rete su] /\n{stazioneId, stato, timestamp,\ntipoEvento HEARTBEAT, bufferSize}
+Soppresso --> Attesa
+Pubblicato --> Attesa
+Pubblicato --> Errore : errore sul canale MQTT /\nconnessioneCentrale = false (S4)
+Errore --> Attesa : retry con backoff\nda 1s a 10s, indefinitely
+Pubblicato -[dashed]-> M4 : la Centrale rimette\nla stazione ONLINE
+
+note right of Soppresso
+  Le due soppressioni hanno significati opposti. Con l'ID non
+  ancora validato il silenzio e' voluto e temporaneo: al primo
+  tick dopo la conferma il battito riparte da solo, senza che
+  S2 debba chiamare nessuno. Con la rete simulata giu' il
+  silenzio e' proprio il comportamento da dimostrare: dopo 30
+  secondi il watchdog della Centrale (M8) dichiara la stazione
+  OFFLINE e apre un guasto CRITICAL.
+end note
+
+note bottom of Errore
+  Un Multi che fallisce TERMINA. Senza il retry, il primo errore
+  sul canale (broker riavviato, rete che sfarfalla) avrebbe spento
+  il battito per sempre e la Centrale avrebbe visto la stazione
+  OFFLINE fino al riavvio del processo. Il backoff riaggancia il
+  canale da solo quando il broker torna disponibile.
+end note
+
+note left of Pubblicato
+  Nel battito viaggia anche bufferSize, cioe' quanti eventi la
+  stazione non e' ancora riuscita a consegnare: e' il modo piu'
+  economico per far vedere alla Centrale che il nodo e' vivo ma
+  arretrato.
+end note
+
+@enduml

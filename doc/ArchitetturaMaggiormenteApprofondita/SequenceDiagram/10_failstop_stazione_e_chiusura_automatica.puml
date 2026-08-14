@@ -1,0 +1,129 @@
+@startuml SQ10 - Fail-stop della stazione e chiusura automatica
+' =========================================================================
+'  SEQUENZA SQ10 - La stazione tace, la Centrale se ne accorge da sola
+'
+'  Codice astratto:
+'    it.uni.reti2.elaboration.FaultMonitor#controllaHeartbeat   (@Scheduled 10s)
+'    it.uni.reti2.elaboration.FaultMonitor#creaGuastoAutomatico
+'    it.uni.reti2.ingestion.IngestionService#pubblicaGuastoSuMqtt
+'    it.uni.reti2.ingestion.IngestionService#ORIGINE_CENTRALE
+'    it.uni.reti2.ingestion.IngestionService#MSG_HEARTBEAT_PERSO
+'    it.uni.reti2.ingestion.IngestionService#onHeartbeat        (rientro)
+'    it.uni.reti2.ingestion.IngestionService#chiudiGuastiHeartbeatPerso
+'    it.uni.reti2.ingestion.IngestionService#pubblicaRisoluzioneSuMqtt
+'
+'  Macchine a stati corrispondenti: M8, M7, M12 (centrale), T9, T11 (treno)
+'
+'  E' il "cardine per assenza": l'informazione non e' cio' che arriva,
+'  e' cio' che non arriva piu'.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam sequence {
+    ArrowColor #5F6368
+    LifeLineBorderColor #1A73E8
+    LifeLineBackgroundColor #E8F0FE
+    ParticipantBorderColor #1A73E8
+    ParticipantBackgroundColor #E8F0FE
+    ParticipantFontColor #202124
+    BoxBorderColor #9AA0A6
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title SQ10 - Fail-stop: stazione silenziosa, guasto automatico e chiusura al rientro
+
+participant "HeartbeatGenerator\n(stazione)" as HB
+
+box "Centrale Operativa" #F8F9FA
+    participant "FaultMonitor" as FM
+    participant "TrafficLogicEngine" as CACHE
+    participant "IngestionService" as ING
+    database "PostgreSQL" as PG
+    participant "RealtimeWebSocket" as WS
+end box
+
+participant "Broker\nrailway/alerts" as BROKER #F1F3F4
+participant "TrainGateway\n(ogni convoglio)" as TGW
+
+== La stazione smette di battere ==
+
+HB -->x FM : nessun heartbeat\n(nodo spento, rete caduta o offline simulato)
+
+loop ogni 10 secondi
+    FM -> FM : controllaHeartbeat()
+    activate FM
+    FM -> CACHE : getTutteStazioni()
+    activate CACHE
+    CACHE --> FM : elenco
+    deactivate CACHE
+
+    alt stato gia' OFFLINE o MANUTENZIONE
+        FM -> FM : salta, e' gia' contata
+    else ultimoHeartbeat == null
+        FM -> FM : salta
+        note right of FM
+          All'avvio nessuna stazione ha ancora battuto: se non si
+          saltassero, la Centrale aprirebbe guasti falsi su tutta
+          la rete dieci secondi dopo l'accensione.
+        end note
+    else ultimoHeartbeat piu' vecchio di 30s
+        FM -> CACHE : stato = "OFFLINE"
+        opt nessun guasto "sensore_offline" gia' aperto per questa stazione
+            FM -> FM : creaGuastoAutomatico("sensore_offline", "CRITICAL",\n"STAZIONE", id, MSG_HEARTBEAT_PERSO + ...)
+            FM -> PG : Guasto.persist() + StoricoGuasto.persist()\n+ EventoStazione (HEARTBEAT_LOST)
+            note right of PG
+              L'id del guasto porta un suffisso casuale: i due job
+              girano entrambi ogni 10 secondi e due guasti creati nello
+              stesso millisecondo avrebbero la stessa chiave primaria,
+              con rollback dell'intero giro di controllo.
+            end note
+            FM -> CACHE : aggiungiGuasto(guasto)
+            FM -> ING : broadcastAlert(guasto)
+            ING -> WS : {"eventType":"ALERT", ...}
+            FM -> ING : pubblicaGuastoSuMqtt(guasto)
+            ING -> BROKER : {"tipoEvento":"GUASTO","origine":"CENTRALE",\n"sorgenteTipo":"STAZIONE","severita":"CRITICAL",...}
+        end
+    end
+    deactivate FM
+end
+
+BROKER -> ING : onAlert(Message)
+activate ING
+ING -> ING : origine == "CENTRALE" -> ack e basta
+note right of ING
+  La Centrale e' sottoscritta al topic su cui pubblica lei stessa:
+  senza il marcatore "origine" si riascolterebbe e creerebbe un
+  secondo Guasto per un allarme appena scritto da lei.
+end note
+deactivate ING
+
+BROKER -> TGW : riceviAlert -> il convoglio si trattiene (SQ08)
+
+== La stazione torna a battere ==
+
+HB -> ING : railway/station/{id}/heartbeat
+activate ING
+ING -> ING : tornataDalFailStop = statoPrecedente == "OFFLINE"
+ING -> CACHE : stato = ONLINE, ultimoHeartbeat = now
+ING -> PG : QuarkusTransaction.requiringNew()\nchiudiGuastiHeartbeatPerso(stazioneId)
+activate PG
+PG -> PG : per ogni Guasto aperto della stazione\nCON messaggio che inizia per MSG_HEARTBEAT_PERSO:\nrisolto = true, tsChiusura = now
+note right of PG
+  Il filtro sul prefisso e' quello che distingue i guasti "suoi"
+  da quelli veri dichiarati dalla stazione: quelli li chiude un
+  operatore, non il ritorno del battito.
+end note
+PG --> ING : elenco dei guasti chiusi
+deactivate PG
+loop per ogni guasto chiuso
+    ING -> BROKER : pubblicaRisoluzioneSuMqtt\n{"tipoEvento":"RESOLVED","origine":"CENTRALE",...}
+    ING -> WS : broadcastAlert(guasto risolto)
+end
+deactivate ING
+
+BROKER -> TGW : RESOLVED -> sbloccaDaGuastoStazione() (SQ08)
+
+@enduml

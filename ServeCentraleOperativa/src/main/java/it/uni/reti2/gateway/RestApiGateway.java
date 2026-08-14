@@ -512,6 +512,10 @@ public class RestApiGateway {
             return Response.status(Response.Status.CONFLICT)
                     .entity(Map.of("errore", "Itinerario già esistente: " + id)).build();
         }
+        // Prima di scrivere qualsiasi cosa: se manca anche un solo arco non si crea niente.
+        Response tratteMancanti = verificaTratteEsistenti(dto.stazioni);
+        if (tratteMancanti != null) return tratteMancanti;
+
         Itinerario itinerario = new Itinerario();
         itinerario.id = id;
         itinerario.persist();
@@ -539,7 +543,21 @@ public class RestApiGateway {
         if (itinerario == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
-        if (dto.stazioni != null && dto.stazioni.size() >= 2) {
+        if (dto.stazioni != null) {
+            // Un elenco troppo corto è un rifiuto esplicito, non un aggiornamento da
+            // ignorare: prima si rispondeva 200 senza cambiare le stazioni e il form
+            // credeva di aver salvato. Se invece "stazioni" non c'è proprio nel JSON
+            // (null) la PUT tocca solo i treni assegnati e l'itinerario resta com'è.
+            if (dto.stazioni.size() < 2) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity(Map.of("errore", "Servono almeno due stazioni")).build();
+            }
+            // La verifica sta PRIMA della delete: se una coppia è scoperta si esce con 404
+            // senza aver smontato niente. Al contrario l'itinerario resterebbe a pezzi,
+            // perché la transazione va in commit lo stesso quando si torna un errore.
+            Response tratteMancanti = verificaTratteEsistenti(dto.stazioni);
+            if (tratteMancanti != null) return tratteMancanti;
+
             ItinerarioTratta.delete("id.idItinerario", id);
             Response errore = componiItinerario(itinerario, dto.stazioni, dto.travelTimes);
             if (errore != null) return errore;
@@ -909,12 +927,22 @@ public class RestApiGateway {
     }
 
     /**
-     * Per ogni coppia consecutiva di stazioni riusa la Tratta esistente (aggiornandone il
-     * tempo di percorrenza se fornito) o ne crea una nuova, quindi crea le righe di
-     * Itinerario_Tratta con l'ordine progressivo.
-     * @return Una Response di errore se una stazione non esiste, altrimenti null.
+     * Controlla che ogni coppia di stazioni consecutive dell'elenco abbia già la sua tratta
+     * registrata in rete. Copre in un colpo solo tutti i modi in cui l'elenco può cambiare
+     * (stazione aggiunta, tolta o spostata di ordine): quando si sposta una stazione cambiano
+     * anche le coppie dei suoi vicini, e qui vengono guardate tutte.
+     *
+     * <p><strong>Va chiamato prima di toccare Itinerario_Tratta.</strong> La {@code @Transactional}
+     * fa rollback solo sulle eccezioni, non quando il metodo torna una Response di errore:
+     * validare a metà composizione lascerebbe l'itinerario smontato sul database.</p>
+     *
+     * @return null se ogni coppia ha il suo arco, altrimenti la Response di errore da restituire
+     *         (404 con l'elenco delle coppie scoperte, 400 se una stazione non esiste).
      */
-    private Response componiItinerario(Itinerario itinerario, List<String> stazioni, List<Integer> travelTimes) {
+    private Response verificaTratteEsistenti(List<String> stazioni) {
+        List<String> descrizioni = new ArrayList<>();
+        List<Map<String, String>> coppieMancanti = new ArrayList<>();
+
         for (int i = 0; i < stazioni.size() - 1; i++) {
             String partenzaId = stazioni.get(i);
             String arrivoId = stazioni.get(i + 1);
@@ -925,18 +953,56 @@ public class RestApiGateway {
                         .entity(Map.of("errore", "Stazione inesistente: " + (partenza == null ? partenzaId : arrivoId)))
                         .build();
             }
+            // La tratta è ORIENTATA: l'arco A->B non vale come B->A, e infatti in rete
+            // i due versi sono due righe distinte.
+            long esiste = Tratta.count("stazionePartenza.id = ?1 and stazioneArrivo.id = ?2",
+                    partenzaId, arrivoId);
+            if (esiste == 0) {
+                String nomePartenza = partenza.nome != null ? partenza.nome : partenzaId;
+                String nomeArrivo = arrivo.nome != null ? arrivo.nome : arrivoId;
+                descrizioni.add(nomePartenza + " -> " + nomeArrivo);
+                coppieMancanti.add(Map.of(
+                        "partenzaId", partenzaId,
+                        "arrivoId", arrivoId,
+                        "partenzaNome", nomePartenza,
+                        "arrivoNome", nomeArrivo));
+            }
+        }
+
+        if (descrizioni.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> corpo = new HashMap<>();
+        corpo.put("errore", "Manca la tratta fra " + String.join(", ", descrizioni)
+                + ". Registrala nella pagina Tratte prima di usarla in un itinerario.");
+        corpo.put("coppieMancanti", coppieMancanti);
+        return Response.status(Response.Status.NOT_FOUND).entity(corpo).build();
+    }
+
+    /**
+     * Per ogni coppia consecutiva di stazioni recupera la Tratta corrispondente (aggiornandone
+     * il tempo di percorrenza se fornito) e crea le righe di Itinerario_Tratta con l'ordine
+     * progressivo. Le tratte devono esistere: le crea l'amministratore dalla pagina Tratte,
+     * non questo metodo, perché un arco inventato qui sarebbe un collegamento fisico che in
+     * rete non c'è. La verifica la fa {@link #verificaTratteEsistenti(List)} prima di entrare.
+     * @return Una Response di errore se una tratta non esiste, altrimenti null.
+     */
+    private Response componiItinerario(Itinerario itinerario, List<String> stazioni, List<Integer> travelTimes) {
+        for (int i = 0; i < stazioni.size() - 1; i++) {
+            String partenzaId = stazioni.get(i);
+            String arrivoId = stazioni.get(i + 1);
             Integer tempo = (travelTimes != null && i < travelTimes.size()) ? travelTimes.get(i) : null;
 
             Tratta tratta = Tratta.find("stazionePartenza.id = ?1 and stazioneArrivo.id = ?2",
                     partenzaId, arrivoId).firstResult();
             if (tratta == null) {
-                tratta = new Tratta();
-                tratta.id = generaIdTratta(partenzaId, arrivoId);
-                tratta.stazionePartenza = partenza;
-                tratta.stazioneArrivo = arrivo;
-                tratta.tempoPercorrenzaMinuti = tempo != null ? tempo : 15;
-                tratta.persist();
-            } else if (tempo != null) {
+                // Non ci si arriva passando dalla verifica: resta come rete di sicurezza
+                // se la tratta viene cancellata fra il controllo e la composizione.
+                return Response.status(Response.Status.NOT_FOUND)
+                        .entity(Map.of("errore", "Manca la tratta fra " + partenzaId + " e " + arrivoId))
+                        .build();
+            }
+            if (tempo != null) {
                 // La Tratta è un ARCO FISICO della rete, condiviso fra più itinerari
                 // (es. T1_MI_BO sta sia in IT1_MI_NA sia in IT3_MI_RM): sovrascriverne
                 // il tempo da qui cambierebbe di nascosto anche gli altri percorsi.
@@ -960,17 +1026,6 @@ public class RestApiGateway {
             riga.persist();
         }
         return null;
-    }
-
-    /** Genera un ID univoco per una nuova tratta nel formato T_{A}_{B}_{n}. */
-    private String generaIdTratta(String partenzaId, String arrivoId) {
-        int n = 1;
-        String candidato;
-        do {
-            candidato = "T_" + partenzaId + "_" + arrivoId + "_" + n;
-            n++;
-        } while (Tratta.findById(candidato) != null);
-        return candidato;
     }
 
     /**

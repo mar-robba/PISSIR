@@ -1,0 +1,185 @@
+{
+  "realm": "railway",
+  "displayName": "Rete Ferroviaria - Centrale Operativa",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginTheme": "keycloak",
+  "accessTokenLifespan": 1800,
+  "ssoSessionIdleTimeout": 3600,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "amministratore",
+        "description": "Puo' fare tutto: CRUD di stazioni, treni, tratte e itinerari oltre alle letture"
+      },
+      {
+        "name": "tecnico",
+        "description": "Legge la situazione del traffico e usa i comandi operativi (invio operatori, soppressione, risoluzione allarmi)"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "railway-webapp",
+      "name": "Interfaccia web della Centrale Operativa (SPA React)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://127.0.0.1:5173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*##http://127.0.0.1:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "matricola",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "matricola",
+            "claim.name": "matricola",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-centrale",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "railway-centrale",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "railway-centrale",
+      "name": "Server Centrale Operativa (API REST Quarkus)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "mat001",
+      "email": "mario.rossi@railway.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Mario",
+      "lastName": "Rossi",
+      "attributes": {
+        "matricola": [
+          "MAT001"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "amministratore"
+      ],
+      "requiredActions": []
+    },
+    {
+      "username": "mat002",
+      "email": "luigi.verdi@railway.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Luigi",
+      "lastName": "Verdi",
+      "attributes": {
+        "matricola": [
+          "MAT002"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "tecnico"
+      ],
+      "requiredActions": []
+    },
+    {
+      "username": "mat003",
+      "email": "giovanni.bianchi@railway.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Giovanni",
+      "lastName": "Bianchi",
+      "attributes": {
+        "matricola": [
+          "MAT003"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "tecnico"
+      ],
+      "requiredActions": []
+    },
+    {
+      "username": "mat004",
+      "email": "anna.neri@railway.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Anna",
+      "lastName": "Neri",
+      "attributes": {
+        "matricola": [
+          "MAT004"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "tecnico"
+      ],
+      "requiredActions": []
+    }
+  ]
+}

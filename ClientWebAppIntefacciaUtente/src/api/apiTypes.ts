@@ -1,5 +1,3 @@
-import type { User } from '../types';
-
 export interface ApiDashboardPayload {
   totalTrains: number;
   trainsInMotion: number;
@@ -81,7 +79,39 @@ export interface ApiTransitPayload {
   ritardo?: number;
 }
 
-export interface ApiLoginResponse {
-  token: string;
-  user: User;
+/**
+ * Profilo restituito da GET /api/auth/me. Non contiene piu' nessun token: quello
+ * lo rilascia Keycloak alla web app, la Centrale si limita a dire chi e' l'utente
+ * che ha presentato il token e con quale ruolo.
+ */
+export interface ApiProfiloResponse {
+  id?: string;
+  username?: string;
+  role?: string;
+  displayName?: string;
+  avatarInitials?: string;
+}
+
+/**
+ * Una coppia di stazioni consecutive di un itinerario per cui in rete non esiste
+ * nessuna tratta. La Centrale la elenca quando rifiuta una POST/PUT su /api/tratte:
+ * l'arco è ORIENTATO, quindi partenza e arrivo non sono intercambiabili.
+ */
+export interface ApiCoppiaMancante {
+  partenzaId: string;
+  arrivoId: string;
+  partenzaNome: string;
+  arrivoNome: string;
+}
+
+/**
+ * Corpo di una risposta di errore della Centrale. Il messaggio sta in "errore"
+ * (gli altri due nomi arrivano dalle eccezioni gestite da Quarkus), mentre
+ * coppieMancanti c'è solo sul rifiuto di un itinerario.
+ */
+export interface ApiErrorPayload {
+  errore?: string;
+  message?: string;
+  detail?: string;
+  coppieMancanti?: ApiCoppiaMancante[];
 }

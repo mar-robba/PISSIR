@@ -13,5 +13,26 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # Identity Provider del sistema: qui vivono utenti, password e ruoli della
+  # Centrale Operativa. La Centrale non verifica piu' le credenziali, si limita a
+  # controllare la firma dei token che Keycloak rilascia (vedi Keycloak/README.txt).
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: railway-keycloak
+    # start-dev: modalita' di sviluppo (HTTP in chiaro e database H2 interno),
+    # piu' che sufficiente per il progetto. --import-realm carica il realm
+    # "railway" dal file montato sotto, ma SOLO se non esiste gia'.
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+    ports:
+      # 8180 sull'host: la 8080 e' la porta di default di Quarkus, che Stazioni e
+      # Treni prenderebbero se si dimenticasse -Dquarkus.http.port.
+      - "8180:8080"
+    volumes:
+      - ./Keycloak/realm-railway.json:/opt/keycloak/data/import/realm-railway.json:ro
+
 volumes:
   postgres_data:

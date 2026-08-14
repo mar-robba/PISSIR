@@ -44,6 +44,17 @@
             <artifactId>quarkus-messaging-mqtt</artifactId>
         </dependency>
 
+        <!--
+            OIDC: e' l'estensione che valida i token JWT firmati da Keycloak.
+            Sostituisce il vecchio login fatto in casa (AuthController + SessioniAttive):
+            la Centrale non conosce piu' nessuna password, controlla solo la firma
+            del token e ne legge i ruoli.
+        -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-oidc</artifactId>
+        </dependency>
+
         <!-- Quarkus Hibernate ORM & Panache (PostgreSQL) -->
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -79,6 +90,15 @@
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+            Permette di simulare un utente autenticato nei test (@TestSecurity) senza
+            dover tenere acceso Keycloak mentre girano i test.
+        -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-test-security</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

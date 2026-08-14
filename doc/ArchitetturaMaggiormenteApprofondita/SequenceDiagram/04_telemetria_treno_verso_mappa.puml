@@ -1,0 +1,126 @@
+@startuml SQ04 - Telemetria dal convoglio alla mappa
+' =========================================================================
+'  SEQUENZA SQ04 - Un frame di telemetria, dal convoglio alla mappa
+'
+'  Codice astratto:
+'    it.uni.reti2.TrainElab#generaTelemetria                    (@Outgoing, 5s)
+'    it.uni.reti2.TrainJourneyEngine#tickInViaggio              (posizione interpolata)
+'    it.uni.reti2.ingestion.IngestionService#onTelemetry        (@Incoming, @Blocking)
+'    it.uni.reti2.ingestion.IngestionService#normalizzaStatoTreno
+'    it.uni.reti2.ingestion.IngestionService#salvaStatoTreno
+'    it.uni.reti2.elaboration.TrafficLogicEngine#aggiornaTreno
+'    it.uni.reti2.gateway.RealtimeWebSocket#broadcast
+'    src/hooks/useRealtimeUpdates.ts                            (frontend)
+'
+'  Topic: railway/train/{id}/telemetry   ->   WebSocket /ws/realtime
+'  Macchine a stati corrispondenti: T8 (treno), M3 e M13 (centrale)
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam sequence {
+    ArrowColor #5F6368
+    LifeLineBorderColor #1A73E8
+    LifeLineBackgroundColor #E8F0FE
+    ParticipantBorderColor #1A73E8
+    ParticipantBackgroundColor #E8F0FE
+    ParticipantFontColor #202124
+    ActorBorderColor #137333
+    ActorBackgroundColor #E6F4EA
+    BoxBorderColor #9AA0A6
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title SQ04 - Telemetria del convoglio: dal tick da 5 secondi alla mappa del traffico
+
+box "Processo Treno" #F8F9FA
+    participant "TrainJourneyEngine" as ENG
+    participant "TrainDB" as TDB
+    participant "TrainElab" as ELAB
+end box
+
+participant "Broker\nrailway/train/{id}/telemetry" as BROKER #F1F3F4
+
+box "Centrale Operativa" #F8F9FA
+    participant "IngestionService" as ING
+    participant "TrafficLogicEngine" as CACHE
+    database "PostgreSQL" as PG
+    participant "RealtimeWebSocket" as WS
+end box
+
+box "Web App" #F8F9FA
+    participant "wsClient" as WSC
+    participant "railwayStore" as STORE
+    actor "Tecnico" as USER
+end box
+
+loop ogni secondo
+    ENG -> TDB : progressPercent, latitudine, longitudine\ninterpolate fra le due stazioni
+end
+
+loop ogni 5 secondi
+    ELAB -> ELAB : Multi.ticks().every(5s)
+    activate ELAB
+    alt trainDB.trenoRiconosciuto == false
+        ELAB -> ELAB : filter() scarta il tick, nessun frame
+    else treno validato
+        ELAB -> TDB : legge stato, posizione, ritardo,\npasseggeri, direzione
+        ELAB -> TDB : velocita = 0 se fermo,\n80 + random*80 se IN_VIAGGIO
+        ELAB -> BROKER : {"trenoId","stato","latitudine","longitudine",\n"velocita","progressPercent","ritardoMinuti",\n"passeggeri","stazioneCorrente","prossimaStazione",\n"direzione","timestamp"}
+        note right of ELAB
+          Un Multi che fallisce TERMINA: senza il retry con backoff
+          (1s..10s) al primo sfarfallio del broker il convoglio non
+          manderebbe piu' telemetria per il resto della sua vita.
+        end note
+    end
+    deactivate ELAB
+end
+
+BROKER -> ING : onTelemetry(Message<byte[]>)
+activate ING
+ING -> ING : normalizzaStatoTreno(raw)\nIN_VIAGGIO->attivo, FERMO->fermo,\nEMERGENZA->rotto, SOPPRESSO->in manutenzione
+ING -> CACHE : getTreno(trenoId)
+activate CACHE
+CACHE --> ING : Treno oppure null
+deactivate CACHE
+
+alt treno non in cache
+    ING -> ING : frame scartato
+    note right of ING
+      La cache e' la fotografia della tabella Treni: se il convoglio
+      non c'e' non esiste. Prima la telemetria lo creava, e cosi' un
+      processo lanciato con un ID inventato si auto-validava.
+    end note
+else treno noto
+    ING -> CACHE : aggiornaTreno(treno) con posizione,\nvelocita, ritardo, passeggeri, ultimoAggiornamento
+    ING -> PG : QuarkusTransaction.requiringNew()\nsalvaStatoTreno(trenoId, stato)
+    activate PG
+    note right of PG
+      Lo storico (Storico_Stato_Treni) si scrive SOLO quando lo
+      stato cambia davvero: a ogni frame sarebbe una riga ogni
+      5 secondi per ogni convoglio.
+    end note
+    PG --> ING : commit
+    deactivate PG
+    ING -> WS : broadcast({"eventType":"TELEMETRY","trainId",\n"stato","progressPercent","delayMinutes",...})
+    activate WS
+    WS -->> WSC : messaggio sulla sessione aperta
+    deactivate WS
+end
+
+ING -> BROKER : message.ack()
+deactivate ING
+
+WSC -> STORE : updateTrain(trainId, {progressPercent,\nstatus, delayMinutes, currentStationId, nextStationId})
+STORE -> USER : la mappa e l'elenco convogli si ridisegnano
+
+note over ING, PG
+  La transazione si apre DENTRO il try (QuarkusTransaction) e non con
+  @Transactional sul metodo: con l'annotazione il commit avveniva fuori
+  dal try e una violazione di vincolo spegneva il canale reattivo, cioe'
+  la Centrale smetteva di ricevere telemetria fino al riavvio.
+end note
+
+@enduml

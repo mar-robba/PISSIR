@@ -2,9 +2,16 @@
 
 Runnare il sistema
 
-1. Avviare i servizi infrastrutturali (Database centrale e Broker MQTT)
-1.1  Database Centrale
+1. Avviare i servizi infrastrutturali (Database centrale, Keycloak e Broker MQTT)
+1.1  Database Centrale + Keycloak
 $ docker-compose up -d
+
+   Lo stesso compose fa partire due container:
+     railway-postgres  -> database, porta 5432
+     railway-keycloak  -> Identity Provider, porta 8180 (admin/admin)
+   Al primo avvio Keycloak importa da solo il realm "railway" con ruoli e utenti
+   (Keycloak/realm-railway.json). La Centrale non parte finche' Keycloak non
+   risponde: ci prova per una trentina di secondi e poi si arrende.
 
 1.2 Broker Mosquitto*
 $ cd BrokerMosquitto
@@ -49,6 +56,22 @@ $ cd Treni    && ./mvnw quarkus:dev -Dtreno.id=TRN002 -Dquarkus.http.port=8092
 Con i jar l'ID si puo' passare anche come primo argomento:
 $ java -Dquarkus.http.port=8092 -jar Treni/target/quarkus-app/quarkus-run.jar TRN002
 
+3.1 Script di avvio in blocco
+
+Per non lanciarli a mano uno per uno ci sono due script che avviano tutti i nodi
+in ciclo, assegnando le porte in ordine (stazioni da 8080, treni da 9080) e un
+file di log per istanza dentro logs/:
+
+$ cd Stazioni && ./avvioStazioni.sh
+$ cd Treni    && ./avvioTreni.sh
+
+Serve prima il jar (./mvnw package). Ctrl+C ferma tutti i processi avviati.
+
+Quali nodi far partire NON e' scritto dentro gli script: la lista sta nei file
+Stazioni/stazioni.conf e Treni/treni.conf, un ID per riga (le righe vuote e
+quelle che iniziano con # vengono ignorate). Per aggiungere o togliere un nodo
+basta modificare quei file, senza toccare lo script.
+
 
 4. Profilo TLS (variante 6: comunicazione cifrata)
 
@@ -65,17 +88,34 @@ $ cd ClientWebAppIntefacciaUtente && cp .env.example .env
   (poi scommentare le due righe della sezione TLS dentro .env)
 
 
-5. Login e permessi
+5. Login e permessi (OAuth2 / OpenID Connect con Keycloak)
 
-Le API della Centrale non sono pubbliche: serve il token restituito dal login,
-allegato nell'header "Authorization: Bearer <token>" (la web app lo fa da sola).
-Utenti di prova (tabella Utenti, seed di import.sql), password "password":
-  MAT001 -> amministratore: CRUD di stazioni, treni, tratte e itinerari
-  MAT002 / MAT003 / MAT004 -> tecnico: letture + invio operatori, soppressione
+Le API della Centrale non sono pubbliche: serve un access token rilasciato da
+Keycloak, allegato nell'header "Authorization: Bearer <token>". La web app lo
+ottiene da sola con il flusso Authorization Code + PKCE:
+
+  - si clicca "Accedi con Keycloak" su http://localhost:5173/login
+  - il browser va sulla pagina di login di Keycloak (la password si digita LI',
+    la web app non la vede mai)
+  - Keycloak rimanda su /login?code=... e la web app scambia il codice con i token
+  - da li' in poi ogni chiamata REST porta il token; la Centrale ne verifica la
+    firma e legge i ruoli dal claim realm_access.roles
+
+Utenti di prova (realm "railway"), password "password" per tutti. ATTENZIONE:
+Keycloak tiene gli username in minuscolo, quindi si scrive "mat001", non "MAT001":
+  mat001 -> amministratore: CRUD di stazioni, treni, tratte e itinerari
+  mat003 / mat002 / mat004 -> tecnico: letture + invio operatori, soppressione
                               corsa e risoluzione allarmi
 
-Esempio da terminale:
-$ TOKEN=$(curl -s -X POST http://localhost:8781/api/auth/login \
-    -H 'Content-Type: application/json' \
-    -d '{"username":"MAT001","password":"password"}' | jq -r .token)
+La tabella Utenti del database non contiene piu' nessuna password: e' rimasta solo
+come anagrafica degli operatori (i guasti puntano a una sua riga). Il collegamento
+fra utente Keycloak e riga della tabella e' la matricola, che viaggia nel token.
+
+Prova da terminale: il flusso Authorization Code vuole il browser, quindi per un
+curl veloce conviene abilitare temporaneamente "Direct access grants" sul client
+railway-webapp dalla console di Keycloak (poi rimetterlo a off):
+$ TOKEN=$(curl -s -X POST \
+    http://localhost:8180/realms/railway/protocol/openid-connect/token \
+    -d grant_type=password -d client_id=railway-webapp \
+    -d username=mat001 -d password=password | jq -r .access_token)
 $ curl -s http://localhost:8781/api/treni -H "Authorization: Bearer $TOKEN"

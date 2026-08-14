@@ -20,7 +20,18 @@ import AdminPage from './pages/AdminPage';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) => {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, sessionePronta } = useAuthStore();
+
+  // Con Keycloak il token vive nel sessionStorage e a ogni ricaricamento va
+  // rinnovato: finché quel controllo non è finito non si decide niente, altrimenti
+  // un banale F5 sbatterebbe fuori un utente che è ancora autenticato.
+  if (!sessionePronta) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <span className="text-muted">Verifica della sessione in corso...</span>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -66,6 +77,14 @@ const RailwayApp = () => {
 };
 
 function App() {
+  const ripristinaSessione = useAuthStore((stato) => stato.ripristinaSessione);
+
+  // Al primo avvio si controlla se nel sessionStorage c'è ancora un refresh token
+  // buono: in quel caso si rientra senza ripassare dalla pagina di Keycloak.
+  useEffect(() => {
+    void ripristinaSessione();
+  }, [ripristinaSessione]);
+
   return (
     <BrowserRouter>
       <Routes>
