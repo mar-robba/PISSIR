@@ -707,6 +707,29 @@ public class RestApiGateway {
                 statoRete.aggiornaStazione(stazione);
             }
         }
+
+        // Stesso discorso per un treno: l'ingestione lo marca "rotto" in cache quando
+        // arriva il suo allarme, quindi alla chiusura del guasto va rimesso "fermo",
+        // altrimenti resterebbe guasto nell'interfaccia anche a riparazione avvenuta.
+        // "fermo" e non "attivo": riparte con la prima telemetria che manda davvero.
+        if ("TRENO".equalsIgnoreCase(guasto.sorgenteTipo)) {
+            Treno treno = statoRete.getTreno(guasto.sorgenteId);
+            if (treno != null && "rotto".equalsIgnoreCase(treno.stato)) {
+                treno.stato = "fermo";
+                statoRete.aggiornaTreno(treno);
+            }
+            Treno dbTreno = Treno.findById(guasto.sorgenteId);
+            if (dbTreno != null && "rotto".equalsIgnoreCase(dbTreno.stato)) {
+                dbTreno.stato = "fermo";
+
+                StoricoStatoTreno storico = new StoricoStatoTreno();
+                storico.treno = dbTreno;
+                storico.stato = "fermo";
+                storico.itinerarioId = dbTreno.itinerario != null ? dbTreno.itinerario.id : null;
+                storico.posizioneId = dbTreno.posizioneAttualeTratta != null ? dbTreno.posizioneAttualeTratta.id : null;
+                storico.persist();
+            }
+        }
         pubblicaResolved(guasto);
         return Response.ok(guasto).build();
     }
@@ -753,7 +776,7 @@ public class RestApiGateway {
         }
         return Response.status(Response.Status.NOT_FOUND).build();
     }
-
+// sofisticazione assolutamente non richiesta fatta di propria zucca dell'ai
     /**
      * Operazione manuale da parte dell'operatore per inviare una squadra di manutenzione a una stazione.
      * Risolve tutti i guasti aperti della stazione e notifica campo e frontend.

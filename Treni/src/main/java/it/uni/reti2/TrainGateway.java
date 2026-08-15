@@ -106,6 +106,7 @@ public class TrainGateway {
                         }
                     }
                 }
+
                 case "RESOLVED" -> {
                     if ("STAZIONE".equals(sorgenteTipo)) {
                         // La stazione torna agibile

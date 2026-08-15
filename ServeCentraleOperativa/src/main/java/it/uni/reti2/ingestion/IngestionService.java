@@ -478,6 +478,9 @@ public class IngestionService {
                 QuarkusTransaction.requiringNew().run(() -> aggiornaMessaggioGuasto(daAggiornare.id, messaggio));
                 giaAperto.messaggio = messaggio;
                 LOG.infof("♻️ Guasto già aperto per %s (%s): aggiornato il messaggio invece di crearne un altro", sorgenteId, tipo);
+                // Anche se il guasto non è nuovo la sorgente va rimarcata: nel frattempo
+                // la telemetria (o un heartbeat) può aver riscritto lo stato in cache.
+                marcaSorgenteGuasta(sorgenteTipo, sorgenteId, severita);
                 broadcastAlert(giaAperto);
                 return message.ack();
             }
@@ -502,23 +505,82 @@ public class IngestionService {
                 storico.persist();
             });
             statoRete.aggiungiGuasto(guasto);
+            // todo : da aggingere la marcatura dell astazione come GUASTA se il guasto proviene da un treno che è presente in una staizone RF1.2.2.1 se non sbaglio l'RF
+            marcaSorgenteGuasta(sorgenteTipo, sorgenteId, severita);
 
-            // Una stazione che segnala un guasto CRITICO viene marcata GUASTA nella cache.
-            // I guasti WARNING restano solo allarmi: la stazione continua a operare
-            // e i suoi heartbeat ONLINE non vanno contraddetti.
-            if ("STAZIONE".equalsIgnoreCase(sorgenteTipo) && "CRITICAL".equalsIgnoreCase(severita)) {
-                Stazione stazione = statoRete.getStazione(sorgenteId);
-                if (stazione != null) {
-                    stazione.stato = "GUASTA";
-                    statoRete.aggiornaStazione(stazione);
-                }
-            }
-
+            //
             broadcastAlert(guasto);
         } catch (Exception e) {
             LOG.error("❌ Errore parsing alert: " + payload, e);
         }
         return message.ack();
+    }
+
+    /**
+     * Riporta il guasto appena ricevuto sulla cache della sorgente che lo ha segnalato.
+     * Senza questo passaggio l'allarme finiva solo nella tabella dei guasti: il nodo
+     * continuava a comparire operativo nelle API REST (che leggono la cache) e la mappa
+     * lo mostrava normale finché non arrivava un altro frame dal campo.
+     * <p>Si marca solo sui CRITICAL: i WARNING restano allarmi informativi e non devono
+     * contraddire gli heartbeat ONLINE della stazione né la telemetria del treno.</p>
+     *
+     * @param sorgenteTipo STAZIONE o TRENO.
+     * @param sorgenteId   Identificativo del nodo che ha segnalato il guasto.
+     * @param severita     Severità dichiarata nell'alert.
+     */
+    private void marcaSorgenteGuasta(String sorgenteTipo, String sorgenteId, String severita) {
+        if (!"CRITICAL".equalsIgnoreCase(severita)) {
+            return;
+        }
+
+        if ("STAZIONE".equalsIgnoreCase(sorgenteTipo)) {
+            Stazione stazione = statoRete.getStazione(sorgenteId);
+            if (stazione != null) {
+                stazione.stato = "GUASTA";
+                statoRete.aggiornaStazione(stazione);
+            }
+            return;
+        }
+
+        if ("TRENO".equalsIgnoreCase(sorgenteTipo)) {
+            Treno treno = statoRete.getTreno(sorgenteId);
+            if (treno == null) {
+                LOG.warnf("🚫 Guasto da un treno sconosciuto '%s': cache non aggiornata", sorgenteId);
+                return;
+            }
+            // "rotto" è uno degli stati ammessi dal CHECK su Treni.stato; il frontend
+            // lo traduce in "guasto" (mapBackendStatus in apiClient.ts).
+            treno.stato = "rotto";
+            treno.velocita = 0;
+            treno.ultimoAggiornamento = Instant.now();
+            statoRete.aggiornaTreno(treno);
+
+            // Allinea anche il DB (e lo storico) come fa la telemetria: la cache viene
+            // ricostruita da lì al riavvio della Centrale.
+            QuarkusTransaction.requiringNew().run(() -> salvaStatoTreno(sorgenteId, "rotto"));
+
+            broadcastStatoTreno(treno);
+        }
+    }
+
+    /**
+     * Manda al frontend un evento TELEMETRY con il nuovo stato del convoglio.
+     * Serve perché un treno che si guasta può smettere di trasmettere: senza questo
+     * l'interfaccia continuerebbe a disegnarlo com'era all'ultimo frame ricevuto.
+     *
+     * @param treno Il treno appena marcato in cache.
+     */
+    private void broadcastStatoTreno(Treno treno) {
+        ObjectNode wsEvent = mapper.createObjectNode();
+        wsEvent.put("eventType", "TELEMETRY");
+        wsEvent.put("trainId", treno.id);
+        wsEvent.put("stato", treno.stato);
+        wsEvent.put("velocita", treno.velocita);
+        wsEvent.put("progressPercent", treno.progresso);
+        wsEvent.put("delayMinutes", treno.ritardo);
+        wsEvent.put("latitudine", treno.latitudine);
+        wsEvent.put("longitudine", treno.longitudine);
+        webSocket.broadcast(wsEvent.toString());
     }
 
     /** Aggiorna il testo di un guasto già aperto (deduplica degli alert ripetuti). */
@@ -579,6 +641,7 @@ public class IngestionService {
      *
      * @param guasto Il guasto appena aperto dalla Centrale.
      */
+    //per i guasti dedotti
     public void pubblicaGuastoSuMqtt(Guasto guasto) {
         ObjectNode alert = mapper.createObjectNode();
         alert.put("tipoEvento", "GUASTO");

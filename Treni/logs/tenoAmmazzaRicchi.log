@@ -2,428 +2,198 @@ __  ____  __  _____   ___  __ ____  ______
  --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
  -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
 --\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
-2026-08-13 23:01:29,918 INFO  [it.uni.reti2.main] (main) 🚂 Avvio processo Treno con ID: tenoAmmazzaRicchi
-2026-08-13 23:01:30,609 INFO  [io.quarkus.scheduler.runtime.SimpleScheduler] (main) No scheduled business methods found - Simple scheduler will not be started
-2026-08-13 23:01:30,647 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[]
-2026-08-13 23:01:30,847 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-13 23:01:30,980 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/alerts, Max QoS 0.
-2026-08-13 23:01:30,981 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/train/+/validation-response, Max QoS 0.
-2026-08-13 23:01:31,066 INFO  [it.uni.reti2.TrainJourneyEngine] (main) 🧭 [TWIN] Motore di viaggio avviato (sosta=20s, fattore=10x, autostart=true)
-2026-08-13 23:01:31,120 INFO  [io.quarkus] (main) treno 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.37.3) started in 1.298s. Listening on: http://0.0.0.0:9081
-2026-08-13 23:01:31,120 INFO  [io.quarkus] (main) Profile prod activated. 
-2026-08-13 23:01:31,121 INFO  [io.quarkus] (main) Installed features: [cdi, messaging, messaging-mqtt, rest, rest-jackson, scheduler, smallrye-context-propagation, vertx]
-2026-08-13 23:01:31,321 INFO  [it.uni.reti2.main] (main) 🔎 Verifica ID treno 'tenoAmmazzaRicchi' nel database centrale...
-2026-08-13 23:01:31,349 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
-2026-08-13 23:01:31,350 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-13 23:01:31,417 INFO  [it.uni.reti2.TrainDatabaseValidator] (vert.x-eventloop-thread-2) 🚂 Processo associato con successo alla chiave primaria del database: tenoAmmazzaRicchi
-2026-08-13 23:01:32,222 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🗺️ [TWIN] Itinerario rt-1785880888800 caricato: 4 stazioni [TO, MI, Padova, stazzaDellaMadonnaTroia]
-2026-08-13 23:01:33,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Treno tenoAmmazzaRicchi pronto alla partenza da torino Porta Nuova (TO), prossima fermata MI
-2026-08-13 23:01:36,352 INFO  [it.uni.reti2.main] (main) ✅ Processo Treno AVVIATO CORRETTAMENTE
-2026-08-13 23:01:36,352 INFO  [it.uni.reti2.main] (main) 🔄 Ingresso nel ciclo infinito di simulazione del treno...
-2026-08-13 23:01:36,352 INFO  [it.uni.reti2.main] (main) 🌐 Server REST disponibile su http://localhost:8082/treno/info
-2026-08-13 23:01:36,352 INFO  [it.uni.reti2.main] (main) 📡 Trasmissione telemetria su topic MQTT: railway/telemetry
-2026-08-13 23:01:36,353 INFO  [it.uni.reti2.main] (main) 🔴 Ascolto alert su topic MQTT: railway/alerts
-2026-08-13 23:01:36,353 INFO  [it.uni.reti2.main] (main) 🎛️ Nessun terminale interattivo: sensori attivabili via POST /treno/sensore/*
-2026-08-13 23:01:54,071 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-13 23:03:25,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 266)
-2026-08-13 23:03:46,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-13 23:05:17,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 380)
-2026-08-13 23:05:38,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-13 23:07:09,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-13 23:07:09,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 135)
-2026-08-13 23:07:49,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-13 23:09:20,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 235)
-2026-08-13 23:09:40,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-13 23:11:11,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 176)
-2026-08-13 23:11:31,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-13 23:13:02,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-13 23:13:02,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 129)
-2026-08-13 23:13:43,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-13 23:15:14,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 241)
-2026-08-13 23:15:35,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-13 23:17:06,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 332)
-2026-08-13 23:17:26,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-13 23:18:57,068 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-13 23:18:57,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 392)
-2026-08-13 23:19:37,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-13 23:21:08,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 105)
-2026-08-13 23:21:29,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-13 23:23:00,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 350)
-2026-08-13 23:23:20,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-13 23:24:51,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-13 23:24:51,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 372)
-2026-08-13 23:25:31,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-13 23:27:02,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 236)
-2026-08-13 23:27:22,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-13 23:28:53,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 297)
-2026-08-13 23:29:13,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-13 23:30:44,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-13 23:30:44,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 310)
-2026-08-13 23:31:24,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-13 23:32:55,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 257)
-2026-08-13 23:33:15,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-13 23:34:46,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 283)
-2026-08-13 23:35:07,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-13 23:36:38,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-13 23:36:38,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 181)
-2026-08-13 23:37:19,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-13 23:38:50,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 121)
-2026-08-13 23:39:10,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-13 23:40:41,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 54)
-2026-08-13 23:41:01,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-13 23:42:32,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-13 23:42:32,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 315)
-2026-08-13 23:43:12,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-13 23:44:43,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 237)
-2026-08-13 23:45:04,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-13 23:46:35,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 199)
-2026-08-13 23:46:55,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-13 23:48:26,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-13 23:48:26,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 127)
-2026-08-13 23:49:07,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-13 23:50:38,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 327)
-2026-08-13 23:50:59,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-13 23:52:30,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 272)
-2026-08-13 23:52:50,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-13 23:54:21,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-13 23:54:21,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 193)
-2026-08-13 23:55:02,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-13 23:56:33,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 201)
-2026-08-13 23:56:54,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-13 23:58:25,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 392)
-2026-08-13 23:58:46,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 00:00:17,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 00:00:17,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 50)
-2026-08-14 00:00:57,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 00:02:28,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 312)
-2026-08-14 00:02:48,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 00:04:19,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 352)
-2026-08-14 00:04:39,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 00:06:10,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 00:06:10,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 205)
-2026-08-14 00:06:51,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 00:08:22,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 136)
-2026-08-14 00:08:43,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 00:10:14,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 380)
-2026-08-14 00:10:35,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 00:12:05,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 00:12:05,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 354)
-2026-08-14 00:12:46,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 00:14:17,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 334)
-2026-08-14 00:14:37,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 00:16:08,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 397)
-2026-08-14 00:16:28,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 00:17:59,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 00:17:59,090 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 265)
-2026-08-14 00:18:40,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 00:20:11,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 77)
-2026-08-14 00:20:31,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 00:22:02,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 202)
-2026-08-14 00:22:22,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 00:23:53,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 00:23:53,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 186)
-2026-08-14 00:24:33,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 00:26:04,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 350)
-2026-08-14 00:26:25,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 00:27:56,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 59)
-2026-08-14 00:28:16,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 00:29:47,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 00:29:47,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 396)
-2026-08-14 00:30:27,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 00:31:57,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 383)
-2026-08-14 00:32:18,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 00:33:49,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 214)
-2026-08-14 00:34:09,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 00:35:40,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 00:35:40,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 338)
-2026-08-14 00:36:21,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 00:37:52,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 98)
-2026-08-14 00:38:13,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 00:39:44,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 66)
-2026-08-14 00:40:05,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 00:41:36,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 00:41:36,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 156)
-2026-08-14 00:42:17,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 00:43:48,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 166)
-2026-08-14 00:44:09,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 00:45:40,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 372)
-2026-08-14 00:46:01,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 00:47:31,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 00:47:31,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 303)
-2026-08-14 00:48:12,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 00:49:43,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 259)
-2026-08-14 00:50:03,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 00:51:34,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 362)
-2026-08-14 00:51:54,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 00:53:25,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 00:53:25,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 255)
-2026-08-14 00:54:05,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 00:55:36,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 387)
-2026-08-14 00:55:56,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 00:57:27,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 332)
-2026-08-14 00:57:47,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 00:59:17,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 00:59:17,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 335)
-2026-08-14 00:59:58,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 01:01:29,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 70)
-2026-08-14 01:01:49,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 01:03:20,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 108)
-2026-08-14 01:03:41,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 01:05:12,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 01:05:12,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 201)
-2026-08-14 01:05:52,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 01:07:23,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 382)
-2026-08-14 01:07:44,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 01:09:14,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 277)
-2026-08-14 01:09:35,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 01:11:06,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 01:11:06,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 225)
-2026-08-14 01:11:47,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 01:13:17,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 283)
-2026-08-14 01:13:38,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 01:15:09,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 81)
-2026-08-14 01:15:30,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 01:17:01,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 01:17:01,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 260)
-2026-08-14 01:17:42,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 01:19:13,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 144)
-2026-08-14 01:19:33,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 01:21:04,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 195)
-2026-08-14 01:21:25,070 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 01:22:56,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 01:22:56,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 319)
-2026-08-14 01:23:37,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 01:25:08,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 111)
-2026-08-14 01:25:28,069 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 13:13:28,890 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 275)
-2026-08-14 13:13:28,920 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
-2026-08-14 13:13:29,926 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-14 13:13:49,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 13:15:20,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 13:15:20,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 233)
-2026-08-14 13:16:01,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 13:17:31,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 333)
-2026-08-14 13:17:51,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 13:19:22,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 271)
-2026-08-14 13:19:43,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 13:21:14,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 13:21:14,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 360)
-2026-08-14 13:21:55,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 13:23:26,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 329)
-2026-08-14 13:23:46,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 13:25:17,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 165)
-2026-08-14 13:25:38,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 13:27:09,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 13:27:09,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 69)
-2026-08-14 13:27:49,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 13:29:20,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 218)
-2026-08-14 13:29:40,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 13:31:11,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 248)
-2026-08-14 13:31:32,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 13:33:03,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 13:33:03,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 286)
-2026-08-14 13:33:43,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 13:35:14,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 342)
-2026-08-14 13:35:35,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 13:37:06,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 202)
-2026-08-14 13:37:27,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 13:38:58,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 13:38:58,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 392)
-2026-08-14 13:39:39,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 13:41:10,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 179)
-2026-08-14 13:41:30,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 13:43:01,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 107)
-2026-08-14 13:43:22,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 13:44:53,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 13:44:53,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 104)
-2026-08-14 13:45:34,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 13:47:05,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 105)
-2026-08-14 13:47:25,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 13:48:55,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 122)
-2026-08-14 13:49:15,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 13:50:46,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 13:50:46,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 267)
-2026-08-14 13:51:26,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 13:52:57,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 65)
-2026-08-14 13:53:18,149 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 13:54:49,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 143)
-2026-08-14 13:55:10,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 13:56:41,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 13:56:41,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 315)
-2026-08-14 13:57:22,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 13:58:53,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 253)
-2026-08-14 13:59:13,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 14:00:44,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 375)
-2026-08-14 14:01:04,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 14:02:35,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 14:02:35,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 301)
-2026-08-14 14:03:16,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 14:04:47,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 104)
-2026-08-14 14:05:07,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 14:06:38,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 343)
-2026-08-14 14:06:59,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 14:08:30,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 14:08:30,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 340)
-2026-08-14 14:09:11,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 14:10:42,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 138)
-2026-08-14 14:11:02,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 14:12:33,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 345)
-2026-08-14 14:12:53,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 14:14:24,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea stazzaDellaMadonnaTroia raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 14:14:24,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 149)
-2026-08-14 14:15:04,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 14:16:35,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 370)
-2026-08-14 14:16:55,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 14:18:26,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 335)
-2026-08-14 14:18:47,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 14:20:18,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 14:20:18,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 120)
-2026-08-14 14:20:58,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 14:22:29,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 201)
-2026-08-14 14:22:49,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 14:23:28,198 INFO  [it.uni.reti2.TrainGateway] (vert.x-eventloop-thread-1) 🗺️ [ALERT] La Centrale ha aggiornato il mio itinerario: lo ricarico
-2026-08-14 14:23:29,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔄 [TWIN] Itinerario aggiornato dalla Centrale: ricarico e ricomincio il viaggio
-2026-08-14 14:23:29,182 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🗺️ [TWIN] Itinerario rt-1785880888800 caricato: 5 stazioni [TO, MI, Padova, stazzaDellaMadonnaTroia, PA]
-2026-08-14 14:23:30,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Treno tenoAmmazzaRicchi pronto alla partenza da torino Porta Nuova (TO), prossima fermata MI
-2026-08-14 14:23:51,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 14:25:22,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 308)
-2026-08-14 14:25:42,147 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 14:27:13,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 292)
-2026-08-14 14:27:34,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 14:29:05,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 332)
-2026-08-14 14:29:26,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso PA (15 min simulati)
-2026-08-14 14:30:57,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea PA raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 14:30:57,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in PA (ritardo 0 min, passeggeri 130)
-2026-08-14 14:31:38,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da PA verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 14:33:09,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 138)
-2026-08-14 14:33:30,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 14:35:01,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 195)
-2026-08-14 14:35:21,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 14:36:52,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 232)
-2026-08-14 14:37:12,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 14:38:43,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 14:38:43,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 188)
-2026-08-14 14:39:23,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 14:40:54,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 104)
-2026-08-14 14:41:14,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 14:42:45,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 75)
-2026-08-14 14:43:06,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 14:44:37,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 374)
-2026-08-14 14:44:58,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso PA (15 min simulati)
-2026-08-14 14:46:29,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea PA raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 14:46:29,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in PA (ritardo 0 min, passeggeri 117)
-2026-08-14 14:47:09,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da PA verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 14:48:40,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 65)
-2026-08-14 14:49:01,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 14:50:32,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 201)
-2026-08-14 14:50:52,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 14:52:23,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 112)
-2026-08-14 14:52:43,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 14:54:14,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 14:54:14,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 269)
-2026-08-14 14:54:54,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 14:56:25,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 214)
-2026-08-14 14:56:46,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 14:58:17,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 234)
-2026-08-14 14:58:38,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 15:00:09,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 317)
-2026-08-14 15:00:29,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso PA (15 min simulati)
-2026-08-14 15:02:00,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea PA raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 15:02:00,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in PA (ritardo 0 min, passeggeri 102)
-2026-08-14 15:02:40,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da PA verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 15:04:11,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 171)
-2026-08-14 15:04:31,164 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 15:06:02,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 198)
-2026-08-14 15:06:23,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 15:07:54,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 64)
-2026-08-14 15:08:14,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 15:09:45,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 15:09:45,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 252)
-2026-08-14 15:10:26,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 15:11:57,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 72)
-2026-08-14 15:12:18,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 15:13:49,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 154)
-2026-08-14 15:14:10,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 15:15:41,148 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 153)
-2026-08-14 15:16:01,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso PA (15 min simulati)
-2026-08-14 15:17:32,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea PA raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 15:17:32,151 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in PA (ritardo 0 min, passeggeri 214)
-2026-08-14 15:18:13,210 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da PA verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 15:19:44,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 278)
-2026-08-14 15:20:04,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 15:21:35,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 330)
-2026-08-14 15:21:55,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 15:23:26,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 304)
-2026-08-14 15:23:46,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 15:25:17,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 15:25:17,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 99)
-2026-08-14 15:25:58,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 15:27:29,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 90)
-2026-08-14 15:27:49,150 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 15:29:20,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 95)
-2026-08-14 15:29:40,150 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 15:31:11,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 332)
-2026-08-14 15:31:32,151 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso PA (15 min simulati)
-2026-08-14 15:33:03,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea PA raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 15:33:03,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in PA (ritardo 0 min, passeggeri 291)
-2026-08-14 15:33:43,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da PA verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 15:35:14,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 206)
-2026-08-14 15:35:35,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 15:37:06,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 260)
-2026-08-14 15:37:27,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 15:38:58,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 151)
-2026-08-14 15:39:19,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 15:40:49,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 15:40:49,158 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 166)
-2026-08-14 15:41:30,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 15:43:01,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 58)
-2026-08-14 15:43:21,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 15:44:52,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 381)
-2026-08-14 15:45:13,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 15:46:44,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 377)
-2026-08-14 15:47:05,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso PA (15 min simulati)
-2026-08-14 15:48:36,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea PA raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 15:48:36,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in PA (ritardo 0 min, passeggeri 85)
-2026-08-14 15:49:16,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da PA verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 15:50:47,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 141)
-2026-08-14 15:51:08,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 15:52:39,156 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 380)
-2026-08-14 15:53:00,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 15:54:30,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 266)
-2026-08-14 15:54:50,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 15:56:21,145 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 15:56:21,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 254)
-2026-08-14 15:57:01,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 15:58:32,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 236)
-2026-08-14 15:58:53,146 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 18:28:32,730 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 296)
-2026-08-14 18:28:32,786 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
-2026-08-14 18:28:33,808 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-14 18:28:53,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 18:30:24,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 133)
-2026-08-14 18:30:44,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso PA (15 min simulati)
-2026-08-14 18:32:14,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea PA raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 18:32:14,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in PA (ritardo 0 min, passeggeri 298)
-2026-08-14 18:32:55,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da PA verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 18:34:26,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 400)
-2026-08-14 18:34:46,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso Padova (15 min simulati)
-2026-08-14 18:36:17,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 234)
-2026-08-14 18:36:37,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
-2026-08-14 18:38:08,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 94)
-2026-08-14 18:38:29,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
-2026-08-14 18:40:00,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
-2026-08-14 18:40:00,010 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 107)
-2026-08-14 18:40:40,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 18:42:05,184 INFO  [it.uni.reti2.TrainGateway] (vert.x-eventloop-thread-1) 🗺️ [ALERT] La Centrale ha aggiornato il mio itinerario: lo ricarico
-2026-08-14 18:42:06,010 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔄 [TWIN] Itinerario aggiornato dalla Centrale: ricarico e ricomincio il viaggio
-2026-08-14 18:42:06,197 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🗺️ [TWIN] Itinerario rt-1785880888800 caricato: 5 stazioni [TO, MI, Padova, stazzaDellaMadonnaTroia, PA]
-2026-08-14 18:42:07,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Treno tenoAmmazzaRicchi pronto alla partenza da torino Porta Nuova (TO), prossima fermata MI
-2026-08-14 18:42:28,081 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
-2026-08-14 18:43:59,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 88)
-2026-08-14 18:44:19,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
-2026-08-14 18:45:50,036 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 329)
-2026-08-14 18:46:11,032 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-14 18:47:42,016 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 212)
-2026-08-14 18:48:03,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso PA (15 min simulati)
-2026-08-14 18:49:34,026 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea PA raggiunto: inversione di marcia (ritorno), sosta doppia
-2026-08-14 18:49:34,035 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in PA (ritardo 0 min, passeggeri 68)
+2026-08-15 13:17:16,713 INFO  [it.uni.reti2.main] (main) 🚂 Avvio processo Treno con ID: tenoAmmazzaRicchi
+2026-08-15 13:17:17,957 INFO  [io.quarkus.scheduler.runtime.SimpleScheduler] (main) No scheduled business methods found - Simple scheduler will not be started
+2026-08-15 13:17:18,028 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[]
+2026-08-15 13:17:18,334 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-15 13:17:18,528 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/alerts, Max QoS 0.
+2026-08-15 13:17:18,528 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/train/+/validation-response, Max QoS 0.
+2026-08-15 13:17:18,598 INFO  [it.uni.reti2.TrainJourneyEngine] (main) 🧭 [TWIN] Motore di viaggio avviato (sosta=20s, fattore=10x, autostart=true)
+2026-08-15 13:17:18,658 INFO  [io.quarkus] (main) treno 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.37.3) started in 2.124s. Listening on: http://0.0.0.0:9081
+2026-08-15 13:17:18,658 INFO  [io.quarkus] (main) Profile prod activated. 
+2026-08-15 13:17:18,658 INFO  [io.quarkus] (main) Installed features: [cdi, messaging, messaging-mqtt, rest, rest-jackson, scheduler, smallrye-context-propagation, vertx]
+2026-08-15 13:17:18,921 INFO  [it.uni.reti2.main] (main) 🔎 Verifica ID treno 'tenoAmmazzaRicchi' nel database centrale...
+2026-08-15 13:17:18,956 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:17:18,958 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:17:23,962 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:17:28,962 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:17:33,964 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:17:33,964 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:17:38,965 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:17:43,965 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:17:48,967 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:17:48,967 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:17:53,968 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:17:58,969 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:03,970 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:18:03,971 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:08,971 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:13,972 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:18,973 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:18:18,974 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:23,974 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:28,975 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:33,976 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:18:33,977 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:38,977 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:43,977 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:48,979 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:18:48,980 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:53,980 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:18:58,981 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:03,982 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:19:03,983 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:08,984 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:13,985 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:18,986 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:19:18,986 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:23,986 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:28,987 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:33,988 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:19:33,989 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:38,989 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:43,990 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:48,991 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:19:48,992 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:53,992 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:19:58,993 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:03,994 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:20:03,995 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:08,995 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:14,000 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:19,001 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:20:19,001 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:24,001 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:29,002 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:34,003 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:20:34,004 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:39,004 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:44,005 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:49,006 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:20:49,007 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:54,007 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:20:59,008 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:04,009 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:21:04,009 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:09,010 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:14,010 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:15,612 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-15 13:21:16,618 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
+Caused by: java.net.ConnectException: Connessione rifiutata
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+
+2026-08-15 13:21:17,628 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
+Caused by: java.net.ConnectException: Connessione rifiutata
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+
+2026-08-15 13:21:18,632 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
+Caused by: java.net.ConnectException: Connessione rifiutata
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+
+2026-08-15 13:21:19,012 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:21:19,012 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:19,636 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
+Caused by: java.net.ConnectException: Connessione rifiutata
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+
+2026-08-15 13:21:20,639 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
+Caused by: java.net.ConnectException: Connessione rifiutata
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+
+2026-08-15 13:21:21,643 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-15 13:21:24,013 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:29,013 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:34,015 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:21:34,015 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:39,015 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:44,016 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:49,017 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:21:49,017 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:54,017 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:21:59,017 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:22:04,019 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: tenoAmmazzaRicchi
+2026-08-15 13:22:04,019 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-15 13:22:04,066 INFO  [it.uni.reti2.TrainDatabaseValidator] (vert.x-eventloop-thread-2) 🚂 Processo associato con successo alla chiave primaria del database: tenoAmmazzaRicchi
+2026-08-15 13:22:04,903 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🗺️ [TWIN] Itinerario rt-1785880888800 caricato: 5 stazioni [TO, MI, Padova, stazzaDellaMadonnaTroia, PA]
+2026-08-15 13:22:05,602 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Treno tenoAmmazzaRicchi pronto alla partenza da torino Porta Nuova (TO), prossima fermata MI
+2026-08-15 13:22:09,020 INFO  [it.uni.reti2.main] (main) ✅ Processo Treno AVVIATO CORRETTAMENTE
+2026-08-15 13:22:09,020 INFO  [it.uni.reti2.main] (main) 🔄 Ingresso nel ciclo infinito di simulazione del treno...
+2026-08-15 13:22:09,020 INFO  [it.uni.reti2.main] (main) 🌐 Server REST disponibile su http://localhost:8082/treno/info
+2026-08-15 13:22:09,020 INFO  [it.uni.reti2.main] (main) 📡 Trasmissione telemetria su topic MQTT: railway/telemetry
+2026-08-15 13:22:09,020 INFO  [it.uni.reti2.main] (main) 🔴 Ascolto alert su topic MQTT: railway/alerts
+2026-08-15 13:22:09,020 INFO  [it.uni.reti2.main] (main) 🎛️ Nessun terminale interattivo: sensori attivabili via POST /treno/sensore/*
+2026-08-15 13:22:26,602 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-15 13:23:57,602 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 132)
+2026-08-15 13:24:18,602 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
+2026-08-15 13:25:49,602 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 170)
+2026-08-15 13:26:10,601 WARN  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) ⛔ [TWIN] Treno bloccato: stazione stazzaDellaMadonnaTroia guasta (ero in fase IN_STAZIONE)
+2026-08-15 13:57:24,887 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-15 13:57:25,890 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-15 14:55:54,684 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-15 14:55:55,688 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-15 16:38:46,666 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-15 16:38:47,673 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-15 18:25:12,867 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-15 18:25:13,871 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-15 22:29:27,857 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-15 22:29:28,871 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully

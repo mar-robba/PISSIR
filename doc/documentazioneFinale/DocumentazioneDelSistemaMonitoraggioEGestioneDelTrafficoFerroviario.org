@@ -1761,6 +1761,44 @@ unico simulatore.
 Anche questa documentazione ha il suo piccolo stack: è scritta in org-mode ed esportata in
 LaTeX, e i diagrammi (stati, sequenza, classi) sono sorgenti PlantUML tenuti dentro il
 documento stesso e compilati in png.
+** Scelte progettuali
+*** Lo stato corrente della rete sta in RAM e non sul database
+
+Il =TrafficLogicEngine= tiene tre mappe in memoria (treni, stazioni, guasti aperti) e le API di
+lettura rispondono da lì. La domanda naturale è perché non interrogare direttamente PostgreSQL.
+
+*Primo: per buona parte di quei dati il database non è un'alternativa*, perché non li contiene.
+Posizione, velocità, ritardo, passeggeri, progresso lungo la tratta, stato runtime della stazione
+e ultimo battito sono campi =@Transient= delle entità: nello schema non esiste nessuna colonna
+corrispondente. Non è quindi una cache in senso stretto — una cache si può svuotare e ricalcolare
+dalla sorgente — ma il posto in cui quello stato vive. Infatti al riavvio la rete riparte OFFLINE
+e riscopre tutto dai messaggi del campo.
+
+*Secondo: la memoria occupata cresce con la topologia della rete, non con il tempo.* Le due mappe
+principali hanno una entry per stazione e una per convoglio esistente, non una per evento. Con i
+numeri di una rete vera — RFI ha circa 2.200 stazioni e in Italia circolano circa 10.000 treni al
+giorno — un oggetto =Treno= occupa un centinaio di byte, che diventano 400-500 contando le
+stringhe referenziate e la entry della mappa: diecimila convogli stanno in *circa 5 MB*, venti
+abbondando. Le stazioni sono un ordine di grandezza meno. Ciò che invece cresce senza limite è lo
+storico, e quello sta solo su PostgreSQL: la divisione è limitato in RAM, illimitato su disco.
+
+*Terzo: il costo dell'alternativa non sarebbe una SELECT in più.* La telemetria arriva ogni
+=P_tel= per convoglio, cioè circa 2.000 aggiornamenti al secondo su una flotta di diecimila
+treni, ai quali si aggiungono i battiti delle stazioni e i tre job del watchdog che ogni =P_ria=
+scorrono l'intera rete. Persistere quel flusso significherebbe altrettanti UPDATE con commit, WAL
+e tuple morte da far digerire all'autovacuum, per dati che diventano obsoleti dopo pochi secondi
+e che non ha senso rendere durabili. È il caso d'uso per cui in esercizio si affianca al database
+un archivio in memoria: qui la stessa funzione la assolve una =ConcurrentHashMap=, che per un
+sistema a nodo singolo è la semplificazione ragionevole.
+#+begin_comment
+Marco : ma chissene frega il progetto non è fatto per avere più centrali cioè è ovvio
+*Il limite che ne consegue non è la memoria ma la replicabilità*: lo stato vive dentro il
+processo, quindi la Centrale non può essere avviata in più copie dietro un bilanciatore, perché
+ognuna avrebbe la propria fotografia della rete e il watchdog aprirebbe guasti doppi (la
+deduplica di =getGuastoApertoPerSorgente= vale solo all'interno di un processo). Superarlo vuol
+dire spostare lo stato condiviso fuori dal processo, non spostarlo su PostgreSQL così com'è.
+#+end_comment
+
 ** Parametri temporali
 
 I requisiti che parlano di tempo si riferiscono a questi parametri e non a numeri fissi. Il valore
@@ -2110,6 +2148,28 @@ Li scrivo qui tutti insieme perchè sono le domande che mi aspetto:
   =./mvnw test= alla presenza di Docker: ho preferito test che girano sempre.
 
 ** Diagrammi degli stati
+
+*Come si leggono.* Nessun componente è una macchina sola: il treno ne ha 11, la stazione 11, la
+centrale 13, e ogni diagramma ritaglia una variabile o un flusso. I richiami alle altre macchine
+sono le giunzioni fra un ritaglio e l'altro, e sono quattro:
+
+- =T2 - evento= in testa all'etichetta :: il *trigger* nasce altrove, ma l'arco resta qui: partenza
+  e arrivo sono stati di questo diagramma.
+- =(T11)= in coda, dopo la barra :: l'*effetto* cambia una variabile di un'altra macchina, dove lo
+  stesso fatto è disegnato come transizione vera.
+- riquadro grigio =<<esterna>>= raggiunto da una freccia tratteggiata :: l'arco *esce*: quel
+  riquadro non è uno stato ma il segnaposto di un'altra macchina, spesso in un altro processo.
+- =[... T9]= dentro una guardia :: la condizione *legge* una variabile di un'altra macchina.
+
+Nessuno stato è condiviso fra due macchine: ogni stato è il valore di una variabile che appartiene a
+una macchina sola, e i nomi che si ripetono (=Ascolto=, =Attesa=, =Errore=) sono omonimi locali.
+=ONLINE= e =GUASTA= stanno sia in S10 sia in M12 perché sono due copie in processi diversi, che
+devono poter divergere.
+
+*Le tre mappe* (T0, S0, M0) non sono macchine a stati ma l'indice del gruppo: i riquadri sono
+macchine e non stati, e la freccia vuol dire "avvia" o "alimenta", mai "transita in". Il processo non
+lascia mai T1, e infatti in T1 le altre macchine stanno *dentro* lo stato "Servizio operativo".
+
 *** Del Treno
 - nota : gli stati del treno sono simulati, al posto delle simulazioni degli eventi nella realta tali dovrebbero essere implementati attraverso l'ascolto dei sensori di bordo
 - il componente e' stato astratto in 11 macchine, ognuna con la sua sezione; la mappa qui sotto dice chi avvia chi
@@ -4903,7 +4963,7 @@ state "B - Filtro della singola richiesta (Centrale)" as B {
     Verificato --> Rifiutata : [nessun ruolo del realm railway] / 403
     Verificato --> Rifiutata : [serve l'amministratore\ne il ruolo e' tecnico] / 403
     Verificato --> Autorizzata : [ruolo sufficiente]
-    Autorizzata --> M10
+    Autorizzata -[dashed]-> M10
 }
 
 Valido -[dashed]-> Richiesta : ogni chiamata porta\nAuthorization: Bearer <JWT>
@@ -9177,3 +9237,82 @@ end note
 | RF03.5              |            | C3, C1          | l'endpoint dell'itinerario e il client che lo chiama                       |
 | RF04.1, RF04.2      | C3         | C6              | verifica del token (quarkus-oidc), filtro sui ruoli, flusso PKCE lato SPA  |
 | RF04.3              |            |                 | non e' una classe: e' la configurazione del profilo =%tls=                 |
+
+*** riepilogo classi - macchine a stati
+
+E' la terza lettura dello stesso codice: nella sezione /Diagrammi degli stati/ si parte dalla macchina
+e si trovano i metodi, qui si parte dalla classe e si trova la macchina. Le sigle sono quelle di quel
+capitolo, T = treno (T1...T11), S = stazione (S1...S11), M = centrale (M1...M13), trentacinque
+macchine in tutto.
+
+*Che cosa vuol dire "cuore".* Una macchina a stati non sta quasi mai in una classe sola: per
+funzionare se ne tira dietro altre, e se le mettessi tutte in tabella ogni macchina comparirebbe
+quattro o cinque volte e la mappatura non direbbe piu' niente. Qui ogni macchina compare una volta
+sola, sulla riga della classe che ne *scrive le transizioni*, cioe' quella che assegna il valore
+nuovo alla variabile di stato. Le classi che servono la macchina senza farla transitare hanno un
+trattino, e la nota dice di quale macchina sono il contorno: sono i tre contenitori di stato
+(=TrainDB=, =DBLocale=, =TrafficLogicEngine=), che tengono in RAM le variabili ma non le muovono, e i
+client (=Sensori=, =SecureHttpClient=, le pagine della web app).
+
+#+ATTR_LATEX: :environment longtable :align L{0.30\textwidth}L{0.13\textwidth}L{0.44\textwidth} :font \small
+| classe                                 | macchine       | perche' e' lei il cuore (oppure di che cosa e' il contorno)                  |
+|----------------------------------------+----------------+-----------------------------------------------------------------------------|
+| *C1 - il nodo Treno*                    |                |                                                                             |
+| main                                   | T1             | legge l'id, aspetta l'esito di T2 e apre il servizio operativo: tutte le altre macchine girano dentro quello stato |
+| TrainDatabaseValidator                 | T2             | i tre valori di =EsitoVerifica= sono gli stati della macchina; l'interlocutore e' M2 |
+| TrainJourneyEngine                     | T3, T4, T5, T7 | e' il digital twin: scarica l'itinerario (T3), batte il tick da 1s (T4) e da li' scrive =faseViaggio= (T5), =direzione= e =indiceStazione= (T7) |
+| TrainGateway                           | T6, T9, T11    | e' la porta da cui la centrale entra nel convoglio: =riceviAlert= porta =stato= a SOPPRESSO o FERMO e riempie =stazioniGuaste=, =inviaGuasto= lo porta a EMERGENZA |
+| TrainElab                              | T8             | il =Multi= da 5 secondi e' l'unica sorgente della telemetria                 |
+| TrainIngestion                         | T10            | gli endpoint =/treno= sono l'unica porta dei sensori di bordo (RF03.4)       |
+| TrainDB                                | --             | tiene le variabili di T5, T6, T7 e T11 ma non le fa cambiare: e' un singleton in RAM senza logica |
+| Sensori                                | --             | e' un client di T10, non la macchina: chiama gli endpoint dall'esterno come farebbe un sensore vero |
+| SecureHttpClient                       | --             | fornisce a T3 il client HTTP, e sotto profilo =%tls= il contesto TLS         |
+|----------------------------------------+----------------+-----------------------------------------------------------------------------|
+| *C2 - il nodo Stazione*                 |                |                                                                             |
+| main                                   | S1             | la stessa di T1 sull'altro nodo: id, attesa dell'esito di S2, poi il servizio operativo |
+| StationDatabaseValidator               | S2             | la stessa conversazione di T2 con un altro topic; l'interlocutore e' sempre M2 |
+| HeartbeatGenerator                     | S3, S7         | i due compiti separati apposta: il =Multi= del battito (S3) e il =@Scheduled= che sorveglia i sensori (S7) |
+| StationGateway                         | S4, S5, S8, S9, S10, S11 | e' la classe piu' carica del nodo: =inviaOppureBufferizza= e =flush= sono S4 e fanno vivere gli eventi di S5, =riceviPassaggio= e' S8 e scrive =treniPresenti= (S11), =riceviAlert= e' S9 e insieme a =inviaGuasto= porta =stato= fra ONLINE e GUASTA (S10) |
+| LocalBuffer                            | --             | e' la coda dove gli eventi di S5 aspettano: =addFirst= al reinvio fallito e' cio' che conserva l'ordine (RF02.1.1.1.2), ma a metterceli e a toglierli e' il gateway |
+| StationIngestion                       | S6             | gli endpoint =/stazione=; =reteOffline= e =reteOnline= toccano anche S4, ma sono comandi di prova e non la macchina |
+| DBLocale                               | --             | tiene le variabili di S4, S10 e S11: la stessa parte di =TrainDB= sull'altro nodo |
+| SecureHttpClient                       | --             | qui non lo inietta nessuno: la stazione non fa chiamate REST verso la centrale |
+|----------------------------------------+----------------+-----------------------------------------------------------------------------|
+| *C3 - la Centrale verso l'operatore*    |                |                                                                             |
+| FiltroAutorizzazione                   | M9 (meta' server) | e' il =@Provider= che ogni richiesta attraversa: la meta' di M9 che decide. L'altra meta' e' in C6 |
+| RestApiGateway                         | M10            | la vita della richiesta dopo il filtro, con i DTO annidati e i comandi che escono su =alerts-out= |
+| RealtimeWebSocket                      | M11            | l'uscita comune di tutte le altre macchine verso la dashboard, di sola andata |
+| AuthController                         | --             | sta dentro M9 ma non ne e' il cuore: ricostruisce il profilo dai claim, non decide nessun permesso |
+|----------------------------------------+----------------+-----------------------------------------------------------------------------|
+| *C4 - la Centrale verso il campo*       |                |                                                                             |
+| IngestionService                       | M3, M4, M5, M6 | un consumatore MQTT per macchina: telemetria, battiti, transiti e allarmi   |
+| FaultMonitor                           | M8             | l'unica macchina che reagisce a un silenzio invece che a un messaggio: i tre job da 10 secondi |
+| ExistIdForEdge, ExistIdForEdgeStazione | M2             | una macchina sola in due classi gemelle: cambiano il topic e la tabella interrogata, non il comportamento |
+| TrafficLogicEngine                     | --             | e' la cache dove vivono le variabili di M12 e M13, come =TrainDB= a bordo: le transizioni gliele scrivono le altre tre classi |
+|----------------------------------------+----------------+-----------------------------------------------------------------------------|
+| *C6 - la Web App*                       |                |                                                                             |
+| keycloak, authStore                    | M9 (meta' browser) | PKCE, scambio del codice e rinnovo del token: M9 e' l'unica macchina che attraversa due componenti |
+| apiClient, WebSocketClient, railwayStore, useRealtimeUpdates, le pagine | -- | sono i consumatori di M10 e M11: ridisegnano quello che ricevono, nessuno stato del dominio nasce qui |
+
+*Le quattro macchine che non hanno una riga.* Trentuno delle trentacinque stanno nella tabella, le
+altre quattro sono tutte della centrale e mancano per due motivi diversi:
+
+- M1, il ciclo di vita del processo :: il suo cuore e' il =main= di =ServeCentraleOperativa=, che non
+  e' disegnato ne' in C3 ne' in C4 perche' le due viste cominciano a container gia' avviato. Sui nodi
+  di campo la macchina corrispondente (T1, S1) invece c'e', e la ragione e' che li' il =main= fa
+  anche la validazione dell'id.
+- M7 (guasto), M12 (stazione), M13 (treno) :: sono le tre macchine di dominio della centrale, e il
+  loro cuore e' un campo di un'entita' JPA (=Guasto.risolto=, =Stazione.stato=, =Treno.stato=), che
+  sta nel capitolo /Modello/ e non in un diagramma delle classi. Le transizioni gliele scrivono tre
+  classi diverse, =IngestionService= (M4 e M6), =FaultMonitor= (M8) e =RestApiGateway= (M10), e
+  nessuna delle tre ne e' il cuore: e' il caso in cui la variabile e' l'unica cosa che tiene insieme
+  la macchina, ed e' proprio quello che il capitolo /Diagrammi degli stati/ chiama macchina di
+  dominio.
+#+begin_comment
+Letta al contrario la tabella dice una cosa che nei diagrammi delle classi non si vede: le macchine
+non sono distribuite in modo uniforme. Su ogni nodo di campo ce ne sono due che ne portano quasi
+tutte (=TrainJourneyEngine= con quattro, =StationGateway= con sei), mentre nella centrale sono piu'
+sparse, perche' li' ogni canale MQTT e' gia' una macchina a se'. Non e' un difetto e non e' nemmeno
+una scelta: sul nodo di campo le variabili di stato sono quattro in croce e ci scrive sopra chi
+riceve i messaggi, quindi le macchine si addensano dove arriva il traffico.
+#+end_comment
