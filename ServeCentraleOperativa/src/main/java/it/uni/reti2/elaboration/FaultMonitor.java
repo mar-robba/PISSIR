@@ -2,6 +2,7 @@ package it.uni.reti2.elaboration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.scheduler.Scheduled;
 import it.uni.reti2.entity.EventoStazione;
 import it.uni.reti2.entity.Guasto;
@@ -12,14 +13,16 @@ import it.uni.reti2.gateway.RealtimeWebSocket;
 import it.uni.reti2.ingestion.IngestionService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Watchdog della Centrale Operativa: controlla periodicamente lo stato della rete
@@ -67,6 +70,15 @@ public class FaultMonitor {
     long trenoFermoTimeoutSecondi;
 
     /**
+     * Da quando ogni convoglio risulta fermo fuori da una stazione (id treno → istante del
+     * primo rilevamento). Serve a far scattare l'anomalia solo se la condizione dura almeno
+     * {@code T_fer}: senza memoria il watchdog poteva solo guardare l'istante presente e
+     * apriva il guasto al primo giro in cui vedeva velocità zero.
+     * Mappa concorrente perché il job gira su un thread di lavoro dello scheduler.
+     */
+    private final Map<String, Instant> fermiDa = new ConcurrentHashMap<>();
+
+    /**
      * Rileva le stazioni che non inviano heartbeat da più del timeout configurato:
      * le marca OFFLINE e apre un guasto automatico (una sola volta per episodio).
      */
@@ -78,8 +90,10 @@ public class FaultMonitor {
     * */
     // ATTENZIOONE !!!! RACE CONDITON
     @Scheduled(every = "10s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP) // <-- Evita sovrapposizioni nello stesso server
-    // @Transactional garantisce la sicurezza dei dati nel Database (ACID) e non t
-    @Transactional
+    // NIENTE @Transactional sul metodo: con quell'annotazione il commit avviene all'uscita,
+    // cioè DOPO che il guasto è già stato annunciato a dashboard e treni. Le scritture
+    // stanno adesso dentro QuarkusTransaction.requiringNew() e la notifica parte solo a
+    // commit avvenuto (stesso ragionamento già applicato in IngestionService).
     public void controllaHeartbeat() {
         Instant limite = Instant.now().minus(Duration.ofSeconds(heartbeatTimeoutSecondi));
         for (Stazione stazione : statoRete.getTutteStazioni()) {
@@ -92,6 +106,10 @@ public class FaultMonitor {
                         stazione.id, heartbeatTimeoutSecondi);
                 stazione.stato = "OFFLINE";
                 statoRete.aggiornaStazione(stazione);
+                // Il cambio di stato va spinto sulla WebSocket: è proprio il caso in cui
+                // l'HEARTBEAT non arriva più, quindi senza questo la mappa continuerebbe a
+                // mostrare la stazione operativa fino al prossimo F5.
+                ingestion.broadcastStatoStazione(stazione);
 
                 // Evita duplicati: un solo guasto aperto per episodio di silenzio
                 if (statoRete.getGuastoApertoPerSorgente(stazione.id, "sensore_offline") == null) {
@@ -100,52 +118,106 @@ public class FaultMonitor {
                     // Il messaggio parte con MSG_HEARTBEAT_PERSO così la Centrale
                     // riconosce il guasto come "suo" e lo richiude da sola quando il
                     // battito torna (vedi IngestionService.onHeartbeat).
-                    Guasto guasto = creaGuastoAutomatico(
+                    creaGuastoAutomatico(
                             "sensore_offline", "CRITICAL", "STAZIONE", stazione.id,
                             IngestionService.MSG_HEARTBEAT_PERSO + " la stazione " + stazione.id
-                                    + " non invia heartbeat da oltre " + heartbeatTimeoutSecondi + " secondi");
-
-                    // Audit log dell'evento sulla tabella eventi_stazioni
-                    EventoStazione evento = new EventoStazione();
-                    evento.stazioneId = stazione.id;
-                    evento.stato = "OFFLINE";
-                    evento.tipoEvento = "HEARTBEAT_LOST";
-                    evento.descrizione = "Heartbeat mancante, guasto automatico " + guasto.id;
-                    evento.persist();
+                                    + " non invia heartbeat da oltre " + heartbeatTimeoutSecondi + " secondi",
+                            "HEARTBEAT_LOST");
                 }
             }
         }
     }
 
     /**
-     * Rileva i treni dichiarati "attivi" ma fermi (velocità nulla o telemetria
-     * scaduta) mentre NON si trovano in una stazione: possibile anomalia in linea.
+     * Rileva i convogli fermi fuori da una stazione (RF02.6.2, scenario SV04: "un
+     * convoglio è fermo fra due stazioni per una causa qualsiasi").
+     *
+     * <p>Il controllo guarda <strong>dove</strong> si trova il treno, non lo stato che
+     * dichiara. Prima filtrava sui soli treni in stato "attivo", cioè esattamente quelli
+     * che si stanno muovendo: un convoglio davvero fermo dichiara FERMO (trattenuto da una
+     * stazione guasta) o EMERGENZA (avaria di bordo) e veniva quindi saltato, mentre
+     * l'unico caso che faceva scattare l'allarme erano i treni caricati dal database
+     * all'avvio e mai visti — dieci secondi dopo l'accensione della Centrale si aprivano
+     * guasti falsi su tutta la flotta.</p>
+     *
+     * <p>Due precauzioni contro i falsi positivi, le stesse già adottate per le stazioni:
+     * si saltano i convogli che non hanno mai trasmesso (telemetria mai arrivata, quindi
+     * processo spento: non è un'anomalia di marcia) e si pretende che la condizione duri
+     * almeno {@code T_fer} secondi prima di aprire il guasto. Prima {@code velocita == 0}
+     * apriva l'allarme al primo giro utile, senza aspettare niente.</p>
      */
     @Scheduled(every = "10s",  concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    @Transactional
     public void controllaTreniFermi() {
-        Instant limite = Instant.now().minus(Duration.ofSeconds(trenoFermoTimeoutSecondi));
+        Instant adesso = Instant.now();
+        Instant limiteTelemetria = adesso.minus(Duration.ofSeconds(trenoFermoTimeoutSecondi));
+        Set<String> treniEsistenti = new HashSet<>();
+
         for (Treno treno : statoRete.getTuttiTreni()) {
-            if (!"attivo".equalsIgnoreCase(treno.stato)) {
+            treniEsistenti.add(treno.id);
+            // Un convoglio soppresso è fermo per decisione dell'operatore: non è un'anomalia.
+            if ("in manutenzione".equalsIgnoreCase(treno.stato)) {
+                fermiDa.remove(treno.id);
                 continue;
             }
-           // è vera se non è dentro una stazione
+            // Mai trasmesso: il processo del treno non è acceso, non c'è niente da dedurre.
+            if (treno.ultimoAggiornamento == null) {
+                fermiDa.remove(treno.id);
+                continue;
+            }
+
             boolean inStazione = treno.stazioneCorrente != null && !treno.stazioneCorrente.isEmpty();
-            boolean immobile = treno.velocita == 0
-                    || (treno.ultimoAggiornamento != null && treno.ultimoAggiornamento.isBefore(limite));
-            if (immobile && !inStazione
-                    && statoRete.getGuastoApertoPerSorgente(treno.id, "treno_fermo") == null) {
-                LOG.warnf("⚠️ [FaultMonitor] Treno %s attivo ma fermo fra stazioni → guasto automatico", treno.id);
+            boolean immobile = treno.velocita == 0 || treno.ultimoAggiornamento.isBefore(limiteTelemetria);
+
+            if (!immobile || inStazione) {
+                fermiDa.remove(treno.id); // si muove, o è fermo dove è lecito esserlo
+                continue;
+            }
+
+            // Da quanto dura la condizione? Il primo giro registra solo l'istante.
+            Instant fermoDa = fermiDa.putIfAbsent(treno.id, adesso);
+            if (fermoDa == null) {
+                continue;
+            }
+            long secondiFermo = Duration.between(fermoDa, adesso).getSeconds();
+            if (secondiFermo < trenoFermoTimeoutSecondi) {
+                continue; // T_fer non ancora scaduto
+            }
+
+            if (statoRete.getGuastoApertoPerSorgente(treno.id, "treno_fermo") == null) {
+                LOG.warnf("⚠️ [FaultMonitor] Treno %s fermo fuori stazione da %d secondi → guasto automatico",
+                        treno.id, secondiFermo);
+                // Il prefisso MSG_TRENO_FERMO marca il guasto come dedotto dalla Centrale:
+                // è quello che permette di richiuderlo da soli quando il treno riparte
+                // (IngestionService.chiudiGuastoTrenoFermoSeRiparte).
                 creaGuastoAutomatico(
                         "treno_fermo", "warning", "TRENO", treno.id,
-                        "Treno " + treno.id + " fermo tra stazioni con stato attivo");
+                        IngestionService.MSG_TRENO_FERMO + " il convoglio " + treno.id
+                                + " è fermo fuori da una stazione da oltre " + trenoFermoTimeoutSecondi + " secondi",
+                        null);
             }
         }
+
+        // Un convoglio eliminato dall'amministrazione non deve lasciarsi dietro il proprio
+        // cronometro: se ne venisse creato un altro con lo stesso nome si troverebbe già
+        // "fermo da un'ora" e il guasto scatterebbe subito, senza aspettare T_fer.
+        fermiDa.keySet().retainAll(treniEsistenti);
     }
 
     /**
-     * Invia periodicamente al frontend uno snapshot dei KPI della rete
-     * (requisito: interrogare lo stato del sistema ogni 10 secondi per il tempo reale).
+     * Invia periodicamente al frontend la fotografia dello stato corrente della rete
+     * (RF02.6.3): i KPI della dashboard più l'elenco completo di treni e stazioni.
+     *
+     * <p>I treni e le stazioni non c'erano: lo snapshot portava i soli KPI, quindi non
+     * poteva riallineare niente, ed era per giunta l'unico evento a cui il frontend non si
+     * sottoscriveva. La dashboard si ricalcolava i numeri per conto suo con formule diverse
+     * da quelle della Centrale (treni in movimento, ritardo medio, stazioni guaste: tre
+     * conti su quattro davano un risultato diverso). Adesso i numeri li calcola una funzione
+     * sola — {@link TrafficLogicEngine#kpiDashboard()}, la stessa che serve GET /api/dashboard
+     * — e lo snapshot è anche la rete di sicurezza che rimette a posto il browser quando un
+     * evento in tempo reale si perde.</p>
+     *
+     * <p>I due elenchi sono gli stessi oggetti in cache serializzati da GET /api/treni e
+     * GET /api/stazioni, quindi il browser li rilegge con lo stesso mappatore.</p>
      */
     @Scheduled(every = "10s",  concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public void broadcastSnapshot() {
@@ -154,6 +226,8 @@ public class FaultMonitor {
             ObjectNode wsEvent = mapper.createObjectNode();
             wsEvent.put("eventType", "SNAPSHOT");
             wsEvent.set("dashboard", mapper.valueToTree(dashboard));
+            wsEvent.set("treni", mapper.valueToTree(statoRete.getTuttiTreni()));
+            wsEvent.set("stazioni", mapper.valueToTree(statoRete.getTutteStazioni()));
             webSocket.broadcast(wsEvent.toString());
         } catch (Exception e) {
             LOG.error("❌ Errore durante il broadcast dello snapshot", e);
@@ -166,10 +240,19 @@ public class FaultMonitor {
      * railway/alerts per il campo (senza quest'ultima i treni non saprebbero mai
      * che una stazione è caduta e continuerebbero ad andarci dentro).
      *
-     * @return Il guasto appena creato.
+     * <p><b>Ordine delle operazioni.</b> Prima si scrive e si chiude la transazione, poi si
+     * annuncia. Fino a poco fa il metodo girava dentro una {@code @Transactional} sul job e
+     * annunciava il guasto <em>prima</em> del commit: se il commit falliva (vincolo violato,
+     * database che non risponde) l'allarme era già arrivato alla dashboard e i treni si erano
+     * già fermati per un guasto che a database non esisteva. Se la scrittura non riesce ora
+     * non parte nessuna notifica e il giro successivo del watchdog riproverà.</p>
+     *
+     * @param tipoEventoStazione Se non null, viene scritta anche una riga di audit su
+     *                           eventi_stazioni con questo tipo (es. HEARTBEAT_LOST).
+     * @return Il guasto appena creato, oppure null se la scrittura non è andata a buon fine.
      */
     private Guasto creaGuastoAutomatico(String tipo, String severita, String sorgenteTipo,
-                                        String sorgenteId, String messaggio) {
+                                        String sorgenteId, String messaggio, String tipoEventoStazione) {
         Guasto guasto = new Guasto();
         // Il suffisso casuale è indispensabile: i due job schedulati girano entrambi ogni
         // 10 secondi e ciclano su tutte le sorgenti, quindi due guasti generati nello stesso
@@ -184,14 +267,35 @@ public class FaultMonitor {
         guasto.messaggio = messaggio;
         guasto.timestamp = Instant.now();
         guasto.risolto = false;
-        guasto.persist();
 
-        StoricoGuasto storico = new StoricoGuasto();
-        storico.guasto = guasto;
-        storico.risolto = false;
-        storico.tsApertura = guasto.timestamp;
-        storico.persist();
+        try {
+            QuarkusTransaction.requiringNew().run(() -> {
+                guasto.persist();
 
+                StoricoGuasto storico = StoricoGuasto.fotografiaDi(guasto);
+                storico.persist();
+
+                if (tipoEventoStazione != null) {
+                    // Audit log dell'evento sulla tabella eventi_stazioni
+                    Stazione stazione = statoRete.getStazione(sorgenteId);
+                    EventoStazione evento = new EventoStazione();
+                    evento.stazioneId = sorgenteId;
+                    // Il nome va congelato qui: la tabella non ha una chiave esterna verso
+                    // la stazione (RF02.7), quindi è l'unico posto dove resta scritto.
+                    evento.nomeStazione = stazione != null ? stazione.nome : sorgenteId;
+                    evento.stato = "OFFLINE";
+                    evento.tipoEvento = tipoEventoStazione;
+                    evento.descrizione = "Heartbeat mancante, guasto automatico " + guasto.id;
+                    evento.persist();
+                }
+            });
+        } catch (Exception e) {
+            LOG.errorf("❌ Guasto automatico %s non scritto a database (%s): nessuna notifica inviata",
+                    guasto.id, e.getMessage());
+            return null;
+        }
+
+        // Da qui in poi il guasto esiste davvero: si può annunciarlo.
         statoRete.aggiungiGuasto(guasto);
         ingestion.broadcastAlert(guasto);       // dashboard (WebSocket)
         ingestion.pubblicaGuastoSuMqtt(guasto); // campo (topic railway/alerts)

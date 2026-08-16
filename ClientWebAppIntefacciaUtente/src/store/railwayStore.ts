@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import type { Train, Station, Alert, Route, TrackSegment, Transit } from '../types';
+import type {
+  Train, Station, Alert, Route, TrackSegment, Transit, DashboardKPI, UiNotification,
+} from '../types';
 import { apiClient } from '../api/apiClient';
 
 /** Restituisce il dettaglio ricevuto dalla Centrale per mostrarlo all'operatore. */
@@ -7,6 +9,25 @@ const dettaglioErrore = (err: unknown): string =>
   err instanceof Error && err.message
     ? `\nMotivo: ${err.message}`
     : '\nMotivo: il server non ha fornito ulteriori dettagli.';
+
+/**
+ * Rimette il treno nell'itinerario giusto dentro `routes[].trainIds`: lo toglie da tutti
+ * gli altri e lo aggiunge a quello nuovo (con `routeId` vuoto viene solo tolto).
+ * Serve perché le assegnazioni sono scritte in due posti — `trains[].routeId` e
+ * `routes[].trainIds` — e finora l'amministrazione ne aggiornava soltanto uno.
+ */
+const routesConAssegnazione = (routes: Route[], trainId: string, routeId?: string): Route[] =>
+  routes.map((route) => {
+    const dovrebbeEsserci = !!routeId && route.id === routeId;
+    const ceGia = route.trainIds.includes(trainId);
+    if (dovrebbeEsserci === ceGia) return route;
+    return {
+      ...route,
+      trainIds: dovrebbeEsserci
+        ? [...route.trainIds, trainId]
+        : route.trainIds.filter((id) => id !== trainId),
+    };
+  });
 
 /**
  * src/store in React
@@ -29,6 +50,14 @@ interface RailwayState {
   routes: Route[];
   trackSegments: TrackSegment[];
   transits: Transit[];
+  /**
+   * I KPI così come li calcola la Centrale (GET /api/dashboard e snapshot periodico).
+   * La dashboard li legge da qui invece di rifarsi i conti da sola: le due formule non
+   * coincidevano e i numeri a schermo discordavano da quelli del server.
+   */
+  kpi: DashboardKPI | null;
+  /** Conferme dei comandi dati dall'operatore: notifiche locali, NON allarmi di rete. */
+  notifications: UiNotification[];
   selectedTrainId: string | null;
   selectedStationId: string | null;
 
@@ -39,6 +68,9 @@ interface RailwayState {
   updateStation: (id: string, update: Partial<Station>) => void;
   addAlert: (alert: Alert) => void;
   acknowledgeAlert: (id: string) => void;
+  setKpi: (kpi: DashboardKPI) => void;
+  pushNotification: (notification: Omit<UiNotification, 'id' | 'timestamp'>) => void;
+  dismissNotification: (id: string) => void;
   addRoute: (route: Route) => Promise<void>;
   updateRoute: (id: string, update: Partial<Route>) => Promise<void>;
   deleteRoute: (id: string) => Promise<void>;
@@ -77,23 +109,28 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
   routes: [],
   trackSegments: [],
   transits: [],
+  kpi: null,
+  notifications: [],
   selectedTrainId: null,
   selectedStationId: null,
 
   /**
    * Carica i dati reali dal backend.
+   * I KPI si scaricano insieme al resto: lo snapshot dalla WebSocket arriva ogni dieci
+   * secondi e senza questa chiamata la dashboard resterebbe vuota fino al primo.
    */
   initialize: async () => {
     try {
-      const [trains, stations, alerts, routes, trackSegments, transits] = await Promise.all([
+      const [trains, stations, alerts, routes, trackSegments, transits, kpi] = await Promise.all([
         apiClient.getTrains(),
         apiClient.getStations(),
         apiClient.getAlerts(),
         apiClient.getRoutes(),
         apiClient.getTrackSegments(),
         apiClient.getTransits(),
+        apiClient.getDashboard(),
       ]);
-      set({ trains, stations, alerts, routes, trackSegments, transits });
+      set({ trains, stations, alerts, routes, trackSegments, transits, kpi });
     } catch (err) {
       console.error('Failed to initialize railway store from API', err);
     }
@@ -125,27 +162,64 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       ),
     })),
 
-  /** Inserisce un nuovo guasto/alert in testa all'array (LIFO) */
+  /**
+   * Inserisce un guasto in testa all'array (LIFO) SE è nuovo, altrimenti aggiorna quello
+   * che c'è già.
+   *
+   * La Centrale manda un evento ALERT con lo stesso id anche quando un guasto si chiude
+   * (fail-stop rientrato) o quando un allarme già aperto si ripete: aggiungendo sempre una
+   * riga nuova, la chiusura di un guasto faceva comparire un secondo allarme rosso —
+   * l'esatto contrario di quello che era appena successo — e ogni ripetizione ne aggiungeva
+   * un altro. Due elementi con la stessa key sono per giunta un errore di rendering React.
+   */
   addAlert: (alert) =>
-    set((s) => ({ alerts: [alert, ...s.alerts] })),
+    set((s) => {
+      const esistente = s.alerts.findIndex((a) => a.id === alert.id);
+      if (esistente < 0) return { alerts: [alert, ...s.alerts] };
+      const alerts = [...s.alerts];
+      alerts[esistente] = { ...alerts[esistente], ...alert };
+      return { alerts };
+    }),
 
   /**
    * Setta a "risolto" (acknowledged) l'allarme senza cancellarlo dallo storico.
-   * Notifica anche il backend; se l'allarme è solo locale (generato dal client)
-   * la chiamata può fallire senza bloccare l'aggiornamento della UI.
+   * Lo stato locale cambia SOLO se la Centrale ha davvero chiuso il guasto: prima si
+   * segnava comunque come risolto e l'errore finiva in console, quindi un allarme che sul
+   * server era ancora aperto spariva dall'elenco dell'operatore.
    */
   acknowledgeAlert: async (id) => {
     try {
       await apiClient.acknowledgeAlert(id);
     } catch (err) {
       console.error('Failed to acknowledge alert on server', err);
+      get().pushNotification({
+        kind: 'errore_comando',
+        severity: 'warning',
+        message: `La Centrale non ha registrato la presa in carico dell'allarme ${id}: l'allarme resta aperto.`,
+      });
+      return;
     }
     set((s) => ({
       alerts: s.alerts.map((a) =>
-        a.id === id ? { ...a, acknowledged: true } : a
+        a.id === id ? { ...a, acknowledged: true, resolvedAt: Date.now() } : a
       ),
     }));
   },
+
+  /** Sostituisce i KPI con quelli calcolati dalla Centrale. */
+  setKpi: (kpi) => set({ kpi }),
+
+  /** Aggiunge una notifica d'interfaccia (esito di un comando), tenendo le ultime dieci. */
+  pushNotification: (notification) =>
+    set((s) => ({
+      notifications: [
+        { ...notification, id: `notif-${Date.now()}-${s.notifications.length}`, timestamp: Date.now() },
+        ...s.notifications,
+      ].slice(0, 10),
+    })),
+
+  dismissNotification: (id) =>
+    set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) })),
 
   /**
    * Crea una nuova tratta sul backend e la aggiunge allo stato locale (UC6).
@@ -201,7 +275,10 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
   adminCreateTrain: async (train) => {
     try {
       await apiClient.createTrain(train);
-      set((s) => ({ trains: [...s.trains, train] }));
+      set((s) => ({
+        trains: [...s.trains, train],
+        routes: routesConAssegnazione(s.routes, train.id, train.routeId),
+      }));
     } catch (err) {
       console.error('Failed to create train', err);
       alert(`Errore: impossibile creare il treno sul server.${dettaglioErrore(err)}`);
@@ -214,6 +291,12 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
       await apiClient.updateTrain(id, update);
       set((s) => ({
         trains: s.trains.map((t) => (t.id === id ? { ...t, ...update } : t)),
+        // Anche gli itinerari vanno riallineati: routes[].trainIds veniva scaricato una
+        // volta sola all'avvio e restava fermo lì, quindi mostrava conteggi vecchi e —
+        // finché la PUT dell'editor lo rimandava indietro — sganciava i treni assegnati.
+        routes: update.routeId !== undefined
+          ? routesConAssegnazione(s.routes, id, update.routeId)
+          : s.routes,
       }));
     } catch (err) {
       console.error('Failed to update train', err);
@@ -225,7 +308,10 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
   adminDeleteTrain: async (id) => {
     try {
       await apiClient.deleteTrain(id);
-      set((s) => ({ trains: s.trains.filter((t) => t.id !== id) }));
+      set((s) => ({
+        trains: s.trains.filter((t) => t.id !== id),
+        routes: routesConAssegnazione(s.routes, id, ''),
+      }));
     } catch (err) {
       console.error('Failed to delete train', err);
       alert(`Errore: impossibile eliminare il treno sul server.${dettaglioErrore(err)}`);
@@ -273,25 +359,28 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
   selectTrain: (id) => set({ selectedTrainId: id }),
   selectStation: (id) => set({ selectedStationId: id }),
 
-  /** 
-   * Logica di business frontend: chiama l'API per sopprimere il treno e aggiorna lo stato locale.
+  /**
+   * Logica di business frontend: chiama l'API per sopprimere il treno e aggiorna lo stato
+   * locale. L'esito è una notifica d'interfaccia, non un allarme: sulla Centrale nessun
+   * guasto è stato aperto, quindi metterlo fra gli allarmi era raccontare una cosa falsa.
    */
   suppressTrain: async (trainId) => {
     try {
       await apiClient.suppressTrain(trainId);
-      const { updateTrain, addAlert } = get();
+      const { updateTrain, pushNotification } = get();
       updateTrain(trainId, { status: 'soppresso', arrivalTime: null, departureTime: null });
-      addAlert({
-        id: `al-supp-${Date.now()}`,
-        type: 'treno_soppresso',
+      pushNotification({
+        kind: 'treno_soppresso',
         severity: 'warning',
         message: `Treno ${trainId} soppresso dall'amministratore.`,
-        trainId,
-        timestamp: Date.now(),
-        acknowledged: false,
       });
     } catch (err) {
       console.error('Failed to suppress train', err);
+      get().pushNotification({
+        kind: 'errore_comando',
+        severity: 'critical',
+        message: `Soppressione del treno ${trainId} non riuscita: la Centrale ha rifiutato il comando.`,
+      });
     }
   },
 
@@ -299,23 +388,24 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
    * Registra lo stato "operatori dispacciati" per una stazione guasta via API.
    */
   dispatchOperators: async (stationId) => {
+    const station = get().stations.find((s) => s.id === stationId);
     try {
       await apiClient.dispatchOperators(stationId);
-      const { updateStation, addAlert } = get();
-      const station = get().stations.find((s) => s.id === stationId);
-      if (!station) return;
+      const { updateStation, pushNotification } = get();
       updateStation(stationId, { operatorsDispatched: true });
-      addAlert({
-        id: `al-ops-${Date.now()}`,
-        type: 'operatori_inviati',
+      pushNotification({
+        kind: 'operatori_inviati',
         severity: 'info',
-        message: `Operatori inviati alla stazione ${station.code ?? station.id} (${station.name}) per riparazione.`,
-        stationId,
-        timestamp: Date.now(),
-        acknowledged: false,
+        message: `Operatori inviati alla stazione ${station?.code ?? stationId}`
+          + `${station ? ` (${station.name})` : ''} per riparazione.`,
       });
     } catch (err) {
       console.error('Failed to dispatch operators', err);
+      get().pushNotification({
+        kind: 'errore_comando',
+        severity: 'critical',
+        message: `Invio degli operatori alla stazione ${station?.name ?? stationId} non riuscito.`,
+      });
     }
   },
 }));

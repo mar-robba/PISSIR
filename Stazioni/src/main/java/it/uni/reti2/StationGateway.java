@@ -165,22 +165,42 @@ public class StationGateway {
     }
 
     /**
+     * Segnala un guasto dell'infrastruttura di terra: è la stazione a non essere più
+     * agibile, quindi il tipo lasciato implicito è {@code stazione_guasta}.
+     *
+     * @param descrizione La descrizione del problema rilevato.
+     * @param severita "CRITICAL" oppure "WARNING".
+     */
+    public void inviaGuasto(String descrizione, String severita) {
+        inviaGuasto(descrizione, severita, null);
+    }
+
+    /**
      * Segnala un guasto locale inviando un alert alla Centrale nel formato condiviso
      * del canale railway/alerts (campo discriminante "tipoEvento").
      * Con severità CRITICAL la stazione passa in stato GUASTA; con WARNING
      * (es. sensore che non risponde) la stazione resta operativa.
      * Se la rete è giù l'evento viene persistito nel buffer locale.
      *
+     * <p>Il campo {@code tipoGuasto} è la classificazione dichiarata dalla sorgente. Prima
+     * non c'era e la Centrale la indovinava cercando la parola "sensore" nel testo del
+     * messaggio: siccome i guasti di terra parlano quasi sempre di sensori, finivano tutti
+     * classificati come {@code sensore_offline} e l'operatore si ritrovava senza il comando
+     * per mandare la squadra di manutenzione. Chi segnala il guasto sa che tipo è: lo dice.</p>
+     *
      * @param descrizione La descrizione del problema rilevato.
      * @param severita "CRITICAL" oppure "WARNING".
+     * @param tipoGuasto Classificazione ("sensore_offline"), oppure null per lasciar
+     *                   decidere alla Centrale in base al tipo di sorgente.
      */
-    public void inviaGuasto(String descrizione, String severita) {
+    public void inviaGuasto(String descrizione, String severita, String tipoGuasto) {
         if ("CRITICAL".equals(severita)) {
             dbLocale.stato = "GUASTA";
         }
+        String campoTipo = tipoGuasto != null ? String.format("\"tipoGuasto\":\"%s\",", tipoGuasto) : "";
         String alertJson = String.format(
-                "{\"tipoEvento\":\"GUASTO\",\"sorgenteTipo\":\"STAZIONE\",\"sorgenteId\":\"%s\",\"severita\":\"%s\",\"messaggio\":\"%s\",\"timestamp\":\"%s\"}",
-                dbLocale.stazioneId, severita, descrizione, Instant.now().toString());
+                "{\"tipoEvento\":\"GUASTO\",\"sorgenteTipo\":\"STAZIONE\",\"sorgenteId\":\"%s\",%s\"severita\":\"%s\",\"messaggio\":\"%s\",\"timestamp\":\"%s\"}",
+                dbLocale.stazioneId, campoTipo, severita, descrizione, Instant.now().toString());
 
         inviaOppureBufferizza("alert", alertJson, alertsEmitter);
     }

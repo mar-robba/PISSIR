@@ -25,4 +25,17 @@ public class Tratta extends PanacheEntityBase {
      */
     @Column(name = "tempoPercorrenzaMinuti")
     public Integer tempoPercorrenzaMinuti = 15;
+
+    /**
+     * Etichetta leggibile della tratta, del tipo "Milano Centrale -> Bologna Centrale".
+     * La copiano dentro di sé le righe di storico, che dopo RF02.7 non hanno più una
+     * chiave esterna con cui risalire alle stazioni: il solo id ("T1_MI_BO") non dice
+     * niente a chi rilegge lo storico, e la tratta nel frattempo può essere stata
+     * eliminata dalla rete.
+     */
+    public String descrizione() {
+        String partenza = stazionePartenza != null ? stazionePartenza.nome : "?";
+        String arrivo = stazioneArrivo != null ? stazioneArrivo.nome : "?";
+        return partenza + " -> " + arrivo;
+    }
 }

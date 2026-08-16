@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Map, 
-  Route as RouteIcon, 
-  Building2, 
-  Bell, 
-  Settings, 
+import {
+  ArrowRightLeft,
+  LayoutDashboard,
+  Map,
+  Route as RouteIcon,
+  Building2,
+  Bell,
+  Settings,
   Train
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -14,8 +15,9 @@ import './Sidebar.css'; // We'll create specific styles if needed, or use index.
 
 export default function Sidebar() {
   const { user } = useAuthStore();
-  const { alerts } = useRailwayStore();
-  
+  // Selettore: alla sidebar servono solo gli allarmi, non tutto lo stato della rete.
+  const alerts = useRailwayStore((s) => s.alerts);
+
   const activeAlertsCount = alerts.filter(a => !a.acknowledged).length;
 
   return (
@@ -54,7 +56,12 @@ export default function Sidebar() {
           <Train size={20} />
           <span>Treni</span>
         </NavLink>
-        
+
+        <NavLink to="/transits" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <ArrowRightLeft size={20} />
+          <span>Transiti</span>
+        </NavLink>
+
         <NavLink to="/alerts" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
           <div className="alert-icon-wrapper">
             <Bell size={20} />

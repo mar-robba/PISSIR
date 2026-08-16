@@ -70,6 +70,8 @@ export interface ApiTransitPayload {
   trenoId?: string;
   stationId?: string;
   stazioneId?: string;
+  /** Tratta percorsa: la Centrale la ricava dalla posizione del convoglio. */
+  trattaId?: string | null;
   tipo?: string;
   type?: string;
   timestamp?: string;

@@ -2,196 +2,1075 @@ __  ____  __  _____   ___  __ ____  ______
  --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
  -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
 --\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
-2026-08-15 13:17:16,709 INFO  [it.uni.reti2.main] (main) 🚂 Avvio processo Treno con ID: Mario
-2026-08-15 13:17:17,957 INFO  [io.quarkus.scheduler.runtime.SimpleScheduler] (main) No scheduled business methods found - Simple scheduler will not be started
-2026-08-15 13:17:18,028 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[]
-2026-08-15 13:17:18,356 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-15 13:17:18,544 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/alerts, Max QoS 0.
-2026-08-15 13:17:18,545 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/train/+/validation-response, Max QoS 0.
-2026-08-15 13:17:18,598 INFO  [it.uni.reti2.TrainJourneyEngine] (main) 🧭 [TWIN] Motore di viaggio avviato (sosta=20s, fattore=10x, autostart=true)
-2026-08-15 13:17:18,658 INFO  [io.quarkus] (main) treno 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.37.3) started in 2.124s. Listening on: http://0.0.0.0:9080
-2026-08-15 13:17:18,659 INFO  [io.quarkus] (main) Profile prod activated. 
-2026-08-15 13:17:18,659 INFO  [io.quarkus] (main) Installed features: [cdi, messaging, messaging-mqtt, rest, rest-jackson, scheduler, smallrye-context-propagation, vertx]
-2026-08-15 13:17:18,921 INFO  [it.uni.reti2.main] (main) 🔎 Verifica ID treno 'Mario' nel database centrale...
-2026-08-15 13:17:18,957 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:17:18,960 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:23,960 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:28,960 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:33,962 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:17:33,962 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:38,963 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:43,964 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:48,965 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:17:48,966 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:53,966 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:58,967 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:03,968 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:18:03,968 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:08,969 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:13,969 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:18,971 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:18:18,971 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:23,971 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:28,972 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:33,973 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:18:33,974 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:38,974 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:43,974 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:48,975 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:18:48,975 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:53,976 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:58,976 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:03,978 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:19:03,978 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:08,978 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:13,979 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:18,980 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:19:18,980 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:23,981 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:28,982 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:33,983 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:19:33,983 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:38,984 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:43,984 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:48,985 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:19:48,986 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:53,986 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:58,987 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:03,988 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:20:03,988 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:08,989 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:13,989 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:18,990 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:20:18,991 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:23,992 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:28,992 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:33,994 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:20:33,994 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:38,995 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:43,996 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:48,998 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:20:48,998 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:53,998 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:58,999 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:04,001 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:21:04,001 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:09,001 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:14,002 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:15,614 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
-2026-08-15 13:21:16,622 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
-Caused by: java.net.ConnectException: Connessione rifiutata
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
-	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
-	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
-	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
-	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
-	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
-	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
-	at java.base/java.lang.Thread.run(Thread.java:1474)
-
-2026-08-15 13:21:17,628 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
-Caused by: java.net.ConnectException: Connessione rifiutata
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
-	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
-	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
-	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
-	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
-	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
-	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
-	at java.base/java.lang.Thread.run(Thread.java:1474)
-
-2026-08-15 13:21:18,633 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
-Caused by: java.net.ConnectException: Connessione rifiutata
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
-	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
-	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
-	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
-	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
-	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
-	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
-	at java.base/java.lang.Thread.run(Thread.java:1474)
-
-2026-08-15 13:21:19,004 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:21:19,004 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:19,637 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
-Caused by: java.net.ConnectException: Connessione rifiutata
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
-	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
-	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
-	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
-	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
-	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
-	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
-	at java.base/java.lang.Thread.run(Thread.java:1474)
-
-2026-08-15 13:21:20,641 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
-Caused by: java.net.ConnectException: Connessione rifiutata
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
-	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
-	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
-	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
-	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
-	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
-	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
-	at java.base/java.lang.Thread.run(Thread.java:1474)
-
-2026-08-15 13:21:21,645 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-15 13:21:24,005 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:29,005 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:34,007 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:21:34,007 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:39,007 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:44,008 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:49,009 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:21:49,009 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:54,009 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:59,010 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:22:04,011 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
-2026-08-15 13:22:04,011 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:22:04,047 INFO  [it.uni.reti2.TrainDatabaseValidator] (vert.x-eventloop-thread-2) 🚂 Processo associato con successo alla chiave primaria del database: Mario
-2026-08-15 13:22:04,904 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🗺️ [TWIN] Itinerario rt-1785880846379 caricato: 5 stazioni [PA, stazzaDellaMadonnaTroia, TO, MI, Padova]
-2026-08-15 13:22:05,602 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Treno Mario pronto alla partenza da padova (PA), prossima fermata stazzaDellaMadonnaTroia
-2026-08-15 13:22:09,012 INFO  [it.uni.reti2.main] (main) ✅ Processo Treno AVVIATO CORRETTAMENTE
-2026-08-15 13:22:09,013 INFO  [it.uni.reti2.main] (main) 🔄 Ingresso nel ciclo infinito di simulazione del treno...
-2026-08-15 13:22:09,013 INFO  [it.uni.reti2.main] (main) 🌐 Server REST disponibile su http://localhost:8082/treno/info
-2026-08-15 13:22:09,013 INFO  [it.uni.reti2.main] (main) 📡 Trasmissione telemetria su topic MQTT: railway/telemetry
-2026-08-15 13:22:09,013 INFO  [it.uni.reti2.main] (main) 🔴 Ascolto alert su topic MQTT: railway/alerts
-2026-08-15 13:22:09,013 INFO  [it.uni.reti2.main] (main) 🎛️ Nessun terminale interattivo: sensori attivabili via POST /treno/sensore/*
-2026-08-15 13:22:26,602 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da PA verso stazzaDellaMadonnaTroia (15 min simulati)
-2026-08-15 13:22:53,033 WARN  [it.uni.reti2.TrainGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT] Stazione stazzaDellaMadonnaTroia guasta sulla mia rotta: mi fermo
-2026-08-15 13:22:53,033 WARN  [it.uni.reti2.TrainJourneyEngine] (vert.x-eventloop-thread-1) ⛔ [TWIN] Treno bloccato: stazione stazzaDellaMadonnaTroia guasta (ero in fase IN_VIAGGIO)
-2026-08-15 13:57:24,886 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
-2026-08-15 13:57:25,890 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-15 14:55:54,685 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
-2026-08-15 14:55:55,688 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-15 16:38:46,666 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
-2026-08-15 16:38:47,673 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-15 18:25:12,866 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
-2026-08-15 18:25:13,871 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-15 22:29:27,857 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
-2026-08-15 22:29:28,871 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 12:17:27,831 INFO  [it.uni.reti2.main] (main) 🚂 Avvio processo Treno con ID: Mario
+2026-08-16 12:17:28,489 INFO  [io.quarkus.scheduler.runtime.SimpleScheduler] (main) No scheduled business methods found - Simple scheduler will not be started
+2026-08-16 12:17:28,528 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[treno-Mario-alerts-in]
+2026-08-16 12:17:28,568 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[]
+2026-08-16 12:17:28,698 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[treno-Mario-alerts-out]
+2026-08-16 12:17:28,857 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 12:17:28,947 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 12:17:28,969 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 12:17:28,977 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/alerts, Max QoS 1.
+2026-08-16 12:17:29,000 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/train/+/validation-response, Max QoS 0.
+2026-08-16 12:17:29,040 INFO  [it.uni.reti2.TrainJourneyEngine] (main) 🧭 [TWIN] Motore di viaggio avviato (sosta=2s, fattore=100x, autostart=true)
+2026-08-16 12:17:29,102 INFO  [io.quarkus] (main) treno 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.37.3) started in 1.371s. Listening on: http://0.0.0.0:9080
+2026-08-16 12:17:29,102 INFO  [io.quarkus] (main) Profile prod activated. 
+2026-08-16 12:17:29,103 INFO  [io.quarkus] (main) Installed features: [cdi, messaging, messaging-mqtt, rest, rest-jackson, scheduler, smallrye-context-propagation, vertx]
+2026-08-16 12:17:29,385 INFO  [it.uni.reti2.main] (main) 🔎 Verifica ID treno 'Mario' nel database centrale...
+2026-08-16 12:17:29,431 INFO  [it.uni.reti2.TrainDatabaseValidator] (main) 📩 Richiesta di validazione inviata per il treno: Mario
+2026-08-16 12:17:29,432 WARN  [it.uni.reti2.main] (main) ID treno non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-16 12:17:29,443 INFO  [it.uni.reti2.TrainDatabaseValidator] (vert.x-eventloop-thread-2) 🚂 Processo associato con successo alla chiave primaria del database: Mario
+2026-08-16 12:17:30,043 WARN  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🛑 [TWIN] Nessun itinerario assegnato: resto fermo in attesa di un percorso
+2026-08-16 12:17:30,102 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🗺️ [TWIN] Itinerario rt-1785880846379 caricato: 5 stazioni [PA, stazzaDellaMadonnaTroia, TO, MI, Padova]
+2026-08-16 12:17:31,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Treno Mario pronto alla partenza da padova (PA), prossima fermata stazzaDellaMadonnaTroia
+2026-08-16 12:17:33,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da PA verso stazzaDellaMadonnaTroia (15 min simulati)
+2026-08-16 12:17:34,433 INFO  [it.uni.reti2.main] (main) ✅ Processo Treno AVVIATO CORRETTAMENTE
+2026-08-16 12:17:34,433 INFO  [it.uni.reti2.main] (main) 🔄 Ingresso nel ciclo infinito di simulazione del treno...
+2026-08-16 12:17:34,433 INFO  [it.uni.reti2.main] (main) 🌐 Server REST disponibile su http://localhost:8082/treno/info
+2026-08-16 12:17:34,433 INFO  [it.uni.reti2.main] (main) 📡 Trasmissione telemetria su topic MQTT: railway/telemetry
+2026-08-16 12:17:34,433 INFO  [it.uni.reti2.main] (main) 🔴 Ascolto alert su topic MQTT: railway/alerts
+2026-08-16 12:17:34,434 INFO  [it.uni.reti2.main] (main) 🎛️ Nessun terminale interattivo: sensori attivabili via POST /treno/sensore/*
+2026-08-16 12:17:43,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 315)
+2026-08-16 12:17:45,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso TO (15 min simulati)
+2026-08-16 12:17:55,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 222)
+2026-08-16 12:17:58,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:18:08,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 299)
+2026-08-16 12:18:11,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso Padova (15 min simulati)
+2026-08-16 12:18:21,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea Padova raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:18:21,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in Padova (ritardo 0 min, passeggeri 194)
+2026-08-16 12:18:25,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da Padova verso MI (15 min simulati)
+2026-08-16 12:18:35,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 193)
+2026-08-16 12:18:37,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:18:47,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 191)
+2026-08-16 12:18:49,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso stazzaDellaMadonnaTroia (15 min simulati)
+2026-08-16 12:18:59,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in stazzaDellaMadonnaTroia (ritardo 0 min, passeggeri 367)
+2026-08-16 12:19:01,045 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da stazzaDellaMadonnaTroia verso PA (15 min simulati)
+2026-08-16 12:19:11,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea PA raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:19:11,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in PA (ritardo 0 min, passeggeri 359)
+2026-08-16 12:19:15,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da PA verso stazzaDellaMadonnaTroia (15 min simulati)
+2026-08-16 12:19:18,594 WARN  [it.uni.reti2.TrainGateway] (vert.x-eventloop-thread-1) 🛑 [ALERT] Corsa soppressa dalla Centrale: {"tipoEvento":"STOP","target":"Mario","motivo":"Soppresso da operatore","timestamp":"2026-08-16T10:19:18.590798794Z"}
+2026-08-16 12:23:46,877 INFO  [it.uni.reti2.TrainGateway] (vert.x-eventloop-thread-1) 🗺️ [ALERT] La Centrale ha aggiornato il mio itinerario: lo ricarico
+2026-08-16 12:23:47,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔄 [TWIN] Itinerario aggiornato dalla Centrale: ricarico e ricomincio il viaggio
+2026-08-16 12:23:47,058 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🗺️ [TWIN] Itinerario rt-1785880846379 caricato: 2 stazioni [TO, MI]
+2026-08-16 12:23:48,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Treno Mario pronto alla partenza da torino Porta Nuova (TO), prossima fermata MI
+2026-08-16 12:23:50,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:24:00,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:24:00,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 115)
+2026-08-16 12:24:04,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:24:14,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:24:14,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 72)
+2026-08-16 12:24:19,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:24:29,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:24:29,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 103)
+2026-08-16 12:24:34,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:24:44,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:24:44,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 145)
+2026-08-16 12:24:48,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:24:58,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:24:58,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 185)
+2026-08-16 12:25:02,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:25:12,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:25:12,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 215)
+2026-08-16 12:25:17,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:25:27,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:25:27,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 371)
+2026-08-16 12:25:32,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:25:42,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:25:42,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 298)
+2026-08-16 12:25:47,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:25:57,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:25:57,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 170)
+2026-08-16 12:26:02,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:26:12,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:26:12,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 138)
+2026-08-16 12:26:17,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:26:27,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:26:27,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 74)
+2026-08-16 12:26:32,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:26:42,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:26:42,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 106)
+2026-08-16 12:26:47,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:26:57,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:26:57,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 154)
+2026-08-16 12:27:01,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:27:11,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:27:11,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 240)
+2026-08-16 12:27:16,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:27:26,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:27:26,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 157)
+2026-08-16 12:27:31,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:27:41,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:27:41,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 169)
+2026-08-16 12:27:45,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:27:55,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:27:55,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 310)
+2026-08-16 12:28:00,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:28:10,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:28:10,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 251)
+2026-08-16 12:28:15,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:28:25,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:28:25,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 130)
+2026-08-16 12:28:30,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:28:40,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:28:40,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 50)
+2026-08-16 12:28:45,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:28:55,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:28:55,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 201)
+2026-08-16 12:29:00,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:29:10,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:29:10,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 350)
+2026-08-16 12:29:15,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:29:25,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:29:25,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 206)
+2026-08-16 12:29:30,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:29:40,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:29:40,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 289)
+2026-08-16 12:29:44,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 12:29:54,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 12:29:54,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 278)
+2026-08-16 12:29:58,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 12:30:08,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 12:30:08,044 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 137)
+2026-08-16 16:13:46,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-1) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:13:46,016 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-16 16:13:46,028 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-16 16:13:46,029 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-16 16:13:47,023 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 16:13:47,030 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 16:13:47,032 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 16:13:55,152 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:13:55,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 279)
+2026-08-16 16:13:59,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:14:09,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:14:09,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 68)
+2026-08-16 16:14:13,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:14:22,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:14:22,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 80)
+2026-08-16 16:14:27,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:14:37,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:14:37,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 155)
+2026-08-16 16:14:42,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:14:52,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:14:52,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 362)
+2026-08-16 16:14:56,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:15:06,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:15:06,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 111)
+2026-08-16 16:15:11,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:15:21,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:15:21,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 175)
+2026-08-16 16:15:26,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:15:36,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:15:36,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 142)
+2026-08-16 16:15:41,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:15:51,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:15:51,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 240)
+2026-08-16 16:15:55,157 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:16:05,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:16:05,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 257)
+2026-08-16 16:16:09,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:16:18,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:16:18,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 139)
+2026-08-16 16:16:23,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:16:33,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:16:33,158 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 174)
+2026-08-16 16:16:37,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:16:47,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:16:47,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 141)
+2026-08-16 16:16:52,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:17:02,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:17:02,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 339)
+2026-08-16 16:17:07,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:17:17,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:17:17,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 81)
+2026-08-16 16:17:22,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:17:32,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:17:32,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 108)
+2026-08-16 16:17:36,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:17:46,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:17:46,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 114)
+2026-08-16 16:17:50,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:18:00,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:18:00,165 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 250)
+2026-08-16 16:18:04,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:18:14,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:18:14,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 316)
+2026-08-16 16:18:18,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:18:28,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:18:28,167 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 200)
+2026-08-16 16:18:33,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:18:43,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:18:43,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 254)
+2026-08-16 16:18:48,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:18:58,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:18:58,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 393)
+2026-08-16 16:19:03,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:19:13,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:19:13,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 168)
+2026-08-16 16:19:18,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:19:28,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:19:28,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 256)
+2026-08-16 16:19:32,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:19:42,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:19:42,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 379)
+2026-08-16 16:19:46,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:19:56,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:19:56,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 189)
+2026-08-16 16:20:01,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:20:11,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:20:11,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 360)
+2026-08-16 16:20:16,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:20:26,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:20:26,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 375)
+2026-08-16 16:20:31,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:20:40,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:20:40,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 381)
+2026-08-16 16:20:45,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:20:55,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:20:55,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 118)
+2026-08-16 16:21:00,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:21:10,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:21:10,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 156)
+2026-08-16 16:21:14,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:21:24,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:21:24,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 89)
+2026-08-16 16:21:28,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:21:37,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:21:37,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 339)
+2026-08-16 16:21:42,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:21:52,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:21:52,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 157)
+2026-08-16 16:21:56,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:22:06,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:22:06,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 286)
+2026-08-16 16:22:10,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:22:20,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:22:20,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 175)
+2026-08-16 16:22:25,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:22:35,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:22:35,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 221)
+2026-08-16 16:22:39,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:22:49,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:22:49,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 152)
+2026-08-16 16:22:53,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:23:03,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:23:03,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 384)
+2026-08-16 16:23:07,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:23:17,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:23:17,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 333)
+2026-08-16 16:23:22,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:23:32,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:23:32,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 140)
+2026-08-16 16:23:37,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:23:47,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:23:47,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 280)
+2026-08-16 16:23:52,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:24:02,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:24:02,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 143)
+2026-08-16 16:24:06,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:24:16,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:24:16,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 107)
+2026-08-16 16:24:21,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:24:30,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:24:30,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 319)
+2026-08-16 16:24:35,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:24:45,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:24:45,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 242)
+2026-08-16 16:24:50,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:25:00,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:25:00,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 382)
+2026-08-16 16:25:04,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:25:14,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:25:14,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 268)
+2026-08-16 16:25:18,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:25:28,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:25:28,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 86)
+2026-08-16 16:25:32,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:25:42,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:25:42,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 327)
+2026-08-16 16:25:47,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:25:57,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:25:57,156 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 144)
+2026-08-16 16:26:02,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:26:12,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:26:12,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 325)
+2026-08-16 16:26:16,155 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:26:26,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:26:26,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 258)
+2026-08-16 16:26:30,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:26:39,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:26:39,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 145)
+2026-08-16 16:26:44,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:26:54,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:26:54,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 189)
+2026-08-16 16:26:58,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:27:08,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:27:08,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 154)
+2026-08-16 16:27:13,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:27:23,157 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:27:23,158 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 144)
+2026-08-16 16:27:28,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:27:38,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:27:38,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 308)
+2026-08-16 16:27:42,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:27:52,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:27:52,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 363)
+2026-08-16 16:27:56,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:28:06,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:28:06,157 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 312)
+2026-08-16 16:28:11,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:28:21,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:28:21,154 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 196)
+2026-08-16 16:28:26,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:28:36,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:28:36,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 332)
+2026-08-16 16:28:41,197 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:28:51,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:28:51,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 177)
+2026-08-16 16:28:56,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:29:06,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:29:06,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 397)
+2026-08-16 16:29:10,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:29:20,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:29:20,162 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 87)
+2026-08-16 16:29:25,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:29:35,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:29:35,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 373)
+2026-08-16 16:29:40,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:29:50,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:29:50,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 277)
+2026-08-16 16:29:54,155 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:30:04,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:30:04,155 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 276)
+2026-08-16 16:30:08,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:30:18,157 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:30:18,158 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 376)
+2026-08-16 16:30:23,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:30:33,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:30:33,157 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 108)
+2026-08-16 16:30:37,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:30:47,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:30:47,153 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 215)
+2026-08-16 16:30:52,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:31:02,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:31:02,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 117)
+2026-08-16 16:31:07,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:31:17,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:31:17,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 253)
+2026-08-16 16:31:21,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:31:31,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:31:31,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 296)
+2026-08-16 16:31:35,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:31:45,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:31:45,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 126)
+2026-08-16 16:31:50,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:32:00,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:32:00,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 79)
+2026-08-16 16:32:04,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:32:14,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:32:14,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 199)
+2026-08-16 16:32:19,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:32:29,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:32:29,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 248)
+2026-08-16 16:32:34,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:32:44,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:32:44,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 234)
+2026-08-16 16:32:49,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:32:58,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:32:58,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 236)
+2026-08-16 16:33:03,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:33:12,010 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:33:12,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 91)
+2026-08-16 16:33:17,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:33:27,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:33:27,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 72)
+2026-08-16 16:33:31,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:33:41,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:33:41,091 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 227)
+2026-08-16 16:33:46,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:33:56,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:33:56,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 53)
+2026-08-16 16:34:01,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:34:11,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:34:11,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 268)
+2026-08-16 16:34:16,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:34:26,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:34:26,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 316)
+2026-08-16 16:34:30,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:34:40,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:34:40,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 212)
+2026-08-16 16:34:44,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:34:54,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:34:54,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 358)
+2026-08-16 16:34:58,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:35:08,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:35:08,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 194)
+2026-08-16 16:35:12,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:35:21,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:35:21,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 174)
+2026-08-16 16:35:25,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:35:35,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:35:35,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 230)
+2026-08-16 16:35:39,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:35:49,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:35:49,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 174)
+2026-08-16 16:35:54,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:36:04,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:36:04,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 190)
+2026-08-16 16:36:09,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:36:19,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:36:19,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 166)
+2026-08-16 16:36:23,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:36:33,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:36:33,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 341)
+2026-08-16 16:36:37,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:36:47,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:36:47,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 317)
+2026-08-16 16:36:52,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:37:02,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:37:02,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 293)
+2026-08-16 16:37:07,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:37:16,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:37:16,060 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 297)
+2026-08-16 16:37:21,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:37:31,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:37:31,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 392)
+2026-08-16 16:37:36,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:37:46,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:37:46,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 153)
+2026-08-16 16:37:51,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:38:01,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:38:01,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 88)
+2026-08-16 16:38:05,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:38:15,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:38:15,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 164)
+2026-08-16 16:38:20,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:38:30,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:38:30,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 274)
+2026-08-16 16:38:34,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:38:44,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:38:44,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 147)
+2026-08-16 16:38:48,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:38:58,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:38:58,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 364)
+2026-08-16 16:39:02,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:39:12,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:39:12,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 97)
+2026-08-16 16:39:16,010 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:39:26,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:39:26,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 253)
+2026-08-16 16:39:31,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:39:41,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:39:41,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 69)
+2026-08-16 16:39:46,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:39:56,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:39:56,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 208)
+2026-08-16 16:40:01,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:40:11,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:40:11,009 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 155)
+2026-08-16 16:40:15,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:40:25,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:40:25,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 376)
+2026-08-16 16:40:30,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:40:39,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:40:39,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 251)
+2026-08-16 16:40:44,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:40:54,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:40:54,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 381)
+2026-08-16 16:40:59,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:41:09,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:41:09,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 55)
+2026-08-16 16:41:13,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:41:23,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:41:23,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 52)
+2026-08-16 16:41:28,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:41:37,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:41:37,073 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 238)
+2026-08-16 16:41:41,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:41:51,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:41:51,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 175)
+2026-08-16 16:41:56,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:42:05,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:42:05,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 52)
+2026-08-16 16:42:10,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:42:19,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:42:19,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 216)
+2026-08-16 16:42:23,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:42:33,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:42:33,043 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 282)
+2026-08-16 16:42:38,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:42:48,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:42:48,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 360)
+2026-08-16 16:42:53,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:43:03,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:43:03,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 280)
+2026-08-16 16:43:08,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:43:17,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:43:17,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 175)
+2026-08-16 16:43:22,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:43:32,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:43:32,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 326)
+2026-08-16 16:43:36,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:43:46,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:43:46,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 113)
+2026-08-16 16:43:51,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:44:01,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:44:01,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 321)
+2026-08-16 16:44:06,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:44:16,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:44:16,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 360)
+2026-08-16 16:44:21,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:44:31,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:44:31,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 108)
+2026-08-16 16:44:35,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:44:45,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:44:45,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 260)
+2026-08-16 16:44:50,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:45:00,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:45:00,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 335)
+2026-08-16 16:45:05,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:45:15,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:45:15,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 152)
+2026-08-16 16:45:19,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:45:28,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:45:28,010 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 193)
+2026-08-16 16:45:33,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:45:43,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:45:43,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 351)
+2026-08-16 16:45:48,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:45:58,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:45:58,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 53)
+2026-08-16 16:46:03,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:46:13,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:46:13,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 335)
+2026-08-16 16:46:18,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:46:28,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:46:28,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 234)
+2026-08-16 16:46:32,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:46:42,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:46:42,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 261)
+2026-08-16 16:46:46,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:46:56,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:46:56,074 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 262)
+2026-08-16 16:47:01,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:47:11,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:47:11,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 292)
+2026-08-16 16:47:15,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:47:25,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:47:25,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 223)
+2026-08-16 16:47:30,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:47:40,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:47:40,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 134)
+2026-08-16 16:47:44,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:47:54,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:47:54,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 187)
+2026-08-16 16:47:58,011 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:48:08,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:48:08,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 57)
+2026-08-16 16:48:12,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:48:22,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:48:22,010 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 356)
+2026-08-16 16:48:26,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:48:36,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:48:36,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 334)
+2026-08-16 16:48:40,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:48:50,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:48:50,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 301)
+2026-08-16 16:48:55,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:49:05,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:49:05,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 337)
+2026-08-16 16:49:10,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:49:20,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:49:20,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 193)
+2026-08-16 16:49:25,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:49:34,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:49:34,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 355)
+2026-08-16 16:49:39,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:49:49,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:49:49,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 283)
+2026-08-16 16:49:53,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:50:02,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:50:02,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 50)
+2026-08-16 16:50:07,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:50:17,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:50:17,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 92)
+2026-08-16 16:50:21,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:50:31,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:50:31,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 295)
+2026-08-16 16:50:35,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:50:45,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:50:45,007 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 161)
+2026-08-16 16:50:50,006 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:58:22,720 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:58:22,722 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 323)
+2026-08-16 16:58:22,738 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-16 16:58:22,751 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-16 16:58:22,751 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
+2026-08-16 16:58:23,769 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 16:58:23,773 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 16:58:23,777 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 16:58:27,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:58:37,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:58:37,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 54)
+2026-08-16 16:58:42,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:58:52,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:58:52,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 248)
+2026-08-16 16:58:57,024 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:59:07,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:59:07,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 399)
+2026-08-16 16:59:11,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:59:21,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:59:21,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 214)
+2026-08-16 16:59:26,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 16:59:35,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 16:59:35,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 191)
+2026-08-16 16:59:40,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 16:59:50,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 16:59:50,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 100)
+2026-08-16 16:59:55,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:00:05,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:00:05,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 187)
+2026-08-16 17:00:09,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:00:18,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:00:18,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 387)
+2026-08-16 17:00:23,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:00:33,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:00:33,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 55)
+2026-08-16 17:00:37,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:00:47,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:00:47,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 395)
+2026-08-16 17:00:51,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:01:00,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:01:00,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 352)
+2026-08-16 17:01:05,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:01:15,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:01:15,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 153)
+2026-08-16 17:01:20,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:01:30,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:01:30,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 197)
+2026-08-16 17:01:35,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:01:45,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:01:45,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 326)
+2026-08-16 17:01:49,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:01:59,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:01:59,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 147)
+2026-08-16 17:02:03,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:02:13,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:02:13,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 210)
+2026-08-16 17:02:18,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:02:28,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:02:28,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 115)
+2026-08-16 17:02:32,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:02:42,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:02:42,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 154)
+2026-08-16 17:02:47,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:02:56,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:02:56,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 62)
+2026-08-16 17:03:01,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:03:11,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:03:11,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 230)
+2026-08-16 17:03:15,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:03:25,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:03:25,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 149)
+2026-08-16 17:03:30,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:03:40,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:03:40,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 136)
+2026-08-16 17:03:45,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:03:55,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:03:55,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 267)
+2026-08-16 17:04:00,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:04:10,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:04:10,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 123)
+2026-08-16 17:04:15,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:04:24,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:04:24,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 155)
+2026-08-16 17:04:29,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:04:38,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:04:38,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 98)
+2026-08-16 17:04:43,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:04:53,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:04:53,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 226)
+2026-08-16 17:04:58,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:05:07,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:05:07,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 348)
+2026-08-16 17:05:12,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:05:22,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:05:22,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 161)
+2026-08-16 17:05:27,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:05:36,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:05:36,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 266)
+2026-08-16 17:05:41,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:05:50,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:05:50,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 196)
+2026-08-16 17:05:55,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:06:05,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:06:05,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 52)
+2026-08-16 17:06:10,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:06:19,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:06:19,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 338)
+2026-08-16 17:06:24,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:06:34,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:06:34,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 228)
+2026-08-16 17:06:38,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:06:48,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:06:48,013 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 390)
+2026-08-16 17:06:53,012 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:07:02,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:07:02,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 237)
+2026-08-16 17:07:06,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:07:16,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:07:16,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 87)
+2026-08-16 17:07:21,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:07:30,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:07:30,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 299)
+2026-08-16 17:07:34,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:07:43,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:07:43,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 382)
+2026-08-16 17:07:48,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:07:58,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:07:58,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 104)
+2026-08-16 17:08:03,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:08:13,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:08:13,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 365)
+2026-08-16 17:08:18,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:08:28,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:08:28,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 284)
+2026-08-16 17:08:33,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:08:42,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:08:42,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 126)
+2026-08-16 17:08:47,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:08:57,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:08:57,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 340)
+2026-08-16 17:09:01,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:09:11,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:09:11,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 334)
+2026-08-16 17:09:16,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:09:25,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:09:25,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 289)
+2026-08-16 17:09:30,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:09:39,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:09:39,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 315)
+2026-08-16 17:09:44,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:09:54,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:09:54,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 166)
+2026-08-16 17:09:58,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:10:07,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:10:07,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 377)
+2026-08-16 17:10:12,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:10:22,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:10:22,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 363)
+2026-08-16 17:10:26,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:10:36,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:10:36,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 119)
+2026-08-16 17:10:41,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:10:51,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:10:51,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 399)
+2026-08-16 17:10:55,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:11:04,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:11:04,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 97)
+2026-08-16 17:11:08,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:11:18,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:11:18,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 227)
+2026-08-16 17:11:23,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:11:33,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:11:33,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 210)
+2026-08-16 17:11:38,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:11:48,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:11:48,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 208)
+2026-08-16 17:11:52,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:12:02,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:12:02,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 106)
+2026-08-16 17:12:07,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:12:17,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:12:17,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 308)
+2026-08-16 17:12:21,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:12:31,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:12:31,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 389)
+2026-08-16 17:12:35,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:12:45,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:12:45,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 368)
+2026-08-16 17:12:50,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:13:00,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:13:00,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 193)
+2026-08-16 17:13:05,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:13:15,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:13:15,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 172)
+2026-08-16 17:13:19,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:13:29,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:13:29,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 58)
+2026-08-16 17:13:34,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:13:44,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:13:44,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 218)
+2026-08-16 17:13:49,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:13:59,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:13:59,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 102)
+2026-08-16 17:14:03,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:14:13,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:14:13,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 140)
+2026-08-16 17:14:18,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:14:28,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:14:28,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 245)
+2026-08-16 17:14:33,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:14:42,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:14:42,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 79)
+2026-08-16 17:14:47,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:14:57,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:14:57,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 209)
+2026-08-16 17:15:01,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:15:11,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:15:11,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 353)
+2026-08-16 17:15:16,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:15:26,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:15:26,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 128)
+2026-08-16 17:15:31,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:15:41,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:15:41,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 274)
+2026-08-16 17:15:45,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:15:55,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:15:55,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 313)
+2026-08-16 17:16:00,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:16:10,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:16:10,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 309)
+2026-08-16 17:16:15,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:16:25,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:16:25,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 321)
+2026-08-16 17:16:30,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:16:40,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:16:40,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 348)
+2026-08-16 17:16:45,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:16:55,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:16:55,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 291)
+2026-08-16 17:16:59,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:17:08,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:17:08,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 358)
+2026-08-16 17:17:13,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:17:23,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:17:23,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 106)
+2026-08-16 17:17:28,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:17:38,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:17:38,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 138)
+2026-08-16 17:17:42,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:17:52,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:17:52,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 309)
+2026-08-16 17:17:56,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:18:06,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:18:06,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 131)
+2026-08-16 17:18:11,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:18:21,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:18:21,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 324)
+2026-08-16 17:18:26,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:18:36,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:18:36,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 121)
+2026-08-16 17:18:41,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:18:51,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:18:51,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 206)
+2026-08-16 17:18:55,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:19:05,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:19:05,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 270)
+2026-08-16 17:19:09,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:19:19,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:19:19,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 347)
+2026-08-16 17:19:23,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:19:33,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:19:33,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 73)
+2026-08-16 17:19:38,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:19:48,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:19:48,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 337)
+2026-08-16 17:19:52,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:20:02,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:20:02,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 60)
+2026-08-16 17:20:07,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:20:17,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:20:17,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 259)
+2026-08-16 17:20:21,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:20:31,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:20:31,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 139)
+2026-08-16 17:20:36,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:20:46,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:20:46,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 384)
+2026-08-16 17:20:50,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:20:59,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:20:59,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 60)
+2026-08-16 17:21:04,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:21:14,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:21:14,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 322)
+2026-08-16 17:21:19,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:21:29,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:21:29,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 365)
+2026-08-16 17:21:34,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:21:43,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:21:43,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 282)
+2026-08-16 17:21:48,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:21:57,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:21:57,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 281)
+2026-08-16 17:22:02,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:22:12,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:22:12,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 373)
+2026-08-16 17:22:17,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:22:27,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:22:27,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 357)
+2026-08-16 17:22:31,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:22:41,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:22:41,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 248)
+2026-08-16 17:22:46,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:22:56,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:22:56,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 86)
+2026-08-16 17:23:00,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:23:09,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:23:09,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 278)
+2026-08-16 17:23:14,821 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:23:24,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:23:24,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 276)
+2026-08-16 17:23:29,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:23:39,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:23:39,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 195)
+2026-08-16 17:23:43,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:23:53,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:23:53,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 174)
+2026-08-16 17:23:57,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:24:07,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:24:07,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 345)
+2026-08-16 17:24:12,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:24:22,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:24:22,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 139)
+2026-08-16 17:24:26,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:24:36,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:24:36,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 234)
+2026-08-16 17:24:41,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:24:51,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:24:51,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 165)
+2026-08-16 17:24:56,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:25:06,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:25:06,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 75)
+2026-08-16 17:25:10,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:25:20,850 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:25:20,850 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 164)
+2026-08-16 17:25:25,821 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:25:35,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:25:35,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 185)
+2026-08-16 17:25:40,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:25:50,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:25:50,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 371)
+2026-08-16 17:25:54,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:26:04,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:26:04,819 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 200)
+2026-08-16 17:26:08,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:26:18,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:26:18,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 309)
+2026-08-16 17:26:23,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:26:33,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:26:33,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 219)
+2026-08-16 17:26:38,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:26:47,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:26:47,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 147)
+2026-08-16 17:26:52,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:27:02,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:27:02,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 210)
+2026-08-16 17:27:07,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:27:16,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:27:16,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 311)
+2026-08-16 17:27:21,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:27:31,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:27:31,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 222)
+2026-08-16 17:27:36,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:27:45,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:27:45,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 282)
+2026-08-16 17:27:50,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:27:59,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:27:59,822 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 136)
+2026-08-16 17:28:04,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:28:14,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:28:14,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 361)
+2026-08-16 17:28:19,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:28:29,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:28:29,848 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 385)
+2026-08-16 17:28:34,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:28:44,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:28:44,895 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 185)
+2026-08-16 17:28:49,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:28:58,820 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:28:58,820 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 347)
+2026-08-16 17:29:03,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:29:13,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:29:13,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 259)
+2026-08-16 17:29:17,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:29:26,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:29:26,830 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 240)
+2026-08-16 17:29:31,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:29:41,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:29:41,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 241)
+2026-08-16 17:29:45,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:29:55,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:29:55,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 279)
+2026-08-16 17:30:00,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:30:09,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:30:09,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 325)
+2026-08-16 17:30:13,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:30:23,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:30:23,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 74)
+2026-08-16 17:30:27,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:30:37,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:30:37,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 341)
+2026-08-16 17:30:42,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:30:52,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:30:52,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 160)
+2026-08-16 17:30:56,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:31:06,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:31:06,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 208)
+2026-08-16 17:31:10,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:31:19,819 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:31:19,819 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 177)
+2026-08-16 17:31:24,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:31:34,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:31:34,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 191)
+2026-08-16 17:31:39,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:31:49,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:31:49,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 64)
+2026-08-16 17:31:54,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:32:04,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:32:04,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 367)
+2026-08-16 17:32:08,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:32:18,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:32:18,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 144)
+2026-08-16 17:32:22,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:32:31,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:32:31,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 104)
+2026-08-16 17:32:36,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:32:46,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:32:46,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 191)
+2026-08-16 17:32:50,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:33:00,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:33:00,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 139)
+2026-08-16 17:33:05,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:33:14,870 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:33:14,870 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 253)
+2026-08-16 17:33:19,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:33:28,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:33:28,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 80)
+2026-08-16 17:33:33,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:33:42,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:33:42,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 201)
+2026-08-16 17:33:47,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:33:57,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:33:57,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 124)
+2026-08-16 17:34:01,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:34:10,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:34:10,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 391)
+2026-08-16 17:34:15,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:34:25,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:34:25,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 133)
+2026-08-16 17:34:30,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:34:40,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:34:40,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 246)
+2026-08-16 17:34:44,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:34:54,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:34:54,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 313)
+2026-08-16 17:34:59,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:35:08,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:35:08,818 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 109)
+2026-08-16 17:35:13,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)
+2026-08-16 17:35:23,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea MI raggiunto: inversione di marcia (ritorno), sosta doppia
+2026-08-16 17:35:23,821 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in MI (ritardo 0 min, passeggeri 180)
+2026-08-16 17:35:27,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da MI verso TO (15 min simulati)
+2026-08-16 17:35:37,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🔁 [TWIN] Capolinea TO raggiunto: inversione di marcia (andata), sosta doppia
+2026-08-16 17:35:37,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚉 [TWIN] Arrivo in TO (ritardo 0 min, passeggeri 374)
+2026-08-16 17:35:41,817 INFO  [it.uni.reti2.TrainJourneyEngine] (executor-thread-3) 🚆 [TWIN] Partenza da TO verso MI (15 min simulati)

@@ -17,19 +17,28 @@ import { useNavigate } from 'react-router-dom';
  */
 export default function DashboardPage() {
   // Preleva lo stato globale sincronizzato tramite Zustand
-  const { trains, stations, alerts } = useRailwayStore();
+  const trains = useRailwayStore((s) => s.trains);
+  const stations = useRailwayStore((s) => s.stations);
+  const alerts = useRailwayStore((s) => s.alerts);
+  // I KPI arrivano dalla Centrale: GET /api/dashboard all'apertura, poi lo snapshot ogni
+  // dieci secondi. Prima questa pagina se li ricalcolava da sola e le formule NON erano le
+  // stesse — treni in movimento, ritardo medio e stazioni guaste davano tre numeri diversi
+  // da quelli del server, e gli allarmi attivi erano gonfiati dai doppioni.
+  const kpi = useRailwayStore((s) => s.kpi);
   const navigate = useNavigate();
 
-  // Calcolo dinamico dei Key Performance Indicators (KPI)
+  // I treni in viaggio da elencare qui sotto restano una lettura locale: è l'elenco delle
+  // righe da disegnare, non un indicatore.
   const activeTrains = trains.filter(t => t.status === 'in_viaggio' || t.status === 'in_ritardo');
-  const delayedTrains = trains.filter(t => t.delayMinutes > 0);
-  const faultyStations = stations.filter(s => s.status !== 'operativa');
-  const unacknowledgedAlerts = alerts.filter(a => !a.acknowledged);
-  
-  // Calcolo del ritardo medio aritmetico arrotondato
-  const avgDelay = delayedTrains.length > 0 
-    ? Math.round(delayedTrains.reduce((acc, t) => acc + t.delayMinutes, 0) / delayedTrains.length) 
-    : 0;
+
+  // Finché la prima risposta della Centrale non è arrivata si mostrano dei trattini
+  // invece di numeri inventati in locale.
+  const numero = (valore: number | undefined) =>
+    valore === undefined ? '—' : Math.round(valore);
+  const trainsInMotion = numero(kpi?.trainsInMotion);
+  const avgDelay = numero(kpi?.avgDelay);
+  const faultyStations = numero(kpi?.stationsFaulty);
+  const activeAlerts = numero(kpi?.activeAlerts);
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
@@ -43,7 +52,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="text-sm text-muted m-0">Treni Attivi</p>
-            <h3 className="text-2xl font-bold m-0">{activeTrains.length} <span className="text-sm font-normal text-muted">/ {trains.length}</span></h3>
+            <h3 className="text-2xl font-bold m-0">{trainsInMotion} <span className="text-sm font-normal text-muted">/ {kpi?.totalTrains ?? trains.length}</span></h3>
           </div>
         </Card>
 
@@ -65,7 +74,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="text-sm text-muted m-0">Stazioni Anomale</p>
-            <h3 className="text-2xl font-bold m-0">{faultyStations.length} <span className="text-sm font-normal text-muted">/ {stations.length}</span></h3>
+            <h3 className="text-2xl font-bold m-0">{faultyStations} <span className="text-sm font-normal text-muted">/ {stations.length}</span></h3>
           </div>
         </Card>
 
@@ -76,7 +85,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="text-sm text-muted m-0">Allarmi Attivi</p>
-            <h3 className="text-2xl font-bold m-0 text-danger">{unacknowledgedAlerts.length}</h3>
+            <h3 className="text-2xl font-bold m-0 text-danger">{activeAlerts}</h3>
           </div>
         </Card>
       </div>

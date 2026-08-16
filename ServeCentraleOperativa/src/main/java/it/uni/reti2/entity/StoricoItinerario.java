@@ -12,8 +12,16 @@ import java.time.Instant;
  * fine percorrenza. Permette di ricostruire la cronologia dei viaggi
  * effettuati da ciascun treno nel tempo.</p>
  *
+ * <h3>Niente chiavi esterne (RF02.7)</h3>
+ * <p>L'itinerario nel database è solo un identificativo: il percorso vero sta nella
+ * associativa {@code Itinerario_Tratta}, e l'amministratore può rifarlo da capo quando
+ * vuole (la PUT su /api/tratte cancella e ricrea le righe). Un riferimento al solo id
+ * racconterebbe quindi il percorso di oggi, non quello che il convoglio ha davvero
+ * percorso: per questo la riga porta la descrizione del percorso e le sue tratte
+ * vengono copiate una per una in {@link StoricoItinerarioTratta}.</p>
+ *
  * @see it.uni.reti2.entity.Itinerario
- * @see it.uni.reti2.entity.Treno
+ * @see it.uni.reti2.entity.StoricoItinerarioTratta
  */
 @Entity
 @Table(name = "Storico_Itinerari")
@@ -25,15 +33,21 @@ public class StoricoItinerario extends PanacheEntityBase {
     @Column(name = "id_storico_itinerario")
     public Long id;
 
-    /** Riferimento all'itinerario assegnato al treno. */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_itinerario", nullable = false)
-    public Itinerario itinerario;
+    /** Identificativo dell'itinerario assegnato al treno (riferimento logico). */
+    @Column(name = "id_itinerario", nullable = false, length = 50)
+    public String itinerarioId;
 
-    /** Riferimento al convoglio che ha percorso l'itinerario. */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_convoglio", nullable = false)
-    public Treno treno;
+    /** Identificativo del convoglio che ha percorso l'itinerario (è anche il suo nome). */
+    @Column(name = "id_convoglio", nullable = false, length = 50)
+    public String trenoId;
+
+    /** Percorso in chiaro ("Milano Centrale - Bologna Centrale - Firenze SMN - Roma Termini"). */
+    @Column(name = "descrizione_percorso", length = 1000)
+    public String descrizionePercorso;
+
+    /** Quante tratte componevano l'itinerario al momento dell'assegnazione. */
+    @Column(name = "numero_tratte")
+    public Integer numeroTratte;
 
     /** Timestamp di inizio assegnazione dell'itinerario al treno. */
     @Column(name = "ts_assegnazione", nullable = false)

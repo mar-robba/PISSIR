@@ -164,6 +164,7 @@ public class TrainJourneyEngine {
             trainDB.itinerarioId = null; // ?
             viaggioAvviato = false;// ?
             ultimoTentativoCaricamento = Instant.EPOCH; // riprova subito// un modo più elegante per dire 0 // Istante dell'ultimo tentativo (fallito o no) di caricamento itinerario. */
+            fermaPerMancanzaItinerario();
         }
 
         // Non facciamo nulla finché il treno non è stato validato dal server centrale
@@ -172,8 +173,15 @@ public class TrainJourneyEngine {
             return;
         }
 
-        // Senza itinerario non si viaggia: tenta il caricamento (con retry ogni 15s)
+        // Senza itinerario non si viaggia: tenta il caricamento (con retry ogni 15s).
+        // Prima di uscire bisogna però DICHIARARSI fermi: la telemetria continua a partire
+        // ogni 5 secondi e, restando IN_VIAGGIO, il convoglio raccontava alla Centrale di
+        // essere in marcia a una velocità inventata fra 80 e 160 km/h mentre la posizione
+        // non si muoveva di un metro. Sulla mappa restava un treno azzurro "IN VIAGGIO"
+        // fermo sul posto, e nemmeno il watchdog poteva accorgersene, perché cercava treni
+        // a velocità zero. È il caso peggiore: uno stato plausibile ma falso.
         if (trainDB.itinerario.isEmpty()) {
+            fermaPerMancanzaItinerario();
             tentaCaricamentoItinerario();
             return;
         }
@@ -283,6 +291,30 @@ public class TrainJourneyEngine {
     }
 
     /**
+     * Mette il convoglio in uno stato coerente con il fatto che non ha (più) un itinerario:
+     * fermo, a velocità zero, in attesa di un percorso o della soppressione, come chiede
+     * RF02.5.1 ("smette di viaggiare e resta fermo in attesa di essere soppresso").
+     *
+     * <p>Gli stati decisi da fuori non si toccano: un convoglio SOPPRESSO resta soppresso e
+     * uno in EMERGENZA resta in avaria, che sono informazioni più importanti di questa.</p>
+     */
+    private void fermaPerMancanzaItinerario() {
+        if ("SOPPRESSO".equals(trainDB.stato) || "EMERGENZA".equals(trainDB.stato)) {
+            return;
+        }
+        boolean eraInMarcia = !"FERMO".equals(trainDB.stato)
+                || !"SENZA_ITINERARIO".equals(trainDB.faseViaggio);
+        trainDB.stato = "FERMO";
+        trainDB.velocita = 0;
+        trainDB.faseViaggio = "SENZA_ITINERARIO";
+        trainDB.prossimaStazione = null;
+        trainDB.stazioneBloccante = null;
+        if (eraInMarcia) {
+            LOG.warn("🛑 [TWIN] Nessun itinerario assegnato: resto fermo in attesa di un percorso");
+        }
+    }
+
+    /**
      * Posiziona il treno alla prima stazione dell'itinerario e apre la sosta iniziale.
      * NOTA: alla prima partenza NON viene pubblicata alcuna ENTRATA, solo la USCITA
      * quando la sosta scade (caso "esce senza entrare" della stazione di partenza).
@@ -387,6 +419,7 @@ public class TrainJourneyEngine {
         // Interpolazione lineare della posizione tra le coordinate delle due stazioni
         trainDB.latitudine = da.latitudine + (a.latitudine - da.latitudine) * progress / 100.0;
         trainDB.longitudine = da.longitudine + (a.longitudine - da.longitudine) * progress / 100.0;
+        //?
         trainDB.prossimaStazione = a.id;
 
         if (progress >= 100.0) {

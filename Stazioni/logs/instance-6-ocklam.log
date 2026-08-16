@@ -2,216 +2,72 @@ __  ____  __  _____   ___  __ ____  ______
  --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
  -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
 --\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
-2026-08-15 13:17:04,771 INFO  [it.uni.reti2.main] (main) 🚉 Avvio processo Stazione con ID: ocklam
-2026-08-15 13:17:06,326 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[]
-2026-08-15 13:17:06,759 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-15 13:17:06,872 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/station/+/validation-response, Max QoS 0.
-2026-08-15 13:17:06,873 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/alerts, Max QoS 0.
-2026-08-15 13:17:06,873 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/train/+/passaggio, Max QoS 0.
-2026-08-15 13:17:06,959 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:17:07,069 INFO  [io.quarkus] (main) stazione 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.37.3) started in 2.518s. Listening on: http://0.0.0.0:8086
-2026-08-15 13:17:07,070 INFO  [io.quarkus] (main) Profile prod activated. 
-2026-08-15 13:17:07,070 INFO  [io.quarkus] (main) Installed features: [cdi, messaging, messaging-mqtt, rest, rest-jackson, scheduler, smallrye-context-propagation, vertx]
-2026-08-15 13:17:07,092 INFO  [it.uni.reti2.main] (main) 🔎 Verifica ID stazione 'ocklam' nel database centrale...
-2026-08-15 13:17:07,183 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:17:07,184 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:12,185 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:16,960 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:17:17,185 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:22,187 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:17:22,187 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:26,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:17:27,187 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:32,188 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:36,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:17:37,189 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:17:37,190 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:42,190 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:46,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:17:47,202 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:52,204 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:17:52,204 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:17:56,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:17:57,204 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:02,205 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:06,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:18:07,206 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:18:07,207 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:12,207 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:16,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:18:17,208 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:22,210 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:18:22,210 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:26,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:18:27,211 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:32,211 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:36,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:18:37,212 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:18:37,213 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:42,213 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:46,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:18:47,213 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:52,215 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:18:52,215 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:18:56,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:18:57,215 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:02,216 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:06,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:19:07,217 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:19:07,218 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:12,218 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:16,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:19:17,219 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:22,221 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:19:22,222 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:26,725 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"STOP","target":"TRENO_TEST_fd1b","motivo":"Soppresso da operatore","timestamp":"2026-08-15T11:19:26.686794182Z"}
-2026-08-15 13:19:26,833 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"STOP","target":"TRENO_TEST_fd1b","motivo":"Treno eliminato da operatore","timestamp":"2026-08-15T11:19:26.831164513Z"}
-2026-08-15 13:19:26,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:19:27,222 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:32,223 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:36,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:19:37,224 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:19:37,224 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:42,225 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:46,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:19:47,225 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:52,227 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:19:52,227 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:19:56,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:19:57,227 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:02,228 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:06,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:20:07,229 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:20:07,230 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:12,230 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:16,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:20:17,230 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:22,231 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:20:22,231 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:26,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:20:27,231 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:32,232 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:36,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:20:37,233 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:20:37,234 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:42,234 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:46,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:20:47,234 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:52,236 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:20:52,236 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:20:56,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:20:57,236 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:02,237 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:06,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:21:07,238 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:21:07,238 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:12,238 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:15,612 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: Connection closed
-2026-08-15 13:21:16,618 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
-Caused by: java.net.ConnectException: Connessione rifiutata
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
-	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
-	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
-	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
-	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
-	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
-	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
-	at java.base/java.lang.Thread.run(Thread.java:1474)
-
-2026-08-15 13:21:16,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:21:17,239 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:17,628 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
-Caused by: java.net.ConnectException: Connessione rifiutata
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
-	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
-	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
-	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
-	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
-	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
-	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
-	at java.base/java.lang.Thread.run(Thread.java:1474)
-
-2026-08-15 13:21:18,631 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
-Caused by: java.net.ConnectException: Connessione rifiutata
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
-	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
-	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
-	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
-	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
-	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
-	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
-	at java.base/java.lang.Thread.run(Thread.java:1474)
-
-2026-08-15 13:21:19,635 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
-Caused by: java.net.ConnectException: Connessione rifiutata
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
-	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
-	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
-	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
-	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
-	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
-	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
-	at java.base/java.lang.Thread.run(Thread.java:1474)
-
-2026-08-15 13:21:20,639 ERROR [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Can't connect to localhost:1883: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connessione rifiutata: localhost/127.0.0.1:1883
-Caused by: java.net.ConnectException: Connessione rifiutata
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046)
-	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:336)
-	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:339)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:784)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:732)
-	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:658)
-	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
-	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:998)
-	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
-	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
-	at java.base/java.lang.Thread.run(Thread.java:1474)
-
-2026-08-15 13:21:21,642 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
-2026-08-15 13:21:22,240 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:21:22,240 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:26,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:21:27,241 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:32,241 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:36,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:21:37,243 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:21:37,243 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:42,243 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:46,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:21:47,244 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:50,982 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"STOP","target":"TRENO_TEST_4ea3","motivo":"Soppresso da operatore","timestamp":"2026-08-15T11:21:50.975729619Z"}
-2026-08-15 13:21:51,015 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"STOP","target":"TRENO_TEST_4ea3","motivo":"Treno eliminato da operatore","timestamp":"2026-08-15T11:21:51.013020033Z"}
-2026-08-15 13:21:52,245 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:21:52,245 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:21:56,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:21:57,246 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:22:02,246 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:22:06,958 WARN  [it.uni.reti2.HeartbeatGenerator] (executor-thread-1) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
-2026-08-15 13:22:07,247 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
-2026-08-15 13:22:07,248 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
-2026-08-15 13:22:07,282 ERROR [it.uni.reti2.StationDatabaseValidator] (vert.x-eventloop-thread-2) ❌ L'ID 'ocklam' non è presente nel database centrale: la stazione non è registrata.
-2026-08-15 13:22:12,248 ERROR [it.uni.reti2.main] (main) ❌ ERRORE FATALE: ID della stazione non presente nel database centrale. Il processo verrà terminato.
-2026-08-15 13:22:12,270 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: <unknown>
-2026-08-15 13:22:12,277 INFO  [io.quarkus] (main) stazione stopped in 0.029s
+2026-08-16 10:52:03,700 INFO  [it.uni.reti2.main] (main) 🚉 Avvio processo Stazione con ID: ocklam
+2026-08-16 10:52:05,344 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[]
+2026-08-16 10:52:05,404 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[stazione-ocklam-alerts-in]
+2026-08-16 10:52:05,662 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 10:52:05,885 INFO  [io.smallrye.reactive.messaging.mqtt] (main) Create MQTT Client for null@localhost:1883<>-[stazione-ocklam-alerts-out]
+2026-08-16 10:52:05,908 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 10:52:05,933 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/alerts, Max QoS 1.
+2026-08-16 10:52:05,968 INFO  [io.vertx.mqtt.impl.MqttClientImpl] (vert.x-eventloop-thread-0) Connection with localhost:1883 established successfully
+2026-08-16 10:52:05,969 WARN  [it.uni.reti2.HeartbeatGenerator] (vert.x-eventloop-thread-0) ⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.
+2026-08-16 10:52:05,980 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/station/+/validation-response, Max QoS 0.
+2026-08-16 10:52:05,980 INFO  [io.smallrye.reactive.messaging.mqtt] (vert.x-eventloop-thread-0) Subscription success on topic railway/train/+/passaggio, Max QoS 0.
+2026-08-16 10:52:05,982 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"GUASTO","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"PA","severita":"CRITICAL","messaggio":"Heartbeat assente: la stazione PA non invia heartbeat da oltre 30 secondi","guastoId":"alert-1786867412002-35e27015","timestamp":"2026-08-16T08:03:32.002682973Z"}
+2026-08-16 10:52:06,097 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"GUASTO","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"MI","severita":"CRITICAL","messaggio":"Heartbeat assente: la stazione MI non invia heartbeat da oltre 30 secondi","guastoId":"alert-1786867412068-73822816","timestamp":"2026-08-16T08:03:32.068262564Z"}
+2026-08-16 10:52:06,100 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"MI","timestamp":"2026-08-16T08:04:02.133878497Z"}
+2026-08-16 10:52:06,101 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"MI","timestamp":"2026-08-16T08:04:02.133878497Z"}
+2026-08-16 10:52:06,102 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"MI","guastoId":"alert-1786867412068-73822816","timestamp":"2026-08-16T08:04:02.138418130Z"}
+2026-08-16 10:52:06,103 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"MI","guastoId":"alert-1786867412068-73822816","timestamp":"2026-08-16T08:04:02.138418130Z"}
+2026-08-16 10:52:06,104 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"MI","guastoId":"alert-1786867412068-73822816","timestamp":"2026-08-16T08:04:02.138512525Z"}
+2026-08-16 10:52:06,104 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"MI","guastoId":"alert-1786867412068-73822816","timestamp":"2026-08-16T08:04:02.138512525Z"}
+2026-08-16 10:52:06,105 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"PA","timestamp":"2026-08-16T08:04:03.775933101Z"}
+2026-08-16 10:52:06,106 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"PA","timestamp":"2026-08-16T08:04:03.775933101Z"}
+2026-08-16 10:52:06,106 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867412002-35e27015","timestamp":"2026-08-16T08:04:03.779877480Z"}
+2026-08-16 10:52:06,107 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867412002-35e27015","timestamp":"2026-08-16T08:04:03.779877480Z"}
+2026-08-16 10:52:06,111 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867412002-35e27015","timestamp":"2026-08-16T08:04:03.780076657Z"}
+2026-08-16 10:52:06,111 INFO  [io.quarkus] (main) stazione 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.37.3) started in 2.620s. Listening on: http://0.0.0.0:8086
+2026-08-16 10:52:06,112 INFO  [io.quarkus] (main) Profile prod activated. 
+2026-08-16 10:52:06,112 INFO  [io.quarkus] (main) Installed features: [cdi, messaging, messaging-mqtt, rest, rest-jackson, scheduler, smallrye-context-propagation, vertx]
+2026-08-16 10:52:06,113 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867412002-35e27015","timestamp":"2026-08-16T08:04:03.780076657Z"}
+2026-08-16 10:52:06,115 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"GUASTO","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"PA","severita":"CRITICAL","messaggio":"Heartbeat assente: la stazione PA non invia heartbeat da oltre 30 secondi","guastoId":"alert-1786867482001-0276a52f","timestamp":"2026-08-16T08:04:42.001406679Z"}
+2026-08-16 10:52:06,117 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"GUASTO","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"MI","severita":"CRITICAL","messaggio":"Heartbeat assente: la stazione MI non invia heartbeat da oltre 30 secondi","guastoId":"alert-1786867482013-ae0f8aca","timestamp":"2026-08-16T08:04:42.014118489Z"}
+2026-08-16 10:52:06,118 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"MI","timestamp":"2026-08-16T08:05:36.693744869Z"}
+2026-08-16 10:52:06,119 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"MI","timestamp":"2026-08-16T08:05:36.693744869Z"}
+2026-08-16 10:52:06,120 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"MI","guastoId":"alert-1786867482013-ae0f8aca","timestamp":"2026-08-16T08:05:36.697515470Z"}
+2026-08-16 10:52:06,120 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"MI","guastoId":"alert-1786867482013-ae0f8aca","timestamp":"2026-08-16T08:05:36.697515470Z"}
+2026-08-16 10:52:06,121 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"MI","guastoId":"alert-1786867482013-ae0f8aca","timestamp":"2026-08-16T08:05:36.698005381Z"}
+2026-08-16 10:52:06,121 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"MI","guastoId":"alert-1786867482013-ae0f8aca","timestamp":"2026-08-16T08:05:36.698005381Z"}
+2026-08-16 10:52:06,121 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"PA","timestamp":"2026-08-16T08:05:38.178896649Z"}
+2026-08-16 10:52:06,122 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"PA","timestamp":"2026-08-16T08:05:38.178896649Z"}
+2026-08-16 10:52:06,122 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867482001-0276a52f","timestamp":"2026-08-16T08:05:38.182901657Z"}
+2026-08-16 10:52:06,123 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867482001-0276a52f","timestamp":"2026-08-16T08:05:38.182901657Z"}
+2026-08-16 10:52:06,123 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867482001-0276a52f","timestamp":"2026-08-16T08:05:38.183024294Z"}
+2026-08-16 10:52:06,123 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867482001-0276a52f","timestamp":"2026-08-16T08:05:38.183024294Z"}
+2026-08-16 10:52:06,124 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"GUASTO","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"PA","severita":"CRITICAL","messaggio":"Heartbeat assente: la stazione PA non invia heartbeat da oltre 30 secondi","guastoId":"alert-1786867576000-1588f38e","timestamp":"2026-08-16T08:06:16.000820085Z"}
+2026-08-16 10:52:06,125 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"GUASTO","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"MI","severita":"CRITICAL","messaggio":"Heartbeat assente: la stazione MI non invia heartbeat da oltre 30 secondi","guastoId":"alert-1786867576009-88f39098","timestamp":"2026-08-16T08:06:16.009558168Z"}
+2026-08-16 10:52:06,126 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"TO","guastoId":"alert-1786867854965-6e1f7c04","timestamp":"2026-08-16T08:10:59.309581434Z"}
+2026-08-16 10:52:06,126 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"TO","guastoId":"alert-1786867854965-6e1f7c04","timestamp":"2026-08-16T08:10:59.309581434Z"}
+2026-08-16 10:52:06,127 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"Padova","guastoId":"alert-1786867854973-ef011a1e","timestamp":"2026-08-16T08:10:59.360642967Z"}
+2026-08-16 10:52:06,128 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"Padova","guastoId":"alert-1786867854973-ef011a1e","timestamp":"2026-08-16T08:10:59.360642967Z"}
+2026-08-16 10:52:06,128 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"stazzaDellaMadonnaTroia","guastoId":"alert-1786867854870-55c922af","timestamp":"2026-08-16T08:10:59.370519943Z"}
+2026-08-16 10:52:06,129 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"stazzaDellaMadonnaTroia","guastoId":"alert-1786867854870-55c922af","timestamp":"2026-08-16T08:10:59.370519943Z"}
+2026-08-16 10:52:06,129 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"TRENO","sorgenteId":"Mario","guastoId":"alert-1786867854871-11aeae1c","timestamp":"2026-08-16T08:50:57.843422673Z"}
+2026-08-16 10:52:06,130 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"MI","guastoId":"alert-1786867576009-88f39098","timestamp":"2026-08-16T08:50:58.498975385Z"}
+2026-08-16 10:52:06,130 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"MI","guastoId":"alert-1786867576009-88f39098","timestamp":"2026-08-16T08:50:58.498975385Z"}
+2026-08-16 10:52:06,131 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"PA","timestamp":"2026-08-16T08:50:59.682975933Z"}
+2026-08-16 10:52:06,132 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"PA","timestamp":"2026-08-16T08:50:59.682975933Z"}
+2026-08-16 10:52:06,132 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867576000-1588f38e","timestamp":"2026-08-16T08:50:59.686646253Z"}
+2026-08-16 10:52:06,133 ERROR [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) Payload alert non interpretabile: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867576000-1588f38e","timestamp":"2026-08-16T08:50:59.686646253Z"}
+2026-08-16 10:52:06,133 INFO  [it.uni.reti2.main] (main) 🔎 Verifica ID stazione 'ocklam' nel database centrale...
+2026-08-16 10:52:06,133 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"PA","guastoId":"alert-1786867576000-1588f38e","timestamp":"2026-08-16T08:50:59.686785100Z"}
+2026-08-16 10:52:06,134 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"GUASTO","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"PA","severita":"CRITICAL","messaggio":"Heartbeat assente: la stazione PA non invia heartbeat da oltre 30 secondi","guastoId":"alert-1786870294642-fae82e0e","timestamp":"2026-08-16T08:51:34.642669697Z"}
+2026-08-16 10:52:06,134 WARN  [it.uni.reti2.StationGateway] (vert.x-eventloop-thread-1) 🚨 [ALERT RICEVUTO] La Centrale dice: {"tipoEvento":"GUASTO","origine":"CENTRALE","sorgenteTipo":"STAZIONE","sorgenteId":"MI","severita":"CRITICAL","messaggio":"Heartbeat assente: la stazione MI non invia heartbeat da oltre 30 secondi","guastoId":"alert-1786870294653-d8ec0b27","timestamp":"2026-08-16T08:51:34.654035646Z"}
+2026-08-16 10:52:06,219 INFO  [it.uni.reti2.StationDatabaseValidator] (main) 📩 Richiesta di validazione inviata per la stazione: ocklam
+2026-08-16 10:52:06,219 WARN  [it.uni.reti2.main] (main) ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...
+2026-08-16 10:52:06,226 ERROR [it.uni.reti2.StationDatabaseValidator] (vert.x-eventloop-thread-2) ❌ L'ID 'ocklam' non è presente nel database centrale: la stazione non è registrata.
+2026-08-16 10:52:11,220 ERROR [it.uni.reti2.main] (main) ❌ ERRORE FATALE: ID della stazione non presente nel database centrale. Il processo verrà terminato.
+2026-08-16 10:52:11,254 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: <unknown>
+2026-08-16 10:52:11,256 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: <unknown>
+2026-08-16 10:52:11,257 INFO  [io.smallrye.reactive.messaging.mqtt.session.impl.MqttClientSessionImpl] (vert.x-eventloop-thread-0) Connection closed: <unknown>
+2026-08-16 10:52:11,262 INFO  [io.quarkus] (main) stazione stopped in 0.041s

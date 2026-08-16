@@ -28,7 +28,12 @@ export interface Station {
   city: string;
   status: StationStatus;
   coordinates: { x: number; y: number }; // posizione proporzionale per rendering su mappa SVG o Canvas
-  lastHeartbeat: number; // timestamp ms (Unix Epoch)
+  /**
+   * Timestamp ms (Unix Epoch) dell'ultimo heartbeat, oppure null se la stazione non ha
+   * MAI battuto. La Centrale tiene apposta il campo vuoto in quel caso: metterci l'ora
+   * corrente faceva vedere "ultimo heartbeat: adesso" per una stazione spenta.
+   */
+  lastHeartbeat: number | null;
   platforms: number;
   faultDescription?: string;
   faultSince?: number;
@@ -91,6 +96,8 @@ export interface Transit {
   id: string;
   trainId: string;
   stationId: string;
+  /** Tratta su cui il convoglio si trovava: RF01.5 la elenca fra i dati del transito. */
+  trackSegmentId: string | null;
   type: 'ingresso' | 'uscita';
   timestamp: number;
   delayed: boolean;
@@ -99,13 +106,16 @@ export interface Transit {
 
 // --- ALERT ---
 export type AlertSeverity = 'info' | 'warning' | 'critical';
+/**
+ * Tipi di guasto che esistono davvero sulla Centrale. Non ci sono più
+ * "treno_soppresso" e "operatori_inviati": erano notifiche costruite dal browser e
+ * mescolate agli allarmi veri, vedi UiNotification.
+ */
 export type AlertType =
   | 'treno_fermo'
   | 'stazione_guasta'
   | 'sensore_offline'
   | 'ritardo'
-  | 'treno_soppresso'
-  | 'operatori_inviati'
   | 'heartbeat_mancante';
 
 export interface Alert {
@@ -118,6 +128,24 @@ export interface Alert {
   timestamp: number;
   acknowledged: boolean; // false se da gestire, true se risolto/soppresso in dashboard
   resolvedAt?: number;
+}
+
+/**
+ * Notifica d'interfaccia: l'esito di un comando dato dall'operatore (soppressione di un
+ * convoglio, invio della squadra di manutenzione), che vive solo in questo browser.
+ *
+ * Prima queste righe venivano infilate nell'elenco degli allarmi con id inventati
+ * (`al-supp-...`, `al-ops-...`) e tipi che sulla Centrale non esistono: sparivano al primo
+ * F5, nessun altro operatore le vedeva, gonfiavano il contatore degli allarmi attivi e
+ * premendo "Presa Visione" partiva una POST che rispondeva 404. Tenerle separate dice la
+ * verità: sono conferme di comando, non guasti della rete.
+ */
+export interface UiNotification {
+  id: string;
+  kind: 'treno_soppresso' | 'operatori_inviati' | 'errore_comando';
+  severity: AlertSeverity;
+  message: string;
+  timestamp: number;
 }
 
 // --- OPERATORI ---

@@ -24,10 +24,19 @@ import java.time.LocalDateTime;
 public class EventoStazione extends PanacheEntity {
 
     /**
-     * Identificativo della stazione coinvolta dall'evento (FK logica, non vincolata in DDL).
-     * Corrisponde a {@code Stazione.id_stazione} nella tabella {@code Stazione}.
+     * Identificativo della stazione coinvolta dall'evento (riferimento logico, non
+     * vincolato in DDL). Corrisponde a {@code Stazione.id_stazione} nella tabella
+     * {@code Stazione}, ma senza chiave esterna: come tutte le tabelle di storico
+     * (RF02.7) questa deve restare leggibile anche dopo che la stazione è stata
+     * eliminata dall'anagrafica.
      */
     public String stazioneId;
+
+    /**
+     * Nome della stazione al momento dell'evento. È l'informazione che sostituisce la
+     * chiave esterna: senza, di una stazione cancellata resterebbe solo la sigla.
+     */
+    public String nomeStazione;
 
     /**
      * Stato della stazione al momento dell'evento (es. "ONLINE", "GUASTA", "MANUTENZIONE").

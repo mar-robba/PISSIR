@@ -154,7 +154,10 @@ public class HeartbeatGenerator implements HeartbeatKA {
         for (Map.Entry<String, Instant> sensore : dbLocale.sensoriUltimoBattito.entrySet()) {
             if (sensore.getValue().isBefore(limite)) {
                 LOG.warnf("⚠️ Sensore %s silente da oltre %d secondi: stazione GUASTA!", sensore.getKey(), timeoutSensoriSecondi);
-                stationGateway.inviaGuasto("Sensore " + sensore.getKey() + " non invia keepalive", "CRITICAL");
+                // "sensore_offline" dichiarato esplicitamente: questo è davvero il guasto di
+                // un sensore di binario, e va distinto dagli altri guasti di terra.
+                stationGateway.inviaGuasto("Sensore " + sensore.getKey() + " non invia keepalive",
+                        "CRITICAL", "sensore_offline");
                 // Rimozione dalla mappa: evita di rigenerare lo stesso alert a ogni tick
                 dbLocale.sensoriUltimoBattito.remove(sensore.getKey());
             }

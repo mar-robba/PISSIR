@@ -15,6 +15,7 @@ import RoutesPage from './pages/RoutesPage';
 import TrackSegmentsPage from './pages/TrackSegmentsPage';
 import StationsPage from './pages/StationsPage';
 import TrainsPage from './pages/TrainsPage';
+import TransitsPage from './pages/TransitsPage';
 import AlertsPage from './pages/AlertsPage';
 import AdminPage from './pages/AdminPage';
 
@@ -46,8 +47,11 @@ const ProtectedRoute = ({ children, requireAdmin = false }: { children: React.Re
 
 // Main App Logic (Simulator initializer)
 const RailwayApp = () => {
-  const { initialize } = useRailwayStore();
-  
+  // Selettore e non lo store intero: questo componente contiene TUTTE le rotte, quindi
+  // sottoscriverlo a ogni cambiamento dello store voleva dire ridisegnare l'intera
+  // applicazione a ogni frame di telemetria (vedi anche useRealtimeUpdates).
+  const initialize = useRailwayStore((s) => s.initialize);
+
   // Initialize mock data once
   useEffect(() => {
     initialize();
@@ -65,6 +69,7 @@ const RailwayApp = () => {
         <Route path="tratte" element={<TrackSegmentsPage />} />
         <Route path="stations" element={<StationsPage />} />
         <Route path="trains" element={<TrainsPage />} />
+        <Route path="transits" element={<TransitsPage />} />
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="admin" element={
           <ProtectedRoute requireAdmin>

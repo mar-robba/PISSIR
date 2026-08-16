@@ -71,8 +71,12 @@ public class TrafficLogicEngine {
 
         // Popola Treni: l'id del convoglio è il nome scelto dall'amministratore,
         // non c'è nessun altro campo anagrafico da ricostruire.
+        // ultimoAggiornamento resta NULL, come ultimoHeartbeat per le stazioni: all'avvio
+        // nessun convoglio ha ancora trasmesso, e datare la telemetria all'accensione della
+        // Centrale faceva sembrare "appena visti" treni il cui processo non è nemmeno acceso.
+        // Il FaultMonitor salta i treni con ultimoAggiornamento nullo, quindi non apre più i
+        // guasti "treno fermo" falsi che comparivano dieci secondi dopo ogni riavvio.
         for (Treno t : Treno.<Treno>listAll()) {
-            t.ultimoAggiornamento = Instant.now();
             treni.put(t.id, t);
         }
         System.out.println("Caricati " + treni.size() + " treni.");

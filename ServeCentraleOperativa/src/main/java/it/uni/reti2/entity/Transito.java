@@ -29,6 +29,14 @@ public class Transito extends PanacheEntityBase {
     @Column(name = "tempoUscita")
     public Instant tempoUscita;
 
+    /**
+     * Ritardo del convoglio (in minuti) NELL'ISTANTE del passaggio.
+     * Va congelato qui: il ritardo che sta in cache cambia di continuo, e lo storico
+     * deve dire quanto era in ritardo il treno quando è passato, non quanto lo è adesso.
+     */
+    @Column(name = "ritardoMinuti")
+    public Integer ritardoMinuti;
+
     // For compatibility with old logic
     @Transient
     public String trenoId;

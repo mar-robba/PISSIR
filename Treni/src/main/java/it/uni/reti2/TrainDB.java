@@ -81,7 +81,9 @@ public class TrainDB {
 
     /**
      * Fase corrente della macchina a stati del viaggio.
-     * Valori possibili: IN_STAZIONE, IN_VIAGGIO, BLOCCATO_GUASTO_STAZIONE, TERMINATO.
+     * Valori possibili: IN_STAZIONE, IN_VIAGGIO, BLOCCATO_GUASTO_STAZIONE,
+     * SENZA_ITINERARIO (nessun percorso assegnato: il convoglio è fermo e aspetta),
+     * TERMINATO.
      */
     public String faseViaggio = "IN_STAZIONE";
 

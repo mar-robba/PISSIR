@@ -65,7 +65,12 @@ export default function StationsPage() {
                       </Badge>
                     </td>
                     <td className="text-sm font-mono">
-                      {new Date(station.lastHeartbeat).toLocaleTimeString()}
+                      {/* Un trattino, non l'ora corrente: se lastHeartbeat è nullo la
+                          stazione non ha MAI battuto e scriverci l'orario di adesso
+                          faceva sembrare viva una stazione spenta. */}
+                      {station.lastHeartbeat
+                        ? new Date(station.lastHeartbeat).toLocaleTimeString()
+                        : '—'}
                     </td>
                     <td>
                       <button 

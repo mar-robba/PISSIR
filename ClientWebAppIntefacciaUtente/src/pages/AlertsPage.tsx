@@ -1,11 +1,19 @@
 import { useRailwayStore } from '../store/railwayStore';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { ShieldAlert, CheckCircle2, Wrench, Clock } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Wrench, Clock, Info, X } from 'lucide-react';
 import { useState } from 'react';
 
 export default function AlertsPage() {
-  const { alerts, stations, trains, acknowledgeAlert, dispatchOperators } = useRailwayStore();
+  const alerts = useRailwayStore((s) => s.alerts);
+  const stations = useRailwayStore((s) => s.stations);
+  const trains = useRailwayStore((s) => s.trains);
+  const acknowledgeAlert = useRailwayStore((s) => s.acknowledgeAlert);
+  const dispatchOperators = useRailwayStore((s) => s.dispatchOperators);
+  // Le conferme dei comandi stanno in un elenco a parte: sono notifiche di questo browser,
+  // non guasti della rete (vedi UiNotification).
+  const notifications = useRailwayStore((s) => s.notifications);
+  const dismissNotification = useRailwayStore((s) => s.dismissNotification);
   const [filter, setFilter] = useState<'all' | 'active' | 'resolved'>('active');
 
   const filteredAlerts = alerts.filter(a => {
@@ -56,6 +64,40 @@ export default function AlertsPage() {
           </button>
         </div>
       </div>
+
+      {/* Notifiche d'interfaccia: esiti dei comandi dati da questo browser. Sono tenute
+          fuori dall'elenco degli allarmi perché sulla Centrale non esiste nessun guasto
+          corrispondente — prima venivano infilate lì dentro con id inventati, gonfiavano
+          il contatore degli allarmi attivi e la "Presa Visione" finiva in un 404. */}
+      {notifications.length > 0 && (
+        <Card title="Notifiche operative" className="flex flex-col gap-2">
+          <p className="text-xs text-muted m-0 mb-2">
+            Esiti dei comandi dati da questa postazione: non sono guasti della rete e
+            restano solo in questa sessione.
+          </p>
+          {notifications.map(notification => (
+            <div
+              key={notification.id}
+              className="flex items-center justify-between gap-3 p-3 border border-border-color rounded-md bg-black/20"
+            >
+              <div className="flex items-center gap-3">
+                <Info size={16} className={notification.severity === 'critical' ? 'text-danger' : 'text-info'} />
+                <span className="text-sm">{notification.message}</span>
+                <span className="text-xs text-muted">
+                  {new Date(notification.timestamp).toLocaleTimeString()}
+                </span>
+              </div>
+              <button
+                title="Togli la notifica"
+                className="p-1 hover:bg-white/10 rounded-full transition-colors"
+                onClick={() => dismissNotification(notification.id)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-4">
         {filteredAlerts.length === 0 ? (
@@ -114,9 +156,14 @@ export default function AlertsPage() {
                     </button>
                   )}
                   
-                  {/* UC5: Invia operatori per riparare stazione guasta */}
-                  {alert.type === 'stazione_guasta' && alert.stationId && !station?.operatorsDispatched && (
-                    <button 
+                  {/* UC5: Invia operatori per riparare stazione guasta.
+                      La condizione è "l'allarme riguarda una stazione", non "è di tipo
+                      stazione_guasta": un guasto ai sensori o un heartbeat perso richiedono
+                      la squadra esattamente come gli altri, ma essendo classificati
+                      sensore_offline restavano senza pulsante — e non c'è nessun altro
+                      punto dell'interfaccia da cui mandare gli operatori (RF01.4.1). */}
+                  {alert.stationId && !station?.operatorsDispatched && !alert.acknowledged && (
+                    <button
                       onClick={() => handleDispatch(alert.stationId!, alert.id)}
                       className="btn btn-primary text-sm shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse"
                     >
@@ -124,7 +171,7 @@ export default function AlertsPage() {
                     </button>
                   )}
 
-                  {station?.operatorsDispatched && alert.type === 'stazione_guasta' && (
+                  {station?.operatorsDispatched && alert.stationId && (
                     <Badge type="success" className="px-3 py-2">Operatori in loco</Badge>
                   )}
                 </div>

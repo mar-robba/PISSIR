@@ -81,6 +81,20 @@
             <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+            Database dei test: H2 in memoria, nato e distrutto insieme alla singola
+            esecuzione. Prima non c'era nessun override e i test usavano lo stesso
+            jdbc:postgresql://localhost:5432/railway dell'esecuzione normale, quindi
+            creavano stazioni, tratte e treni di prova nel database di lavoro (e ce li
+            lasciavano se un test in mezzo falliva prima della pulizia). In piu' senza
+            Postgres acceso "./mvnw test" non partiva nemmeno, il che rendeva vano il
+            motivo per cui i test erano stati scritti senza Keycloak.
+        -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-h2</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

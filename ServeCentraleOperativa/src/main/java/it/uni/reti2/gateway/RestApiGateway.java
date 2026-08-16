@@ -4,6 +4,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.panache.common.Sort;
 import it.uni.reti2.entity.*;
 import it.uni.reti2.elaboration.TrafficLogicEngine;
+import it.uni.reti2.ingestion.IngestionService;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
@@ -43,6 +44,14 @@ public class RestApiGateway {
     /** Referenza alla logica e cache di sistema. */
     @Inject
     TrafficLogicEngine statoRete;
+
+    /**
+     * Serve per rimandare al frontend i cambi di stato delle stazioni decisi da qui
+     * (presa in carico di un allarme, invio della squadra): sono modifiche che nessun
+     * heartbeat annuncerà mai, quindi senza broadcast la schermata resterebbe indietro.
+     */
+    @Inject
+    IngestionService ingestion;
 
     /**
      * Canale reattivo di uscita per inviare comandi asincroni ai field edge devices
@@ -194,13 +203,26 @@ public class RestApiGateway {
         if (dto.binari != null) cache.binari = dto.binari;
         if (dto.stato != null) cache.stato = normalizzaStatoStazione(dto.stato);
         statoRete.aggiornaStazione(cache);
+        if (dto.stato != null) {
+            // Anche lo stato cambiato a mano dall'amministratore deve arrivare subito
+            // alle altre schermate aperte, non al prossimo ricaricamento.
+            ingestion.broadcastStatoStazione(cache);
+        }
 
         return Response.ok(cache).build();
     }
 
     /**
-     * Elimina una stazione. Se è referenziata da qualche tratta risponde 409,
-     * altrimenti rimuove prima i record storici collegati per evitare violazioni di FK.
+     * Elimina una stazione. Se è referenziata da qualche tratta risponde 409, altrimenti
+     * chiude la partita con i transiti ancora aperti e cancella la riga di anagrafica.
+     *
+     * <p><b>Lo storico non si tocca</b> (RF02.7): le righe di Storico_Transiti,
+     * Storico_Stato_Stazioni ed eventi_stazioni restano dov'erano. Prima venivano
+     * cancellate, ma non era una scelta: era l'unico modo di far passare la DELETE finché
+     * quelle tabelle avevano una chiave esterna verso Stazione. Adesso che gli storici
+     * portano dentro l'id e il nome della stazione, la storia di una stazione dismessa
+     * resta consultabile — che è esattamente quello che il requisito chiede.</p>
+     *
      * @param id ID della stazione.
      * @return 204 No Content, 404 o 409.
      */
@@ -218,11 +240,10 @@ public class RestApiGateway {
                     .entity(Map.of("errore", "Stazione referenziata da " + tratteCollegate + " tratte: eliminarle prima"))
                     .build();
         }
-        // Pulizia dei record collegati per non violare le FK
-        StoricoTransito.delete("stazione.id", id);
+        // Restano da cancellare solo i transiti VIVI: Transiti è una tabella dello stato
+        // corrente (il treno dentro la stazione) e ha davvero una chiave esterna verso
+        // Stazione. Lo storico invece sopravvive alla stazione.
         Transito.delete("stazione.id", id);
-        StoricoStatoStazione.delete("stazione.id", id);
-        EventoStazione.delete("stazioneId", id);
         dbStazione.delete();
         statoRete.rimuoviStazione(id);
         return Response.noContent().build();
@@ -270,7 +291,9 @@ public class RestApiGateway {
         if (esito.errore != null) {
             return esito.errore;
         }
-        esito.treno.ultimoAggiornamento = Instant.now();
+        // ultimoAggiornamento resta null: il convoglio appena creato non ha ancora
+        // trasmesso niente, ed è proprio quello che il watchdog usa per non aprire un
+        // guasto "treno fermo" su un treno il cui processo non è nemmeno acceso.
         statoRete.aggiornaTreno(esito.treno);
         return Response.status(Response.Status.CREATED).entity(esito.treno).build();
     }
@@ -375,8 +398,14 @@ public class RestApiGateway {
     }
 
     /**
-     * Elimina un treno cancellando a cascata i record storici che lo referenziano
-     * (scelta progettuale per evitare violazioni di FK) e notificando lo STOP via MQTT.
+     * Elimina un treno chiudendo i suoi transiti ancora aperti e notificando lo STOP
+     * via MQTT.
+     *
+     * <p><b>Lo storico non si tocca</b> (RF02.7), come per le stazioni: i passaggi, i
+     * cambi di stato e gli itinerari percorsi da quel convoglio sono cose successe e
+     * restano scritte. La cascata di prima serviva solo a non violare le chiavi esterne,
+     * che adesso non ci sono più.</p>
+     *
      * @param id ID del convoglio.
      * @return 204 No Content oppure 404.
      */
@@ -388,11 +417,8 @@ public class RestApiGateway {
         if (dbTreno == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
-        // Cancellazione a cascata dei record storici del convoglio
-        StoricoStatoTreno.delete("treno.id", id);
-        StoricoTransito.delete("treno.id", id);
+        // Solo i transiti vivi: è la tabella dello stato corrente e ha la chiave esterna.
         Transito.delete("treno.id", id);
-        StoricoItinerario.delete("treno.id", id);
         dbTreno.delete();
         statoRete.rimuoviTreno(id);
 
@@ -468,8 +494,23 @@ public class RestApiGateway {
         if (tratta == null) return Response.status(Response.Status.NOT_FOUND).build();
         long usi = ItinerarioTratta.count("id.idTratta", id);
         if (usi > 0) return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Tratta usata da " + usi + " itinerari: modificare prima gli itinerari")).build();
-        if (Transito.count("tratta.id", id) > 0 || StoricoTransito.count("tratta.id", id) > 0) {
-            return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Tratta presente nei transiti storici e non eliminabile")).build();
+        // Il rifiuto resta per la tabella viva Transiti, che verso Tratte ha davvero una
+        // chiave esterna. Sui transiti STORICI invece è caduto con RF02.7: la riga di
+        // storico si porta dentro l'id e la descrizione della tratta, quindi togliere
+        // l'arco dalla rete non cancella più il percorso dei passaggi già avvenuti.
+        if (Transito.count("tratta.id", id) > 0) {
+            return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Tratta presente nei transiti e non eliminabile")).build();
+        }
+        // Treni.PosizioneAttualeTrattaOStazione è una chiave esterna verso Tratte: senza
+        // questo controllo la DELETE partiva lo stesso, Postgres la rifiutava per violazione
+        // di vincolo e l'amministratore si prendeva un 500 con l'eccezione invece del 409
+        // con la spiegazione che chiede RF01.3.5.
+        long treniFermiQui = Treno.count("posizioneAttualeTratta.id", id);
+        if (treniFermiQui > 0) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of("errore", "Tratta usata come posizione corrente di " + treniFermiQui
+                            + " convogli: spostarli prima di eliminarla"))
+                    .build();
         }
         tratta.delete();
         return Response.noContent().build();
@@ -571,8 +612,13 @@ public class RestApiGateway {
         for (Treno t : Treno.<Treno>list("itinerario.id", id)) {
             daNotificare.add(t.id);
         }
-        assegnaTreni(itinerario, dto.treniIds, true);
+        // "treniIds" assente nel JSON vuol dire "le assegnazioni non le sto toccando",
+        // non "sgancia tutti": l'editor degli itinerari non ha nessun campo per sceglierle
+        // e mandava indietro la lista che aveva scaricato all'avvio, sganciando i treni
+        // assegnati nel frattempo dalla pagina Amministrazione. Adesso quel form non manda
+        // più il campo e qui l'assenza viene rispettata.
         if (dto.treniIds != null) {
+            assegnaTreni(itinerario, dto.treniIds, true);
             daNotificare.addAll(dto.treniIds); // anche i treni appena agganciati
         }
 
@@ -597,9 +643,15 @@ public class RestApiGateway {
         if (itinerario == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
-        // Sgancia i treni (DB + cache)
+        // Sgancia i treni (DB + cache) tenendo da parte i loro id: vanno avvisati.
+        // Senza la notifica il digital twin continuava a percorrere un itinerario che non
+        // esisteva più — ce l'ha già in memoria e non lo ricarica mai da solo — pubblicando
+        // passaggi e transiti che la Centrale registrava regolarmente. La PUT lo faceva già
+        // (vedi updateTratta), la DELETE era rimasta indietro.
+        Set<String> daNotificare = new LinkedHashSet<>();
         for (Treno t : Treno.<Treno>list("itinerario.id", id)) {
             t.itinerario = null;
+            daNotificare.add(t.id);
             Treno cache = statoRete.getTreno(t.id);
             if (cache != null) {
                 cache.itinerario = null;
@@ -607,8 +659,15 @@ public class RestApiGateway {
             }
         }
         ItinerarioTratta.delete("id.idItinerario", id);
-        StoricoItinerario.delete("itinerario.id", id);
+        // Storico_Itinerari resta: i viaggi già fatti su questo itinerario sono avvenuti
+        // e la riga di storico si porta dentro il percorso (RF02.7).
         itinerario.delete();
+
+        // Ricevuto ITINERARIO_AGGIORNATO il twin scarta l'itinerario in memoria e ne chiede
+        // uno nuovo: non essendocene più resta fermo e visibile in attesa di essere soppresso.
+        for (String trenoId : daNotificare) {
+            pubblicaItinerarioAggiornato(trenoId);
+        }
         return Response.noContent().build();
     }
 
@@ -632,15 +691,19 @@ public class RestApiGateway {
         List<Map<String, Object>> result = new ArrayList<>();
         for (StoricoTransito t : transiti) {
             Instant timestamp = t.tempoUscita != null ? t.tempoUscita : t.tempoEntrata;
-            Treno cacheTreno = statoRete.getTreno(t.treno.id);
-            int ritardo = cacheTreno != null ? cacheTreno.ritardo : 0;
+            // Il ritardo è quello CONGELATO al momento del passaggio, non quello che il
+            // convoglio ha adesso: leggerlo dalla cache faceva vedere lo stesso numero su
+            // tutti i transiti dello stesso treno, e degli zeri dopo ogni riavvio.
+            int ritardo = t.ritardoMinuti != null ? t.ritardoMinuti : 0;
 
             Map<String, Object> dto = new HashMap<>();
             dto.put("id", t.idTransito + "-" + t.id);
-            dto.put("trenoId", t.treno.id);
-            dto.put("stazioneId", t.stazione.id);
+            dto.put("trenoId", t.trenoId);
+            dto.put("stazioneId", t.stazioneId);
             dto.put("tipo", t.tempoUscita == null ? "ingresso" : "uscita");
             dto.put("timestamp", timestamp != null ? timestamp.toString() : null);
+            // La tratta è uno dei campi che RF01.5 chiede di poter consultare.
+            dto.put("trattaId", t.trattaId);
             dto.put("inRitardo", ritardo > 0);
             dto.put("ritardo", ritardo);
             result.add(dto);
@@ -705,6 +768,9 @@ public class RestApiGateway {
                 stazione.stato = "ONLINE";
                 stazione.ultimoHeartbeat = Instant.now();
                 statoRete.aggiornaStazione(stazione);
+                // Il ritorno in servizio va spinto sulla WebSocket: prima la stazione
+                // restava rossa sulla mappa finché l'operatore non ricaricava la pagina.
+                ingestion.broadcastStatoStazione(stazione);
             }
         }
 
@@ -720,13 +786,10 @@ public class RestApiGateway {
             }
             Treno dbTreno = Treno.findById(guasto.sorgenteId);
             if (dbTreno != null && "rotto".equalsIgnoreCase(dbTreno.stato)) {
+                String statoPrecedente = dbTreno.stato;
                 dbTreno.stato = "fermo";
 
-                StoricoStatoTreno storico = new StoricoStatoTreno();
-                storico.treno = dbTreno;
-                storico.stato = "fermo";
-                storico.itinerarioId = dbTreno.itinerario != null ? dbTreno.itinerario.id : null;
-                storico.posizioneId = dbTreno.posizioneAttualeTratta != null ? dbTreno.posizioneAttualeTratta.id : null;
+                StoricoStatoTreno storico = StoricoStatoTreno.fotografiaDi(dbTreno, statoPrecedente);
                 storico.persist();
             }
         }
@@ -755,13 +818,10 @@ public class RestApiGateway {
             // Aggiorna anche il salvataggio su DB persistente (stato canonico)
             Treno dbTreno = Treno.findById(id);
             if (dbTreno != null) {
+                String statoPrecedente = dbTreno.stato;
                 dbTreno.stato = "in manutenzione";
 
-                StoricoStatoTreno storico = new StoricoStatoTreno();
-                storico.treno = dbTreno;
-                storico.stato = "in manutenzione";
-                storico.itinerarioId = dbTreno.itinerario != null ? dbTreno.itinerario.id : null;
-                storico.posizioneId = dbTreno.posizioneAttualeTratta != null ? dbTreno.posizioneAttualeTratta.id : null;
+                StoricoStatoTreno storico = StoricoStatoTreno.fotografiaDi(dbTreno, statoPrecedente);
                 storico.persist();
             }
 
@@ -791,8 +851,12 @@ public class RestApiGateway {
         if (stazione == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
+        // Lo stato di partenza serve alla riga di storico scritta in fondo al metodo:
+        // è da lì che la stazione viene (di solito GUASTA o OFFLINE).
+        String statoPrima = stazione.stato;
         stazione.stato = "MANUTENZIONE";
         statoRete.aggiornaStazione(stazione);
+        ingestion.broadcastStatoStazione(stazione);
 
         // Notifica informativa dell'invio degli operatori
         String alertJson = String.format(
@@ -816,14 +880,14 @@ public class RestApiGateway {
         stazione.stato = "ONLINE";
         stazione.ultimoHeartbeat = Instant.now();
         statoRete.aggiornaStazione(stazione);
+        ingestion.broadcastStatoStazione(stazione);
 
+        // Una riga sola, quella del rientro in servizio: il passaggio per MANUTENZIONE
+        // resta non storicizzato perché dura il tempo di questo metodo (è il limite già
+        // dichiarato di RF01.4.1, non una dimenticanza).
         Stazione dbStazione = Stazione.findById(id);
         if (dbStazione != null) {
-            StoricoStatoStazione storico = new StoricoStatoStazione();
-            storico.stazione = dbStazione;
-            storico.nome = dbStazione.nome;
-            storico.tipo = dbStazione.tipoCapolineaPartenzaoNormale;
-            storico.funzionanteONo = true;
+            StoricoStatoStazione storico = StoricoStatoStazione.fotografiaDi(dbStazione, "ONLINE", statoPrima);
             storico.persist();
         }
         return Response.ok(stazione).build();
@@ -965,10 +1029,24 @@ public class RestApiGateway {
     private Response verificaTratteEsistenti(List<String> stazioni) {
         List<String> descrizioni = new ArrayList<>();
         List<Map<String, String>> coppieMancanti = new ArrayList<>();
+        Set<String> coppieGiaViste = new LinkedHashSet<>();
 
         for (int i = 0; i < stazioni.size() - 1; i++) {
             String partenzaId = stazioni.get(i);
             String arrivoId = stazioni.get(i + 1);
+
+            // Un itinerario che ripassa sullo stesso arco non è rappresentabile: la chiave
+            // primaria di Itinerario_Tratta è (id_itinerario, id_Tratta) e la colonna
+            // "ordine" non ne fa parte, quindi la seconda riga violerebbe la PK e la
+            // richiesta finirebbe in 500 senza spiegare niente. Meglio un rifiuto parlante.
+            if (!coppieGiaViste.add(partenzaId + "->" + arrivoId)) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity(Map.of("errore", "L'itinerario percorre due volte la stessa tratta ("
+                                + partenzaId + " -> " + arrivoId + "): non è una composizione ammessa, "
+                                + "ogni collegamento può comparire una volta sola."))
+                        .build();
+            }
+
             Stazione partenza = Stazione.findById(partenzaId);
             Stazione arrivo = Stazione.findById(arrivoId);
             if (partenza == null || arrivo == null) {
@@ -1054,11 +1132,14 @@ public class RestApiGateway {
     /**
      * Assegna i treni indicati all'itinerario. Se {@code sganciaAssenti} è true
      * (caso PUT), i treni prima assegnati e non più presenti vengono scollegati.
+     *
+     * <p>Con {@code treniIds} nullo non si sgancia niente: l'elenco assente significa che il
+     * chiamante non sta gestendo le assegnazioni, non che le vuole azzerare tutte.</p>
      */
     private void assegnaTreni(Itinerario itinerario, List<String> treniIds, boolean sganciaAssenti) {
-        if (sganciaAssenti) {
+        if (sganciaAssenti && treniIds != null) {
             for (Treno t : Treno.<Treno>list("itinerario.id", itinerario.id)) {
-                if (treniIds == null || !treniIds.contains(t.id)) {
+                if (!treniIds.contains(t.id)) {
                     t.itinerario = null;
                     Treno cache = statoRete.getTreno(t.id);
                     if (cache != null) {
@@ -1142,16 +1223,14 @@ public class RestApiGateway {
         guasto.risolto = true;
         guasto.timestampRisoluzione = Instant.now();
 
-        StoricoGuasto storico = StoricoGuasto.find("guasto", guasto).firstResult();
+        StoricoGuasto storico = StoricoGuasto.find("guastoId", guasto.id).firstResult();
         if (storico != null) {
             storico.risolto = true;
             storico.tsChiusura = guasto.timestampRisoluzione;
         } else {
-            storico = new StoricoGuasto();
-            storico.guasto = guasto;
-            storico.risolto = true;
-            storico.tsApertura = guasto.timestamp != null ? guasto.timestamp : Instant.now();
-            storico.tsChiusura = guasto.timestampRisoluzione;
+            // Guasto senza storico (per esempio aperto prima che la tabella esistesse):
+            // la riga si scrive adesso, già chiusa.
+            storico = StoricoGuasto.fotografiaDi(guasto);
             storico.persist();
         }
         statoRete.risolviGuasto(guasto.id);

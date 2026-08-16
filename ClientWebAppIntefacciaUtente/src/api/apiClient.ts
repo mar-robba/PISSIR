@@ -103,6 +103,68 @@ const mapProfilo = (dati: ApiProfiloResponse): User => ({
   avatarInitials: String(dati.avatarInitials ?? ''),
 });
 
+/**
+ * Converte il DTO treno della Centrale nella shape Train del frontend.
+ * Esportata perché la usano in due: la GET /api/treni e lo SNAPSHOT che arriva ogni dieci
+ * secondi dalla WebSocket, che porta gli stessi identici oggetti. Un mappatore solo per
+ * tutte e due le strade, così la pagina appena aperta e quella aggiornata dal vivo non
+ * possono discordare.
+ */
+export const mapApiTrain = (t: ApiTrainPayload): Train => {
+  // La tratta è ORIENTATA come sta a database (partenza → arrivo), ma nella corsa di
+  // ritorno il convoglio la percorre al contrario: lì "stazionePartenza" è la stazione
+  // verso cui sta andando, non quella da cui è uscito. Leggendola alla lettera
+  // previousStationId finiva sulla stessa stazione di prossimaStazione e la mappa,
+  // interpolando fra due punti coincidenti, disegnava il treno fermo sul nodo di arrivo
+  // per tutta la tratta di ritorno (metà di ogni viaggio).
+  const inRitorno = t.direzione === 'ritorno';
+  const estremoPartenza = inRitorno
+    ? t.posizioneAttualeTratta?.stazioneArrivo?.id
+    : t.posizioneAttualeTratta?.stazionePartenza?.id;
+  const estremoArrivo = inRitorno
+    ? t.posizioneAttualeTratta?.stazionePartenza?.id
+    : t.posizioneAttualeTratta?.stazioneArrivo?.id;
+
+  return {
+    // L'id È il nome del convoglio (chiave primaria Treni.id_convoglio): la Centrale
+    // non espone più un campo "nome" separato.
+    id: t.id,
+    status: mapBackendStatus(t.stato ?? ''),
+    currentStationId: t.stazioneCorrente || null,
+    nextStationId: t.prossimaStazione || estremoArrivo || null,
+    // Se il convoglio è in una stazione l'ultima stazione è quella, come scrive l'evento
+    // TELEMETRY: altrimenti le due strade che riempiono lo stesso campo raccontavano due
+    // cose diverse (la telemetria la fermata attuale, lo snapshot quella prima ancora).
+    // Fuori dalla stazione vale l'estremo di partenza della tratta che sta percorrendo,
+    // che al primo avvio può non essere ancora persistito: da lì il null.
+    previousStationId: t.stazioneCorrente || estremoPartenza || null,
+    routeId: t.itinerario?.id || '',
+    direction: inRitorno ? 'ritorno' : 'andata',
+    arrivalTime: null,
+    departureTime: null,
+    delayMinutes: t.ritardo || 0,
+    passengers: t.passeggeri || 0,
+    progressPercent: t.progresso || 0,
+    lastUpdate: t.ultimoAggiornamento ? new Date(t.ultimoAggiornamento).getTime() : Date.now()
+  };
+};
+
+/** Converte il DTO stazione della Centrale nella shape Station del frontend. */
+export const mapApiStation = (s: ApiStationPayload): Station => ({
+  id: s.id,
+  code: s.id,
+  name: s.nome || s.id,
+  city: s.nome || '',
+  status: mapBackendStationStatus(s.stato || ''),
+  coordinates: { x: s.latitudine || 0, y: s.longitudine || 0 },
+  platforms: s.binari || 1,
+  // null = non ha mai battuto. La Centrale lascia il campo vuoto apposta per le
+  // stazioni spente: sostituirlo con Date.now() faceva scrivere l'ora corrente nella
+  // colonna "Ultimo Heartbeat" di una stazione che non ha mai dato segni di vita.
+  lastHeartbeat: s.ultimoHeartbeat ? new Date(s.ultimoHeartbeat).getTime() : null,
+  operatorsDispatched: s.stato === 'MANUTENZIONE'
+});
+
 /** Converte il DTO tratta del backend nella shape Route usata dal frontend. */
 const mapApiRoute = (r: ApiRoutePayload): Route => ({
   id: r.id,
@@ -195,25 +257,7 @@ export const apiClient = {
     const res = await fetch(`${API_BASE_URL}/treni`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch trains');
     const data = await res.json() as ApiTrainPayload[];
-    return data.map((t) => ({
-      // L'id È il nome del convoglio (chiave primaria Treni.id_convoglio): la Centrale
-      // non espone più un campo "nome" separato.
-      id: t.id,
-      status: mapBackendStatus(t.stato ?? ''),
-      currentStationId: t.stazioneCorrente || null,
-      nextStationId: t.prossimaStazione || t.posizioneAttualeTratta?.stazioneArrivo?.id || null,
-      // Al primo avvio la tratta persistita può non essere ancora disponibile;
-      // la stazione corrente della telemetria è comunque l'estremo di partenza.
-      previousStationId: t.posizioneAttualeTratta?.stazionePartenza?.id || t.stazioneCorrente || null,
-      routeId: t.itinerario?.id || '',
-      direction: t.direzione === 'ritorno' ? 'ritorno' : 'andata',
-      arrivalTime: null,
-      departureTime: null,
-      delayMinutes: t.ritardo || 0,
-      passengers: t.passeggeri || 0,
-      progressPercent: t.progresso || 0,
-      lastUpdate: t.ultimoAggiornamento ? new Date(t.ultimoAggiornamento).getTime() : Date.now()
-    }));
+    return data.map(mapApiTrain);
   },
 
   /**
@@ -223,17 +267,7 @@ export const apiClient = {
     const res = await fetch(`${API_BASE_URL}/stazioni`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch stations');
     const data = await res.json() as ApiStationPayload[];
-    return data.map((s) => ({
-      id: s.id,
-      code: s.id,
-      name: s.nome || s.id,
-      city: s.nome || '',
-      status: mapBackendStationStatus(s.stato || ''),
-      coordinates: { x: s.latitudine || 0, y: s.longitudine || 0 },
-      platforms: s.binari || 1,
-      lastHeartbeat: s.ultimoHeartbeat ? new Date(s.ultimoHeartbeat).getTime() : Date.now(),
-      operatorsDispatched: s.stato === 'MANUTENZIONE'
-    }));
+    return data.map(mapApiStation);
   },
 
   /**
@@ -299,6 +333,13 @@ export const apiClient = {
 
   /**
    * Aggiorna parzialmente o totalmente una tratta esistente.
+   *
+   * `treniIds` viaggia solo se il chiamante lo ha davvero impostato: sulla Centrale un
+   * elenco presente vuol dire "queste sono TUTTE le assegnazioni", quindi i treni non
+   * elencati vengono sganciati. L'editor degli itinerari non gestisce le assegnazioni (non
+   * ha nessun campo per sceglierle) e rimandava indietro la lista scaricata all'avvio,
+   * sganciando i convogli assegnati nel frattempo dalla pagina Amministrazione: adesso
+   * omette il campo e la Centrale lascia le assegnazioni dove sono.
    */
   updateRoute: async (id: string, route: Partial<Route>): Promise<Route> => {
     const res = await fetch(`${API_BASE_URL}/tratte/${encodeURIComponent(id)}`, {
@@ -309,7 +350,7 @@ export const apiClient = {
         stazioni: route.stationIds,
         travelTimes: route.travelTimes,
         attivo: route.active,
-        treniIds: route.trainIds
+        ...(route.trainIds !== undefined ? { treniIds: route.trainIds } : {})
       })
     });
     if (!res.ok) throw await createApiError(res);
@@ -488,6 +529,7 @@ export const apiClient = {
       id: t.id,
       trainId: t.trainId || t.trenoId || '',
       stationId: t.stationId || t.stazioneId || '',
+      trackSegmentId: t.trattaId ?? null,
       type: (t.tipo || t.type || 'ingresso') as 'ingresso' | 'uscita',
       timestamp: t.timestamp ? new Date(t.timestamp).getTime() : Date.now(),
       delayed: t.delayed ?? t.inRitardo ?? false,

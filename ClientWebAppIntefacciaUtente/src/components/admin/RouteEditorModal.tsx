@@ -107,7 +107,14 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
     setSalvataggioInCorso(true);
     try {
       if (routeIdToEdit) {
-        await updateRoute(routeIdToEdit, formData);
+        // trainIds NON si manda: questo form non gestisce le assegnazioni dei convogli
+        // (non c'è nessun campo per sceglierle, si vede solo il conteggio) e rimandare
+        // indietro la lista scaricata all'avvio sganciava i treni che nel frattempo erano
+        // stati assegnati dalla pagina Amministrazione. Un campo che una schermata non
+        // gestisce è meglio che non lo tocchi affatto.
+        const { trainIds, ...senzaAssegnazioni } = formData;
+        void trainIds;
+        await updateRoute(routeIdToEdit, senzaAssegnazioni);
       } else {
         // L'id si manda vuoto apposta: lo genera il server (IT-xxxxxxxx), così non c'è
         // un id scelto a mano da controllare per l'unicità.

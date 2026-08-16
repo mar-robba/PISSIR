@@ -51,7 +51,9 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
           status: 'operativa',
           platforms: 1,
           coordinates: { x: 0, y: 0 },
-          lastHeartbeat: Date.now(),
+          // Una stazione appena registrata non ha ancora battuto: il campo resta vuoto e
+          // l'elenco mostra un trattino, finché non arriva il primo heartbeat vero.
+          lastHeartbeat: null,
         });
       }
     }
@@ -66,6 +68,15 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
     }
     if (!stationIdToEdit && stations.some(s => s.id === formData.id)) {
       alert('Esiste già una stazione con questo codice.');
+      return;
+    }
+    // La mappa del traffico piazza le stazioni proprio su queste due coordinate:
+    // un valore fuori scala le manderebbe fuori dall'Italia (e schiaccerebbe
+    // tutte le altre in un angolo), quindi conviene fermarlo qui.
+    const latitudine = formData.coordinates?.x ?? 0;
+    const longitudine = formData.coordinates?.y ?? 0;
+    if (Math.abs(latitudine) > 90 || Math.abs(longitudine) > 180) {
+      alert('Coordinate non valide: la latitudine va da -90 a 90, la longitudine da -180 a 180.');
       return;
     }
 
@@ -150,7 +161,10 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
               <input
                 type="number"
                 step="any"
+                min="-90"
+                max="90"
                 className="input-field w-full font-mono"
+                placeholder="es. 45.4869"
                 value={formData.coordinates?.x ?? 0}
                 onChange={e => setFormData({
                   ...formData,
@@ -163,7 +177,10 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
               <input
                 type="number"
                 step="any"
+                min="-180"
+                max="180"
                 className="input-field w-full font-mono"
+                placeholder="es. 9.2050"
                 value={formData.coordinates?.y ?? 0}
                 onChange={e => setFormData({
                   ...formData,
@@ -172,6 +189,15 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
               />
             </div>
           </div>
+
+          {/* Sono le coordinate con cui la mappa del traffico posiziona la
+              stazione: lasciandole a zero la stazione si vede lo stesso, ma
+              messa in base alle tratte invece che al posto suo. */}
+          <p className="text-xs text-muted mt-2">
+            Coordinate GPS in gradi decimali (WGS84): la mappa del traffico
+            dispone le stazioni proprio su questi valori. Lasciandole a 0 la
+            stazione viene piazzata vicino a quelle a cui è collegata.
+          </p>
         </div>
 
         <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border-color">

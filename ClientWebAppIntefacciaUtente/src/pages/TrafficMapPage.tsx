@@ -17,6 +17,18 @@ import './TrafficMapPage.css';
 type DiagramPoint = { x: number; y: number };
 type GraphEdge = { fromId: string; toId: string; key: string; doppioSenso: boolean };
 
+/**
+ * Risultato del posizionamento delle stazioni sul diagramma.
+ *
+ * <p>`kmPerUnita` vale null quando la mappa NON è geografica (nessuna coordinata
+ * in banca dati): in quel caso la barra di scala non ha senso e non va disegnata.
+ */
+type Disposizione = {
+  posizioni: Map<string, DiagramPoint>;
+  kmPerUnita: number | null;
+  senzaGps: string[];
+};
+
 /** Riquadro nel sistema di coordinate del diagramma, usato per le collisioni. */
 type Riquadro = { x1: number; y1: number; x2: number; y2: number };
 
@@ -39,6 +51,8 @@ type ElementoMappa = {
   ancora: DiagramPoint;
   posizione: DiagramPoint;
   inAvaria: boolean;
+  /** Stazione piazzata senza coordinate GPS: sulla mappa si disegna tratteggiata. */
+  senzaGps: boolean;
 };
 
 /** Insieme di elementi che cadono praticamente nello stesso punto della mappa. */
@@ -71,6 +85,20 @@ const DISTANZA_MINIMA = 34;
 // Limiti dello zoom, espressi come frazione della larghezza del diagramma.
 const ZOOM_MIN = 1 / 8;
 const ZOOM_MAX = 1.1;
+// Un grado di latitudine sono sempre ~111 km (i meridiani sono tutti uguali):
+// è il fattore che trasforma le unità del diagramma in chilometri veri.
+const GRADO_LAT_KM = 111.19;
+// Sotto questa estensione (un centesimo di grado, poco più di un chilometro) si
+// smette di ingrandire: con tutte le stazioni nello stesso punto la scala
+// diventerebbe infinita.
+const SPAN_MINIMO_GRADI = 0.01;
+// Lunghezza a riposo di un arco e forza di repulsione del layout a forze, usato
+// come ripiego quando le coordinate GPS mancano.
+const LUNGHEZZA_ARCO = 175;
+const REPULSIONE = 26000;
+// Lunghezza indicativa in pixel della barra di scala: da lì si sceglie il numero
+// tondo di chilometri da scriverci sopra.
+const BARRA_SCALA_PX = 110;
 
 /**
  * Restituisce tutti gli archi della rete, senza duplicati e senza dipendere
@@ -124,49 +152,226 @@ function chiaveArco(primaStazione: string, secondaStazione: string): string {
 }
 
 /**
- * Layout force-directed deterministico: nodi collegati si attraggono, tutti i
- * nodi si respingono. Di conseguenza una stazione nuova compare sempre e viene
- * posizionata in funzione degli archi della rete, non di latitudine/longitudine.
+ * Nel tipo Station le coordinate GPS stanno dentro `coordinates`, ma con nomi
+ * che ingannano: x è la LATITUDINE e y la LONGITUDINE (è la mappatura che fa
+ * apiClient dai campi latitudine/longitudine della Centrale). Queste due
+ * funzioncine servono a non sbagliarsi in giro per il file, visto che quelle x/y
+ * non hanno niente a che vedere con le x/y del disegno.
  */
-function calculateGraphLayout(
+function latitudineDi(station: Station): number {
+  return station.coordinates?.x ?? 0;
+}
+
+function longitudineDi(station: Station): number {
+  return station.coordinates?.y ?? 0;
+}
+
+/**
+ * Una stazione si può proiettare solo se le sue coordinate sono plausibili.
+ * Il punto (0, 0) va scartato apposta: è quello che esce da apiClient quando la
+ * Centrale non ha la coordinata (`s.latitudine || 0`), cade nel Golfo di Guinea
+ * e da solo schiaccerebbe tutta la rete vera in un angolo della mappa.
+ */
+function haCoordinateGps(station: Station): boolean {
+  const lat = latitudineDi(station);
+  const lon = longitudineDi(station);
+  return Number.isFinite(lat) && Number.isFinite(lon)
+    && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+    && !(lat === 0 && lon === 0);
+}
+
+/** Spazio del diagramma al netto dei margini, mai negativo su pannelli stretti. */
+function spazioUtile(riquadro: Riquadro2D): Riquadro2D {
+  return {
+    w: Math.max(40, riquadro.w - 2 * MAP_PADDING),
+    h: Math.max(40, riquadro.h - 2 * MAP_PADDING),
+  };
+}
+
+/**
+ * Decide dove disegnare ogni stazione.
+ *
+ * <p>Regola principale: le stazioni stanno dove dice il GPS, così aggiungendone
+ * altre la rete continua a somigliare alla cartina vera. Il layout a forze resta
+ * solo come ripiego, per le stazioni a cui le coordinate mancano del tutto (e per
+ * l'intera mappa se in banca dati non ce n'è nemmeno una).
+ */
+function calcolaDisposizione(
   stations: Station[],
   edges: GraphEdge[],
   riquadro: Riquadro2D,
-): Map<string, DiagramPoint> {
-  const orderedStations = [...stations].sort((a, b) => a.id.localeCompare(b.id));
-  const positions = new Map<string, DiagramPoint>();
-  const count = orderedStations.length;
+): Disposizione {
+  const conGps = stations.filter(haCoordinateGps);
+  const senzaGps = stations.filter(station => !haCoordinateGps(station));
 
-  if (count === 0) return positions;
+  // Con meno di due stazioni geolocalizzate non c'è niente da proiettare (una
+  // sola non dà né scala né orientamento): si torna al vecchio layout a forze.
+  if (conGps.length < 2) {
+    return {
+      posizioni: layoutAForze(stations, edges, riquadro),
+      kmPerUnita: null,
+      senzaGps: senzaGps.map(({ id }) => id),
+    };
+  }
 
-  const centerX = riquadro.w / 2;
-  const centerY = riquadro.h / 2;
-  const initialRadius = Math.min(riquadro.h / 2 - MAP_PADDING, 80 + count * 18);
+  const { posizioni, kmPerUnita } = proiettaGeografiche(conGps, riquadro);
 
-  // Posizione iniziale stabile basata sull'ID, poi raffinata dalle forze del grafo.
-  orderedStations.forEach((station, index) => {
-    const angle = (2 * Math.PI * index) / count - Math.PI / 2;
-    positions.set(station.id, {
-      x: centerX + initialRadius * Math.cos(angle),
-      y: centerY + initialRadius * Math.sin(angle),
+  if (senzaGps.length > 0) {
+    // Le stazioni senza coordinate partono vicino a quelle a cui sono collegate e
+    // poi si assestano con le forze: le geolocalizzate restano inchiodate dove
+    // dice il GPS (sono "fisse"), a muoversi sono soltanto le altre.
+    const lunghezzaArco = lunghezzaTipicaArchi(edges, posizioni);
+    seminaSenzaGps(senzaGps, edges, posizioni, riquadro, lunghezzaArco);
+    disponiAForze(
+      stations,
+      edges,
+      riquadro,
+      posizioni,
+      new Set(conGps.map(({ id }) => id)),
+      lunghezzaArco,
+    );
+  }
+
+  return { posizioni, kmPerUnita, senzaGps: senzaGps.map(({ id }) => id) };
+}
+
+/**
+ * Proietta le stazioni geolocalizzate sul riquadro del diagramma.
+ *
+ * <p>È una proiezione equirettangolare centrata sulla latitudine media della
+ * rete: la longitudine viene moltiplicata per cos(latitudine media) perché alle
+ * nostre latitudini un grado di longitudine vale ~73 km contro i 111 km di un
+ * grado di latitudine, e senza quella correzione l'Italia verrebbe fuori larga
+ * un terzo in più del vero. La scala poi è la stessa sui due assi (Math.min),
+ * quindi la forma della rete non viene stirata e le distanze fra due stazioni
+ * qualsiasi si possono confrontare a occhio.
+ *
+ * <p>Vale per reti di dimensione nazionale: su scala continentale la
+ * deformazione ai bordi si vedrebbe, ma qui la rete è quella italiana.
+ */
+function proiettaGeografiche(
+  stazioni: Station[],
+  riquadro: Riquadro2D,
+): { posizioni: Map<string, DiagramPoint>; kmPerUnita: number } {
+  const latMedia = stazioni.reduce((somma, s) => somma + latitudineDi(s), 0) / stazioni.length;
+  const compressione = Math.cos((latMedia * Math.PI) / 180);
+
+  // Coordinate ancora in gradi: la y è negata perché sullo schermo il nord sta in
+  // alto (y piccola) mentre la latitudine cresce andando verso nord.
+  const piane = stazioni.map(station => ({
+    id: station.id,
+    x: longitudineDi(station) * compressione,
+    y: -latitudineDi(station),
+  }));
+
+  const minX = Math.min(...piane.map(({ x }) => x));
+  const maxX = Math.max(...piane.map(({ x }) => x));
+  const minY = Math.min(...piane.map(({ y }) => y));
+  const maxY = Math.max(...piane.map(({ y }) => y));
+  const larghezza = Math.max(maxX - minX, SPAN_MINIMO_GRADI);
+  const altezza = Math.max(maxY - minY, SPAN_MINIMO_GRADI);
+
+  const spazio = spazioUtile(riquadro);
+  const scala = Math.min(spazio.w / larghezza, spazio.h / altezza);
+
+  const posizioni = new Map<string, DiagramPoint>();
+  piane.forEach(({ id, x, y }) => {
+    posizioni.set(id, {
+      x: riquadro.w / 2 + (x - (minX + maxX) / 2) * scala,
+      y: riquadro.h / 2 + (y - (minY + maxY) / 2) * scala,
     });
   });
 
-  const desiredEdgeLength = 175;
-  const repulsion = 26000;
+  // La scala è in unità del diagramma per grado di latitudine: invertendola si
+  // sa quanti chilometri vale un'unità, cioè quanto è lunga la barra di scala.
+  return { posizioni, kmPerUnita: GRADO_LAT_KM / scala };
+}
 
-  for (let iteration = 0; iteration < 200; iteration += 1) {
-    const displacement = new Map<string, DiagramPoint>(
-      orderedStations.map(({ id }) => [id, { x: 0, y: 0 }]),
+/**
+ * Lunghezza mediana degli archi già proiettati: è la distanza "normale" fra due
+ * stazioni collegate su questa mappa, e serve da lunghezza a riposo quando si
+ * infila una stazione senza coordinate in mezzo a quelle geolocalizzate.
+ */
+function lunghezzaTipicaArchi(edges: GraphEdge[], posizioni: Map<string, DiagramPoint>): number {
+  const lunghezze = edges
+    .map(({ fromId, toId }) => {
+      const da = posizioni.get(fromId);
+      const a = posizioni.get(toId);
+      return da && a ? Math.hypot(a.x - da.x, a.y - da.y) : null;
+    })
+    .filter((lunghezza): lunghezza is number => lunghezza !== null && lunghezza > 1)
+    .sort((primo, secondo) => primo - secondo);
+
+  return lunghezze.length === 0 ? LUNGHEZZA_ARCO : lunghezze[Math.floor(lunghezze.length / 2)];
+}
+
+/**
+ * Posizione di partenza delle stazioni senza coordinate: il baricentro delle
+ * vicine già piazzate, scostato di un po' perché due stazioni non partano dallo
+ * stesso identico punto. Chi non ha nessun collegamento parte dal centro.
+ */
+function seminaSenzaGps(
+  senzaGps: Station[],
+  edges: GraphEdge[],
+  posizioni: Map<string, DiagramPoint>,
+  riquadro: Riquadro2D,
+  lunghezzaArco: number,
+): void {
+  const ordinate = [...senzaGps].sort((primo, secondo) => primo.id.localeCompare(secondo.id));
+
+  ordinate.forEach((station, indice) => {
+    const vicine = edges
+      .filter(({ fromId, toId }) => fromId === station.id || toId === station.id)
+      .map(({ fromId, toId }) => posizioni.get(fromId === station.id ? toId : fromId))
+      .filter((punto): punto is DiagramPoint => punto !== undefined);
+
+    const base = vicine.length > 0
+      ? {
+        x: vicine.reduce((somma, { x }) => somma + x, 0) / vicine.length,
+        y: vicine.reduce((somma, { y }) => somma + y, 0) / vicine.length,
+      }
+      : { x: riquadro.w / 2, y: riquadro.h / 2 };
+
+    const angolo = (2 * Math.PI * indice) / ordinate.length - Math.PI / 2;
+    posizioni.set(station.id, {
+      x: base.x + lunghezzaArco * 0.6 * Math.cos(angolo),
+      y: base.y + lunghezzaArco * 0.6 * Math.sin(angolo),
+    });
+  });
+}
+
+/**
+ * Layout a forze deterministico: nodi collegati si attraggono, tutti i nodi si
+ * respingono. Le stazioni elencate in `fisse` restano dove sono (fanno forza
+ * sulle altre ma non si spostano), così lo stesso codice serve sia da ripiego
+ * per l'intera mappa sia per sistemare le poche stazioni senza coordinate.
+ */
+function disponiAForze(
+  stations: Station[],
+  edges: GraphEdge[],
+  riquadro: Riquadro2D,
+  posizioni: Map<string, DiagramPoint>,
+  fisse: Set<string>,
+  lunghezzaArco: number,
+): void {
+  const ordinate = [...stations].sort((primo, secondo) => primo.id.localeCompare(secondo.id));
+  const count = ordinate.length;
+  // La repulsione va riscalata insieme alla lunghezza degli archi, se no su una
+  // mappa fitta i nodi liberi schizzerebbero via.
+  const repulsione = REPULSIONE * (lunghezzaArco / LUNGHEZZA_ARCO) ** 2;
+
+  for (let iterazione = 0; iterazione < 200; iterazione += 1) {
+    const spostamenti = new Map<string, DiagramPoint>(
+      ordinate.map(({ id }) => [id, { x: 0, y: 0 }]),
     );
 
     // Repulsione tra ciascuna coppia: evita sovrapposizioni anche per nodi isolati.
     for (let first = 0; first < count; first += 1) {
       for (let second = first + 1; second < count; second += 1) {
-        const firstId = orderedStations[first].id;
-        const secondId = orderedStations[second].id;
-        const firstPoint = positions.get(firstId)!;
-        const secondPoint = positions.get(secondId)!;
+        const firstId = ordinate[first].id;
+        const secondId = ordinate[second].id;
+        const firstPoint = posizioni.get(firstId)!;
+        const secondPoint = posizioni.get(secondId)!;
         let dx = firstPoint.x - secondPoint.x;
         let dy = firstPoint.y - secondPoint.y;
         let distanceSquared = dx * dx + dy * dy;
@@ -179,9 +384,9 @@ function calculateGraphLayout(
         }
 
         const distance = Math.sqrt(distanceSquared);
-        const force = repulsion / distanceSquared;
-        const firstMove = displacement.get(firstId)!;
-        const secondMove = displacement.get(secondId)!;
+        const force = repulsione / distanceSquared;
+        const firstMove = spostamenti.get(firstId)!;
+        const secondMove = spostamenti.get(secondId)!;
         firstMove.x += (dx / distance) * force;
         firstMove.y += (dy / distance) * force;
         secondMove.x -= (dx / distance) * force;
@@ -191,14 +396,16 @@ function calculateGraphLayout(
 
     // Attrazione sugli archi: mantiene vicine le stazioni realmente collegate.
     edges.forEach(({ fromId, toId }) => {
-      const from = positions.get(fromId)!;
-      const to = positions.get(toId)!;
+      const from = posizioni.get(fromId);
+      const to = posizioni.get(toId);
+      const fromMove = spostamenti.get(fromId);
+      const toMove = spostamenti.get(toId);
+      if (!from || !to || !fromMove || !toMove) return;
+
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const distance = Math.max(1, Math.hypot(dx, dy));
-      const force = (distance - desiredEdgeLength) * 0.075;
-      const fromMove = displacement.get(fromId)!;
-      const toMove = displacement.get(toId)!;
+      const force = (distance - lunghezzaArco) * 0.075;
       fromMove.x += (dx / distance) * force;
       fromMove.y += (dy / distance) * force;
       toMove.x -= (dx / distance) * force;
@@ -206,26 +413,67 @@ function calculateGraphLayout(
     });
 
     // Raffreddamento progressivo: il layout converge invece di oscillare.
-    const cooling = 0.22 * (1 - iteration / 200) + 0.03;
-    orderedStations.forEach(({ id }) => {
-      const point = positions.get(id)!;
-      const move = displacement.get(id)!;
-      positions.set(id, {
-        x: Math.max(MAP_PADDING, Math.min(riquadro.w - MAP_PADDING, point.x + move.x * cooling)),
-        y: Math.max(MAP_PADDING, Math.min(riquadro.h - MAP_PADDING, point.y + move.y * cooling)),
+    const raffreddamento = 0.22 * (1 - iterazione / 200) + 0.03;
+    ordinate.forEach(({ id }) => {
+      if (fisse.has(id)) return;
+      const punto = posizioni.get(id)!;
+      const spostamento = spostamenti.get(id)!;
+      posizioni.set(id, {
+        x: Math.max(
+          MAP_PADDING,
+          Math.min(riquadro.w - MAP_PADDING, punto.x + spostamento.x * raffreddamento),
+        ),
+        y: Math.max(
+          MAP_PADDING,
+          Math.min(riquadro.h - MAP_PADDING, punto.y + spostamento.y * raffreddamento),
+        ),
       });
     });
   }
-
-  adattaAlDiagramma(positions, riquadro);
-  return positions;
 }
 
 /**
- * Ingrandisce e ricentra il risultato del layout finché la rete non riempie il
- * diagramma: senza questo passaggio poche stazioni restano in un grumo al centro
- * e metà della mappa resta vuota. La scala è uniforme, quindi la forma del grafo
- * non viene deformata.
+ * Disposizione di ripiego, tutta a forze: si usa quando in banca dati non c'è
+ * nessuna coordinata GPS utilizzabile. La rete si vede lo stesso, ma la posizione
+ * dipende soltanto dagli archi, quindi non corrisponde alla geografia vera.
+ */
+function layoutAForze(
+  stations: Station[],
+  edges: GraphEdge[],
+  riquadro: Riquadro2D,
+): Map<string, DiagramPoint> {
+  const ordinate = [...stations].sort((primo, secondo) => primo.id.localeCompare(secondo.id));
+  const posizioni = new Map<string, DiagramPoint>();
+  const count = ordinate.length;
+
+  if (count === 0) return posizioni;
+
+  const centroX = riquadro.w / 2;
+  const centroY = riquadro.h / 2;
+  const raggioIniziale = Math.min(riquadro.h / 2 - MAP_PADDING, 80 + count * 18);
+
+  // Posizione iniziale stabile basata sull'ID, poi raffinata dalle forze del grafo.
+  ordinate.forEach((station, indice) => {
+    const angolo = (2 * Math.PI * indice) / count - Math.PI / 2;
+    posizioni.set(station.id, {
+      x: centroX + raggioIniziale * Math.cos(angolo),
+      y: centroY + raggioIniziale * Math.sin(angolo),
+    });
+  });
+
+  disponiAForze(stations, edges, riquadro, posizioni, new Set(), LUNGHEZZA_ARCO);
+  adattaAlDiagramma(posizioni, riquadro);
+  return posizioni;
+}
+
+/**
+ * Ingrandisce e ricentra il risultato del layout a forze finché la rete non
+ * riempie il diagramma: senza questo passaggio poche stazioni restano in un grumo
+ * al centro e metà della mappa resta vuota. La scala è uniforme, quindi la forma
+ * del grafo non viene deformata.
+ *
+ * <p>Sulla disposizione geografica NON va applicata: cambierebbe la scala e la
+ * barra dei chilometri direbbe una bugia.
  */
 function adattaAlDiagramma(positions: Map<string, DiagramPoint>, riquadro: Riquadro2D): void {
   const punti = [...positions.values()];
@@ -237,11 +485,8 @@ function adattaAlDiagramma(positions: Map<string, DiagramPoint>, riquadro: Riqua
   const maxY = Math.max(...punti.map(({ y }) => y));
   const larghezza = Math.max(1, maxX - minX);
   const altezza = Math.max(1, maxY - minY);
-  const scala = Math.min(
-    (riquadro.w - 2 * MAP_PADDING) / larghezza,
-    (riquadro.h - 2 * MAP_PADDING) / altezza,
-    2.2,
-  );
+  const spazio = spazioUtile(riquadro);
+  const scala = Math.min(spazio.w / larghezza, spazio.h / altezza, 2.2);
 
   positions.forEach((punto, id) => {
     positions.set(id, {
@@ -249,6 +494,22 @@ function adattaAlDiagramma(positions: Map<string, DiagramPoint>, riquadro: Riqua
       y: riquadro.h / 2 + (punto.y - (minY + maxY) / 2) * scala,
     });
   });
+}
+
+/**
+ * Il convoglio sta percorrendo una tratta, cioè va disegnato fra due stazioni invece che
+ * sopra a una.
+ *
+ * Non basta lo stato: un treno che dichiara una stazione corrente è FERMO lì, perché quel
+ * campo lo svuota la telemetria stessa appena riparte. Lo stato invece, nello snapshot,
+ * può arrivare vecchio di qualche secondo — la Centrale registra l'ingresso in stazione
+ * appena le arriva il passaggio, ma "attivo" e la percentuale restano quelli dell'ultimo
+ * frame di telemetria — e in quella finestra il treno appena arrivato veniva scagliato
+ * quasi sopra la stazione successiva.
+ */
+function inMarcia(train: TrainType): boolean {
+  return (train.status === 'in_viaggio' || train.status === 'in_ritardo')
+    && !train.currentStationId;
 }
 
 /** Colore del simbolo del treno in base allo stato del convoglio. */
@@ -266,6 +527,44 @@ function coloreTreno(train: TrainType): { simbolo: string; classe: string } {
 /** Etichetta leggibile dello stato, senza underscore. */
 function descriviStato(stato: string): string {
   return stato.replace(/_/g, ' ').toUpperCase();
+}
+
+/**
+ * Arrotonda i chilometri della barra di scala a 1, 2 o 5 per decade, come fanno
+ * le cartine: si preferisce scrivere "200 km" invece di "187 km".
+ */
+function arrotondaScala(km: number): number {
+  const decade = 10 ** Math.floor(Math.log10(km));
+  const resto = km / decade;
+  if (resto >= 5) return 5 * decade;
+  if (resto >= 2) return 2 * decade;
+  return decade;
+}
+
+/** Scrive la distanza in metri sotto il chilometro, se no in km. */
+function formattaScala(km: number): string {
+  return km >= 1 ? `${km} km` : `${Math.round(km * 1000)} m`;
+}
+
+/** Testo dell'avviso sulle stazioni prive di coordinate GPS utilizzabili. */
+function avvisoSenzaGps(quante: number, geografica: boolean): string {
+  if (!geografica) return 'Nessuna coordinata GPS: stazioni disposte in base ai collegamenti';
+  return quante === 1
+    ? '1 stazione senza coordinate GPS valide, messa vicino a quelle collegate'
+    : `${quante} stazioni senza coordinate GPS valide, messe vicino a quelle collegate`;
+}
+
+/**
+ * Coordinate da scrivere nella scheda della stazione. Se il dato c'è ma non sta
+ * nei limiti (capita scrivendo a mano nel pannello di amministrazione) lo si
+ * mostra lo stesso, segnalandolo: così si capisce quale riga va corretta invece
+ * di credere che la coordinata manchi del tutto.
+ */
+function descriviCoordinate(station: Station): string {
+  const lat = latitudineDi(station);
+  const lon = longitudineDi(station);
+  if (haCoordinateGps(station)) return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+  return lat === 0 && lon === 0 ? 'non impostate' : `${lat}, ${lon} (fuori scala)`;
 }
 
 /**
@@ -475,15 +774,32 @@ export default function TrafficMapPage() {
     () => buildGraphEdges(stations, routes, trackSegments),
     [stations, routes, trackSegments],
   );
-  const graphLayout = useMemo(
-    () => calculateGraphLayout(stations, graphEdges, riquadro),
+  const disposizione = useMemo(
+    () => calcolaDisposizione(stations, graphEdges, riquadro),
     [stations, graphEdges, riquadro],
   );
+  const graphLayout = disposizione.posizioni;
+  const senzaGps = useMemo(() => new Set(disposizione.senzaGps), [disposizione]);
   const getCoordinates = (stationId: string): DiagramPoint =>
     graphLayout.get(stationId) ?? { x: riquadro.w / 2, y: riquadro.h / 2 };
 
   const vistaPiena: Vista = { x: 0, y: 0, w: riquadro.w, h: riquadro.h };
   const vistaCorrente = vista ?? vistaPiena;
+
+  /**
+   * Barra di scala: quanti chilometri veri sono i pixel disegnati a schermo.
+   * Il rapporto cambia con lo zoom (la viewBox si stringe mentre il pannello
+   * resta grande uguale), quindi ogni volta si sceglie il numero tondo di km che
+   * sta in circa BARRA_SCALA_PX pixel e si ricalcola la lunghezza esatta.
+   */
+  const scalaGrafica = useMemo(() => {
+    if (disposizione.kmPerUnita === null) return null;
+    const pixelPerUnita = riquadro.w / vistaCorrente.w;
+    const kmPerPixel = disposizione.kmPerUnita / pixelPerUnita;
+    const km = arrotondaScala(kmPerPixel * BARRA_SCALA_PX);
+    if (!Number.isFinite(km) || km <= 0) return null;
+    return { km, larghezza: km / kmPerPixel };
+  }, [disposizione.kmPerUnita, riquadro.w, vistaCorrente.w]);
 
   // I dettagli vengono ricavati ogni volta dallo store: così il pannello resta
   // aggiornato in tempo reale invece di mostrare la fotografia del click.
@@ -493,6 +809,12 @@ export default function TrafficMapPage() {
   const trenoSelezionato = selezione?.tipo === 'treno'
     ? trains.find(({ id }) => id === selezione.id) ?? null
     : null;
+  // Stesse due condizioni usate per posizionare il simbolo sul diagramma, così il pannello
+  // non racconta un avanzamento che la mappa non è in grado di disegnare.
+  const inMarciaSelezionato = !!trenoSelezionato && inMarcia(trenoSelezionato);
+  const trattaSelezionataNota = !!trenoSelezionato?.previousStationId
+    && !!trenoSelezionato?.nextStationId
+    && trenoSelezionato.previousStationId !== trenoSelezionato.nextStationId;
 
   /**
    * Costruisce l'elenco di tutto ciò che va disegnato (stazioni e treni
@@ -516,6 +838,7 @@ export default function TrafficMapPage() {
           ancora,
           posizione: ancora,
           inAvaria,
+          senzaGps: senzaGps.has(station.id),
         };
       });
 
@@ -527,12 +850,21 @@ export default function TrafficMapPage() {
         const prevStation = stations.find(({ id }) => id === train.previousStationId);
         const nextStation = stations.find(({ id }) => id === train.nextStationId);
         const currentStation = stations.find(({ id }) => id === train.currentStationId);
-        const isMoving = train.status === 'in_viaggio' || train.status === 'in_ritardo';
+        const isMoving = inMarcia(train);
+        // Gli estremi devono essere due stazioni DIVERSE: se coincidono l'interpolazione
+        // restituisce sempre lo stesso punto e il convoglio verrebbe disegnato immobile su
+        // un nodo mentre in realtà sta percorrendo una tratta. Meglio ripiegare su quello
+        // che si sa per certo (la stazione corrente) che mostrare una posizione inventata.
+        const trattaNota = !!prevStation && !!nextStation && prevStation.id !== nextStation.id;
 
         let ancora: DiagramPoint | null = null;
-        if (isMoving && prevStation && nextStation) {
+        if (isMoving && trattaNota && prevStation && nextStation) {
           // Interpolazione lineare: 0% coincide con la stazione precedente,
           // 100% con la successiva. Il clamp protegge la vista da frame incompleti.
+          // Il digital twin calcola la propria posizione GPS nello stesso modo
+          // (TrainJourneyEngine interpola lat/lon sulla percentuale), quindi ora
+          // che le stazioni stanno sulle coordinate vere il punto disegnato qui è
+          // proprio quello che il treno pubblica nella telemetria.
           const pct = Math.max(0, Math.min(100, train.progressPercent)) / 100;
           const prevCoords = getCoordinates(prevStation.id);
           const nextCoords = getCoordinates(nextStation.id);
@@ -565,6 +897,7 @@ export default function TrafficMapPage() {
           ancora,
           posizione: ancora,
           inAvaria: train.status === 'guasto',
+          senzaGps: false,
         };
       })
       .filter((elemento): elemento is ElementoMappa => elemento !== null);
@@ -574,7 +907,7 @@ export default function TrafficMapPage() {
     raggruppati.forEach(sventaglia);
 
     return { elementi: tutti, gruppi: raggruppati, trainiNonLocalizzabili: scartati };
-  }, [stations, trains, graphLayout]);
+  }, [stations, trains, graphLayout, senzaGps]);
 
   const etichette = useMemo(
     () => (mostraEtichette
@@ -836,6 +1169,8 @@ export default function TrafficMapPage() {
         {elemento.inAvaria && (
           <circle className="map-pulse" r={17} fill="none" stroke="#ef4444" strokeWidth="2" />
         )}
+        {/* Bordo tratteggiato = stazione senza coordinate GPS: sta lì per i suoi
+            collegamenti, non perché sia davvero in quel punto d'Italia. */}
         {elemento.tipo === 'stazione' ? (
           <circle
             className="map-marker__simbolo"
@@ -843,6 +1178,7 @@ export default function TrafficMapPage() {
             fill={elemento.colore}
             stroke="#ffffff"
             strokeWidth="3"
+            strokeDasharray={elemento.senzaGps ? '4 3' : undefined}
           />
         ) : (
           <rect
@@ -1033,13 +1369,40 @@ export default function TrafficMapPage() {
               <span className="map-legend-dot" style={{ background: '#ffffff', border: '1.5px solid #94a3b8' }} />
               Elementi sovrapposti
             </span>
+            {senzaGps.size > 0 && (
+              <span className="map-legend-item">
+                <span className="map-legend-dot map-legend-dot--senza-gps" />
+                Stazione senza GPS
+              </span>
+            )}
           </div>
 
-          {trainiNonLocalizzabili > 0 && (
-            <div className="map-avviso">
-              {trainiNonLocalizzabili} treni senza posizione nota
-            </div>
-          )}
+          {/* Avvisi e barra di scala impilati nell'angolo, così non si coprono. */}
+          <div className="map-angolo">
+            {trainiNonLocalizzabili > 0 && (
+              <div className="map-avviso">
+                {trainiNonLocalizzabili} treni senza posizione nota
+              </div>
+            )}
+
+            {senzaGps.size > 0 && (
+              <div className="map-avviso">
+                {avvisoSenzaGps(senzaGps.size, disposizione.kmPerUnita !== null)}
+              </div>
+            )}
+
+            {/* Con le stazioni sulle coordinate vere le distanze sui due assi
+                valgono gli stessi chilometri: la barra dice quanti. */}
+            {scalaGrafica && (
+              <div className="map-scala" title="Le stazioni sono disposte sulle coordinate GPS reali">
+                <span
+                  className="map-scala__barra"
+                  style={{ width: `${scalaGrafica.larghezza}px` }}
+                />
+                <span className="map-scala__testo">{formattaScala(scalaGrafica.km)}</span>
+              </div>
+            )}
+          </div>
 
           {/* Menù di scelta fra gli elementi che condividono lo stesso punto. */}
           {selettore && (
@@ -1137,9 +1500,17 @@ export default function TrafficMapPage() {
                   <span className="map-detail__valore">{stazioneSelezionata.platforms}</span>
                 </div>
                 <div className="map-detail__riga">
+                  <span className="map-detail__etichetta">Coordinate GPS</span>
+                  <span className="map-detail__valore font-mono">
+                    {descriviCoordinate(stazioneSelezionata)}
+                  </span>
+                </div>
+                <div className="map-detail__riga">
                   <span className="map-detail__etichetta">Ultimo heartbeat</span>
                   <span className="map-detail__valore">
-                    {new Date(stazioneSelezionata.lastHeartbeat).toLocaleTimeString()}
+                    {stazioneSelezionata.lastHeartbeat
+                      ? new Date(stazioneSelezionata.lastHeartbeat).toLocaleTimeString()
+                      : '—'}
                   </span>
                 </div>
                 <div className="map-detail__riga">
@@ -1192,21 +1563,37 @@ export default function TrafficMapPage() {
                 )}
               </div>
 
-              <div className="map-detail__progresso">
-                <div className="map-detail__progresso-barra">
-                  <div
-                    className="map-detail__progresso-riempimento"
-                    style={{
-                      width: `${Math.max(0, Math.min(100, trenoSelezionato.progressPercent))}%`,
-                    }}
-                  />
+              {/* La barra misura l'avanzamento SULLA TRATTA, quindi ha senso solo mentre
+                  il convoglio la sta percorrendo e solo se i due estremi sono stazioni
+                  diverse. A treno fermo restava a schermo un 100% che non voleva dire
+                  niente (la sosta non è un avanzamento) e, quando gli estremi
+                  coincidevano, la barra saliva fra una stazione e sé stessa. */}
+              {inMarciaSelezionato && trattaSelezionataNota ? (
+                <div className="map-detail__progresso">
+                  <div className="map-detail__progresso-barra">
+                    <div
+                      className="map-detail__progresso-riempimento"
+                      style={{
+                        width: `${Math.max(0, Math.min(100, trenoSelezionato.progressPercent))}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="map-detail__progresso-estremi">
+                    <span>{nomeStazione(trenoSelezionato.previousStationId)}</span>
+                    <span>{Math.round(trenoSelezionato.progressPercent)}%</span>
+                    <span>{nomeStazione(trenoSelezionato.nextStationId)}</span>
+                  </div>
                 </div>
-                <div className="map-detail__progresso-estremi">
-                  <span>{nomeStazione(trenoSelezionato.previousStationId)}</span>
-                  <span>{Math.round(trenoSelezionato.progressPercent)}%</span>
-                  <span>{nomeStazione(trenoSelezionato.nextStationId)}</span>
-                </div>
-              </div>
+              ) : (
+                <p className="map-detail__sottotitolo">
+                  {trenoSelezionato.currentStationId
+                    ? `In sosta a ${nomeStazione(trenoSelezionato.currentStationId)}`
+                    : 'Avanzamento sulla tratta non disponibile'}
+                  {trenoSelezionato.nextStationId
+                    ? ` · prossima fermata ${nomeStazione(trenoSelezionato.nextStationId)}`
+                    : ''}
+                </p>
+              )}
 
               <div className="map-detail__righe">
                 <div className="map-detail__riga">

@@ -46,7 +46,7 @@ public class TrainElab {
         // Crea un flusso che "scatta" regolarmente ogni 5 secondi
         return Multi.createFrom()
                 .ticks()                 // qui avviene ogni 5 sec
-                .every(Duration.ofSeconds(5))
+                .every(Duration.ofSeconds(1))
                 .filter(tick -> {
                     // ID non ancora validato dalla Centrale: nessuna telemetria
                     if (!trainDB.trenoRiconosciuto) {

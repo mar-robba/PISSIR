@@ -226,7 +226,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  max-width: calc(100% - 1.5rem);
+  /* Lascia libero l'angolo destro: lì stanno avvisi e barra di scala. */
+  max-width: calc(100% - 13rem);
   z-index: 2;
 }
 
@@ -257,6 +258,12 @@
   border-radius: 0.15rem;
 }
 
+/* Stessa idea del marker tratteggiato sulla mappa: coordinate GPS mancanti. */
+.map-legend-dot--senza-gps {
+  background: #ffffff;
+  border: 1.5px dashed #10b981;
+}
+
 .map-hint {
   position: absolute;
   top: 0.75rem;
@@ -274,17 +281,57 @@
   z-index: 2;
 }
 
-.map-avviso {
+/* Colonna in basso a destra: avvisi e barra di scala uno sotto l'altro. */
+.map-angolo {
   position: absolute;
   right: 0.75rem;
   bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  max-width: calc(100% - 1.5rem);
+  z-index: 2;
+}
+
+.map-avviso {
   padding: 0.25rem 0.6rem;
   font-size: 0.7rem;
+  text-align: right;
   color: var(--warning);
   background: #fffbeb;
   border: 1px solid #fde68a;
   border-radius: var(--radius-full);
-  z-index: 2;
+}
+
+/* --- Barra di scala --- */
+
+.map-scala {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  backdrop-filter: blur(8px);
+}
+
+/* Il segmento vero e proprio: la larghezza la mette il componente, in pixel,
+   ricalcolandola a ogni zoom. Le due tacche laterali sono i bordi. */
+.map-scala__barra {
+  height: 0.45rem;
+  border: 1px solid var(--text-muted);
+  border-top: none;
+  flex-shrink: 0;
+}
+
+.map-scala__testo {
+  font-family: var(--font-mono);
+  white-space: nowrap;
 }
 
 /* --- Selettore degli elementi sovrapposti --- */
