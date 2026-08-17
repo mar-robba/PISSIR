@@ -27,6 +27,23 @@ public class Tratta extends PanacheEntityBase {
     public Integer tempoPercorrenzaMinuti = 15;
 
     /**
+     * Percorribilità corrente dell'arco: PERCORRIBILE oppure IMPERCORRIBILE (RF02.1.2.2.2).
+     *
+     * <p>È {@code @Transient} come lo stato delle stazioni e per lo stesso motivo: lo stato
+     * corrente della rete vive in RAM e si ricostruisce dagli eventi, a database va il
+     * <b>cambiamento</b> (la riga di {@code Storico_Stato_Tratte}, con dentro la causa). Prima
+     * non esisteva affatto — la tratta risultava sempre libera — ed è la ragione per cui un
+     * convoglio guasto fra due stazioni non fermava nessun altro: non c'era nessuno stato da
+     * cambiare.</p>
+     *
+     * <p>La percorribilità non è un dato d'anagrafica: una tratta impercorribile resta una
+     * tratta della rete, e al riavvio della Centrale riparte percorribile finché qualcuno non
+     * dichiara il contrario, esattamente come le stazioni ripartono OFFLINE.</p>
+     */
+    @Transient
+    public String stato = "PERCORRIBILE";
+
+    /**
      * Etichetta leggibile della tratta, del tipo "Milano Centrale -> Bologna Centrale".
      * La copiano dentro di sé le righe di storico, che dopo RF02.7 non hanno più una
      * chiave esterna con cui risalire alle stazioni: il solo id ("T1_MI_BO") non dice

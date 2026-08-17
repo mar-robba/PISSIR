@@ -1,6 +1,7 @@
 package it.uni.reti2.entity;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import it.uni.reti2.eventi.CausaEvento;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -59,6 +60,24 @@ public class StoricoStatoStazione extends PanacheEntityBase {
     @Column(name = "funzionanteONo")
     public Boolean funzionanteONo;
 
+    /**
+     * Tipo del nodo che ha causato il cambiamento (TRENO, STAZIONE, OPERATORE), null se la
+     * stazione ha cambiato stato per conto suo. Riferimento logico, niente FK (RF02.7).
+     */
+    @Column(name = "causa_tipo", length = 20)
+    public String causaTipo;
+
+    /** Identificativo del nodo che ha causato il cambiamento (riferimento logico). */
+    @Column(name = "causa_id", length = 50)
+    public String causaId;
+
+    /**
+     * Catena di eventi a cui il cambiamento appartiene, cioè l'identificativo del guasto primario
+     * che l'ha originata.
+     */
+    @Column(name = "catena_id", length = 50)
+    public String catenaId;
+
     /** Timestamp di inserimento del record nello storico. */
     @Column(name = "ts_storicizzazione", nullable = false)
     public Instant tsStoricizzazione = Instant.now();
@@ -73,6 +92,22 @@ public class StoricoStatoStazione extends PanacheEntityBase {
      * @return La riga da persistere (non è ancora stata scritta).
      */
     public static StoricoStatoStazione fotografiaDi(Stazione stazione, String stato, String statoPrecedente) {
+        return fotografiaDi(stazione, stato, statoPrecedente, null);
+    }
+
+    /**
+     * Come sopra, ma registrando anche <b>perché</b> la stazione ha cambiato stato: serve quando
+     * il cambiamento è la conseguenza di un evento di un altro nodo (un convoglio che si guasta
+     * sui suoi binari) e non di un guasto dichiarato dalla stazione stessa.
+     *
+     * @param stazione        La stazione interessata dal cambiamento.
+     * @param stato           Lo stato nuovo.
+     * @param statoPrecedente Lo stato che aveva prima.
+     * @param causa           Chi ha causato il cambiamento e a quale catena appartiene (può essere null).
+     * @return La riga da persistere (non è ancora stata scritta).
+     */
+    public static StoricoStatoStazione fotografiaDi(Stazione stazione, String stato, String statoPrecedente,
+                                                    CausaEvento causa) {
         StoricoStatoStazione storico = new StoricoStatoStazione();
         storico.stazioneId = stazione.id;
         storico.nome = stazione.nome;
@@ -80,6 +115,11 @@ public class StoricoStatoStazione extends PanacheEntityBase {
         storico.stato = stato;
         storico.statoPrecedente = statoPrecedente;
         storico.funzionanteONo = !"GUASTA".equalsIgnoreCase(stato) && !"OFFLINE".equalsIgnoreCase(stato);
+        if (causa != null) {
+            storico.causaTipo = causa.tipo();
+            storico.causaId = causa.id();
+            storico.catenaId = causa.catenaId();
+        }
         return storico;
     }
 }

@@ -1,4 +1,4 @@
-import { Train, Station, Route, TrackSegment, Alert, DashboardKPI, Transit, TrainStatus, User, UserRole } from '../types';
+import { Train, Station, Route, TrackSegment, Alert, DashboardKPI, TrainStatus, User, UserRole } from '../types';
 import type {
   ApiAlertPayload,
   ApiCoppiaMancante,
@@ -8,7 +8,6 @@ import type {
   ApiRoutePayload,
   ApiTrackSegmentPayload,
   ApiStationPayload,
-  ApiTransitPayload,
   ApiTrainPayload
 } from './apiTypes';
 
@@ -382,10 +381,28 @@ export const apiClient = {
       // finirebbe associato anche a una stazione (e viceversa)
       stationId: a.sorgenteTipo === 'STAZIONE' ? a.sorgenteId : undefined,
       trainId: a.sorgenteTipo === 'TRENO' ? a.sorgenteId : undefined,
+      // Terza sorgente possibile (RF01.2.1): un arco della rete occupato da un convoglio
+      // guasto in linea. Senza questa riga l'allarme arrivava senza nessun riferimento e
+      // nell'elenco restava con il solo messaggio.
+      trackSegmentId: a.sorgenteTipo === 'TRATTA' ? a.sorgenteId : undefined,
       timestamp: a.timestamp ? new Date(a.timestamp).getTime() : Date.now(),
       acknowledged: a.risolto || false,
-      resolvedAt: a.timestampRisoluzione ? new Date(a.timestampRisoluzione).getTime() : undefined
+      resolvedAt: a.timestampRisoluzione ? new Date(a.timestampRisoluzione).getTime() : undefined,
+      // Arriva dalla Centrale e non dallo store locale: la presa in carico deve reggere il
+      // ricaricamento della pagina ed essere visibile anche all'altro operatore.
+      takenBy: a.operatore ?? undefined
     }));
+  },
+
+  /**
+   * Presa in carico di un allarme (RF01.4.2): l'operatore collegato dichiara di
+   * occuparsene lui. Non chiude il guasto — quello lo fa acknowledgeAlert — ma gli mette
+   * sopra un nome, che la Centrale ricava dal token e scrive nello storico delle
+   * assegnazioni (RF02.7).
+   */
+  takeAlert: async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/allarmi/${id}/assegna`, { method: 'POST', headers: authHeaders() });
+    if (!res.ok) throw new Error('Failed to take alert');
   },
 
   /**
@@ -519,21 +536,15 @@ export const apiClient = {
   },
 
   /**
-   * Recupera i transiti.
+   * Dichiara concluso l'intervento della squadra: la stazione torna in servizio (RF01.4.1).
+   *
+   * È un comando a sé e non una conseguenza automatica dell'invio, perché il ritorno in
+   * servizio avviene quando il lavoro è finito e questo lo sa solo chi lo sta seguendo. Prima
+   * la Centrale rimetteva ONLINE dentro la stessa chiamata dell'invio, e la manutenzione
+   * durava qualche millisecondo.
    */
-  getTransits: async (): Promise<Transit[]> => {
-    const res = await fetch(`${API_BASE_URL}/transiti`, { headers: authHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch transits');
-    const data = await res.json() as ApiTransitPayload[];
-    return data.map((t) => ({
-      id: t.id,
-      trainId: t.trainId || t.trenoId || '',
-      stationId: t.stationId || t.stazioneId || '',
-      trackSegmentId: t.trattaId ?? null,
-      type: (t.tipo || t.type || 'ingresso') as 'ingresso' | 'uscita',
-      timestamp: t.timestamp ? new Date(t.timestamp).getTime() : Date.now(),
-      delayed: t.delayed ?? t.inRitardo ?? false,
-      delayMinutes: t.delayMinutes ?? t.ritardo ?? 0
-    }));
+  completeMaintenance: async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/stazioni/${encodeURIComponent(id)}/manutenzione/conclusa`, { method: 'POST', headers: authHeaders() });
+    if (!res.ok) throw await createApiError(res);
   }
 };

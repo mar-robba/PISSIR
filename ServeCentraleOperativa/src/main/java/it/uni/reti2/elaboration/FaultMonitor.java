@@ -4,13 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.scheduler.Scheduled;
-import it.uni.reti2.entity.EventoStazione;
 import it.uni.reti2.entity.Guasto;
 import it.uni.reti2.entity.Stazione;
-import it.uni.reti2.entity.StoricoGuasto;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.gateway.RealtimeWebSocket;
 import it.uni.reti2.ingestion.IngestionService;
+import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -49,6 +48,10 @@ public class FaultMonitor {
 
     @Inject
     IngestionService ingestion;
+
+    /** Il guasto automatico e la sua riga di storico li scrive il repository. */
+    @Inject
+    RailwayRepository repository;
 
     /* È una classe fondamentale che fa parte della libreria Jackson (il motore JSON standard usato da Quarkus). Il suo compito principale è fare due cose:
     Serializzazione (Object → JSON): Prende un normale oggetto Java (POJO) e lo trasforma in una stringa di testo in formato JSON.
@@ -121,8 +124,7 @@ public class FaultMonitor {
                     creaGuastoAutomatico(
                             "sensore_offline", "CRITICAL", "STAZIONE", stazione.id,
                             IngestionService.MSG_HEARTBEAT_PERSO + " la stazione " + stazione.id
-                                    + " non invia heartbeat da oltre " + heartbeatTimeoutSecondi + " secondi",
-                            "HEARTBEAT_LOST");
+                                    + " non invia heartbeat da oltre " + heartbeatTimeoutSecondi + " secondi");
                 }
             }
         }
@@ -192,8 +194,7 @@ public class FaultMonitor {
                 creaGuastoAutomatico(
                         "treno_fermo", "warning", "TRENO", treno.id,
                         IngestionService.MSG_TRENO_FERMO + " il convoglio " + treno.id
-                                + " è fermo fuori da una stazione da oltre " + trenoFermoTimeoutSecondi + " secondi",
-                        null);
+                                + " è fermo fuori da una stazione da oltre " + trenoFermoTimeoutSecondi + " secondi");
             }
         }
 
@@ -247,12 +248,10 @@ public class FaultMonitor {
      * già fermati per un guasto che a database non esisteva. Se la scrittura non riesce ora
      * non parte nessuna notifica e il giro successivo del watchdog riproverà.</p>
      *
-     * @param tipoEventoStazione Se non null, viene scritta anche una riga di audit su
-     *                           eventi_stazioni con questo tipo (es. HEARTBEAT_LOST).
      * @return Il guasto appena creato, oppure null se la scrittura non è andata a buon fine.
      */
     private Guasto creaGuastoAutomatico(String tipo, String severita, String sorgenteTipo,
-                                        String sorgenteId, String messaggio, String tipoEventoStazione) {
+                                        String sorgenteId, String messaggio) {
         Guasto guasto = new Guasto();
         // Il suffisso casuale è indispensabile: i due job schedulati girano entrambi ogni
         // 10 secondi e ciclano su tutte le sorgenti, quindi due guasti generati nello stesso
@@ -267,27 +266,14 @@ public class FaultMonitor {
         guasto.messaggio = messaggio;
         guasto.timestamp = Instant.now();
         guasto.risolto = false;
+        // Guasto dedotto dalla Centrale: è comunque un evento primario (nessun altro evento
+        // l'ha causato), quindi la catena delle sue conseguenze parte da lui.
+        guasto.catenaId = guasto.id;
 
         try {
             QuarkusTransaction.requiringNew().run(() -> {
-                guasto.persist();
-
-                StoricoGuasto storico = StoricoGuasto.fotografiaDi(guasto);
-                storico.persist();
-
-                if (tipoEventoStazione != null) {
-                    // Audit log dell'evento sulla tabella eventi_stazioni
-                    Stazione stazione = statoRete.getStazione(sorgenteId);
-                    EventoStazione evento = new EventoStazione();
-                    evento.stazioneId = sorgenteId;
-                    // Il nome va congelato qui: la tabella non ha una chiave esterna verso
-                    // la stazione (RF02.7), quindi è l'unico posto dove resta scritto.
-                    evento.nomeStazione = stazione != null ? stazione.nome : sorgenteId;
-                    evento.stato = "OFFLINE";
-                    evento.tipoEvento = tipoEventoStazione;
-                    evento.descrizione = "Heartbeat mancante, guasto automatico " + guasto.id;
-                    evento.persist();
-                }
+                repository.salvaGuasto(guasto);
+                repository.salvaStoricoGuasto(guasto);
             });
         } catch (Exception e) {
             LOG.errorf("❌ Guasto automatico %s non scritto a database (%s): nessuna notifica inviata",

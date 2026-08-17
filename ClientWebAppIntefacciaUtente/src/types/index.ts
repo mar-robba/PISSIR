@@ -90,20 +90,6 @@ export interface TrackSegment {
   travelTimeMinutes: number;
 }
 
-// --- TRANSIT LOG ---
-/** Definisce storicamente quando un convoglio ha varcato il perimetro di una specifica stazione. */
-export interface Transit {
-  id: string;
-  trainId: string;
-  stationId: string;
-  /** Tratta su cui il convoglio si trovava: RF01.5 la elenca fra i dati del transito. */
-  trackSegmentId: string | null;
-  type: 'ingresso' | 'uscita';
-  timestamp: number;
-  delayed: boolean;
-  delayMinutes: number;
-}
-
 // --- ALERT ---
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 /**
@@ -115,6 +101,7 @@ export type AlertType =
   | 'treno_fermo'
   | 'stazione_guasta'
   | 'sensore_offline'
+  | 'tratta_impercorribile'
   | 'ritardo'
   | 'heartbeat_mancante';
 
@@ -125,9 +112,22 @@ export interface Alert {
   message: string;
   stationId?: string; // associato opzionalmente ad una stazione
   trainId?: string;   // associato opzionalmente ad un treno
+  /**
+   * Arco della rete a cui l'allarme si riferisce, quando la sorgente è una tratta resa non
+   * percorribile da un convoglio guasto in linea (RF02.1.2.2.2). RF01.2.1 chiede che l'elenco
+   * dica quale stazione, quale convoglio o quale tratta: questa è la terza.
+   */
+  trackSegmentId?: string;
   timestamp: number;
   acknowledged: boolean; // false se da gestire, true se risolto/soppresso in dashboard
   resolvedAt?: number;
+  /**
+   * Chi lo ha preso in carico, se qualcuno lo ha fatto (RF01.4.2). È il nome che la
+   * Centrale ricava dal token e scrive in Storico_Assegnazioni_Guasti: qui serve solo a
+   * far vedere che l'allarme ha già qualcuno sopra, così due operatori non ci si mettono
+   * in due. Resta in questo browser, la fonte di verità è il database.
+   */
+  takenBy?: string;
 }
 
 /**

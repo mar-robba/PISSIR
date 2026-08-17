@@ -76,4 +76,17 @@ public class Guasto extends PanacheEntityBase {
     /** Istante di risoluzione dell'allarme (null se ancora aperto). */
     @Column(name = "ts_risoluzione")
     public Instant timestampRisoluzione;
+
+    /**
+     * Catena di eventi a cui il guasto appartiene.
+     *
+     * <p>Per un guasto che nasce da un sensore (evento primario) coincide con il proprio id: la
+     * catena parte da lì. Per un guasto che è la conseguenza di un altro evento — la stazione
+     * che si dichiara non percorribile perché un convoglio si è guastato sui suoi binari — è la
+     * catena <b>ereditata</b> dal guasto di partenza. Serve a due cose: non contare due volte la
+     * stessa avaria e poter chiedere al database che cosa ha prodotto in rete un singolo
+     * guasto.</p>
+     */
+    @Column(name = "catena_id", length = 50)
+    public String catenaId;
 }

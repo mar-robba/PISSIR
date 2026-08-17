@@ -2,9 +2,12 @@ package it.uni.reti2.elaboration;
 
 import it.uni.reti2.entity.Guasto;
 import it.uni.reti2.entity.Stazione;
+import it.uni.reti2.entity.Tratta;
 import it.uni.reti2.entity.Treno;
+import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import io.quarkus.runtime.StartupEvent;
 
@@ -29,11 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
  TrafficLogicEngine.onStart() è annotato @Transactional e carica la cache dal DB all'avvio; nel ciclo di inizializzazione imposta alcuni campi volatili (es. s.stato, t.ultimoAggiornamento) che sono marcati @Transient e quindi NON vengono persistiti (vedi Stazione.java:68-76 e Treno.java:1-30).
  Eccezione: durante l’inizializzazione onStart() il codice imposta default per campi persistenti di Guasto (es. timestamp, severita) — questi campi sono persistiti nel DB perché non sono @Transient (vedi Guasto.java:57-74 e TrafficLogicEngine.java:62-64). Quindi un aggiornamento puntuale al DB può avvenire all'avvio per quei campi.
  Conclusione breve
-
- Sì: la funzionalità di aggiornare il DB è prevista e avviene principalmente nel IngestionService (gestione MQTT) e negli endpoint REST amministrativi; TrafficLogicEngine è pensato come cache e non è il punto primario di scrittura runtime (salvo i default per Guasto eseguiti in start-up).
- Vuoi che punti esattamente altre righe o che generi una mappa delle chiamate di persistenza per ogni evento MQTT?
-
- GPT-5 mini • 1x**/
+**/
 
 /**
  * Cache in-memory dello stato corrente della rete ferroviaria.
@@ -53,6 +52,20 @@ public class TrafficLogicEngine {
     
     /** Mappa thread-safe per tenere traccia dei guasti attualmente segnalati e non ancora risolti */
     private final Map<String, Guasto> guastiAttivi = new ConcurrentHashMap<>();
+
+    /**
+     * Mappa thread-safe degli archi della rete con la loro percorribilità corrente
+     * (RF02.1.2.2.2). Ci sta per lo stesso motivo delle altre due: la percorribilità è stato
+     * corrente, e lo stato corrente in questo sistema vive in RAM.
+     */
+    private final Map<String, Tratta> tratte = new ConcurrentHashMap<>();
+
+    /**
+     * La cache si riempie dal database una volta sola, all'avvio: è l'unico punto in cui
+     * questa classe ha bisogno del repository. Da lì in poi lavora solo sulle tre mappe.
+     */
+    @Inject
+    RailwayRepository repository;
 /*Prevenire errori di "Lazy Loading" (Caricamento Pigro): Se la tua entità Stazioni ha dei campi collegati (ad esempio una lista di Sensori o di Storici) che non vengono caricati immediatamente dalla query principale, l'ORM (come Hibernate) proverà a leggerli nel momento in cui accedi a quei campi. Senza una transazione aperta, riceveresti un blocco totale (il famoso errore LazyInitializationException).***/
     @Transactional
     void onStart(@Observes StartupEvent ev) {
@@ -64,7 +77,7 @@ public class TrafficLogicEngine {
         // nessuna stazione ha ancora battuto (marcarle ONLINE faceva vedere per 30
         // secondi una rete tutta operativa anche a nodi spenti). Il FaultMonitor
         // salta le stazioni con heartbeat nullo, quindi non apre falsi guasti.
-        for (Stazione s : Stazione.<Stazione>listAll()) {
+        for (Stazione s : repository.tutteLeStazioni()) {
             stazioni.put(s.id, s);
         }
         System.out.println("Caricate " + stazioni.size() + " stazioni.");
@@ -76,14 +89,23 @@ public class TrafficLogicEngine {
         // Centrale faceva sembrare "appena visti" treni il cui processo non è nemmeno acceso.
         // Il FaultMonitor salta i treni con ultimoAggiornamento nullo, quindi non apre più i
         // guasti "treno fermo" falsi che comparivano dieci secondi dopo ogni riavvio.
-        for (Treno t : Treno.<Treno>listAll()) {
+        for (Treno t : repository.tuttiITreni()) {
             treni.put(t.id, t);
         }
         System.out.println("Caricati " + treni.size() + " treni.");
 
+        // Popola le Tratte: dal DB arrivano gli estremi e il tempo di percorrenza, la
+        // percorribilità no. Riparte PERCORRIBILE per tutte, come le stazioni ripartono
+        // OFFLINE: è stato corrente, e lo ridichiara chi lo sa (il convoglio fermo sull'arco
+        // ripubblica la propria reazione).
+        for (Tratta t : repository.tutteLeTratte()) {
+            tratte.put(t.id, t);
+        }
+        System.out.println("Caricate " + tratte.size() + " tratte.");
+
         // Popola Guasti: tipo/severita/timestamp sono ora persistiti,
         // quindi non vanno sovrascritti; si applicano solo default per righe legacy.
-        for (Guasto g : Guasto.<Guasto>list("risolto", false)) {
+        for (Guasto g : repository.guastiNonRisolti()) {
             if (g.timestamp == null) g.timestamp = Instant.now();
             if (g.severita == null) g.severita = "warning";
             guastiAttivi.put(g.id, g);
@@ -140,6 +162,39 @@ public class TrafficLogicEngine {
      */
     public List<Stazione> getTutteStazioni() {
         return new ArrayList<>(stazioni.values());
+    }
+
+    /**
+     * Aggiorna (o inserisce) un arco della rete nella cache.
+     * @param tratta L'arco con la percorribilità aggiornata.
+     */
+    public void aggiornaTratta(Tratta tratta) {
+        tratte.put(tratta.id, tratta);
+    }
+
+    /**
+     * Recupera un arco dalla cache tramite ID.
+     * @param id L'identificativo della tratta.
+     * @return La tratta richiesta, o null se non presente.
+     */
+    public Tratta getTratta(String id) {
+        return tratte.get(id);
+    }
+
+    /**
+     * Estrae l'elenco completo degli archi della rete con la loro percorribilità.
+     * @return Una nuova lista delle tratte.
+     */
+    public List<Tratta> getTutteTratte() {
+        return new ArrayList<>(tratte.values());
+    }
+
+    /**
+     * Rimuove un arco dalla cache (usato dalla DELETE REST).
+     * @param id ID della tratta da rimuovere.
+     */
+    public void rimuoviTratta(String id) {
+        tratte.remove(id);
     }
 
     /**

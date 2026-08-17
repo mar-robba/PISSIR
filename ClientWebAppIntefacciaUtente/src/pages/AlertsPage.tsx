@@ -1,15 +1,23 @@
 import { useRailwayStore } from '../store/railwayStore';
+import { useAuthStore } from '../store/authStore';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { ShieldAlert, CheckCircle2, Wrench, Clock, Info, X } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Wrench, Clock, Info, X, UserCheck } from 'lucide-react';
 import { useState } from 'react';
 
 export default function AlertsPage() {
   const alerts = useRailwayStore((s) => s.alerts);
   const stations = useRailwayStore((s) => s.stations);
   const trains = useRailwayStore((s) => s.trains);
+  const takeAlert = useRailwayStore((s) => s.takeAlert);
   const acknowledgeAlert = useRailwayStore((s) => s.acknowledgeAlert);
   const dispatchOperators = useRailwayStore((s) => s.dispatchOperators);
+  // La fine dell'intervento è un comando a sé (RF01.4.1): da quando la manutenzione dura
+  // davvero, qualcuno deve poter dire che la squadra ha finito.
+  const completeMaintenance = useRailwayStore((s) => s.completeMaintenance);
+  // Serve solo per scrivere "in carico a ..." accanto all'allarme: chi sia davvero
+  // l'operatore lo decide la Centrale leggendo il token, non questo nome.
+  const utente = useAuthStore((s) => s.user);
   // Le conferme dei comandi stanno in un elenco a parte: sono notifiche di questo browser,
   // non guasti della rete (vedi UiNotification).
   const notifications = useRailwayStore((s) => s.notifications);
@@ -109,6 +117,11 @@ export default function AlertsPage() {
           filteredAlerts.map(alert => {
             const station = alert.stationId ? stations.find(s => s.id === alert.stationId) : null;
             const train = alert.trainId ? trains.find(t => t.id === alert.trainId) : null;
+            // Un allarme può riguardare anche un arco della rete (RF01.2.1): succede quando un
+            // convoglio si guasta fra due stazioni e il pezzo di linea che occupa diventa
+            // impercorribile. Qui non serve cercare la tratta fra quelle caricate: l'id basta a
+            // dire quale, e l'elenco degli archi non è fra i dati di questa schermata.
+            const trattaId = alert.trackSegmentId;
 
             return (
               <div 
@@ -142,13 +155,34 @@ export default function AlertsPage() {
                       {train && (
                         <span>Treno: <strong className="text-main">{train.id}</strong></span>
                       )}
+                      {trattaId && (
+                        <span>Tratta: <strong className="text-main">{trattaId}</strong></span>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2 mt-4 md:mt-0 w-full md:w-auto">
+                  {/* RF01.4.2: la presa in carico è il passo prima della chiusura, non la
+                      chiusura stessa. Serve perché un allarme chiuso deve dire chi se n'era
+                      occupato, e perché due operatori non ci si mettano in due sopra. Chi
+                      chiude senza passare di qui viene registrato lo stesso, come presa in
+                      carico implicita. */}
+                  {!alert.acknowledged && !alert.takenBy && (
+                    <button
+                      onClick={() => takeAlert(alert.id, utente?.displayName ?? 'Operatore')}
+                      className="btn btn-outline text-sm"
+                    >
+                      <UserCheck size={16} /> Prendi in carico
+                    </button>
+                  )}
+
+                  {!alert.acknowledged && alert.takenBy && (
+                    <Badge type="info" className="px-3 py-2">In carico a {alert.takenBy}</Badge>
+                  )}
+
                   {!alert.acknowledged && (
-                    <button 
+                    <button
                       onClick={() => acknowledgeAlert(alert.id)}
                       className="btn btn-outline text-sm"
                     >
@@ -171,8 +205,20 @@ export default function AlertsPage() {
                     </button>
                   )}
 
+                  {/* La squadra è sul posto e la stazione RESTA in manutenzione finché
+                      qualcuno non dichiara finito il lavoro (RF01.4.1). Prima qui c'era solo
+                      un'etichetta, perché il ritorno in servizio avveniva da solo un istante
+                      dopo l'invio: adesso è un comando, ed è questo. */}
                   {station?.operatorsDispatched && alert.stationId && (
-                    <Badge type="success" className="px-3 py-2">Operatori in loco</Badge>
+                    <>
+                      <Badge type="success" className="px-3 py-2">Operatori in loco</Badge>
+                      <button
+                        onClick={() => completeMaintenance(alert.stationId!)}
+                        className="btn btn-outline text-sm"
+                      >
+                        <Wrench size={16} /> Intervento concluso
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

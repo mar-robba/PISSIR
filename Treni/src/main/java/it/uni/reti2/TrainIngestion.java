@@ -83,6 +83,11 @@ public class TrainIngestion {
         viaggio.put("stazioneCorrente", trainDB.stazioneCorrente != null ? trainDB.stazioneCorrente : "");
         viaggio.put("prossimaStazione", trainDB.prossimaStazione != null ? trainDB.prossimaStazione : "");
         viaggio.put("stazioneBloccante", trainDB.stazioneBloccante != null ? trainDB.stazioneBloccante : "");
+        // Le due facce del blocco: la stazione chiusa davanti, oppure l'arco occupato da
+        // un'avaria (RF02.1.2.2.2). Ne è valorizzata al più una.
+        viaggio.put("trattaBloccante", trainDB.trattaBloccante != null ? trainDB.trattaBloccante : "");
+        viaggio.put("trattaDichiarataImpercorribile",
+                trainDB.trattaDichiarataImpercorribile != null ? trainDB.trattaDichiarataImpercorribile : "");
         viaggio.put("itinerarioCaricato", !trainDB.itinerario.isEmpty());
         viaggio.put("itinerarioId", trainDB.itinerarioId != null ? trainDB.itinerarioId : "");
         viaggio.put("stazioni", trainDB.stazioniTratta);

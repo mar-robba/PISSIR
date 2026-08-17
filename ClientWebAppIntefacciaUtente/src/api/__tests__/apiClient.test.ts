@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { mapApiTrain } from '../apiClient';
-import type { ApiTrainPayload } from '../apiTypes';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { apiClient, mapApiTrain } from '../apiClient';
+import type { ApiAlertPayload, ApiTrainPayload } from '../apiTypes';
 
 /**
  * La tratta arriva dalla Centrale orientata come sta a database (partenza → arrivo),
@@ -62,5 +62,55 @@ describe('mapApiTrain', () => {
     expect(mappato.previousStationId).toBe('MI');
     expect(mappato.nextStationId).toBe('Padova');
     expect(mappato.status).toBe('in_stazione');
+  });
+});
+
+/**
+ * La presa in carico di un allarme (RF01.4.2) deve arrivare dalla Centrale e non restare
+ * nello store del browser che ha premuto il pulsante: se stesse solo lì, sparirebbe al
+ * ricaricamento della pagina e l'altro operatore vedrebbe l'allarme ancora libero, che è
+ * esattamente il caso che il badge dovrebbe evitare.
+ */
+describe('getAlerts', () => {
+  const rispondiCon = (allarmi: ApiAlertPayload[]) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => allarmi,
+    }));
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const allarme = (campi: Partial<ApiAlertPayload> = {}): ApiAlertPayload => ({
+    id: 'G1',
+    tipo: 'sensore_offline',
+    severita: 'CRITICAL',
+    messaggio: 'Sensore fuori servizio',
+    sorgenteId: 'MI',
+    sorgenteTipo: 'STAZIONE',
+    timestamp: '2026-08-16T20:00:00Z',
+    risolto: false,
+    ...campi,
+  });
+
+  it('riporta chi ha preso in carico l\'allarme', async () => {
+    rispondiCon([allarme({ operatore: 'Mario Rossi' })]);
+
+    const [mappato] = await apiClient.getAlerts();
+
+    expect(mappato.takenBy).toBe('Mario Rossi');
+    expect(mappato.acknowledged).toBe(false);
+  });
+
+  it('un allarme che nessuno ha preso in carico non ha un assegnatario', async () => {
+    rispondiCon([allarme({ operatore: null })]);
+
+    const [mappato] = await apiClient.getAlerts();
+
+    // undefined e non null: è la condizione su cui la pagina decide se mostrare il
+    // pulsante "Prendi in carico" oppure il badge con il nome.
+    expect(mappato.takenBy).toBeUndefined();
   });
 });

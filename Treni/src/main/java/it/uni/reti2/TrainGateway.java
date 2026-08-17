@@ -82,6 +82,14 @@ public class TrainGateway {
             String sorgenteId = alert.path("sorgenteId").asText("");
             String severita = alert.path("severita").asText("CRITICAL");
             String target = alert.path("target").asText("");
+            // Catena di eventi a cui l'alert appartiene: è l'id del guasto primario da cui
+            // discende. Se il campo non c'è (alert vecchio stile) si usa l'id del guasto, e
+            // in mancanza anche di quello la sorgente: serve comunque una chiave stabile per
+            // non reagire due volte allo stesso fatto.
+            String catenaId = primoNonVuoto(
+                    alert.path("catenaId").asText(""),
+                    alert.path("guastoId").asText(""),
+                    sorgenteId);
 
             switch (tipoEvento) {
                 case "STOP" -> {
@@ -97,18 +105,57 @@ public class TrainGateway {
                     // sensore mancante) sono informativi e la stazione resta agibile.
                     if ("STAZIONE".equals(sorgenteTipo) && !sorgenteId.isEmpty()
                             && "CRITICAL".equalsIgnoreCase(severita)) {
-                        // Memorizza la stazione guasta per i controlli di partenza
-                        trainDB.stazioniGuaste.add(sorgenteId);
+                        // Memorizza la stazione guasta (con la sua catena) per i controlli di partenza
+                        trainDB.stazioniGuaste.put(sorgenteId, catenaId);
                         // Il treno si blocca solo se la stazione guasta lo riguarda direttamente
                         if (sorgenteId.equals(trainDB.prossimaStazione) || sorgenteId.equals(trainDB.stazioneCorrente)) {
                             LOG.warnf("🚨 [ALERT] Stazione %s guasta sulla mia rotta: mi fermo", sorgenteId);
-                            journeyEngine.bloccaPerGuastoStazione(sorgenteId);
+                            journeyEngine.bloccaPerGuastoStazione(sorgenteId, catenaId);
                         }
+                    }
+                    // Un arco della rete e' occupato da un'avaria (RF02.1.2.2.2): vale come una
+                    // stazione chiusa, e lo si tratta allo stesso modo.
+                    if ("TRATTA".equals(sorgenteTipo) && !sorgenteId.isEmpty()) {
+                        trainDB.tratteGuaste.put(sorgenteId, catenaId);
+                        // Se è la mia stessa dichiarazione che torna indietro non c'è niente da
+                        // fare: sono già fermo perché sono guasto io, e non ha senso bloccarmi
+                        // per un arco che ho occupato io.
+                        if (!sorgenteId.equals(trainDB.trattaDichiarataImpercorribile)) {
+                            LOG.warnf("🚨 [ALERT] Tratta %s non percorribile: la considero chiusa", sorgenteId);
+                            journeyEngine.bloccaPerGuastoTratta(sorgenteId, catenaId);
+                        }
+                    }
+                    // Il guasto riguarda ME e sono in linea, cioe' fra due stazioni: la
+                    // conseguenza e' che l'arco che sto occupando non e' piu' percorribile
+                    // (RF02.1.2.2.2). Vale sia per l'avaria che ho dichiarato io sia per quella
+                    // che la Centrale ha dedotto vedendomi immobile (RF02.6.2): in tutti e due i
+                    // casi il fatto e' che sono fermo li' sopra, e la severita' non c'entra.
+                    if ("TRENO".equals(sorgenteTipo) && trainDB.trenoId.equals(sorgenteId)) {
+                        journeyEngine.dichiaraTrattaNonPercorribile(catenaId);
                     }
                 }
 
                 case "RESOLVED" -> {
-                    if ("STAZIONE".equals(sorgenteTipo)) {
+                    // La catena si chiude: il convoglio può tornare a reagire se in futuro
+                    // quello stesso guasto dovesse riaprirsi.
+                    trainDB.cateneReagite.remove(catenaId);
+                    // Srotolamento per catena: tutte le stazioni diventate non percorribili per
+                    // colpa di QUESTO guasto tornano agibili. Serve quando il RESOLVED riguarda
+                    // un nodo diverso da quello che teneva fermo il convoglio: è il caso di una
+                    // stazione resa impercorribile da un altro convoglio guasto sui suoi binari,
+                    // dove il guasto che si chiude è quello del convoglio, non quello della
+                    // stazione.
+                    trainDB.stazioniGuaste.values().removeIf(catenaId::equals);
+                    // Stessa cosa per gli archi: quelli resi non percorribili da QUESTA avaria
+                    // tornano liberi. E se l'arco l'avevo dichiarato io, sono io a dover
+                    // dichiarare che è di nuovo percorribile: la tratta non parla.
+                    trainDB.tratteGuaste.values().removeIf(catenaId::equals);
+                    journeyEngine.dichiaraTrattaPercorribile(catenaId);
+
+                    if (catenaId.equals(trainDB.catenaBloccante)) {
+                        LOG.infof("✅ [ALERT] Catena %s chiusa: riprendo il viaggio", catenaId);
+                        journeyEngine.sbloccaDaGuastoStazione();
+                    } else if ("STAZIONE".equals(sorgenteTipo)) {
                         // La stazione torna agibile
                         trainDB.stazioniGuaste.remove(sorgenteId);
                         if (sorgenteId.equals(trainDB.stazioneBloccante)) {
@@ -116,7 +163,9 @@ public class TrainGateway {
                             journeyEngine.sbloccaDaGuastoStazione();
                         }
                     } else if ("TRENO".equals(sorgenteTipo) && trainDB.trenoId.equals(sorgenteId)) {
-                        // Rientro dall'emergenza di bordo: il treno è pronto a ripartire
+                        // Rientro dall'emergenza di bordo: il treno è pronto a ripartire e la
+                        // catena aperta dalla sua avaria si chiude.
+                        trainDB.catenaGuastoDiBordo = null;
                         if ("EMERGENZA".equals(trainDB.stato)) {
                             LOG.info("✅ [ALERT] Guasto di bordo risolto: pronto a ripartire");
                             trainDB.stato = "FERMO";
@@ -138,6 +187,24 @@ public class TrainGateway {
         // Conferma (acknowledge) l'avvenuta processazione del messaggio al broker
         return message.ack();
     }
+
+    /**
+     * Primo valore non vuoto fra quelli passati.
+     * Serve a ricavare la catena di un alert quando il campo dedicato non c'è: gli alert
+     * pubblicati prima di questa versione non lo hanno, e senza una chiave stabile il
+     * convoglio reagirebbe di nuovo a ogni ripetizione dello stesso messaggio.
+     *
+     * @param valori I candidati, in ordine di preferenza.
+     * @return Il primo non vuoto, stringa vuota se non ce n'è nessuno.
+     */
+    private String primoNonVuoto(String... valori) {
+        for (String valore : valori) {
+            if (valore != null && !valore.isBlank()) {
+                return valore;
+            }
+        }
+        return "";
+    }
 //---- END listeners
 // =========================== inizio emettitori ======================
 
@@ -153,17 +220,58 @@ public class TrainGateway {
         trainDB.stato = "EMERGENZA";
         trainDB.velocita = 0;
 
+        // Catena delle conseguenze: il guasto di bordo è un evento primario, quindi la catena
+        // parte da qui. La conia il treno e la riusa finché l'avaria non è risolta, così tutto
+        // quello che ne discende (la stazione che diventa impercorribile perché il convoglio è
+        // fermo sui suoi binari, gli altri convogli che si fermano) resta riconducibile a
+        // questa avaria e non a tante avarie diverse.
+        if (trainDB.catenaGuastoDiBordo == null) {
+            trainDB.catenaGuastoDiBordo = trainDB.trenoId + "-" + Instant.now().toEpochMilli();
+        }
+
         // Composizione del payload JSON per l'alert (formato condiviso su railway/alerts)
                             // formattazione stringhe java classico
         String alertJson = String.format(Locale.US,
-                "{\"tipoEvento\":\"GUASTO\",\"sorgenteTipo\":\"TRENO\",\"sorgenteId\":\"%s\",\"severita\":\"%s\",\"messaggio\":\"%s\",\"timestamp\":\"%s\"}",
-                trainDB.trenoId, severita, descrizione, Instant.now().toString());
+                "{\"tipoEvento\":\"GUASTO\",\"sorgenteTipo\":\"TRENO\",\"sorgenteId\":\"%s\",\"severita\":\"%s\",\"messaggio\":\"%s\",\"catenaId\":\"%s\",\"timestamp\":\"%s\"}",
+                trainDB.trenoId, severita, descrizione, trainDB.catenaGuastoDiBordo, Instant.now().toString());
 
         try {
             // Invio del messaggio in modo reattivo
             alertsEmitter.send(alertJson);
         } catch (Exception e) {
             LOG.error("Errore invio guasto: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Ripubblica come GUASTO il fatto che un arco della rete non è percorribile, ereditando la
+     * catena dell'avaria che lo ha causato (RF02.1.2.2.2).
+     *
+     * <p>Perché un GUASTO e non solo la reazione: gli altri convogli reagiscono ai guasti, non
+     * alle reazioni altrui — per loro "la tratta T1 è chiusa" è un fatto primario come la
+     * stazione guasta, e si fermano senza chiedersi chi l'abbia causato. La catena ereditata
+     * dice alla Centrale che è sempre la stessa avaria e non una seconda. L'allarme che ne nasce
+     * è giusto che l'operatore lo veda: un pezzo di rete è fuori uso.</p>
+     *
+     * <p>Nota sulla sorgente: qui {@code sorgenteTipo} è TRATTA, cioè un tipo di sorgente che
+     * prima non esisteva. È il requisito stesso a chiederlo, visto che l'elenco degli allarmi
+     * deve dire "quale stazione, quale convoglio, quale tratta".</p>
+     *
+     * @param trattaId    Arco diventato non percorribile.
+     * @param descrizione Descrizione leggibile per l'operatore.
+     * @param catenaId    Catena ereditata dall'avaria che lo ha occupato.
+     */
+    public void inviaGuastoTratta(String trattaId, String descrizione, String catenaId) {
+        String alertJson = String.format(Locale.US,
+                "{\"tipoEvento\":\"GUASTO\",\"sorgenteTipo\":\"TRATTA\",\"sorgenteId\":\"%s\","
+                        + "\"tipoGuasto\":\"tratta_impercorribile\",\"severita\":\"CRITICAL\","
+                        + "\"messaggio\":\"%s\",\"catenaId\":\"%s\",\"timestamp\":\"%s\"}",
+                trattaId, descrizione, catenaId, Instant.now().toString());
+
+        try {
+            alertsEmitter.send(alertJson);
+        } catch (Exception e) {
+            LOG.error("Errore invio guasto tratta: " + e.getMessage());
         }
     }
 

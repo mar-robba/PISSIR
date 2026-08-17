@@ -107,15 +107,20 @@ public class FiltroAutorizzazione implements ContainerRequestFilter {
 
     /**
      * Decide se l'operazione richiesta è riservata all'amministratore.
-     * Le letture no, e nemmeno i tre comandi operativi che il PDF assegna al tecnico
-     * (invio operatori, soppressione corsa, presa in carico di un allarme).
+     * Le letture no, e nemmeno i comandi operativi che il PDF assegna al tecnico
+     * (invio operatori, soppressione corsa, presa in carico e chiusura di un allarme).
      */
     private boolean richiedeAmministratore(String metodo, String percorso) {
         if ("GET".equalsIgnoreCase(metodo) || "HEAD".equalsIgnoreCase(metodo)) {
             return false;
         }
+        // La fine dell'intervento sta con l'invio della squadra: sono i due estremi dello
+        // stesso comando operativo (RF01.4.1), e se il tecnico puo' mandarla deve anche poter
+        // dire che ha finito, altrimenti la stazione resterebbe in manutenzione fino a quando
+        // non passa un amministratore.
         return !percorso.endsWith("/sopprimi") && !percorso.endsWith("/risolvi")
-                && !percorso.endsWith("/manutenzione");
+                && !percorso.endsWith("/assegna") && !percorso.endsWith("/manutenzione")
+                && !percorso.endsWith("/manutenzione/conclusa");
     }
 
     /**

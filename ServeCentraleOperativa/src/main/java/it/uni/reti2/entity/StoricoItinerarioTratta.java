@@ -22,10 +22,8 @@ import java.time.Instant;
  * e per questo è l'unico vincolo che RF02.7 lascia in piedi (nel DDL è dichiarato con
  * {@code ON DELETE CASCADE}, le due righe nascono e muoiono insieme).</p>
  *
- * <p>Nessuno la scrive ancora: la registrazione degli itinerari percorsi è il passo
- * successivo, questa è la tabella su cui appoggiarla.</p>
- *
  * @see it.uni.reti2.entity.StoricoItinerario
+ * @see it.uni.reti2.persistence.RailwayRepository#registraAssegnazioneItinerario
  */
 @Entity
 @Table(name = "Storico_Itinerari_Tratte")
@@ -72,4 +70,26 @@ public class StoricoItinerarioTratta extends PanacheEntityBase {
     /** Timestamp di inserimento del record nello storico. */
     @Column(name = "ts_storicizzazione", nullable = false)
     public Instant tsStoricizzazione = Instant.now();
+
+    /**
+     * Copia una tratta dell'itinerario dentro lo storico, con il posto che occupava nella
+     * sequenza e il tempo di percorrenza che aveva allora: se domani l'amministratore
+     * cambia quel tempo, il viaggio già fatto continua a raccontare il proprio.
+     *
+     * @param idStoricoItinerario La riga di {@link StoricoItinerario} appena scritta.
+     * @param riga                La tratta dell'itinerario da copiare.
+     * @return La riga da persistere (non è ancora stata scritta).
+     */
+    public static StoricoItinerarioTratta fotografiaDi(Long idStoricoItinerario, ItinerarioTratta riga) {
+        StoricoItinerarioTratta storico = new StoricoItinerarioTratta();
+        storico.storicoItinerarioId = idStoricoItinerario;
+        storico.ordine = riga.ordine;
+        storico.trattaId = riga.tratta.id;
+        storico.stazionePartenzaId = riga.tratta.stazionePartenza.id;
+        storico.nomeStazionePartenza = riga.tratta.stazionePartenza.nome;
+        storico.stazioneArrivoId = riga.tratta.stazioneArrivo.id;
+        storico.nomeStazioneArrivo = riga.tratta.stazioneArrivo.nome;
+        storico.tempoPercorrenzaMinuti = riga.tratta.tempoPercorrenzaMinuti;
+        return storico;
+    }
 }

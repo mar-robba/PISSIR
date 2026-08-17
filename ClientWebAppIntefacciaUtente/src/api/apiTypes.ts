@@ -62,23 +62,8 @@ export interface ApiAlertPayload {
   timestamp?: string;
   risolto?: boolean;
   timestampRisoluzione?: string;
-}
-
-export interface ApiTransitPayload {
-  id: string;
-  trainId?: string;
-  trenoId?: string;
-  stationId?: string;
-  stazioneId?: string;
-  /** Tratta percorsa: la Centrale la ricava dalla posizione del convoglio. */
-  trattaId?: string | null;
-  tipo?: string;
-  type?: string;
-  timestamp?: string;
-  delayed?: boolean;
-  inRitardo?: boolean;
-  delayMinutes?: number;
-  ritardo?: number;
+  /** Nome dell'operatore che lo ha preso in carico, se qualcuno lo ha fatto (RF01.4.2). */
+  operatore?: string | null;
 }
 
 /**

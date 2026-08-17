@@ -1,6 +1,7 @@
 it/uni/reti2/TrainDB.class
 it/uni/reti2/main.class
 it/uni/reti2/TrainGateway.class
+it/uni/reti2/PubblicatoreReazioni.class
 it/uni/reti2/SecureHttpClient.class
 it/uni/reti2/TrainDatabaseValidator$EsitoVerifica.class
 it/uni/reti2/TrainDB$TappaItinerario.class

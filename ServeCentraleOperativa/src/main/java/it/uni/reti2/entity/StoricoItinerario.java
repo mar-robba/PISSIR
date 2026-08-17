@@ -3,6 +3,7 @@ package it.uni.reti2.entity;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Entità JPA per lo <strong>storico degli itinerari</strong> assegnati ai treni.
@@ -60,4 +61,57 @@ public class StoricoItinerario extends PanacheEntityBase {
     /** Timestamp di inserimento del record nello storico. */
     @Column(name = "ts_storicizzazione", nullable = false)
     public Instant tsStoricizzazione = Instant.now();
+
+    /** Lunghezza della colonna descrizione_percorso: oltre, l'INSERT fallirebbe. */
+    private static final int MAX_DESCRIZIONE = 1000;
+
+    /**
+     * Costruisce la riga di storico di un itinerario appena assegnato a un convoglio,
+     * congelando il percorso che l'itinerario ha <em>in questo momento</em>: la sequenza
+     * delle stazioni in chiaro e quante tratte la compongono. Le singole tratte le copia
+     * poi {@link StoricoItinerarioTratta}, una riga per ciascuna.
+     *
+     * <p>La riga nasce aperta ({@code tsCompletamento} a null): si chiude quando il
+     * convoglio smette di percorrere questo itinerario.</p>
+     *
+     * @param idTreno    Il convoglio a cui l'itinerario è stato assegnato.
+     * @param itinerario L'itinerario assegnato.
+     * @param tratte     Le sue tratte in ordine di percorrenza.
+     * @return La riga da persistere (non è ancora stata scritta).
+     */
+    public static StoricoItinerario fotografiaDi(String idTreno, Itinerario itinerario,
+                                                 List<ItinerarioTratta> tratte) {
+        StoricoItinerario storico = new StoricoItinerario();
+        storico.trenoId = idTreno;
+        storico.itinerarioId = itinerario.id;
+        storico.numeroTratte = tratte.size();
+        storico.descrizionePercorso = descriviPercorso(tratte);
+        storico.tsAssegnazione = Instant.now();
+        return storico;
+    }
+
+    /**
+     * "Memoria Alfa - Memoria Bravo - Memoria Charlie": la stazione di partenza della prima
+     * tratta e poi tutti gli arrivi, che è la sequenza delle stazioni toccate.
+     *
+     * <p>Se l'itinerario è talmente lungo da sforare la colonna la descrizione viene
+     * troncata: si perde la coda della frase, non il dato, perché le tratte restano tutte
+     * quante in {@link StoricoItinerarioTratta}.</p>
+     *
+     * @param tratte Le tratte dell'itinerario in ordine di percorrenza.
+     * @return Il percorso in chiaro, oppure null se l'itinerario non ha ancora tratte.
+     */
+    private static String descriviPercorso(List<ItinerarioTratta> tratte) {
+        if (tratte.isEmpty()) {
+            return null;
+        }
+        StringBuilder percorso = new StringBuilder(tratte.get(0).tratta.stazionePartenza.nome);
+        for (ItinerarioTratta riga : tratte) {
+            percorso.append(" - ").append(riga.tratta.stazioneArrivo.nome);
+        }
+        if (percorso.length() > MAX_DESCRIZIONE) {
+            return percorso.substring(0, MAX_DESCRIZIONE - 3) + "...";
+        }
+        return percorso.toString();
+    }
 }

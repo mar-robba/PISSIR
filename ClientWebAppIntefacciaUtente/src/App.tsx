@@ -15,7 +15,6 @@ import RoutesPage from './pages/RoutesPage';
 import TrackSegmentsPage from './pages/TrackSegmentsPage';
 import StationsPage from './pages/StationsPage';
 import TrainsPage from './pages/TrainsPage';
-import TransitsPage from './pages/TransitsPage';
 import AlertsPage from './pages/AlertsPage';
 import AdminPage from './pages/AdminPage';
 
@@ -69,7 +68,6 @@ const RailwayApp = () => {
         <Route path="tratte" element={<TrackSegmentsPage />} />
         <Route path="stations" element={<StationsPage />} />
         <Route path="trains" element={<TrainsPage />} />
-        <Route path="transits" element={<TransitsPage />} />
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="admin" element={
           <ProtectedRoute requireAdmin>

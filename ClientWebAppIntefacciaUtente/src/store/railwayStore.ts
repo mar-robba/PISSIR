@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  Train, Station, Alert, Route, TrackSegment, Transit, DashboardKPI, UiNotification,
+  Train, Station, Alert, Route, TrackSegment, DashboardKPI, UiNotification,
 } from '../types';
 import { apiClient } from '../api/apiClient';
 
@@ -35,7 +35,7 @@ In questa app, la cartella src/store contiene il codice per lo stato globale del
 
 Cosa c’è dentro
 railwayStore.ts
-definisce lo stato globale di treni, stazioni, alert, tratte, transiti, selezioni
+definisce lo stato globale di treni, stazioni, alert, tratte, selezioni
 espone azioni per modificare lo stato:
  * Interfaccia dello Stato Globale dell'applicazione gestito con Zustand.
  * Comprende gli array immutabili di tutte le entità core (treni, stazioni, ecc)
@@ -49,7 +49,6 @@ interface RailwayState {
   alerts: Alert[];
   routes: Route[];
   trackSegments: TrackSegment[];
-  transits: Transit[];
   /**
    * I KPI così come li calcola la Centrale (GET /api/dashboard e snapshot periodico).
    * La dashboard li legge da qui invece di rifarsi i conti da sola: le due formule non
@@ -67,6 +66,7 @@ interface RailwayState {
   setStations: (stations: Station[]) => void;
   updateStation: (id: string, update: Partial<Station>) => void;
   addAlert: (alert: Alert) => void;
+  takeAlert: (id: string, operatore: string) => void;
   acknowledgeAlert: (id: string) => void;
   setKpi: (kpi: DashboardKPI) => void;
   pushNotification: (notification: Omit<UiNotification, 'id' | 'timestamp'>) => void;
@@ -77,7 +77,6 @@ interface RailwayState {
   createTrackSegment: (segment: TrackSegment) => Promise<void>;
   updateTrackSegment: (id: string, segment: Partial<TrackSegment>) => Promise<void>;
   deleteTrackSegment: (id: string) => Promise<void>;
-  addTransit: (transit: Transit) => void;
 
   // Azioni CRUD amministrative (persistite sul backend via API)
   adminCreateTrain: (train: Train) => Promise<void>;
@@ -94,6 +93,7 @@ interface RailwayState {
   // Azioni di Business Logic
   suppressTrain: (trainId: string) => void;
   dispatchOperators: (stationId: string) => void;
+  completeMaintenance: (stationId: string) => void;
   initialize: () => void;
 }
 
@@ -108,7 +108,6 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
   alerts: [],
   routes: [],
   trackSegments: [],
-  transits: [],
   kpi: null,
   notifications: [],
   selectedTrainId: null,
@@ -121,16 +120,15 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
    */
   initialize: async () => {
     try {
-      const [trains, stations, alerts, routes, trackSegments, transits, kpi] = await Promise.all([
+      const [trains, stations, alerts, routes, trackSegments, kpi] = await Promise.all([
         apiClient.getTrains(),
         apiClient.getStations(),
         apiClient.getAlerts(),
         apiClient.getRoutes(),
         apiClient.getTrackSegments(),
-        apiClient.getTransits(),
         apiClient.getDashboard(),
       ]);
-      set({ trains, stations, alerts, routes, trackSegments, transits, kpi });
+      set({ trains, stations, alerts, routes, trackSegments, kpi });
     } catch (err) {
       console.error('Failed to initialize railway store from API', err);
     }
@@ -187,6 +185,29 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
    * segnava comunque come risolto e l'errore finiva in console, quindi un allarme che sul
    * server era ancora aperto spariva dall'elenco dell'operatore.
    */
+  /**
+   * Presa in carico dell'allarme (RF01.4.2). Non lo chiude: gli mette sopra il nome di chi
+   * se ne sta occupando, così un altro operatore lo vede già preso. Il nome mostrato è
+   * quello dell'utente collegato a questo browser, ma quello che finisce nello storico lo
+   * ricava la Centrale dal token: qui non si può firmare a nome di un altro.
+   */
+  takeAlert: async (id, operatore) => {
+    try {
+      await apiClient.takeAlert(id);
+    } catch (err) {
+      console.error('Failed to take alert on server', err);
+      get().pushNotification({
+        kind: 'errore_comando',
+        severity: 'warning',
+        message: `La Centrale non ha registrato la presa in carico dell'allarme ${id}.`,
+      });
+      return;
+    }
+    set((s) => ({
+      alerts: s.alerts.map((a) => (a.id === id ? { ...a, takenBy: operatore } : a)),
+    }));
+  },
+
   acknowledgeAlert: async (id) => {
     try {
       await apiClient.acknowledgeAlert(id);
@@ -353,9 +374,6 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
     }
   },
 
-  addTransit: (transit) =>
-    set((s) => ({ transits: [transit, ...s.transits] })),
-
   selectTrain: (id) => set({ selectedTrainId: id }),
   selectStation: (id) => set({ selectedStationId: id }),
 
@@ -405,6 +423,37 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
         kind: 'errore_comando',
         severity: 'critical',
         message: `Invio degli operatori alla stazione ${station?.name ?? stationId} non riuscito.`,
+      });
+    }
+  },
+
+  /**
+   * Dichiara concluso l'intervento della squadra: la stazione torna in servizio (RF01.4.1).
+   *
+   * Serve un comando apposta perché adesso la manutenzione dura: prima la stazione tornava
+   * ONLINE da sola, dentro la stessa chiamata che ci mandava la squadra, e "in manutenzione"
+   * era uno stato che nessuno faceva in tempo a vedere.
+   */
+  completeMaintenance: async (stationId) => {
+    const station = get().stations.find((s) => s.id === stationId);
+    try {
+      await apiClient.completeMaintenance(stationId);
+      const { updateStation, pushNotification } = get();
+      // Lo stato vero arriva comunque dalla Centrale con l'evento STATION_STATUS: questo è
+      // solo il riscontro immediato al comando.
+      updateStation(stationId, { operatorsDispatched: false, status: 'operativa' });
+      pushNotification({
+        kind: 'operatori_inviati',
+        severity: 'info',
+        message: `Intervento concluso alla stazione ${station?.code ?? stationId}`
+          + `${station ? ` (${station.name})` : ''}: torna in servizio.`,
+      });
+    } catch (err) {
+      console.error('Failed to complete maintenance', err);
+      get().pushNotification({
+        kind: 'errore_comando',
+        severity: 'critical',
+        message: `Chiusura dell'intervento alla stazione ${station?.name ?? stationId} non riuscita.`,
       });
     }
   },

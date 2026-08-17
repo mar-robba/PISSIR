@@ -1,6 +1,7 @@
 package it.uni.reti2.entity;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import it.uni.reti2.eventi.CausaEvento;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -60,6 +61,26 @@ public class StoricoStatoTreno extends PanacheEntityBase {
     @Column(name = "descrizione_posizione", length = 255)
     public String descrizionePosizione;
 
+    /**
+     * Tipo del nodo che ha causato il cambiamento (STAZIONE, TRENO, TRATTA, OPERATORE), null se
+     * il convoglio ha cambiato stato per conto suo. Riferimento logico, niente FK: vale la regola
+     * degli storici di RF02.7.
+     */
+    @Column(name = "causa_tipo", length = 20)
+    public String causaTipo;
+
+    /** Identificativo del nodo che ha causato il cambiamento (riferimento logico). */
+    @Column(name = "causa_id", length = 50)
+    public String causaId;
+
+    /**
+     * Catena di eventi a cui il cambiamento appartiene, cioè l'identificativo del guasto primario
+     * che l'ha originata. È la colonna che permette di chiedere al database che cosa ha prodotto
+     * in tutta la rete un singolo guasto.
+     */
+    @Column(name = "catena_id", length = 50)
+    public String catenaId;
+
     /** Timestamp di inserimento del record nello storico. */
     @Column(name = "ts_storicizzazione", nullable = false)
     public Instant tsStoricizzazione = Instant.now();
@@ -75,6 +96,21 @@ public class StoricoStatoTreno extends PanacheEntityBase {
      * @return La riga da persistere (non è ancora stata scritta).
      */
     public static StoricoStatoTreno fotografiaDi(Treno treno, String statoPrecedente) {
+        return fotografiaDi(treno, statoPrecedente, null);
+    }
+
+    /**
+     * Come sopra, ma registrando anche <b>perché</b> il convoglio ha cambiato stato: è la riga
+     * che serve quando il cambiamento non nasce dal convoglio ma è la conseguenza di un evento
+     * di un altro nodo (la stazione che diventa non percorribile, la corsa soppressa
+     * dall'operatore).
+     *
+     * @param treno            Il convoglio con lo stato nuovo già assegnato.
+     * @param statoPrecedente  Lo stato che aveva prima.
+     * @param causa            Chi ha causato il cambiamento e a quale catena appartiene (può essere null).
+     * @return La riga da persistere (non è ancora stata scritta).
+     */
+    public static StoricoStatoTreno fotografiaDi(Treno treno, String statoPrecedente, CausaEvento causa) {
         StoricoStatoTreno storico = new StoricoStatoTreno();
         storico.trenoId = treno.id;
         storico.stato = treno.stato;
@@ -83,6 +119,11 @@ public class StoricoStatoTreno extends PanacheEntityBase {
         if (treno.posizioneAttualeTratta != null) {
             storico.posizioneId = treno.posizioneAttualeTratta.id;
             storico.descrizionePosizione = treno.posizioneAttualeTratta.descrizione();
+        }
+        if (causa != null) {
+            storico.causaTipo = causa.tipo();
+            storico.causaId = causa.id();
+            storico.catenaId = causa.catenaId();
         }
         return storico;
     }

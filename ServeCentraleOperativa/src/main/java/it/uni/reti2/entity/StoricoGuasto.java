@@ -88,6 +88,14 @@ public class StoricoGuasto extends PanacheEntityBase {
     @Column(name = "ts_chiusura")
     public Instant tsChiusura;
 
+    /**
+     * Catena di eventi a cui il guasto apparteneva: l'identificativo del guasto primario da cui
+     * discende (per un guasto primario è il proprio id). Riferimento logico, niente FK come tutto
+     * il resto della riga.
+     */
+    @Column(name = "catena_id", length = 50)
+    public String catenaId;
+
     /** Timestamp di inserimento del record nello storico. */
     @Column(name = "ts_storicizzazione", nullable = false)
     public Instant tsStoricizzazione = Instant.now();
@@ -99,41 +107,30 @@ public class StoricoGuasto extends PanacheEntityBase {
      * a mano: adesso li copia un metodo solo, così non possono divergere.
      *
      * @param guasto Il guasto appena creato o appena chiuso.
+     * @param nomeSorgente Nome leggibile del nodo che ha generato il guasto, da congelare
+     *                     nella riga. Lo cerca il repository: l'anagrafica si legge da lì,
+     *                     un'entità non fa query per conto suo.
      * @return La riga da persistere (non è ancora stata scritta).
      */
-    public static StoricoGuasto fotografiaDi(Guasto guasto) {
+    public static StoricoGuasto fotografiaDi(Guasto guasto, String nomeSorgente) {
         StoricoGuasto storico = new StoricoGuasto();
         storico.guastoId = guasto.id;
         storico.tipo = guasto.tipo;
         storico.severita = guasto.severita;
         storico.sorgenteTipo = guasto.sorgenteTipo;
         storico.sorgenteId = guasto.sorgenteId;
-        storico.nomeSorgente = nomeDellaSorgente(guasto.sorgenteTipo, guasto.sorgenteId);
+        storico.nomeSorgente = nomeSorgente;
         storico.messaggio = guasto.messaggio;
         storico.risolto = guasto.risolto;
         storico.tsApertura = guasto.timestamp != null ? guasto.timestamp : Instant.now();
         storico.tsChiusura = guasto.timestampRisoluzione;
+        // Un guasto senza catena dichiarata è primario: la catena parte da lui.
+        storico.catenaId = guasto.catenaId != null ? guasto.catenaId : guasto.id;
         if (guasto.operatore != null) {
             storico.operatoreId = guasto.operatore.id;
             storico.nomeOperatore = guasto.operatore.nome + " " + guasto.operatore.cognome;
             storico.matricolaOperatore = guasto.operatore.matricola;
         }
         return storico;
-    }
-
-    /**
-     * Cerca il nome della sorgente da congelare nello storico. Per una stazione va letto
-     * dall'anagrafica (l'id da solo, tipo "S3", non dice niente a chi rilegge lo storico
-     * fra un mese); per un convoglio l'identificativo è già il nome.
-     */
-    private static String nomeDellaSorgente(String sorgenteTipo, String sorgenteId) {
-        if (sorgenteId == null || sorgenteId.isEmpty()) {
-            return null;
-        }
-        if ("STAZIONE".equalsIgnoreCase(sorgenteTipo)) {
-            Stazione stazione = Stazione.findById(sorgenteId);
-            return stazione != null ? stazione.nome : sorgenteId;
-        }
-        return sorgenteId;
     }
 }

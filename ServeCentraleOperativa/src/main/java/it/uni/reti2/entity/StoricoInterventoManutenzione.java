@@ -21,7 +21,11 @@ import java.time.Instant;
  * <p>Come tutti gli storici non ha chiavi esterne: stazione, guasto e operatore sono
  * identificativi accompagnati dai dati che servono a rileggere la riga.</p>
  *
- * <p>Nessuno la scrive ancora: la registrazione degli interventi è il passo successivo.</p>
+ * <p>Invio e rientro stanno sulla stessa riga perché sono due momenti dello stesso intervento.
+ * Fino a poco fa fra i due passavano millisecondi, perché il comando faceva tutte e due le cose
+ * dentro la stessa chiamata — era il limite dichiarato di RF01.4.1. Adesso {@code ts_rientro}
+ * resta nullo finché la squadra lavora e viene riempito dal comando di fine intervento, quindi
+ * la differenza fra i due timestamp è la durata vera del lavoro.</p>
  *
  * @see it.uni.reti2.gateway.RestApiGateway#dispacciaManutenzione
  */
@@ -75,7 +79,52 @@ public class StoricoInterventoManutenzione extends PanacheEntityBase {
     @Column(name = "ts_rientro")
     public Instant tsRientro;
 
+    /**
+     * Catena di eventi dell'intervento: la conia la Centrale quando parte la squadra, perché il
+     * comando dell'operatore è un evento primario come il guasto di un sensore, solo che nasce
+     * da una decisione. È quella che lega fra loro le due righe di {@code Storico_Stato_Stazioni}
+     * (l'ingresso in MANUTENZIONE e il ritorno in servizio) e questa riga di intervento.
+     */
+    @Column(name = "catena_id", length = 50)
+    public String catenaId;
+
     /** Timestamp di inserimento del record nello storico. */
     @Column(name = "ts_storicizzazione", nullable = false)
     public Instant tsStoricizzazione = Instant.now();
+
+    /**
+     * Costruisce la riga della squadra mandata a una stazione, copiando il nome della
+     * stazione e i dati di chi ha dato il comando: l'intervento deve restare leggibile
+     * anche se poi la stazione viene dismessa.
+     *
+     * <p>La riga nasce <b>aperta</b>: {@code ts_rientro} resta nullo e lo stato di arrivo è
+     * MANUTENZIONE, perché in questo istante la squadra sta andando e il lavoro non è finito.
+     * Si chiude quando l'operatore dichiara concluso l'intervento.</p>
+     *
+     * @param stazione   La stazione dove è stata mandata la squadra.
+     * @param guastoId   Il guasto che ha motivato l'invio, oppure null se non ce n'erano aperti.
+     * @param operatore  Chi ha dato il comando dalla web app.
+     * @param statoPrima Lo stato che la stazione aveva quando è partita la squadra.
+     * @param tsInvio    Istante in cui la squadra è stata mandata.
+     * @param catenaId   Catena coniata per questo intervento.
+     * @return La riga da persistere (non è ancora stata scritta).
+     */
+    public static StoricoInterventoManutenzione invioSquadra(Stazione stazione, String guastoId,
+                                                             DatiOperatore operatore,
+                                                             String statoPrima, Instant tsInvio,
+                                                             String catenaId) {
+        StoricoInterventoManutenzione storico = new StoricoInterventoManutenzione();
+        storico.stazioneId = stazione.id;
+        storico.nomeStazione = stazione.nome;
+        storico.guastoId = guastoId;
+        storico.operatoreId = operatore.id();
+        storico.nomeOperatore = operatore.nome();
+        storico.matricolaOperatore = operatore.matricola();
+        storico.statoStazionePrima = statoPrima;
+        storico.statoStazioneDopo = "MANUTENZIONE";
+        storico.tsInvio = tsInvio;
+        storico.tsRientro = null;
+        storico.catenaId = catenaId;
+        return storico;
+    }
 }

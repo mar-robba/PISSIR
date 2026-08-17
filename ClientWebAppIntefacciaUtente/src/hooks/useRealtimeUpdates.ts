@@ -9,7 +9,7 @@ import { mapBackendStatus, mapApiStation, mapApiTrain } from '../api/apiClient';
 /**
  * Converte in millisecondi il timestamp ISO che viaggia negli eventi della Centrale.
  * Se manca o non è leggibile si ripiega sull'ora di arrivo, ma il caso normale è che
- * l'ora ci sia: è quella in cui il fatto è successo davvero, e per i transiti rimandati
+ * l'ora ci sia: è quella in cui il fatto è successo davvero, e per gli eventi rimandati
  * dal buffer di una stazione dopo un'interruzione (SV02) può essere di parecchi minuti
  * prima. Scriverci Date.now() schiacciava tutti quegli eventi sull'istante del rientro.
  */
@@ -24,13 +24,12 @@ const istanteEvento = (timestamp: unknown): number => {
 export function useRealtimeUpdates() {
   // Ogni azione si prende con un selettore: prendere lo store intero significa
   // sottoscriversi a QUALUNQUE cambiamento, e siccome questo hook sta in RailwayApp
-  // (il componente che contiene tutte le rotte) ogni frame di telemetria, ogni battito
-  // e ogni transito ri-renderizzavano l'intera applicazione, mappa compresa.
+  // (il componente che contiene tutte le rotte) ogni frame di telemetria e ogni battito
+  // ri-renderizzavano l'intera applicazione, mappa compresa.
   // Le azioni di Zustand sono riferimenti stabili, quindi così non si ridisegna nulla.
   const updateTrain = useRailwayStore((s) => s.updateTrain);
   const updateStation = useRailwayStore((s) => s.updateStation);
   const addAlert = useRailwayStore((s) => s.addAlert);
-  const addTransit = useRailwayStore((s) => s.addTransit);
   const setKpi = useRailwayStore((s) => s.setKpi);
   const setTrains = useRailwayStore((s) => s.setTrains);
   const setStations = useRailwayStore((s) => s.setStations);
@@ -109,22 +108,15 @@ export function useRealtimeUpdates() {
         message: data.message || 'Allarme dal campo',
         trainId: data.trainId,
         stationId: data.stationId,
+        // Terza sorgente possibile: l'arco di rete reso non percorribile da un convoglio
+        // guasto in linea (RF02.1.2.2.2).
+        trackSegmentId: data.trattaId,
         timestamp: istanteEvento(data.timestamp),
         acknowledged: risolto,
-        resolvedAt: data.timestampRisoluzione ? istanteEvento(data.timestampRisoluzione) : undefined
-      });
-    });
-
-    const unsubTransit = wsClient.subscribe('TRANSIT', (data) => {
-      addTransit({
-        id: data.id || `tr-${Date.now()}`,
-        trainId: data.trainId,
-        stationId: data.stationId,
-        trackSegmentId: data.trattaId ?? null,
-        type: data.type === 'uscita' ? 'uscita' : 'ingresso',
-        timestamp: istanteEvento(data.timestamp),
-        delayed: data.delayMinutes > 0,
-        delayMinutes: data.delayMinutes
+        resolvedAt: data.timestampRisoluzione ? istanteEvento(data.timestampRisoluzione) : undefined,
+        // La presa in carico viaggia sullo stesso evento ALERT: così l'altro operatore vede
+        // che l'allarme è già di qualcuno senza dover ricaricare la pagina.
+        takenBy: data.operatore ?? undefined
       });
     });
 
@@ -144,9 +136,8 @@ export function useRealtimeUpdates() {
       unsubHeartbeat();
       unsubStationStatus();
       unsubAlert();
-      unsubTransit();
       unsubSnapshot();
       wsClient.disconnect();
     };
-  }, [updateTrain, updateStation, addAlert, addTransit, setKpi, setTrains, setStations]);
+  }, [updateTrain, updateStation, addAlert, setKpi, setTrains, setStations]);
 }

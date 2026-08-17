@@ -4,12 +4,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.quarkus.narayana.jta.QuarkusTransaction;
-import io.quarkus.panache.common.Sort;
 import io.smallrye.common.annotation.Blocking;
 // quindi Anche Treno
 import it.uni.reti2.entity.*;
 import it.uni.reti2.elaboration.TrafficLogicEngine;
+import it.uni.reti2.eventi.CausaEvento;
+import it.uni.reti2.eventi.EventoDerivato;
+import it.uni.reti2.eventi.GestoreReazioni;
+import it.uni.reti2.eventi.RegistroCatene;
+import it.uni.reti2.eventi.VocabolarioEventi;
 import it.uni.reti2.gateway.RealtimeWebSocket;
+import it.uni.reti2.persistence.RailwayRepository;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -50,13 +55,6 @@ public class IngestionService {
     private static final Logger LOG = Logger.getLogger(IngestionService.class);
 
     /**
-     * Valori ammessi dal CHECK sulla colonna Treni.stato: qualunque altra cosa
-     * farebbe fallire il commit (e per il motivo spiegato sopra è meglio evitarlo).
-     */
-    private static final List<String> STATI_TRENO_VALIDI =
-            List.of("attivo", "fermo", "rotto", "in manutenzione");
-
-    /**
      * Marcatore inserito negli alert che la Centrale pubblica su railway/alerts.
      * Il topic è condiviso e la Centrale è sottoscritta anche in ingresso: senza
      * questo campo si riascolterebbe da sola e creerebbe un secondo Guasto per un
@@ -80,6 +78,13 @@ public class IngestionService {
      */
     public static final String MSG_TRENO_FERMO = "Convoglio fermo:";
 
+    /**
+     * Tipo dei guasti che dichiarano un arco della rete non percorribile (RF02.1.2.2.2).
+     * È la classificazione che li distingue nell'elenco degli allarmi: la sorgente non è un
+     * nodo che si è rotto ma un pezzo di infrastruttura occupato da un'avaria altrui.
+     */
+    public static final String TIPO_TRATTA_IMPERCORRIBILE = "tratta_impercorribile";
+
     @Inject
     ObjectMapper mapper;
 
@@ -97,6 +102,29 @@ public class IngestionService {
     @Inject
     RealtimeWebSocket webSocket;
 
+    /**
+     * Tutto quello che finisce sul database passa da qui: questa classe decide COSA
+     * scrivere e dentro quale transazione, il repository sa COME farlo.
+     */
+    @Inject
+    RailwayRepository repository;
+
+    /**
+     * Applica gli eventi derivati (tipoEvento REAZIONE), cioè i cambiamenti di stato che un nodo
+     * dichiara di aver subito per colpa di un evento altrui. Sono l'altra metà del canale
+     * rispetto ai guasti e vanno trattati in modo opposto: non aprono niente in
+     * Guasti_Pervenuti_da_treni_o_Staz, aggiornano stato e storico portandosi dietro la causa.
+     */
+    @Inject
+    GestoreReazioni gestoreReazioni;
+
+    /**
+     * Chi sta reagendo a quale catena di eventi: serve qui per chiudere la catena quando il
+     * guasto che l'ha originata viene risolto.
+     */
+    @Inject
+    RegistroCatene registroCatene;
+
 // Ste conversioni vanno messe a posto, bisogna fare solo un unico tipo di dato
     /**
      * Converte lo stato MQTT del treno nello stato canonico usato dal DB.
@@ -105,12 +133,9 @@ public class IngestionService {
      * "fermo": la colonna ha un CHECK e uno stato inventato farebbe saltare il commit.
      */
     private String normalizzaStatoTreno(String rawStato) {
-        if ("IN_VIAGGIO".equalsIgnoreCase(rawStato)) return "attivo";
-        if ("FERMO".equalsIgnoreCase(rawStato)) return "fermo";
-        if ("EMERGENZA".equalsIgnoreCase(rawStato)) return "rotto";
-        if ("SOPPRESSO".equalsIgnoreCase(rawStato)) return "in manutenzione";
-        String normalizzato = rawStato == null ? "" : rawStato.trim().toLowerCase();
-        return STATI_TRENO_VALIDI.contains(normalizzato) ? normalizzato : "fermo";
+        // La traduzione sta nel vocabolario condiviso del canale: serve identica anche al
+        // gestore delle reazioni, e due copie sarebbero divergute alla prima modifica.
+        return VocabolarioEventi.normalizzaStatoTreno(rawStato);
     }
 
     /**
@@ -118,10 +143,7 @@ public class IngestionService {
      * per il campo "status" degli eventi WebSocket HEARTBEAT.
      */
     private String statoStazionePerFrontend(String stato) {
-        if ("ONLINE".equalsIgnoreCase(stato)) return "operativa";
-        if ("GUASTA".equalsIgnoreCase(stato)) return "guasta";
-        if ("MANUTENZIONE".equalsIgnoreCase(stato)) return "manutenzione";
-        return "offline";
+        return VocabolarioEventi.statoStazionePerFrontend(stato);
     }
 
 // ma che cazz di controllo è ?? è davvero necessario
@@ -222,9 +244,18 @@ public class IngestionService {
      * Gira dentro la transazione aperta dal chiamante.
      */
     private void salvaStatoTreno(String trenoId, String stato) {
-        // è una operazione a postgres? sì ed è fornita dal framework come metodo statico
-        // della classe entità, dunque sarebbe un metodo statico della classe Treno
-        Treno dbTreno = Treno.findById(trenoId);
+        salvaStatoTreno(trenoId, stato, null);
+    }
+
+    /**
+     * Come sopra, registrando anche perché lo stato è cambiato.
+     *
+     * @param trenoId Convoglio da aggiornare.
+     * @param stato   Stato nuovo, già normalizzato.
+     * @param causa   Chi ha provocato il cambiamento e a quale catena appartiene (può essere null).
+     */
+    private void salvaStatoTreno(String trenoId, String stato, CausaEvento causa) {
+        Treno dbTreno = repository.trovaTreno(trenoId);
         if (dbTreno == null) {
             LOG.warnf("🚫 Il treno '%s' non è nella tabella Treni: nessuna scrittura", trenoId);
             return;
@@ -237,8 +268,7 @@ public class IngestionService {
         dbTreno.stato = stato;
 
         if (statoCambiato) {
-            StoricoStatoTreno storico = StoricoStatoTreno.fotografiaDi(dbTreno, statoPrecedente);
-            storico.persist();
+            repository.salvaStoricoStatoTreno(dbTreno, statoPrecedente, causa);
         }
     }
 
@@ -282,7 +312,7 @@ public class IngestionService {
      */
     private List<Guasto> chiudiGuastiTrenoFermo(String trenoId) {
         List<Guasto> chiusi = new ArrayList<>();
-        List<Guasto> aperti = Guasto.list("sorgenteId = ?1 and sorgenteTipo = 'TRENO' and risolto = false", trenoId);
+        List<Guasto> aperti = repository.guastiApertiDi(trenoId, "TRENO");
         for (Guasto guasto : aperti) {
             if (guasto.messaggio == null || !guasto.messaggio.startsWith(MSG_TRENO_FERMO)) {
                 continue; // avaria dichiarata dal convoglio: la chiude un operatore
@@ -290,11 +320,15 @@ public class IngestionService {
             guasto.risolto = true;
             guasto.timestampRisoluzione = Instant.now();
 
-            StoricoGuasto storico = StoricoGuasto.find("guastoId", guasto.id).firstResult();
+            StoricoGuasto storico = repository.trovaStoricoGuasto(guasto.id);
             if (storico != null) {
                 storico.risolto = true;
                 storico.tsChiusura = guasto.timestampRisoluzione;
             }
+            // Nessun operatore: il guasto si è richiuso da solo. Se però qualcuno lo aveva
+            // preso in carico, la sua riga va chiusa lo stesso, altrimenti risulterebbe al
+            // lavoro per sempre su un allarme già finito (RF02.7).
+            repository.chiudiAssegnazioneGuasto(guasto, null);
             statoRete.risolviGuasto(guasto.id);
             chiusi.add(guasto);
         }
@@ -319,12 +353,22 @@ public class IngestionService {
             }
 
             String statoPrecedente = stazione.stato;
-            boolean statoCambiato = statoPrecedente == null || !statoPrecedente.equalsIgnoreCase(stato);
+            // La squadra è sul posto: il battito dice che il nodo è vivo, non che l'intervento
+            // è finito. Il nodo dichiara di sé solo ONLINE o GUASTA (RF02.3.4) e MANUTENZIONE
+            // non è nel suo vocabolario: se lo si lasciasse sovrascrivere, il primo battito
+            // utile cancellerebbe uno stato deciso dall'operatore, e MANUTENZIONE tornerebbe a
+            // durare pochi secondi come quando invio e rientro stavano nella stessa chiamata.
+            // Finisce quando l'operatore dichiara concluso l'intervento, e non prima.
+            boolean inManutenzione = "MANUTENZIONE".equalsIgnoreCase(statoPrecedente);
+            boolean statoCambiato = !inManutenzione
+                    && (statoPrecedente == null || !statoPrecedente.equalsIgnoreCase(stato));
             // Se la Centrale l'aveva marcata OFFLINE (fail-stop) e il battito è tornato,
             // il guasto automatico va chiuso e i treni vanno sbloccati.
             boolean tornataDalFailStop = "OFFLINE".equalsIgnoreCase(statoPrecedente);
 
-            stazione.stato = stato;
+            if (!inManutenzione) {
+                stazione.stato = stato;
+            }
             stazione.ultimoHeartbeat = Instant.now();
             statoRete.aggiornaStazione(stazione);
 
@@ -350,7 +394,11 @@ public class IngestionService {
             wsEvent.put("eventType", "HEARTBEAT");
             // Campi aggiuntivi richiesti dal frontend
             wsEvent.put("stationId", stazioneId);
-            wsEvent.put("status", statoStazionePerFrontend(stato));
+            // Lo stato che si annuncia è quello che la Centrale tiene, non quello dichiarato nel
+            // battito: sono diversi proprio nel caso della manutenzione, dove il nodo continua a
+            // dirsi ONLINE perché quello stato non lo conosce. Mandando il suo, la schermata
+            // avrebbe rimesso "operativa" una stazione con la squadra ancora sul posto.
+            wsEvent.put("status", statoStazionePerFrontend(stazione.stato));
             webSocket.broadcast(wsEvent.toString());
 
         } catch (Exception e) {
@@ -367,12 +415,11 @@ public class IngestionService {
      *                         il cambiamento e non solo il punto di arrivo.
      */
     private void storicizzaStatoStazione(String stazioneId, String stato, String statoPrecedente) {
-        Stazione dbStazione = Stazione.findById(stazioneId);
+        Stazione dbStazione = repository.trovaStazione(stazioneId);
         if (dbStazione == null) {
             return;
         }
-        StoricoStatoStazione storico = StoricoStatoStazione.fotografiaDi(dbStazione, stato, statoPrecedente);
-        storico.persist();
+        repository.salvaStoricoStatoStazione(dbStazione, stato, statoPrecedente);
     }
 
     /**
@@ -384,7 +431,7 @@ public class IngestionService {
      */
     private List<Guasto> chiudiGuastiHeartbeatPerso(String stazioneId) {
         List<Guasto> chiusi = new ArrayList<>();
-        List<Guasto> aperti = Guasto.list("sorgenteId = ?1 and sorgenteTipo = 'STAZIONE' and risolto = false", stazioneId);
+        List<Guasto> aperti = repository.guastiApertiDi(stazioneId, "STAZIONE");
         for (Guasto guasto : aperti) {
             if (guasto.messaggio == null || !guasto.messaggio.startsWith(MSG_HEARTBEAT_PERSO)) {
                 continue; // guasto dichiarato dalla stazione: lo chiude un operatore
@@ -392,11 +439,14 @@ public class IngestionService {
             guasto.risolto = true;
             guasto.timestampRisoluzione = Instant.now();
 
-            StoricoGuasto storico = StoricoGuasto.find("guastoId", guasto.id).firstResult();
+            StoricoGuasto storico = repository.trovaStoricoGuasto(guasto.id);
             if (storico != null) {
                 storico.risolto = true;
                 storico.tsChiusura = guasto.timestampRisoluzione;
             }
+            // Come sopra: il battito tornato chiude il guasto, e con lui l'eventuale presa
+            // in carico rimasta aperta.
+            repository.chiudiAssegnazioneGuasto(guasto, null);
             statoRete.risolviGuasto(guasto.id);
             chiusi.add(guasto);
         }
@@ -458,8 +508,8 @@ public class IngestionService {
     private void registraTransito(String trenoId, String stazioneId, String tipo,
                                   Instant quandoEPassato, int ritardoMinuti) {
         Instant adesso = quandoEPassato != null ? quandoEPassato : Instant.now();
-        Treno dbTreno = Treno.findById(trenoId);
-        Stazione dbStazione = Stazione.findById(stazioneId);
+        Treno dbTreno = repository.trovaTreno(trenoId);
+        Stazione dbStazione = repository.trovaStazione(stazioneId);
         if (dbTreno == null || dbStazione == null) {
             LOG.warnf("🚫 Transito ignorato: treno '%s' o stazione '%s' non presenti a DB", trenoId, stazioneId);
             return;
@@ -474,15 +524,13 @@ public class IngestionService {
             transito.tratta = dbTreno.posizioneAttualeTratta;
             transito.tempoEntrata = adesso;
             transito.ritardoMinuti = ritardoMinuti;
-            transito.persist();
+            repository.salvaTransito(transito);
 
             // Storicizza subito l'apertura (record con tempoUscita null)
             storicizzaTransito(transito);
         } else {
             // USCITA: chiude il transito aperto per stesso treno+stazione
-            Transito aperto = Transito.find(
-                    "treno.id = ?1 and stazione.id = ?2 and tempoUscita is null",
-                    trenoId, stazioneId).firstResult();
+            Transito aperto = repository.trovaTransitoAperto(trenoId, stazioneId);
             if (aperto != null) {
                 aperto.tempoUscita = adesso;
                 aperto.ritardoMinuti = ritardoMinuti;
@@ -498,7 +546,7 @@ public class IngestionService {
                 transito.tempoEntrata = adesso;
                 transito.tempoUscita = adesso;
                 transito.ritardoMinuti = ritardoMinuti;
-                transito.persist();
+                repository.salvaTransito(transito);
                 storicizzaTransito(transito);
             }
         }
@@ -511,8 +559,7 @@ public class IngestionService {
      * lo storico non ha più chiavi esterne verso l'anagrafica (RF02.7).
      */
     private void storicizzaTransito(Transito transito) {
-        StoricoTransito storico = StoricoTransito.fotografiaDi(transito);
-        storico.persist();
+        repository.salvaStoricoTransito(transito);
     }
 
     /**
@@ -548,13 +595,26 @@ public class IngestionService {
             // (RESOLVED, STOP, MAINTENANCE_DISPATCHED, ITINERARIO_AGGIORNATO):
             // per questi NON va creato alcun guasto.
             String tipoEvento = root.path("tipoEvento").asText("");
+            boolean dallaCentrale = ORIGINE_CENTRALE.equalsIgnoreCase(root.path("origine").asText(""));
+
+            // Eventi derivati: un nodo dichiara di aver cambiato stato per causa altrui. Non
+            // sono guasti e non ne aprono (dieci convogli fermi per una sola avaria non devono
+            // diventare dieci allarmi da risolvere a mano): li applica il gestore delle reazioni,
+            // che aggiorna stato e storico portandosi dietro la causa e la catena.
+            if (VocabolarioEventi.TIPO_REAZIONE.equalsIgnoreCase(tipoEvento)) {
+                if (!dallaCentrale) {
+                    gestoreReazioni.applica(EventoDerivato.daJson(root));
+                }
+                return message.ack();
+            }
+
             if (!"GUASTO".equalsIgnoreCase(tipoEvento)) {
                 return message.ack();
             }
             // Nemmeno per i GUASTO che ha pubblicato la Centrale stessa (fail-stop di una
             // stazione): sono già stati scritti a DB dal FaultMonitor, qui tornano solo
             // perché siamo sottoscritti al nostro stesso topic.
-            if (ORIGINE_CENTRALE.equalsIgnoreCase(root.path("origine").asText(""))) {
+            if (dallaCentrale) {
                 return message.ack();
             }
 
@@ -571,6 +631,13 @@ public class IngestionService {
             // Se un guasto dello stesso tipo per la stessa sorgente è già aperto si
             // aggiorna il messaggio invece di riempire la tabella di righe identiche
             // (con N righe aperte, "risolvi" ne chiuderebbe una sola).
+            // Catena ereditata: un nodo che si dichiara guasto PER COLPA di un altro evento
+            // (la stazione resa non percorribile da un convoglio guasto sui suoi binari)
+            // ripubblica un GUASTO normale, perché per gli altri nodi di campo quel fatto è un
+            // primario come un altro, ma si porta dietro la catena di partenza. Se il campo non
+            // c'è il guasto è primario e la catena parte da lui.
+            String catenaEreditata = root.path(VocabolarioEventi.CAMPO_CATENA).asText("");
+
             Guasto giaAperto = statoRete.getGuastoApertoPerSorgente(sorgenteId, tipo);
             if (giaAperto != null) {
                 final Guasto daAggiornare = giaAperto;
@@ -579,7 +646,7 @@ public class IngestionService {
                 LOG.infof("♻️ Guasto già aperto per %s (%s): aggiornato il messaggio invece di crearne un altro", sorgenteId, tipo);
                 // Anche se il guasto non è nuovo la sorgente va rimarcata: nel frattempo
                 // la telemetria (o un heartbeat) può aver riscritto lo stato in cache.
-                marcaSorgenteGuasta(sorgenteTipo, sorgenteId, severita);
+                marcaSorgenteGuasta(giaAperto);
                 broadcastAlert(giaAperto);
                 return message.ack();
             }
@@ -593,16 +660,20 @@ public class IngestionService {
             guasto.messaggio = messaggio;
             guasto.timestamp = quando;
             guasto.risolto = false;
+            guasto.catenaId = catenaEreditata.isBlank() ? guasto.id : catenaEreditata;
 
             QuarkusTransaction.requiringNew().run(() -> {
-                guasto.persist();
-
-                StoricoGuasto storico = StoricoGuasto.fotografiaDi(guasto);
-                storico.persist();
+                repository.salvaGuasto(guasto);
+                repository.salvaStoricoGuasto(guasto);
             });
             statoRete.aggiungiGuasto(guasto);
-            // todo : da aggingere la marcatura dell astazione come GUASTA se il guasto proviene da un treno che è presente in una staizone RF1.2.2.1 se non sbaglio l'RF
-            marcaSorgenteGuasta(sorgenteTipo, sorgenteId, severita);
+            // Qui c'era un todo: marcare GUASTA la stazione quando il guasto arriva da un treno
+            // fermo sui suoi binari (RF02.1.2.2.1). Non va fatto qui, ed è il motivo per cui il
+            // todo è rimasto lì tanto: quella decisione non appartiene alla Centrale. Chi sa
+            // quali convogli ha sui binari è la stazione, che è sottoscritta allo stesso canale
+            // e reagisce da sé (StationGateway.riceviAlert), così la conseguenza vale anche
+            // mentre la rete è giù. La Centrale la registra, non la comanda.
+            marcaSorgenteGuasta(guasto);
 
             //
             broadcastAlert(guasto);
@@ -620,22 +691,63 @@ public class IngestionService {
      * <p>Si marca solo sui CRITICAL: i WARNING restano allarmi informativi e non devono
      * contraddire gli heartbeat ONLINE della stazione né la telemetria del treno.</p>
      *
-     * @param sorgenteTipo STAZIONE o TRENO.
-     * @param sorgenteId   Identificativo del nodo che ha segnalato il guasto.
-     * @param severita     Severità dichiarata nell'alert.
+     * <p>Il cambio di stato passa anche dal database e dallo storico, con dentro la causa
+     * (il guasto che l'ha provocato e la sua catena). Prima il ramo della STAZIONE toccava
+     * solo la cache: il passaggio ONLINE → GUASTA non finiva in Storico_Stato_Stazioni,
+     * e siccome la cache era già GUASTA al battito successivo "lo stato è cambiato"
+     * risultava falso, quindi quella riga non la scriveva più nessuno.</p>
+     *
+     * @param guasto Il guasto appena aperto o già aperto per quella sorgente.
      */
-    private void marcaSorgenteGuasta(String sorgenteTipo, String sorgenteId, String severita) {
-        if (!"CRITICAL".equalsIgnoreCase(severita)) {
+    private void marcaSorgenteGuasta(Guasto guasto) {
+        if (guasto == null || !"CRITICAL".equalsIgnoreCase(guasto.severita)) {
             return;
         }
+        String sorgenteTipo = guasto.sorgenteTipo;
+        String sorgenteId = guasto.sorgenteId;
+        String catenaId = guasto.catenaId != null ? guasto.catenaId : guasto.id;
+        CausaEvento causa = CausaEvento.propria(sorgenteTipo, sorgenteId, catenaId);
 
         if ("STAZIONE".equalsIgnoreCase(sorgenteTipo)) {
             Stazione stazione = statoRete.getStazione(sorgenteId);
-            if (stazione != null) {
-                stazione.stato = "GUASTA";
-                statoRete.aggiornaStazione(stazione);
-                broadcastStatoStazione(stazione);
+            if (stazione == null) {
+                LOG.warnf("🚫 Guasto da una stazione sconosciuta '%s': cache non aggiornata", sorgenteId);
+                return;
             }
+            String statoPrecedente = stazione.stato;
+            stazione.stato = "GUASTA";
+            statoRete.aggiornaStazione(stazione);
+            if (!"GUASTA".equalsIgnoreCase(statoPrecedente)) {
+                QuarkusTransaction.requiringNew().run(() -> salvaStatoStazione(sorgenteId, "GUASTA", statoPrecedente, causa));
+            }
+            broadcastStatoStazione(stazione);
+            return;
+        }
+
+        if (VocabolarioEventi.NODO_TRATTA.equalsIgnoreCase(sorgenteTipo)) {
+            // La tratta resa impercorribile viene ripubblicata come GUASTO dal convoglio che ci
+            // è rimasto sopra, perché gli altri convogli reagiscono ai guasti e non alle
+            // reazioni altrui. Di norma la reazione è già arrivata (stesso client, stesso topic,
+            // quindi nell'ordine) e la cache è già a posto: questo ramo è la rete di sicurezza
+            // per il caso in cui si sia persa solo lei.
+            Tratta tratta = statoRete.getTratta(sorgenteId);
+            if (tratta == null) {
+                LOG.warnf("🚫 Guasto su una tratta sconosciuta '%s': cache non aggiornata", sorgenteId);
+                return;
+            }
+            String statoPrecedente = tratta.stato;
+            if (VocabolarioEventi.TRATTA_IMPERCORRIBILE.equalsIgnoreCase(statoPrecedente)) {
+                return; // già impercorribile: niente da cambiare e niente da storicizzare
+            }
+            tratta.stato = VocabolarioEventi.TRATTA_IMPERCORRIBILE;
+            statoRete.aggiornaTratta(tratta);
+            QuarkusTransaction.requiringNew().run(() -> {
+                Tratta dbTratta = repository.trovaTratta(sorgenteId);
+                if (dbTratta != null) {
+                    repository.salvaStoricoStatoTratta(dbTratta,
+                            VocabolarioEventi.TRATTA_IMPERCORRIBILE, statoPrecedente, causa);
+                }
+            });
             return;
         }
 
@@ -654,10 +766,32 @@ public class IngestionService {
 
             // Allinea anche il DB (e lo storico) come fa la telemetria: la cache viene
             // ricostruita da lì al riavvio della Centrale.
-            QuarkusTransaction.requiringNew().run(() -> salvaStatoTreno(sorgenteId, "rotto"));
+            QuarkusTransaction.requiringNew().run(() -> salvaStatoTreno(sorgenteId, "rotto", causa));
 
             broadcastStatoTreno(treno);
         }
+    }
+
+    /**
+     * Scrive la riga di storico del cambio di stato di una stazione, con dentro la causa.
+     * Gira dentro la transazione aperta dal chiamante.
+     *
+     * <p>Lo stato corrente della stazione non si scrive: {@code Stazione.stato} è
+     * {@code @Transient}, cioè vive solo nella cache e si ricostruisce dagli heartbeat. Quello
+     * che deve restare a database è il <b>cambiamento</b>, ed è questa riga.</p>
+     *
+     * @param stazioneId      Stazione interessata.
+     * @param stato           Stato nuovo.
+     * @param statoPrecedente Stato da cui proviene.
+     * @param causa           Perché è cambiato (può essere null).
+     */
+    private void salvaStatoStazione(String stazioneId, String stato, String statoPrecedente, CausaEvento causa) {
+        Stazione dbStazione = repository.trovaStazione(stazioneId);
+        if (dbStazione == null) {
+            LOG.warnf("🚫 La stazione '%s' non è nella tabella Stazione: nessuna scrittura", stazioneId);
+            return;
+        }
+        repository.salvaStoricoStatoStazione(dbStazione, stato, statoPrecedente, causa);
     }
 
     /**
@@ -682,7 +816,7 @@ public class IngestionService {
 
     /** Aggiorna il testo di un guasto già aperto (deduplica degli alert ripetuti). */
     private void aggiornaMessaggioGuasto(String guastoId, String messaggio) {
-        Guasto dbGuasto = Guasto.findById(guastoId);
+        Guasto dbGuasto = repository.trovaGuasto(guastoId);
         if (dbGuasto != null) {
             dbGuasto.messaggio = messaggio;
         }
@@ -707,7 +841,8 @@ public class IngestionService {
     private String tipoGuastoPerFrontend(String sorgenteTipo, String tipoDichiarato) {
         if (tipoDichiarato != null && !tipoDichiarato.isBlank()) {
             String tipo = tipoDichiarato.trim().toLowerCase();
-            if ("sensore_offline".equals(tipo) || "stazione_guasta".equals(tipo) || "treno_fermo".equals(tipo)) {
+            if ("sensore_offline".equals(tipo) || "stazione_guasta".equals(tipo)
+                    || "treno_fermo".equals(tipo) || TIPO_TRATTA_IMPERCORRIBILE.equals(tipo)) {
                 return tipo;
             }
         }
@@ -716,6 +851,11 @@ public class IngestionService {
         }
         if ("STAZIONE".equalsIgnoreCase(sorgenteTipo)) {
             return "stazione_guasta";
+        }
+        // Un arco della rete occupato da un'avaria: è un allarme a sé, con la sua sorgente, e
+        // l'operatore deve vederlo perché è un pezzo di rete che non si può percorrere.
+        if (VocabolarioEventi.NODO_TRATTA.equalsIgnoreCase(sorgenteTipo)) {
+            return TIPO_TRATTA_IMPERCORRIBILE;
         }
         return "sensore_offline";
     }
@@ -746,10 +886,19 @@ public class IngestionService {
         if (guasto.timestampRisoluzione != null) {
             wsEvent.put("timestampRisoluzione", guasto.timestampRisoluzione.toString());
         }
+        // Chi se ne sta occupando (RF01.4.2): senza questo campo la presa in carico si
+        // vedeva solo nel browser di chi l'aveva premuta, e un secondo operatore poteva
+        // mettersi a lavorare sullo stesso allarme senza saperlo.
+        if (guasto.operatore != null) {
+            wsEvent.put("operatore", (guasto.operatore.nome + " " + guasto.operatore.cognome).trim());
+        }
         if ("TRENO".equalsIgnoreCase(guasto.sorgenteTipo)) {
             wsEvent.put("trainId", guasto.sorgenteId);
         } else if ("STAZIONE".equalsIgnoreCase(guasto.sorgenteTipo)) {
             wsEvent.put("stationId", guasto.sorgenteId);
+        } else if (VocabolarioEventi.NODO_TRATTA.equalsIgnoreCase(guasto.sorgenteTipo)) {
+            // La terza sorgente possibile secondo RF01.2.1: un arco della rete.
+            wsEvent.put("trattaId", guasto.sorgenteId);
         }
         webSocket.broadcast(wsEvent.toString());
     }
@@ -802,20 +951,75 @@ public class IngestionService {
         alert.put("severita", guasto.severita);
         alert.put("messaggio", guasto.messaggio);
         alert.put("guastoId", guasto.id);
+        // La catena viaggia con l'alert: è quello che permette a chi reagisce di dichiarare
+        // POI di che conseguenza si tratta, e di reagirci una volta sola.
+        alert.put(VocabolarioEventi.CAMPO_CATENA, guasto.catenaId != null ? guasto.catenaId : guasto.id);
         alert.put("timestamp", guasto.timestamp != null ? guasto.timestamp.toString() : Instant.now().toString());
         inviaSuMqtt(alert.toString());
     }
 
+    /**
+     * Pubblica su railway/alerts una reazione decisa dalla Centrale, cioè il cambiamento di stato
+     * che segue a un comando dell'operatore (la squadra mandata a una stazione, il ritorno in
+     * servizio a intervento finito).
+     *
+     * <p>Va sul canale come le reazioni del campo perché è lo stesso tipo di fatto e chiunque
+     * ascolti deve poterlo leggere allo stesso modo. Porta il marcatore {@code origine}: il topic
+     * è condiviso e la Centrale è sottoscritta anche a sé stessa, quindi senza quel campo si
+     * riascolterebbe e riapplicherebbe la propria reazione — che è poi la regola anti-eco che
+     * vale già per i guasti.</p>
+     *
+     * @param sorgenteTipo    Tipo del nodo che cambia stato.
+     * @param sorgenteId      Identificativo di quel nodo.
+     * @param nuovoStato      Stato nuovo.
+     * @param statoPrecedente Stato da cui proviene.
+     * @param causa           Chi lo ha deciso e a quale catena appartiene.
+     * @param attiva          true se il nodo entra nella catena, false se ne esce.
+     * @param motivo          Descrizione leggibile.
+     */
+    public void pubblicaReazioneSuMqtt(String sorgenteTipo, String sorgenteId, String nuovoStato,
+                                       String statoPrecedente, CausaEvento causa, boolean attiva,
+                                       String motivo) {
+        ObjectNode reazione = mapper.createObjectNode();
+        reazione.put(VocabolarioEventi.CAMPO_TIPO_EVENTO, VocabolarioEventi.TIPO_REAZIONE);
+        reazione.put("origine", ORIGINE_CENTRALE);
+        reazione.put(VocabolarioEventi.CAMPO_SORGENTE_TIPO, sorgenteTipo);
+        reazione.put(VocabolarioEventi.CAMPO_SORGENTE_ID, sorgenteId);
+        reazione.put(VocabolarioEventi.CAMPO_NUOVO_STATO, nuovoStato);
+        if (statoPrecedente != null) {
+            reazione.put(VocabolarioEventi.CAMPO_STATO_PRECEDENTE, statoPrecedente);
+        }
+        if (causa != null) {
+            reazione.put(VocabolarioEventi.CAMPO_CAUSA_TIPO, causa.tipo());
+            reazione.put(VocabolarioEventi.CAMPO_CAUSA_ID, causa.id());
+            reazione.put(VocabolarioEventi.CAMPO_CATENA, causa.catenaId());
+        }
+        reazione.put(VocabolarioEventi.CAMPO_ATTIVA, attiva);
+        reazione.put(VocabolarioEventi.CAMPO_MOTIVO, motivo);
+        reazione.put(VocabolarioEventi.CAMPO_TIMESTAMP, Instant.now().toString());
+        inviaSuMqtt(reazione.toString());
+    }
+
     /** Pubblica su railway/alerts la chiusura di un guasto aperto dalla Centrale. */
     public void pubblicaRisoluzioneSuMqtt(Guasto guasto) {
+        String catenaId = guasto.catenaId != null ? guasto.catenaId : guasto.id;
         ObjectNode alert = mapper.createObjectNode();
         alert.put("tipoEvento", "RESOLVED");
         alert.put("origine", ORIGINE_CENTRALE);
         alert.put("sorgenteTipo", guasto.sorgenteTipo != null ? guasto.sorgenteTipo : "STAZIONE");
         alert.put("sorgenteId", guasto.sorgenteId != null ? guasto.sorgenteId : "");
         alert.put("guastoId", guasto.id);
+        alert.put(VocabolarioEventi.CAMPO_CATENA, catenaId);
         alert.put("timestamp", Instant.now().toString());
         inviaSuMqtt(alert.toString());
+
+        // La catena si srotola: chi si era fermato per questo guasto torna a muoversi e lo
+        // dichiara. Qui la si chiude anche nel registro, altrimenti resterebbero registrati
+        // per sempre i nodi che nel frattempo si sono spenti senza dichiarare l'uscita.
+        java.util.Set<String> nodi = registroCatene.chiudi(catenaId);
+        if (!nodi.isEmpty()) {
+            LOG.infof("🔗 Catena %s chiusa: %d nodi tornano liberi %s", catenaId, nodi.size(), nodi);
+        }
     }
 
     /** Invio difensivo sul canale MQTT: un broker giù non deve far cadere il chiamante. */
@@ -900,7 +1104,7 @@ public class IngestionService {
      * e calcola quale sarà la prossima stazione.
      */
     private EsitoPassaggio aggiornaPosizioneSuTratta(String trenoId, String stazioneId, String tipo, String direzione) {
-        Treno dbTreno = Treno.findById(trenoId);
+        Treno dbTreno = repository.trovaTreno(trenoId);
         if (dbTreno == null || dbTreno.itinerario == null) {
             return new EsitoPassaggio(null, null);
         }
@@ -921,7 +1125,7 @@ public class IngestionService {
      * @return ID della prossima stazione, o null se capolinea/itinerario non noto.
      */
     private String calcolaProssimaStazione(String itinerarioId, String stazioneId, String direzione) {
-        List<String> stazioni = stazioniOrdinateDiItinerario(itinerarioId);
+        List<String> stazioni = repository.stazioniOrdinateDi(itinerarioId);
         int idx = stazioni.indexOf(stazioneId);
         if (idx < 0) return null;
 
@@ -932,31 +1136,13 @@ public class IngestionService {
     }
 
     /**
-     * Ricostruisce la sequenza ordinata degli ID stazione di un itinerario
-     * a partire dalle righe di Itinerario_Tratta.
-     */
-    private List<String> stazioniOrdinateDiItinerario(String itinerarioId) {
-        List<ItinerarioTratta> tratte = ItinerarioTratta
-                .find("itinerario.id", Sort.by("ordine"), itinerarioId).list();
-        List<String> stazioni = new ArrayList<>();
-        if (!tratte.isEmpty()) {
-            stazioni.add(tratte.get(0).tratta.stazionePartenza.id);
-            for (ItinerarioTratta it : tratte) {
-                stazioni.add(it.tratta.stazioneArrivo.id);
-            }
-        }
-        return stazioni;
-    }
-
-    /**
      * Trova la tratta dell'itinerario coerente con l'evento di passaggio:
      * per una ENTRATA la tratta appena percorsa (arrivo = stazione), per una
      * USCITA la tratta che il treno sta imboccando (partenza = stazione).
      * In direzione "ritorno" i ruoli di partenza/arrivo si invertono.
      */
     private Tratta trovaTratta(String itinerarioId, String stazioneId, String tipo, String direzione) {
-        List<ItinerarioTratta> tratte = ItinerarioTratta
-                .find("itinerario.id", Sort.by("ordine"), itinerarioId).list();
+        List<ItinerarioTratta> tratte = repository.tratteOrdinateDi(itinerarioId);
         boolean andata = !"ritorno".equalsIgnoreCase(direzione);
         boolean entrata = "ENTRATA".equalsIgnoreCase(tipo);
         for (ItinerarioTratta it : tratte) {

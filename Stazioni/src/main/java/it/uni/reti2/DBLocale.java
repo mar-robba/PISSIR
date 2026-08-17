@@ -5,6 +5,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 // da spostare in un sqlite per maggiore resilienza nel caso di un fault energetico da parte della stazione
 
@@ -31,6 +32,39 @@ public class DBLocale {
      * - "GUASTA": stazione inagibile (es. guasto ai sistemi di terra).
      */
     public String stato = "ONLINE";
+
+    /**
+     * Catena di eventi che sta rendendo la stazione non percorribile: l'identificativo del
+     * guasto primario da cui la situazione discende (null se la stazione è agibile).
+     * <p>Per un guasto ai propri sistemi di terra è la catena che parte dalla stazione stessa;
+     * quando invece la stazione diventa impercorribile per colpa di un altro nodo (un convoglio
+     * guasto fermo sui suoi binari) è la catena ereditata da quell'evento. Viaggia negli alert
+     * che la stazione pubblica, così chi legge sa che si tratta della stessa avaria e non di
+     * una nuova.</p>
+     */
+    public String catenaAttiva = null;
+
+    /**
+     * Catene di eventi a cui questa stazione ha già reagito: è la regola che fa terminare le
+     * reazioni a catena (un nodo reagisce al massimo una volta per ogni catena) e che taglia i
+     * cicli, per esempio stazione guasta - convoglio fermo - stazione guasta.
+     */
+    public final Set<String> cateneReagite = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Le catene per cui la stazione <b>in questo momento</b> non è percorribile: il proprio
+     * guasto ai sistemi di terra, il convoglio guasto fermo sui binari, o tutti e due insieme.
+     *
+     * <p>Serve perché le due cose possono capitare contemporaneamente e la risposta alla
+     * domanda "torna percorribile quando si chiude una sola di esse?" è no: finché in questo
+     * insieme rimane qualcosa la stazione resta GUASTA. Con il solo {@link #catenaAttiva} il
+     * ripristino di un guasto qualsiasi rimetteva la stazione ONLINE anche con l'altro ancora
+     * aperto, e i convogli ci entravano dentro.</p>
+     *
+     * <p>{@link #catenaAttiva} resta il valore che viaggia negli alert: è una di queste catene,
+     * quella che la stazione sta dichiarando a chi le arriva addosso.</p>
+     */
+    public final Set<String> cateneImpercorribili = ConcurrentHashMap.newKeySet();
 
     // per il riconoscimento della stazione
     public boolean stazioneRiconosciuta = false ;

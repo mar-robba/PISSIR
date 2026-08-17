@@ -97,26 +97,10 @@ CREATE TABLE Guasti_Pervenuti_da_treni_o_Staz (
     messaggio       VARCHAR(500),  -- ESTENSIONE: descrizione leggibile
     ts_apertura     TIMESTAMP,     -- ESTENSIONE: istante di apertura
     ts_risoluzione  TIMESTAMP,     -- ESTENSIONE: istante di risoluzione (null se aperto)
+    catena_id       VARCHAR(50),   -- ESTENSIONE: catena di eventi (id del guasto primario da cui
+                                   -- discende; per un guasto primario e' il proprio id)
     FOREIGN KEY (OperatoreCheSeNeStaOccupandoFK)
         REFERENCES Utenti(id_utente)
-);
-
--- --- Eventi delle Stazioni (audit log) ---
--- Tabella usata dall'entita' EventoStazione: non era prevista dallo schema iniziale
--- e in esecuzione la crea Hibernate (quarkus.hibernate-orm.database.generation=update).
--- E' riportata qui perche' questo file e' il DDL di riferimento allegato alla relazione.
--- E' gia' una tabella di storico: nessuna FK, e il nome della stazione congelato dentro
--- la riga (vedi la regola degli storici piu' sotto). I nomi delle colonne sono quelli
--- che genera Hibernate dai campi dell'entita', cioe' tutti attaccati e minuscoli: la
--- tabella non nasce da questo file, quindi qui va scritta com'e' davvero.
-CREATE TABLE eventi_stazioni (
-    id           BIGINT PRIMARY KEY,   -- generato da Hibernate (sequenza dedicata)
-    stazioneid   VARCHAR(255),         -- riferimento logico a Stazione(id_stazione), NON vincolato
-    nomestazione VARCHAR(255),         -- nome della stazione al momento dell'evento
-    stato        VARCHAR(255),         -- stato della stazione al momento dell'evento
-    tipoevento   VARCHAR(255),         -- es. 'HEARTBEAT_LOST', 'GUASTO', 'MANUTENZIONE'
-    descrizione  VARCHAR(255),
-    timestamp    TIMESTAMP
 );
 
 -- ================================================================
@@ -145,6 +129,13 @@ CREATE TABLE eventi_stazioni (
 -- L'unica chiave esterna ammessa e' fra due tabelle di storico
 -- (Storico_Itinerari_Tratte -> Storico_Itinerari): li' non si punta allo stato corrente
 -- e le due righe nascono e muoiono insieme.
+--
+-- COLONNE DI CAUSA (causa_tipo, causa_id, catena_id). Gli storici di stato registrano anche
+-- PERCHE' un nodo e' cambiato, non solo che e' cambiato: senza queste colonne un convoglio
+-- fermo perche' la stazione davanti a lui e' guasta e' indistinguibile da uno fermo in sosta
+-- regolare. catena_id e' l'identificativo del guasto primario da cui la conseguenza discende
+-- ed e' lo stesso su tutte le righe prodotte da quel guasto in tutta la rete. Valgono anche
+-- qui le regole di questa sezione: sono riferimenti logici, non chiavi esterne.
 
 -- --- Storico Transiti ---
 CREATE TABLE Storico_Transiti (
@@ -180,6 +171,7 @@ CREATE TABLE Storico_Guasti (
     matricola_operatore VARCHAR(50),
     ts_apertura         TIMESTAMP NOT NULL,
     ts_chiusura         TIMESTAMP,
+    catena_id           VARCHAR(50),   -- catena di eventi a cui il guasto apparteneva
     ts_storicizzazione  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -194,6 +186,15 @@ CREATE TABLE Storico_Stato_Treni (
     itinerario                      VARCHAR(50),
     PosizioneAttualeTrattaOStazione VARCHAR(50),
     descrizione_posizione           VARCHAR(255),  -- "Milano Centrale -> Bologna Centrale"
+    -- PERCHE' il convoglio ha cambiato stato: riferimenti logici, NIENTE FK come il resto
+    -- della riga. Sono null quando il cambiamento nasce dal convoglio stesso e valorizzati
+    -- quando e' la conseguenza di un evento di un altro nodo (stazione non percorribile,
+    -- corsa soppressa dall'operatore). catena_id e' l'id del guasto primario da cui tutto
+    -- discende: e' la colonna che permette di chiedere al database che cosa ha prodotto in
+    -- tutta la rete un singolo guasto.
+    causa_tipo                      VARCHAR(20),   -- STAZIONE / TRENO / TRATTA / OPERATORE
+    causa_id                        VARCHAR(50),
+    catena_id                       VARCHAR(50),
     ts_storicizzazione              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -206,7 +207,32 @@ CREATE TABLE Storico_Stato_Stazioni (
     stato               VARCHAR(30),   -- ONLINE / OFFLINE / GUASTA / MANUTENZIONE
     stato_precedente    VARCHAR(30),
     funzionanteONo      BOOLEAN,       -- riassunto booleano dello stato, resta per compatibilita'
+    causa_tipo          VARCHAR(20),   -- PERCHE' la stazione ha cambiato stato (vedi Storico_Stato_Treni)
+    causa_id            VARCHAR(50),
+    catena_id           VARCHAR(50),
     ts_storicizzazione  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- --- Storico Stato Tratte ---
+-- La percorribilita' di un arco della rete: PERCORRIBILE / IMPERCORRIBILE (RF02.1.2.2.2).
+-- E' l'unico "stato" che le tratte hanno, e non sta nella tabella Tratte per la stessa
+-- ragione per cui non ci sta quello delle stazioni: lo stato corrente vive in RAM, a
+-- database va il cambiamento. Le tratte non sono un processo e non parlano: a dichiarare
+-- per loro e' il convoglio che le occupa, che e' l'unico a sapere dove si trova quando si
+-- guasta. Per questo le colonne di causa qui non sono un di piu' ma il contenuto: dicono
+-- quale convoglio ha reso impercorribile quell'arco e a quale avaria appartiene il fatto.
+CREATE TABLE Storico_Stato_Tratte (
+    id_storico_tratta    BIGSERIAL PRIMARY KEY,
+    id_Tratta            VARCHAR(50) NOT NULL,   -- riferimento logico, NIENTE FK
+    descrizione_tratta   VARCHAR(255),           -- "Milano Centrale -> Bologna Centrale"
+    id_stazione_partenza VARCHAR(50),            -- riferimento logico
+    id_stazione_arrivo   VARCHAR(50),            -- riferimento logico
+    stato                VARCHAR(30),   -- PERCORRIBILE / IMPERCORRIBILE
+    stato_precedente     VARCHAR(30),
+    causa_tipo           VARCHAR(20),   -- di norma TRENO: il convoglio guasto fermo sull'arco
+    causa_id             VARCHAR(50),
+    catena_id            VARCHAR(50),
+    ts_storicizzazione   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- --- Storico Itinerari (itinerari percorsi dai convogli) ---
@@ -275,6 +301,7 @@ CREATE TABLE Storico_Interventi_Manutenzione (
     stato_stazione_prima  VARCHAR(30),
     stato_stazione_dopo   VARCHAR(30),
     ts_invio              TIMESTAMP NOT NULL,
-    ts_rientro            TIMESTAMP,
+    ts_rientro            TIMESTAMP,     -- null finche' la squadra sta lavorando (RF01.4.1)
+    catena_id             VARCHAR(50),   -- catena dell'intervento, coniata dalla Centrale
     ts_storicizzazione    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

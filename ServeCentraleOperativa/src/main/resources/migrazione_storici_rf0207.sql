@@ -67,10 +67,12 @@ ALTER TABLE Storico_Assegnazioni_Guasti ADD COLUMN IF NOT EXISTS nome_operatore 
 ALTER TABLE Storico_Assegnazioni_Guasti ADD COLUMN IF NOT EXISTS matricola_operatore VARCHAR(50);
 ALTER TABLE Storico_Assegnazioni_Guasti ADD COLUMN IF NOT EXISTS ruolo_operatore     VARCHAR(50);
 
--- eventi_stazioni non e' nata da questo DDL, l'ha creata Hibernate dall'entita': le sue
--- colonne sono quindi tutte attaccate (stazioneid, tipoevento) e anche questa deve
--- chiamarsi come la scrive Hibernate, altrimenti ne creerebbe una seconda al riavvio.
-ALTER TABLE eventi_stazioni ADD COLUMN IF NOT EXISTS nomestazione VARCHAR(255);
+-- eventi_stazioni non c'e' piu': ogni sua colonna era gia' in Storico_Guasti (id e nome
+-- della stazione, istante, id del guasto dentro la descrizione) e le altre due erano due
+-- costanti scritte a mano, 'OFFLINE' e 'HEARTBEAT_LOST'. La scriveva un punto solo del
+-- codice e non la leggeva nessuno. La DROP sta in fondo al file, dopo il COMMIT, perche'
+-- e' l'unica istruzione che butta via dei dati: se non la si vuole eseguire basta non
+-- lanciare quelle righe, il resto della migrazione e' indipendente.
 
 -- Larghezze: le descrizioni sono "nome -> nome" e i nomi delle stazioni arrivano a 100
 -- caratteri l'uno, quindi 200 non basterebbero. Stessa cosa per "nome cognome"
@@ -101,8 +103,9 @@ BEGIN
 END $$;
 
 -- ----------------------------------------------------------------
--- 4. Tabelle nuove (nessuno le scrive ancora: la registrazione degli
---    eventi arriva dopo, qui si prepara solo il posto dove metterli)
+-- 4. Tabelle nuove: le tratte di un itinerario percorso e gli
+--    interventi di manutenzione (le scrivono il repository e il
+--    comando "Invia Operatori", vedi RailwayRepository)
 -- ----------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS Storico_Itinerari_Tratte (
     id_storico_itinerario_tratta BIGSERIAL PRIMARY KEY,
@@ -187,12 +190,21 @@ UPDATE Storico_Guasti
 SET nome_sorgente = sorgenteId
 WHERE sorgenteTipo = 'TRENO' AND nome_sorgente IS NULL AND sorgenteId IS NOT NULL;
 
-UPDATE eventi_stazioni e
-SET nomestazione = s.nome
-FROM Stazione s
-WHERE e.stazioneid = s.id_stazione AND e.nomestazione IS NULL;
-
 COMMIT;
+
+-- ================================================================
+-- ELIMINAZIONE DI eventi_stazioni
+-- ================================================================
+-- Sta qui in fondo, fuori dalla transazione, perche' e' l'unico punto della migrazione
+-- che cancella qualcosa. Prima di lanciarla si puo' controllare che ogni riga abbia
+-- davvero la gemella nello storico dei guasti: questa query deve tornare zero.
+--
+--   SELECT count(*) FROM eventi_stazioni e
+--    WHERE NOT EXISTS (SELECT 1 FROM Storico_Guasti sg
+--                       WHERE sg.id_guasto = replace(e.descrizione,
+--                             'Heartbeat mancante, guasto automatico ', ''));
+--
+-- DROP TABLE IF EXISTS eventi_stazioni;
 
 -- Controllo finale: questa query non deve tornare piu' nessuna riga.
 -- SELECT conrelid::regclass, conname FROM pg_constraint

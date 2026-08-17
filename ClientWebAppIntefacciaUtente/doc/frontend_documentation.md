@@ -64,7 +64,6 @@ Il diagramma delle classi completo (in formato PlantUML) è disponibile nel file
 - **Route**: La tratta percorsa da un treno.
 - **Alert**: Avvisi generati dal sistema per notificare problemi (es. treno in ritardo, stazione offline).
 - **OperatorDispatch**: Tracciamento di squadre di operatori inviati in una stazione per manutenzione o per risolvere guasti.
-- **Transit**: Log del passaggio di un treno in una determinata stazione.
 
 ---
 

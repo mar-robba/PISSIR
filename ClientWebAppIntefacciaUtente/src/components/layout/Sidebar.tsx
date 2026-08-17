@@ -1,6 +1,5 @@
 import { NavLink } from 'react-router-dom';
 import {
-  ArrowRightLeft,
   LayoutDashboard,
   Map,
   Route as RouteIcon,
@@ -55,11 +54,6 @@ export default function Sidebar() {
         <NavLink to="/trains" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
           <Train size={20} />
           <span>Treni</span>
-        </NavLink>
-
-        <NavLink to="/transits" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-          <ArrowRightLeft size={20} />
-          <span>Transiti</span>
         </NavLink>
 
         <NavLink to="/alerts" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>

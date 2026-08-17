@@ -97,6 +97,14 @@ public class TrainJourneyEngine {
     @Inject
     SecureHttpClient secureHttpClient;
 
+    /**
+     * Dichiara alla Centrale i cambiamenti di stato subiti per causa altrui (blocco e sblocco
+     * per stazione non percorribile). È una classe a parte e non il gateway per non creare un
+     * anello: è il gateway a chiamare questo motore, non il contrario.
+     */
+    @Inject
+    PubblicatoreReazioni pubblicatoreReazioni;
+
     private final Random random = new Random();
 
     /** Istante dell'ultimo tentativo (fallito o no) di caricamento itinerario. */
@@ -211,7 +219,7 @@ public class TrainJourneyEngine {
         switch (trainDB.faseViaggio) {
             case "IN_STAZIONE" -> tickInStazione();
             case "IN_VIAGGIO" -> tickInViaggio();
-            case "BLOCCATO_GUASTO_STAZIONE" -> tickBloccato();
+            case "BLOCCATO_GUASTO_STAZIONE", "BLOCCATO_GUASTO_TRATTA" -> tickBloccato();
             default -> { /* TERMINATO o fase sconosciuta: nulla da fare */ }
         }
     }
@@ -263,7 +271,8 @@ public class TrainJourneyEngine {
                         nodo.path("nome").asText(),
                         nodo.path("latitudine").asDouble(),
                         nodo.path("longitudine").asDouble(),
-                        nodo.path("tempoVersoProssimaMinuti").asInt());
+                        nodo.path("tempoVersoProssimaMinuti").asInt(),
+                        nodo.path("trattaVersoProssimaId").asText(""));
                 tappe.add(tappa);
                 soloId.add(tappa.id);
             }
@@ -309,6 +318,7 @@ public class TrainJourneyEngine {
         trainDB.faseViaggio = "SENZA_ITINERARIO";
         trainDB.prossimaStazione = null;
         trainDB.stazioneBloccante = null;
+        trainDB.trattaBloccante = null;
         if (eraInMarcia) {
             LOG.warn("🛑 [TWIN] Nessun itinerario assegnato: resto fermo in attesa di un percorso");
         }
@@ -373,13 +383,21 @@ public class TrainJourneyEngine {
         // caso il gateway non aveva chiamato bloccaPerGuastoStazione perché la stazione
         // non era né la corrente né la prossima.
         String stazioneGuasta = null;
-        if (trainDB.stazioniGuaste.contains(corrente.id)) {
+        if (trainDB.stazioniGuaste.containsKey(corrente.id)) {
             stazioneGuasta = corrente.id;
-        } else if (trainDB.stazioniGuaste.contains(prossima.id)) {
+        } else if (trainDB.stazioniGuaste.containsKey(prossima.id)) {
             stazioneGuasta = prossima.id;
         }
         if (stazioneGuasta != null) {
-            bloccaPerGuastoStazione(stazioneGuasta);
+            bloccaPerGuastoStazione(stazioneGuasta, trainDB.stazioniGuaste.get(stazioneGuasta));
+            return;
+        }
+
+        // Stesso controllo per l'arco che sta per imboccare: le due stazioni possono essere
+        // aperte e il pezzo di rete in mezzo occupato da un convoglio guasto (RF02.1.2.2.2).
+        String trattaDaPercorrere = trattaCorrenteId();
+        if (trattaDaPercorrere != null && trainDB.tratteGuaste.containsKey(trattaDaPercorrere)) {
+            bloccaPerGuastoTratta(trattaDaPercorrere, trainDB.tratteGuaste.get(trattaDaPercorrere));
             return;
         }
 
@@ -511,36 +529,189 @@ public class TrainJourneyEngine {
      * @param stazioneId Stazione guasta che causa il blocco.
      */
     public void bloccaPerGuastoStazione(String stazioneId) {
-        if (!viaggioAvviato || "SOPPRESSO".equals(trainDB.stato)
-                || "BLOCCATO_GUASTO_STAZIONE".equals(trainDB.faseViaggio)) {
+        bloccaPerGuastoStazione(stazioneId, trainDB.stazioniGuaste.get(stazioneId));
+    }
+
+    /**
+     * Come sopra, sapendo anche a quale catena di eventi il blocco appartiene.
+     *
+     * <p>Due cose in più rispetto al semplice cambio di fase. La prima è la regola che fa
+     * terminare le catene: se il convoglio ha già reagito a questa catena non reagisce di
+     * nuovo, così lo stesso guasto ripubblicato (la stazione guasta manda un alert per ogni
+     * treno che entra, e MQTT consegna at-least-once) non produce una seconda reazione. La
+     * seconda è la dichiarazione alla Centrale: il blocco non resta un fatto privato del
+     * digital twin, viene detto insieme alla sua causa e finisce nello storico.</p>
+     *
+     * @param stazioneId Stazione guasta che causa il blocco.
+     * @param catenaId   Catena di eventi da cui il blocco discende (id del guasto primario).
+     */
+    public void bloccaPerGuastoStazione(String stazioneId, String catenaId) {
+        blocca("STAZIONE", stazioneId, catenaId, "BLOCCATO_GUASTO_STAZIONE",
+                "Trattenuto: la stazione " + stazioneId + " non e' percorribile");
+    }
+
+    /**
+     * Blocca il treno perché l'arco che deve percorrere (o che sta percorrendo) è occupato da
+     * un'avaria: un altro convoglio si è guastato lì sopra (RF02.1.2.2.2).
+     *
+     * <p>È lo stesso identico meccanismo del blocco per stazione guasta, con un'altra causa. La
+     * simmetria non è un vezzo: sono due istanze della stessa regola, e il convoglio che si
+     * ferma non ha nessun bisogno di sapere quale delle due sia — legge un fatto sul canale, si
+     * chiede se lo riguarda e dichiara la propria reazione.</p>
+     *
+     * @param trattaId Arco non percorribile che causa il blocco.
+     * @param catenaId Catena di eventi da cui il blocco discende.
+     */
+    public void bloccaPerGuastoTratta(String trattaId, String catenaId) {
+        blocca("TRATTA", trattaId, catenaId, "BLOCCATO_GUASTO_TRATTA",
+                "Trattenuto: la tratta " + trattaId + " non e' percorribile");
+    }
+
+    /**
+     * Il blocco vero e proprio, comune alle due cause.
+     *
+     * @param causaTipo  STAZIONE o TRATTA.
+     * @param causaId    Identificativo del nodo che causa il blocco.
+     * @param catenaId   Catena di eventi da cui il blocco discende.
+     * @param nuovaFase  Fase del twin da assumere.
+     * @param motivo     Descrizione leggibile che viaggia nella dichiarazione.
+     */
+    private void blocca(String causaTipo, String causaId, String catenaId, String nuovaFase, String motivo) {
+        if (!viaggioAvviato || "SOPPRESSO".equals(trainDB.stato) || bloccato()) {
+            return;
+        }
+        if (catenaId != null && !trainDB.cateneReagite.add(catenaId)) {
+            LOG.debugf("🔁 [TWIN] Ho già reagito alla catena %s: nessuna nuova reazione", catenaId);
             return;
         }
         fasePrimaDelBlocco = trainDB.faseViaggio;
         secondiDiBlocco = 0;
-        trainDB.stazioneBloccante = stazioneId;
-        trainDB.faseViaggio = "BLOCCATO_GUASTO_STAZIONE";
+        trainDB.stazioneBloccante = "STAZIONE".equals(causaTipo) ? causaId : null;
+        trainDB.trattaBloccante = "TRATTA".equals(causaTipo) ? causaId : null;
+        trainDB.catenaBloccante = catenaId;
+        trainDB.faseViaggio = nuovaFase;
         trainDB.stato = "FERMO";
         trainDB.velocita = 0;
-        LOG.warnf("⛔ [TWIN] Treno bloccato: stazione %s guasta (ero in fase %s)", stazioneId, fasePrimaDelBlocco);
+        LOG.warnf("⛔ [TWIN] Treno bloccato: %s %s non percorribile (ero in fase %s)",
+                causaTipo.toLowerCase(), causaId, fasePrimaDelBlocco);
+
+        pubblicatoreReazioni.pubblica(nuovaFase, fasePrimaDelBlocco,
+                causaTipo, causaId, catenaId, true, motivo);
+    }
+
+    /** @return true se il convoglio è fermo per un guasto altrui, di qualunque dei due tipi. */
+    private boolean bloccato() {
+        return "BLOCCATO_GUASTO_STAZIONE".equals(trainDB.faseViaggio)
+                || "BLOCCATO_GUASTO_TRATTA".equals(trainDB.faseViaggio);
     }
 
     /**
-     * Sblocca il treno dopo la risoluzione del guasto della stazione bloccante
-     * e riprende la fase in cui si trovava prima del blocco.
+     * Dichiara non percorribile l'arco su cui il convoglio si è guastato (RF02.1.2.2.1 per la
+     * stazione ha come corrispettivo questo, RF02.1.2.2.2, per la tratta).
+     *
+     * <p>Chi decide è il convoglio, e non la Centrale, per il motivo di sempre: la conseguenza
+     * deve valere anche a rete caduta, e soprattutto è lui l'unico a sapere dove si trovava
+     * quando si è rotto. La Centrale, al più, lo dedurrebbe dall'ultima posizione ricevuta.</p>
+     *
+     * <p>Fa le due cose che fa la stazione nel caso gemello: <b>dichiara</b> la reazione, così
+     * la Centrale registra il fatto e la sua causa senza aprire una seconda avaria, e
+     * <b>ripubblica</b> il fatto come guasto, perché gli altri convogli reagiscono ai guasti e
+     * non alle reazioni altrui.</p>
+     *
+     * @param catenaId Catena dell'avaria che ha fermato il convoglio (la propria, o quella del
+     *                 guasto che la Centrale ha dedotto vedendolo immobile).
+     */
+    public void dichiaraTrattaNonPercorribile(String catenaId) {
+        if (catenaId == null || catenaId.isBlank()) {
+            return; // senza catena la dichiarazione verrebbe riapplicata a ogni ripetizione
+        }
+        if (trainDB.trattaDichiarataImpercorribile != null) {
+            return; // già dichiarata: il guasto è lo stesso
+        }
+        // Fermo in stazione? Allora la conseguenza non è sua: è la stazione a diventare
+        // impercorribile, e lo dichiara lei (RF02.1.2.2.1). Le due conseguenze si escludono, e
+        // a sceglierle è dove si trova il convoglio.
+        if (trainDB.stazioneCorrente != null && !trainDB.stazioneCorrente.isBlank()) {
+            return;
+        }
+        String trattaId = trattaCorrenteId();
+        if (trattaId == null) {
+            LOG.warn("⚠️ [TWIN] Guasto fuori stazione ma non so su quale tratta mi trovo: "
+                    + "nessuna dichiarazione di percorribilità");
+            return;
+        }
+        if (!trainDB.cateneReagite.add(catenaId)) {
+            LOG.debugf("🔁 [TWIN] Ho già reagito alla catena %s: nessuna nuova reazione", catenaId);
+            return;
+        }
+
+        trainDB.trattaDichiarataImpercorribile = trattaId;
+        trainDB.catenaTrattaDichiarata = catenaId;
+        trainDB.tratteGuaste.put(trattaId, catenaId);
+        LOG.warnf("⛔ [TWIN] Sono guasto sulla tratta %s: la dichiaro non percorribile (catena %s)",
+                trattaId, catenaId);
+
+        String motivo = String.format("Tratta %s non percorribile: convoglio %s guasto in linea",
+                trattaId, trainDB.trenoId);
+        pubblicatoreReazioni.pubblicaPerNodo("TRATTA", trattaId,
+                "IMPERCORRIBILE", "PERCORRIBILE", "TRENO", trainDB.trenoId, catenaId, true, motivo);
+        trainGateway.inviaGuastoTratta(trattaId, motivo, catenaId);
+    }
+
+    /**
+     * L'avaria è stata riparata: l'arco che questo convoglio occupava torna percorribile e lui
+     * lo dichiara. È l'uscita dalla catena, il verso opposto della dichiarazione di sopra.
+     *
+     * @param catenaId Catena che si è chiusa.
+     */
+    public void dichiaraTrattaPercorribile(String catenaId) {
+        String trattaId = trainDB.trattaDichiarataImpercorribile;
+        if (trattaId == null || catenaId == null || !catenaId.equals(trainDB.catenaTrattaDichiarata)) {
+            return;
+        }
+        trainDB.trattaDichiarataImpercorribile = null;
+        trainDB.catenaTrattaDichiarata = null;
+        trainDB.tratteGuaste.remove(trattaId);
+        LOG.infof("✅ [TWIN] Riparato: la tratta %s torna percorribile", trattaId);
+
+        pubblicatoreReazioni.pubblicaPerNodo("TRATTA", trattaId,
+                "PERCORRIBILE", "IMPERCORRIBILE", "TRENO", trainDB.trenoId, catenaId, false,
+                "Avaria riparata: la tratta " + trattaId + " torna percorribile");
+    }
+
+    /**
+     * Sblocca il treno dopo la risoluzione del guasto che lo teneva fermo (stazione chiusa o
+     * tratta occupata) e riprende la fase in cui si trovava prima del blocco.
      */
     public void sbloccaDaGuastoStazione() {
-        if (!"BLOCCATO_GUASTO_STAZIONE".equals(trainDB.faseViaggio)) {
+        if (!bloccato()) {
             return;
         }
         String faseDaRiprendere = fasePrimaDelBlocco != null ? fasePrimaDelBlocco : "IN_STAZIONE";
+        String fasePrecedente = trainDB.faseViaggio;
+        boolean eraLaTratta = trainDB.trattaBloccante != null;
+        String causaTipo = eraLaTratta ? "TRATTA" : "STAZIONE";
+        String causaId = eraLaTratta ? trainDB.trattaBloccante : trainDB.stazioneBloccante;
+        String catenaChiusa = trainDB.catenaBloccante;
         fasePrimaDelBlocco = null;
         trainDB.stazioneBloccante = null;
+        trainDB.trattaBloccante = null;
+        trainDB.catenaBloccante = null;
         trainDB.faseViaggio = faseDaRiprendere;
         if ("IN_VIAGGIO".equals(faseDaRiprendere)) {
             trainDB.stato = "IN_VIAGGIO"; // riprende la marcia dal punto in cui era
         }
-        LOG.infof("✅ [TWIN] Guasto stazione risolto: riprendo la fase %s (ritardo accumulato %d min)",
-                faseDaRiprendere, trainDB.ritardoMinuti);
+        LOG.infof("✅ [TWIN] Guasto risolto (%s %s): riprendo la fase %s (ritardo accumulato %d min)",
+                causaTipo.toLowerCase(), causaId, faseDaRiprendere, trainDB.ritardoMinuti);
+
+        // Uscita dalla catena: va dichiarata come l'ingresso, altrimenti in Centrale il
+        // convoglio resterebbe registrato su una catena ormai chiusa.
+        if (catenaChiusa != null) {
+            trainDB.cateneReagite.remove(catenaChiusa);
+            pubblicatoreReazioni.pubblica(faseDaRiprendere, fasePrecedente,
+                    causaTipo, causaId, catenaChiusa, false,
+                    "Ripristino: riprendo la corsa");
+        }
     }
 
     /**
@@ -584,5 +755,31 @@ public class TrainJourneyEngine {
     private int tempoTrattaMinuti(TrainDB.TappaItinerario da, TrainDB.TappaItinerario a) {
         int minuti = "andata".equals(trainDB.direzione) ? da.tempoVersoProssimaMinuti : a.tempoVersoProssimaMinuti;
         return Math.max(1, minuti); // mai 0 per evitare divisioni per zero
+    }
+
+    /**
+     * Identificativo dell'arco che il convoglio sta percorrendo, o che sta per imboccare se è
+     * fermo in stazione.
+     *
+     * <p>Vale lo stesso ragionamento del tempo di percorrenza: l'arco è uno solo e in andata è
+     * "appeso" alla tappa di partenza, al ritorno lo si percorre al contrario, quindi lo si
+     * trova sulla tappa di arrivo. Usare l'id vero della tratta e non la coppia di stazioni è
+     * quello che permette a un convoglio di un altro itinerario di riconoscere lo stesso pezzo
+     * di rete.</p>
+     *
+     * @return L'id della tratta, oppure null se l'itinerario non lo dice (per esempio perché
+     *         è stato caricato da una Centrale che ancora non lo mandava).
+     */
+    private String trattaCorrenteId() {
+        if (trainDB.itinerario.isEmpty()) {
+            return null;
+        }
+        TrainDB.TappaItinerario da = tappaCorrente();
+        TrainDB.TappaItinerario a = tappaProssima();
+        if (a == null) {
+            return null; // capolinea: nessun arco da percorrere
+        }
+        String id = "andata".equals(trainDB.direzione) ? da.trattaVersoProssimaId : a.trattaVersoProssimaId;
+        return id == null || id.isBlank() ? null : id;
     }
 }

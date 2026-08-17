@@ -19,7 +19,10 @@ import java.time.Instant;
  * dell'operatore), così l'assegnazione resta leggibile anche quando l'allarme non è più
  * fra quelli vivi e l'operatore non è più in anagrafica.</p>
  *
- * <p>Nessuno la scrive ancora: la presa in carico dei guasti è il passo successivo.</p>
+ * <p>La riga si apre con {@code POST /api/allarmi/&#123;id&#125;/assegna} (la presa in carico,
+ * RF01.4.2) e si chiude con {@code POST /api/allarmi/&#123;id&#125;/risolvi}. Chi risolve un
+ * allarme senza averlo prima preso in carico ne lascia comunque una, aperta e chiusa nello
+ * stesso istante: è la presa in carico implicita di chi ha fatto tutto da solo.</p>
  *
  * @see it.uni.reti2.entity.Guasto
  * @see it.uni.reti2.entity.Utente
@@ -81,4 +84,33 @@ public class StoricoAssegnazioneGuasto extends PanacheEntityBase {
     /** Timestamp di inserimento del record nello storico. Inizializzato automaticamente. */
     @Column(name = "ts_storicizzazione", nullable = false)
     public Instant tsStoricizzazione = Instant.now();
+
+    /**
+     * Costruisce la riga di presa in carico: da una parte il guasto con la sua sorgente,
+     * dall'altra l'operatore che se ne sta occupando, tutti e due copiati per esteso perché
+     * qui non ci sono chiavi esterne da seguire.
+     *
+     * <p>La riga nasce aperta ({@code tsRisoluzione} a null) e si chiude quando l'allarme
+     * viene risolto.</p>
+     *
+     * @param guasto       Il guasto preso in carico.
+     * @param nomeSorgente Nome della stazione o del convoglio che lo ha generato.
+     * @param operatore    Chi lo ha preso in carico, come risulta dal token.
+     * @return La riga da persistere (non è ancora stata scritta).
+     */
+    public static StoricoAssegnazioneGuasto fotografiaDi(Guasto guasto, String nomeSorgente,
+                                                         DatiOperatore operatore) {
+        StoricoAssegnazioneGuasto storico = new StoricoAssegnazioneGuasto();
+        storico.guastoId = guasto.id;
+        storico.tipoGuasto = guasto.tipo;
+        storico.sorgenteTipo = guasto.sorgenteTipo;
+        storico.sorgenteId = guasto.sorgenteId;
+        storico.nomeSorgente = nomeSorgente;
+        storico.operatoreId = operatore.id();
+        storico.nomeOperatore = operatore.nome();
+        storico.matricolaOperatore = operatore.matricola();
+        storico.ruoloOperatore = operatore.ruolo();
+        storico.tsAssegnazione = Instant.now();
+        return storico;
+    }
 }
