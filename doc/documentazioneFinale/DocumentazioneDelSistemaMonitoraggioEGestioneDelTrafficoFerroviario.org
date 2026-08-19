@@ -190,8 +190,7 @@ dei tre e' completo.
 
 *** RF01.2 - Visualizzazione dei guasti
 
-*Stato di implementazione*: parziale — l'elenco c'e' per intero, la distinzione fra guasto segnalato
-e guasto dedotto non arriva all'operatore.
+*Stato di implementazione*: completo, entrambe le voci.
 
 **** RF01.2.1 - Elenco degli allarmi aperti
 - enunciato: sono visibili i guasti attivi con la sorgente (quale stazione, quale convoglio, quale
@@ -207,11 +206,9 @@ e guasto dedotto non arriva all'operatore.
   soltanto un problema di collegamento, e chi decide se mandare la squadra deve poterli distinguere
   senza indovinare.
 - dipende da: RF02.6.
-- stato di implementazione: parziale. La centrale la distinzione ce l'ha — il tipo del guasto lo
-  dichiara la sorgente e in mancanza lo decide il tipo di sorgente — ma non la porta fuori: il dato
-  che arriva alla schermata non ha nessun campo sull'origine, e il fail-stop dedotto e il sensore
-  guasto segnalato dalla stazione hanno per giunta lo stesso tipo. Per l'operatore le due strade
-  restano indistinguibili, che e' proprio quello che il requisito voleva evitare.
+- stato di implementazione: completo. L'API e gli eventi in tempo reale portano l'origine
+  dell'allarme, e la schermata la mostra esplicitamente come "segnalato dal campo" oppure
+  "dedotto dalla centrale".
 
 *** RF01.3 - Amministrazione dei dati della rete
 

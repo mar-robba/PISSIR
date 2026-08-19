@@ -109,6 +109,7 @@ export function useRealtimeUpdates() {
         message: data.message || 'Allarme dal campo',
         trainId: data.trainId,
         stationId: data.stationId,
+        origin: data.origine === 'DEDOTTO_CENTRALE' ? 'dedotto_centrale' : 'segnalato_campo',
         timestamp: istanteEvento(data.timestamp),
         acknowledged: risolto,
         resolvedAt: data.timestampRisoluzione ? istanteEvento(data.timestampRisoluzione) : undefined

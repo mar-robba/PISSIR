@@ -94,6 +94,7 @@ interface RailwayState {
   // Azioni di Business Logic
   suppressTrain: (trainId: string) => void;
   dispatchOperators: (stationId: string) => void;
+  completeMaintenance: (stationId: string) => Promise<void>;
   initialize: () => void;
 }
 
@@ -405,6 +406,30 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
         kind: 'errore_comando',
         severity: 'critical',
         message: `Invio degli operatori alla stazione ${station?.name ?? stationId} non riuscito.`,
+      });
+    }
+  },
+
+  /**
+   * Completa la manutenzione di una stazione, riportandola operativa.
+   */
+  completeMaintenance: async (stationId) => {
+    const station = get().stations.find((s) => s.id === stationId);
+    try {
+      await apiClient.updateStation(stationId, { status: 'operativa' });
+      const { updateStation, pushNotification } = get();
+      updateStation(stationId, { status: 'operativa', operatorsDispatched: false });
+      pushNotification({
+        kind: 'operatori_inviati',
+        severity: 'success',
+        message: `Riparazione compiuta per la stazione ${station?.code ?? stationId}. La stazione è ora operativa.`,
+      });
+    } catch (err) {
+      console.error('Failed to complete maintenance', err);
+      get().pushNotification({
+        kind: 'errore_comando',
+        severity: 'critical',
+        message: `Impossibile completare la riparazione per la stazione ${station?.name ?? stationId}.`,
       });
     }
   },

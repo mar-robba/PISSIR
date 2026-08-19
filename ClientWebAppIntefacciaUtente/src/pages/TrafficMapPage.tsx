@@ -1,4 +1,5 @@
 import {
+  CSSProperties,
   MouseEvent as EventoMouse,
   PointerEvent as EventoPuntatore,
   useEffect,
@@ -73,6 +74,11 @@ type Riquadro2D = { w: number; h: number };
 
 const RIQUADRO_PREDEFINITO: Riquadro2D = { w: 960, h: 620 };
 const MAP_PADDING = 80;
+// ATTENZIONE: tutte le misure di disegno qui sotto (simboli, frecce, etichette,
+// distanze fra i simboli) sono in PIXEL DI SCHERMO, non in unità del diagramma.
+// Vanno quindi moltiplicate per `unitaPerPixel` prima di finire nell'SVG, se no
+// lo zoom le ingrandisce insieme alla rete: vedi il commento della costante.
+//
 // Quanto la linea si ferma prima del centro della stazione: la punta della freccia
 // deve restare fuori dal cerchio (r 13, 17 se selezionata), se no ci finisce sotto.
 const STATION_EDGE_GAP = 24;
@@ -497,19 +503,24 @@ function adattaAlDiagramma(positions: Map<string, DiagramPoint>, riquadro: Riqua
 }
 
 /**
- * Il convoglio sta percorrendo una tratta, cioè va disegnato fra due stazioni invece che
- * sopra a una.
+ * Il convoglio è in linea, cioè va disegnato fra due stazioni invece che sopra a una.
  *
- * Non basta lo stato: un treno che dichiara una stazione corrente è FERMO lì, perché quel
- * campo lo svuota la telemetria stessa appena riparte. Lo stato invece, nello snapshot,
- * può arrivare vecchio di qualche secondo — la Centrale registra l'ingresso in stazione
- * appena le arriva il passaggio, ma "attivo" e la percentuale restano quelli dell'ultimo
- * frame di telemetria — e in quella finestra il treno appena arrivato veniva scagliato
- * quasi sopra la stazione successiva.
+ * A dirlo è la stazione corrente e non lo stato: un treno che ne dichiara una è FERMO lì,
+ * perché quel campo lo svuota la telemetria stessa appena riparte. Lo stato invece, nello
+ * snapshot, può arrivare vecchio di qualche secondo — la Centrale registra l'ingresso in
+ * stazione appena le arriva il passaggio, ma "attivo" e la percentuale restano quelli
+ * dell'ultimo frame di telemetria — e in quella finestra il treno appena arrivato veniva
+ * scagliato quasi sopra la stazione successiva.
+ *
+ * Per lo stesso motivo qui NON si chiede più che lo stato sia "in viaggio": fermo non vuol
+ * dire senza posizione. Un convoglio guasto in linea (EMERGENZA) o trattenuto dal guasto di
+ * qualcun altro (BLOCCATO_GUASTO_*, gli eventi domino) manda telemetria come prima, con gli
+ * stessi due estremi e la percentuale congelata dove si è fermato: chiedendo lo stato
+ * spariva dalla mappa — finendo nel conteggio dei "treni senza posizione nota" — proprio
+ * nel momento in cui all'operatore serve vedere dove si è piantato.
  */
-function inMarcia(train: TrainType): boolean {
-  return (train.status === 'in_viaggio' || train.status === 'in_ritardo')
-    && !train.currentStationId;
+function inLinea(train: TrainType): boolean {
+  return !train.currentStationId;
 }
 
 /** Colore del simbolo del treno in base allo stato del convoglio. */
@@ -572,13 +583,20 @@ function descriviCoordinate(station: Station): string {
  * deterministico (prima le stazioni, poi i treni per nome), quindi i gruppi non
  * cambiano da un aggiornamento WebSocket all'altro se le posizioni non cambiano.
  */
-function raggruppaSovrapposti(elementi: ElementoMappa[]): GruppoSovrapposti[] {
+function raggruppaSovrapposti(
+  elementi: ElementoMappa[],
+  unitaPerPixel: number,
+): GruppoSovrapposti[] {
   const gruppi: GruppoSovrapposti[] = [];
+  // La soglia è in pixel di schermo: ingrandendo, due stazioni vicine si
+  // allontanano davvero e smettono di essere "sovrapposte", quindi il ventaglio
+  // sparisce da solo invece di restare aperto su simboli ormai distanti.
+  const soglia = RAGGIO_SOVRAPPOSIZIONE * unitaPerPixel;
 
   elementi.forEach(elemento => {
     const gruppo = gruppi.find(
       ({ ancora }) => Math.hypot(ancora.x - elemento.ancora.x, ancora.y - elemento.ancora.y)
-        <= RAGGIO_SOVRAPPOSIZIONE,
+        <= soglia,
     );
     if (gruppo) {
       gruppo.elementi.push(elemento);
@@ -598,7 +616,7 @@ function raggruppaSovrapposti(elementi: ElementoMappa[]): GruppoSovrapposti[] {
  * <p>Se nel gruppo c'è una stazione, questa resta ferma sul suo nodo (è lì che
  * convergono le tratte) e a spostarsi sono soltanto i treni che ci stanno sopra.
  */
-function sventaglia(gruppo: GruppoSovrapposti): void {
+function sventaglia(gruppo: GruppoSovrapposti, unitaPerPixel: number): void {
   gruppo.elementi.forEach(elemento => { elemento.posizione = gruppo.ancora; });
   if (gruppo.elementi.length === 1) return;
 
@@ -609,10 +627,16 @@ function sventaglia(gruppo: GruppoSovrapposti): void {
   const quanti = daDisporre.length;
   if (quanti === 0) return;
 
-  const raggioMinimo = stazione ? 36 : 30;
+  // Il ventaglio si misura sui simboli, che restano grandi uguali a schermo:
+  // quindi anche il suo raggio va tenuto in pixel e riportato in unità.
+  const raggioMinimo = (stazione ? 36 : 30) * unitaPerPixel;
+  const distanzaMinima = DISTANZA_MINIMA * unitaPerPixel;
   const raggio = quanti === 1
     ? raggioMinimo
-    : Math.min(90, Math.max(raggioMinimo, DISTANZA_MINIMA / (2 * Math.sin(Math.PI / quanti))));
+    : Math.min(
+      90 * unitaPerPixel,
+      Math.max(raggioMinimo, distanzaMinima / (2 * Math.sin(Math.PI / quanti))),
+    );
 
   daDisporre.forEach((elemento, indice) => {
     const angolo = (2 * Math.PI * indice) / quanti - Math.PI / 2;
@@ -627,10 +651,10 @@ function sventaglia(gruppo: GruppoSovrapposti): void {
  * Dove mettere il disco col numero di elementi sovrapposti: sul punto stesso se
  * lì non c'è nessun simbolo, altrimenti come pastiglia appoggiata alla stazione.
  */
-function posizioneDisco(gruppo: GruppoSovrapposti): DiagramPoint {
+function posizioneDisco(gruppo: GruppoSovrapposti, unitaPerPixel: number): DiagramPoint {
   const conStazione = gruppo.elementi.some(({ tipo }) => tipo === 'stazione');
   return conStazione
-    ? { x: gruppo.ancora.x + 14, y: gruppo.ancora.y - 14 }
+    ? { x: gruppo.ancora.x + 14 * unitaPerPixel, y: gruppo.ancora.y - 14 * unitaPerPixel }
     : gruppo.ancora;
 }
 
@@ -659,19 +683,28 @@ function piazzaEtichette(
   elementi: ElementoMappa[],
   gruppi: GruppoSovrapposti[],
   selezione: Selezione,
+  unitaPerPixel: number,
 ): Map<string, Etichetta> {
   const piazzate = new Map<string, Etichetta>();
+  // Testi e simboli restano della stessa misura a schermo, quindi anche gli
+  // ingombri con cui si cerca il posto libero vanno convertiti in unità: se no,
+  // ingrandendo, le etichette resterebbero staccate dal proprio simbolo.
   const occupati: Riquadro[] = elementi.map(({ posizione }) => ({
-    x1: posizione.x - 14,
-    y1: posizione.y - 14,
-    x2: posizione.x + 14,
-    y2: posizione.y + 14,
+    x1: posizione.x - 14 * unitaPerPixel,
+    y1: posizione.y - 14 * unitaPerPixel,
+    x2: posizione.x + 14 * unitaPerPixel,
+    y2: posizione.y + 14 * unitaPerPixel,
   }));
 
   // Anche i dischi dei gruppi sovrapposti sono ingombri da evitare.
   gruppi.filter(({ elementi: dentro }) => dentro.length > 1).forEach(gruppo => {
-    const disco = posizioneDisco(gruppo);
-    occupati.push({ x1: disco.x - 10, y1: disco.y - 10, x2: disco.x + 10, y2: disco.y + 10 });
+    const disco = posizioneDisco(gruppo, unitaPerPixel);
+    occupati.push({
+      x1: disco.x - 10 * unitaPerPixel,
+      y1: disco.y - 10 * unitaPerPixel,
+      x2: disco.x + 10 * unitaPerPixel,
+      y2: disco.y + 10 * unitaPerPixel,
+    });
   });
 
   // Chi è selezionato ha la precedenza sul posto migliore, poi le stazioni.
@@ -685,18 +718,19 @@ function piazzaEtichette(
   );
 
   ordinati.forEach(elemento => {
-    const larghezza = elemento.etichetta.length * (elemento.tipo === 'treno' ? 5.6 : 6) + 6;
+    const larghezza = (elemento.etichetta.length * (elemento.tipo === 'treno' ? 5.6 : 6) + 6)
+      * unitaPerPixel;
     const posizioneLibera = POSIZIONI_ETICHETTA.find(({ dx, dy, ancora }) => {
-      const centroX = elemento.posizione.x + dx;
-      const centroY = elemento.posizione.y + dy;
+      const centroX = elemento.posizione.x + dx * unitaPerPixel;
+      const centroY = elemento.posizione.y + dy * unitaPerPixel;
       const sinistra = ancora === 'middle'
         ? centroX - larghezza / 2
         : ancora === 'start' ? centroX : centroX - larghezza;
       const riquadro: Riquadro = {
         x1: sinistra,
-        y1: centroY - 10,
+        y1: centroY - 10 * unitaPerPixel,
         x2: sinistra + larghezza,
-        y2: centroY + 3,
+        y2: centroY + 3 * unitaPerPixel,
       };
       if (occupati.some(altro => siSovrappongono(altro, riquadro))) return false;
       occupati.push(riquadro);
@@ -705,8 +739,8 @@ function piazzaEtichette(
 
     if (posizioneLibera) {
       piazzate.set(elemento.chiave, {
-        x: elemento.posizione.x + posizioneLibera.dx,
-        y: elemento.posizione.y + posizioneLibera.dy,
+        x: elemento.posizione.x + posizioneLibera.dx * unitaPerPixel,
+        y: elemento.posizione.y + posizioneLibera.dy * unitaPerPixel,
         ancora: posizioneLibera.ancora,
       });
     }
@@ -787,6 +821,21 @@ export default function TrafficMapPage() {
   const vistaCorrente = vista ?? vistaPiena;
 
   /**
+   * Quante unità del diagramma vale un pixel dello schermo. Vale 1 quando si
+   * vede tutta la rete e cala man mano che si ingrandisce (a 4x vale 0.25),
+   * perché la viewBox si stringe mentre il pannello resta grande uguale.
+   *
+   * <p>Serve perché l'SVG scala TUTTO insieme alla viewBox: senza correzione,
+   * ingrandendo, i pallini delle stazioni e le punte delle frecce diventavano
+   * macchie enormi invece di limitarsi ad allontanarsi fra loro. Moltiplicando
+   * per questo numero ogni misura di disegno (raggi, spessori, punte, testi) i
+   * simboli restano della stessa misura a schermo a ogni livello di zoom: è il
+   * comportamento delle mappe vere, dove zoomando si guadagna spazio e non
+   * semplicemente un ingrandimento fotografico.
+   */
+  const unitaPerPixel = vistaCorrente.w / riquadro.w;
+
+  /**
    * Barra di scala: quanti chilometri veri sono i pixel disegnati a schermo.
    * Il rapporto cambia con lo zoom (la viewBox si stringe mentre il pannello
    * resta grande uguale), quindi ogni volta si sceglie il numero tondo di km che
@@ -811,7 +860,7 @@ export default function TrafficMapPage() {
     : null;
   // Stesse due condizioni usate per posizionare il simbolo sul diagramma, così il pannello
   // non racconta un avanzamento che la mappa non è in grado di disegnare.
-  const inMarciaSelezionato = !!trenoSelezionato && inMarcia(trenoSelezionato);
+  const inLineaSelezionato = !!trenoSelezionato && inLinea(trenoSelezionato);
   const trattaSelezionataNota = !!trenoSelezionato?.previousStationId
     && !!trenoSelezionato?.nextStationId
     && trenoSelezionato.previousStationId !== trenoSelezionato.nextStationId;
@@ -830,11 +879,11 @@ export default function TrafficMapPage() {
           tipo: 'stazione' as const,
           chiave: `stazione:${station.id}`,
           id: station.id,
-          nome: station.name,
-          etichetta: station.code,
+          nome: station.status === 'manutenzione' ? `${station.name} (MANUTENZIONE)` : station.name,
+          etichetta: station.status === 'manutenzione' ? `${station.code} (MANUTENZIONE)` : station.code,
           nota: `Stazione · ${descriviStato(station.status)}`,
-          colore: inAvaria ? '#ef4444' : '#10b981',
-          classeEtichetta: '',
+          colore: station.status === 'manutenzione' ? '#f59e0b' : (inAvaria ? '#ef4444' : '#10b981'),
+          classeEtichetta: station.status === 'manutenzione' ? 'text-warning font-bold' : '',
           ancora,
           posizione: ancora,
           inAvaria,
@@ -850,7 +899,7 @@ export default function TrafficMapPage() {
         const prevStation = stations.find(({ id }) => id === train.previousStationId);
         const nextStation = stations.find(({ id }) => id === train.nextStationId);
         const currentStation = stations.find(({ id }) => id === train.currentStationId);
-        const isMoving = inMarcia(train);
+        const inTratta = inLinea(train);
         // Gli estremi devono essere due stazioni DIVERSE: se coincidono l'interpolazione
         // restituisce sempre lo stesso punto e il convoglio verrebbe disegnato immobile su
         // un nodo mentre in realtà sta percorrendo una tratta. Meglio ripiegare su quello
@@ -858,7 +907,7 @@ export default function TrafficMapPage() {
         const trattaNota = !!prevStation && !!nextStation && prevStation.id !== nextStation.id;
 
         let ancora: DiagramPoint | null = null;
-        if (isMoving && trattaNota && prevStation && nextStation) {
+        if (inTratta && trattaNota && prevStation && nextStation) {
           // Interpolazione lineare: 0% coincide con la stazione precedente,
           // 100% con la successiva. Il clamp protegge la vista da frame incompleti.
           // Il digital twin calcola la propria posizione GPS nello stesso modo
@@ -903,17 +952,17 @@ export default function TrafficMapPage() {
       .filter((elemento): elemento is ElementoMappa => elemento !== null);
 
     const tutti = [...elencoStazioni, ...elencoTreni];
-    const raggruppati = raggruppaSovrapposti(tutti);
-    raggruppati.forEach(sventaglia);
+    const raggruppati = raggruppaSovrapposti(tutti, unitaPerPixel);
+    raggruppati.forEach(gruppo => sventaglia(gruppo, unitaPerPixel));
 
     return { elementi: tutti, gruppi: raggruppati, trainiNonLocalizzabili: scartati };
-  }, [stations, trains, graphLayout, senzaGps]);
+  }, [stations, trains, graphLayout, senzaGps, unitaPerPixel]);
 
   const etichette = useMemo(
     () => (mostraEtichette
-      ? piazzaEtichette(elementi, gruppi, selezione)
+      ? piazzaEtichette(elementi, gruppi, selezione, unitaPerPixel)
       : new Map<string, Etichetta>()),
-    [elementi, gruppi, selezione, mostraEtichette],
+    [elementi, gruppi, selezione, mostraEtichette, unitaPerPixel],
   );
 
   /**
@@ -1082,7 +1131,8 @@ export default function TrafficMapPage() {
     const dy = to.y - from.y;
     const distanza = Math.max(1, Math.hypot(dx, dy));
     // Su stazioni molto vicine si accorcia meno, se no la linea si annullerebbe.
-    const scarto = Math.min(STATION_EDGE_GAP, distanza / 2 - 1);
+    // Lo stacco segue il cerchio della stazione, che non cresce più con lo zoom.
+    const scarto = Math.min(STATION_EDGE_GAP * unitaPerPixel, distanza / 2 - 1);
     const offsetX = (dx / distanza) * scarto;
     const offsetY = (dy / distanza) * scarto;
     const attiva = archiEvidenziati.has(key);
@@ -1111,7 +1161,7 @@ export default function TrafficMapPage() {
    */
   const renderGruppi = () => gruppi.filter(({ elementi: dentro }) => dentro.length > 1)
     .map(gruppo => {
-      const disco = posizioneDisco(gruppo);
+      const disco = posizioneDisco(gruppo, unitaPerPixel);
       return (
       <g key={`gruppo-${gruppo.chiave}`}>
         {gruppo.elementi.filter(({ posizione }) => posizione !== gruppo.ancora).map(elemento => (
@@ -1133,8 +1183,10 @@ export default function TrafficMapPage() {
           }}
         >
           <title>{`${gruppo.elementi.length} elementi in questo punto`}</title>
-          <circle className="map-cluster-hub__disco" r={9} />
-          <text className="map-cluster-hub__conteggio" y={3}>{gruppo.elementi.length}</text>
+          <circle className="map-cluster-hub__disco" r={9 * unitaPerPixel} />
+          <text className="map-cluster-hub__conteggio" y={3 * unitaPerPixel}>
+            {gruppo.elementi.length}
+          </text>
         </g>
       </g>
       );
@@ -1164,33 +1216,46 @@ export default function TrafficMapPage() {
       >
         <title>{`${elemento.nome} — ${elemento.nota}`}</title>
         {/* Alone di selezione: sostituisce il bordo scuro, che si confondeva con le tratte. */}
-        {selezionato && <circle className="map-alone" r={elemento.tipo === 'stazione' ? 21 : 19} />}
+        {selezionato && (
+          <circle
+            className="map-alone"
+            r={(elemento.tipo === 'stazione' ? 21 : 19) * unitaPerPixel}
+          />
+        )}
         {/* Il cerchio pulsante rende immediatamente visibile un guasto. */}
         {elemento.inAvaria && (
-          <circle className="map-pulse" r={17} fill="none" stroke="#ef4444" strokeWidth="2" />
+          <circle
+            className="map-pulse"
+            r={17 * unitaPerPixel}
+            fill="none"
+            stroke="#ef4444"
+            strokeWidth={2 * unitaPerPixel}
+          />
         )}
         {/* Bordo tratteggiato = stazione senza coordinate GPS: sta lì per i suoi
             collegamenti, non perché sia davvero in quel punto d'Italia. */}
         {elemento.tipo === 'stazione' ? (
           <circle
             className="map-marker__simbolo"
-            r={inRisalto ? 15 : 13}
+            r={(inRisalto ? 15 : 13) * unitaPerPixel}
             fill={elemento.colore}
             stroke="#ffffff"
-            strokeWidth="3"
-            strokeDasharray={elemento.senzaGps ? '4 3' : undefined}
+            strokeWidth={3 * unitaPerPixel}
+            strokeDasharray={elemento.senzaGps
+              ? `${4 * unitaPerPixel} ${3 * unitaPerPixel}`
+              : undefined}
           />
         ) : (
           <rect
             className="map-marker__simbolo"
-            x={inRisalto ? -12 : -10}
-            y={inRisalto ? -12 : -10}
-            width={inRisalto ? 24 : 20}
-            height={inRisalto ? 24 : 20}
-            rx={5}
+            x={(inRisalto ? -12 : -10) * unitaPerPixel}
+            y={(inRisalto ? -12 : -10) * unitaPerPixel}
+            width={(inRisalto ? 24 : 20) * unitaPerPixel}
+            height={(inRisalto ? 24 : 20) * unitaPerPixel}
+            rx={5 * unitaPerPixel}
             fill={elemento.colore}
             stroke="#ffffff"
-            strokeWidth="2.5"
+            strokeWidth={2.5 * unitaPerPixel}
           />
         )}
       </g>
@@ -1208,7 +1273,7 @@ export default function TrafficMapPage() {
     if (!piazzata && !inRisalto) return null;
     const posizione = piazzata ?? {
       x: elemento.posizione.x,
-      y: elemento.posizione.y + 26,
+      y: elemento.posizione.y + 26 * unitaPerPixel,
       ancora: 'middle' as const,
     };
 
@@ -1244,6 +1309,9 @@ export default function TrafficMapPage() {
             ref={svgRef}
             className={`map-svg${inTrascinamento ? ' map-svg--trascinamento' : ''}`}
             viewBox={`${vistaCorrente.x} ${vistaCorrente.y} ${vistaCorrente.w} ${vistaCorrente.h}`}
+            /* Le misure che stanno nel CSS (spessori delle tratte, corpo dei testi)
+               si correggono con questa variabile: `calc(3.5px * var(--map-k))`. */
+            style={{ '--map-k': unitaPerPixel } as CSSProperties}
             preserveAspectRatio="xMidYMid meet"
             onPointerDown={avviaTrascinamento}
             onPointerMove={durante}
@@ -1251,21 +1319,31 @@ export default function TrafficMapPage() {
             onPointerCancel={concludiTrascinamento}
           >
             <defs>
+              {/* I quadretti sono un riferimento del terreno, quindi si allargano
+                  con lo zoom come le distanze; il tratto invece resta sottile. */}
               <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(15,23,42,0.05)" strokeWidth="1" />
+                <path
+                  d="M 40 0 L 0 0 0 40"
+                  fill="none"
+                  stroke="rgba(15,23,42,0.05)"
+                  strokeWidth={unitaPerPixel}
+                />
               </pattern>
               {/* Punta di freccia delle tratte. orient="auto-start-reverse" fa sì che
                   lo stesso marker si giri da solo quando è usato come markerStart,
                   così il doppio senso è una linea con due punte e non due linee.
                   markerUnits="userSpaceOnUse" la tiene della stessa misura a
-                  prescindere dallo spessore della linea. */}
+                  prescindere dallo spessore della linea, ma la lascia comunque in
+                  unità del diagramma: per non farla gonfiare con lo zoom la misura
+                  (12 px) va riportata in unità come tutto il resto. refX/refY invece
+                  stanno nella viewBox della punta, quindi non si toccano. */}
               <marker
                 id="punta-tratta"
                 viewBox="0 0 10 10"
                 refX="9"
                 refY="5"
-                markerWidth="12"
-                markerHeight="12"
+                markerWidth={12 * unitaPerPixel}
+                markerHeight={12 * unitaPerPixel}
                 markerUnits="userSpaceOnUse"
                 orient="auto-start-reverse"
               >
@@ -1276,8 +1354,8 @@ export default function TrafficMapPage() {
                 viewBox="0 0 10 10"
                 refX="9"
                 refY="5"
-                markerWidth="12"
-                markerHeight="12"
+                markerWidth={12 * unitaPerPixel}
+                markerHeight={12 * unitaPerPixel}
                 markerUnits="userSpaceOnUse"
                 orient="auto-start-reverse"
               >
@@ -1348,6 +1426,10 @@ export default function TrafficMapPage() {
             <span className="map-legend-item">
               <span className="map-legend-dot" style={{ background: '#10b981' }} />
               Stazione operativa
+            </span>
+            <span className="map-legend-item">
+              <span className="map-legend-dot" style={{ background: '#f59e0b' }} />
+              Stazione in manutenzione
             </span>
             <span className="map-legend-item">
               <span className="map-legend-dot" style={{ background: '#ef4444' }} />
@@ -1563,12 +1645,14 @@ export default function TrafficMapPage() {
                 )}
               </div>
 
-              {/* La barra misura l'avanzamento SULLA TRATTA, quindi ha senso solo mentre
-                  il convoglio la sta percorrendo e solo se i due estremi sono stazioni
-                  diverse. A treno fermo restava a schermo un 100% che non voleva dire
-                  niente (la sosta non è un avanzamento) e, quando gli estremi
-                  coincidevano, la barra saliva fra una stazione e sé stessa. */}
-              {inMarciaSelezionato && trattaSelezionataNota ? (
+              {/* La barra misura l'avanzamento SULLA TRATTA, quindi ha senso solo quando il
+                  convoglio è in linea e i due estremi sono stazioni diverse. In sosta
+                  restava a schermo un 100% che non voleva dire niente (la sosta non è un
+                  avanzamento) e, quando gli estremi coincidevano, la barra saliva fra una
+                  stazione e sé stessa. Per un treno fermo in mezzo alla tratta — guasto o
+                  trattenuto da un guasto altrui — la percentuale invece resta quella buona:
+                  dice a che punto si è fermato. */}
+              {inLineaSelezionato && trattaSelezionataNota ? (
                 <div className="map-detail__progresso">
                   <div className="map-detail__progresso-barra">
                     <div

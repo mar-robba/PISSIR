@@ -730,6 +730,7 @@ public class RestApiGateway {
             dto.put("messaggio", g.messaggio != null ? g.messaggio : "Allarme di sistema per " + g.id);
             dto.put("sorgenteId", g.sorgenteId != null ? g.sorgenteId : "");
             dto.put("sorgenteTipo", g.sorgenteTipo != null ? g.sorgenteTipo : "");
+            dto.put("origine", IngestionService.originePerOperatore(g));
             dto.put("timestamp", g.timestamp != null ? g.timestamp.toString() : null);
             dto.put("risolto", g.risolto);
             dto.put("timestampRisoluzione", g.timestampRisoluzione != null ? g.timestampRisoluzione.toString() : null);
@@ -792,6 +793,10 @@ public class RestApiGateway {
                 StoricoStatoTreno storico = StoricoStatoTreno.fotografiaDi(dbTreno, statoPrecedente);
                 storico.persist();
             }
+
+            // RF02.1.2.2.1: se il convoglio guasto aveva reso inagibile una stazione,
+            // alla risoluzione del treno si chiude anche il guasto derivato.
+            risolviGuastoStazioneDerivatoDaConvoglio(guasto.sorgenteId);
         }
         pubblicaResolved(guasto);
         return Response.ok(guasto).build();
@@ -811,6 +816,12 @@ public class RestApiGateway {
         // Aggiorna lo stato in memoria per riflesso immediato sulle dashboard
         Treno treno = statoRete.getTreno(id);
         if (treno != null) {
+            if (!"fermo".equalsIgnoreCase(treno.stato) || treno.stazioneCorrente == null) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity(java.util.Map.of("errore", "Il treno può essere soppresso solo se fermo in una stazione"))
+                        .build();
+            }
+
             treno.stato = "SOPPRESSO";
             treno.velocita = 0;
             statoRete.aggiornaTreno(treno);
@@ -1244,6 +1255,48 @@ public class RestApiGateway {
                 "{\"tipoEvento\":\"RESOLVED\",\"sorgenteTipo\":\"%s\",\"sorgenteId\":\"%s\",\"guastoId\":\"%s\",\"timestamp\":\"%s\"}",
                 sorgenteTipo, sorgenteId, guasto.id, Instant.now().toString());
         alertsEmitter.send(alertJson);
+    }
+
+    /**
+     * RF02.1.2.2.1 — Alla risoluzione di un guasto TRENO, chiude automaticamente
+     * l'eventuale guasto di tipo {@code convoglio_guasto_in_stazione} generato per
+     * la stazione in cui il convoglio si era guastato. Se non rimangono altri guasti
+     * aperti per la stazione, questa torna ONLINE.
+     *
+     * @param trenoId Identificativo del convoglio il cui guasto è stato risolto.
+     */
+    private void risolviGuastoStazioneDerivatoDaConvoglio(String trenoId) {
+        List<Guasto> guastiDerivativi = Guasto.list(
+                "tipo = 'convoglio_guasto_in_stazione' and risolto = false");
+        for (Guasto gs : guastiDerivativi) {
+            if (gs.messaggio == null || !gs.messaggio.contains(trenoId)) {
+                continue;
+            }
+            chiudiGuasto(gs);
+            pubblicaResolved(gs);
+
+            // Se la stazione non ha più guasti aperti, torna operativa
+            long altriGuasti = Guasto.count(
+                    "sorgenteId = ?1 and sorgenteTipo = 'STAZIONE' and risolto = false",
+                    gs.sorgenteId);
+            if (altriGuasti == 0) {
+                Stazione stazione = statoRete.getStazione(gs.sorgenteId);
+                if (stazione != null && "GUASTA".equalsIgnoreCase(stazione.stato)) {
+                    String statoPrima = stazione.stato;
+                    stazione.stato = "ONLINE";
+                    stazione.ultimoHeartbeat = Instant.now();
+                    statoRete.aggiornaStazione(stazione);
+                    ingestion.broadcastStatoStazione(stazione);
+
+                    Stazione dbStazione = Stazione.findById(gs.sorgenteId);
+                    if (dbStazione != null) {
+                        StoricoStatoStazione storicoStato = StoricoStatoStazione.fotografiaDi(
+                                dbStazione, "ONLINE", statoPrima);
+                        storicoStato.persist();
+                    }
+                }
+            }
+        }
     }
 
     /** Pubblica su MQTT l'evento ITINERARIO_AGGIORNATO destinato a un treno. */

@@ -65,6 +65,10 @@ public class Guasto extends PanacheEntityBase {
     @Column(name = "sorgenteId", length = 50)
     public String sorgenteId;
 
+    /** Origine dell'allarme: segnalato dal campo oppure dedotto dalla Centrale. */
+    @Column(name = "origine", length = 30)
+    public String origine;
+
     /** Messaggio di dettaglio leggibile dall'operatore. */
     @Column(name = "messaggio", length = 500)
     public String messaggio;

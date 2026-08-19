@@ -47,6 +47,11 @@
   /* Serve per far arrivare a React il trascinamento anche da touchpad/touch. */
   touch-action: none;
   cursor: grab;
+  /* Quante unità del diagramma vale un pixel a schermo: la scrive la pagina a
+     ogni zoom (vale 1 sulla vista intera, 0.25 a 4x). Tutte le misure di
+     disegno qui sotto la usano, se no zoomando si gonfierebbero insieme alla
+     rete invece di restare della stessa misura a schermo. */
+  --map-k: 1;
 }
 
 .map-svg--trascinamento {
@@ -57,14 +62,16 @@
 
 .map-edge {
   stroke: #cbd5e1;
-  stroke-width: 3.5;
+  stroke-width: calc(3.5px * var(--map-k));
   stroke-linecap: round;
-  transition: stroke 0.25s ease, opacity 0.25s ease, stroke-width 0.25s ease;
+  /* La transizione non comprende stroke-width: durante lo zoom lo spessore
+     cambia a ogni scatto della rotella e la linea resterebbe sempre indietro. */
+  transition: stroke 0.25s ease, opacity 0.25s ease;
 }
 
 .map-edge--attiva {
   stroke: #60a5fa;
-  stroke-width: 5;
+  stroke-width: calc(5px * var(--map-k));
 }
 
 .map-edge--spenta {
@@ -73,8 +80,8 @@
 
 .map-fan-leader {
   stroke: #cbd5e1;
-  stroke-width: 1.4;
-  stroke-dasharray: 3 3;
+  stroke-width: calc(1.4px * var(--map-k));
+  stroke-dasharray: calc(3px * var(--map-k)) calc(3px * var(--map-k));
 }
 
 /* --- Marker --- */
@@ -103,7 +110,7 @@
 .map-alone {
   fill: none;
   stroke: #2563eb;
-  stroke-width: 2;
+  stroke-width: calc(2px * var(--map-k));
 }
 
 .map-pulse {
@@ -120,12 +127,12 @@
 /* --- Etichette --- */
 
 .map-label {
-  font-size: 10px;
+  font-size: calc(10px * var(--map-k));
   font-weight: 600;
   fill: #1e293b;
   /* Contorno bianco: il testo resta leggibile anche sopra le tratte. */
   stroke: #ffffff;
-  stroke-width: 3px;
+  stroke-width: calc(3px * var(--map-k));
   stroke-linejoin: round;
   paint-order: stroke;
   pointer-events: none;
@@ -134,7 +141,7 @@
 
 .map-label--treno {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: calc(9.5px * var(--map-k));
   fill: #1d4ed8;
 }
 
@@ -159,7 +166,7 @@
 .map-cluster-hub__disco {
   fill: #ffffff;
   stroke: #94a3b8;
-  stroke-width: 1.5;
+  stroke-width: calc(1.5px * var(--map-k));
 }
 
 .map-cluster-hub:hover .map-cluster-hub__disco {
@@ -167,7 +174,7 @@
 }
 
 .map-cluster-hub__conteggio {
-  font-size: 9px;
+  font-size: calc(9px * var(--map-k));
   font-weight: 700;
   fill: #475569;
   text-anchor: middle;

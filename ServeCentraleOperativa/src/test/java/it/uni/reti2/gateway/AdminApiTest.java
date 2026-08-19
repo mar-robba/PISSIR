@@ -30,6 +30,9 @@ public class AdminApiTest {
     private static final String STAZIONE_ID = "STAZ_TEST_" + UUID.randomUUID().toString().substring(0, 4);
     private static final String TRENO_ID = "TRENO_TEST_" + UUID.randomUUID().toString().substring(0, 4);
 
+    @jakarta.inject.Inject
+    it.uni.reti2.elaboration.TrafficLogicEngine statoRete;
+
     @Test
     @Order(0)
     public void testSenzaTokenVieneRifiutato() {
@@ -193,6 +196,13 @@ public class AdminApiTest {
     @Order(10)
     @TestSecurity(user = "mat003", roles = {"tecnico"})
     public void testSopprimiTreno() {
+        // Mock the state to simulate the train stopped in a station
+        it.uni.reti2.entity.Treno treno = statoRete.getTreno(TRENO_ID);
+        if (treno != null) {
+            treno.stato = "fermo";
+            treno.stazioneCorrente = STAZIONE_ID;
+        }
+
         // La soppressione e' uno dei tre comandi operativi concessi anche al tecnico.
         given()
             .contentType(ContentType.JSON)

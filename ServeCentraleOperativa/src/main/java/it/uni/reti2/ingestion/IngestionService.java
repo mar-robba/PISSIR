@@ -64,6 +64,10 @@ public class IngestionService {
      */
     public static final String ORIGINE_CENTRALE = "CENTRALE";
 
+    /** Valori esposti all'operatore per distinguere un guasto dichiarato da uno dedotto. */
+    public static final String ORIGINE_SEGNALATO_CAMPO = "SEGNALATO_CAMPO";
+    public static final String ORIGINE_DEDOTTO_CENTRALE = "DEDOTTO_CENTRALE";
+
     /**
      * Prefisso dei messaggi dei guasti aperti automaticamente dal watchdog quando una
      * stazione smette di battere: permette alla Centrale di riconoscerli e chiuderli da
@@ -590,6 +594,7 @@ public class IngestionService {
             guasto.severita = severita;
             guasto.sorgenteTipo = sorgenteTipo;
             guasto.sorgenteId = sorgenteId;
+            guasto.origine = ORIGINE_SEGNALATO_CAMPO;
             guasto.messaggio = messaggio;
             guasto.timestamp = quando;
             guasto.risolto = false;
@@ -601,7 +606,6 @@ public class IngestionService {
                 storico.persist();
             });
             statoRete.aggiungiGuasto(guasto);
-            // todo : da aggingere la marcatura dell astazione come GUASTA se il guasto proviene da un treno che è presente in una staizone RF1.2.2.1 se non sbaglio l'RF
             marcaSorgenteGuasta(sorgenteTipo, sorgenteId, severita);
 
             //
@@ -657,7 +661,106 @@ public class IngestionService {
             QuarkusTransaction.requiringNew().run(() -> salvaStatoTreno(sorgenteId, "rotto"));
 
             broadcastStatoTreno(treno);
+
+            // RF02.1.2.2.1: se il convoglio è fermo in una stazione, la stazione
+            // diventa non percorribile (treno deragliato o avaria grave).
+            marcaStazionePerConvoglioGuasto(treno);
         }
+    }
+
+    /**
+     * RF02.1.2.2.1 — Se il convoglio guasto si trova fisicamente in una stazione,
+     * la stazione diventa non percorribile. Un treno deragliato o gravemente avariato
+     * blocca i binari e impedisce il transito: la Centrale crea un guasto dedicato
+     * per la stazione e notifica campo e dashboard.
+     *
+     * @param treno Il treno appena marcato come «rotto» in cache.
+     */
+    private void marcaStazionePerConvoglioGuasto(Treno treno) {
+        String stazioneId = treno.stazioneCorrente;
+        if (stazioneId == null || stazioneId.isEmpty()) {
+            return; // il convoglio è in tratta, non in stazione
+        }
+
+        Stazione stazione = statoRete.getStazione(stazioneId);
+        if (stazione == null) {
+            LOG.warnf("🚫 Stazione '%s' non trovata in cache: impossibile marcarla GUASTA per convoglio %s",
+                    stazioneId, treno.id);
+            return;
+        }
+
+        // Se la stazione è già guasta non serve un secondo guasto: basta il log.
+        if ("GUASTA".equalsIgnoreCase(stazione.stato)) {
+            LOG.infof("♻️ Stazione %s già GUASTA: convoglio %s non genera un guasto duplicato",
+                    stazioneId, treno.id);
+            return;
+        }
+
+        String statoPrecedente = stazione.stato;
+
+        // 1. Cache: la stazione diventa non percorribile
+        stazione.stato = "GUASTA";
+        statoRete.aggiornaStazione(stazione);
+        broadcastStatoStazione(stazione);
+
+        // 2. Deduplica: un solo guasto aperto per episodio
+        String tipo = "convoglio_guasto_in_stazione";
+        if (statoRete.getGuastoApertoPerSorgente(stazioneId, tipo) != null) {
+            return;
+        }
+
+        // 3. Nuovo guasto per la stazione
+        Guasto guastoStazione = new Guasto();
+        guastoStazione.id = "alert-" + Instant.now().toEpochMilli() + "-"
+                + java.util.UUID.randomUUID().toString().substring(0, 8);
+        guastoStazione.tipo = tipo;
+        guastoStazione.severita = "CRITICAL";
+        guastoStazione.sorgenteTipo = "STAZIONE";
+        guastoStazione.sorgenteId = stazioneId;
+        guastoStazione.origine = ORIGINE_DEDOTTO_CENTRALE;
+        guastoStazione.messaggio = "Convoglio " + treno.id + " guasto in stazione "
+                + stazioneId + ": stazione non percorribile";
+        guastoStazione.timestamp = Instant.now();
+        guastoStazione.risolto = false;
+
+        try {
+            QuarkusTransaction.requiringNew().run(() -> {
+                guastoStazione.persist();
+
+                StoricoGuasto storicoGuasto = StoricoGuasto.fotografiaDi(guastoStazione);
+                storicoGuasto.persist();
+
+                // Audit log sull'evento stazione
+                EventoStazione evento = new EventoStazione();
+                evento.stazioneId = stazioneId;
+                evento.nomeStazione = stazione.nome != null ? stazione.nome : stazioneId;
+                evento.stato = "GUASTA";
+                evento.tipoEvento = "CONVOGLIO_GUASTO";
+                evento.descrizione = "Convoglio " + treno.id
+                        + " guasto: stazione non percorribile";
+                evento.persist();
+
+                // Storico del cambio di stato della stazione
+                Stazione dbStazione = Stazione.findById(stazioneId);
+                if (dbStazione != null) {
+                    StoricoStatoStazione storicoStato = StoricoStatoStazione.fotografiaDi(
+                            dbStazione, "GUASTA", statoPrecedente);
+                    storicoStato.persist();
+                }
+            });
+        } catch (Exception e) {
+            LOG.errorf("❌ Guasto stazione %s per convoglio %s non scritto a DB (%s): nessuna notifica",
+                    stazioneId, treno.id, e.getMessage());
+            return;
+        }
+
+        // 4. Notifica: cache guasti + dashboard + campo
+        statoRete.aggiungiGuasto(guastoStazione);
+        broadcastAlert(guastoStazione);
+        pubblicaGuastoSuMqtt(guastoStazione);
+
+        LOG.warnf("🚨 Stazione %s marcata GUASTA per convoglio %s guasto in stazione",
+                stazioneId, treno.id);
     }
 
     /**
@@ -741,6 +844,7 @@ public class IngestionService {
         wsEvent.put("severity", guasto.severita != null ? guasto.severita.toLowerCase() : "warning");
         wsEvent.put("message", guasto.messaggio);
         wsEvent.put("sorgenteId", guasto.sorgenteId);
+        wsEvent.put("origine", originePerOperatore(guasto));
         wsEvent.put("timestamp", guasto.timestamp != null ? guasto.timestamp.toString() : Instant.now().toString());
         wsEvent.put("risolto", guasto.risolto);
         if (guasto.timestampRisoluzione != null) {
@@ -752,6 +856,16 @@ public class IngestionService {
             wsEvent.put("stationId", guasto.sorgenteId);
         }
         webSocket.broadcast(wsEvent.toString());
+    }
+
+    /** Mantiene leggibili anche gli allarmi creati prima dell'introduzione del campo origine. */
+    public static String originePerOperatore(Guasto guasto) {
+        return ORIGINE_DEDOTTO_CENTRALE.equals(guasto.origine)
+                || (guasto.origine == null && guasto.messaggio != null
+                && (guasto.messaggio.startsWith(MSG_HEARTBEAT_PERSO)
+                || guasto.messaggio.startsWith(MSG_TRENO_FERMO)))
+                ? ORIGINE_DEDOTTO_CENTRALE
+                : ORIGINE_SEGNALATO_CAMPO;
     }
 
     /**

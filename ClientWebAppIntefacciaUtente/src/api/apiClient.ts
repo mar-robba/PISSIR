@@ -382,6 +382,7 @@ export const apiClient = {
       // finirebbe associato anche a una stazione (e viceversa)
       stationId: a.sorgenteTipo === 'STAZIONE' ? a.sorgenteId : undefined,
       trainId: a.sorgenteTipo === 'TRENO' ? a.sorgenteId : undefined,
+      origin: a.origine === 'DEDOTTO_CENTRALE' ? 'dedotto_centrale' : 'segnalato_campo',
       timestamp: a.timestamp ? new Date(a.timestamp).getTime() : Date.now(),
       acknowledged: a.risolto || false,
       resolvedAt: a.timestampRisoluzione ? new Date(a.timestampRisoluzione).getTime() : undefined

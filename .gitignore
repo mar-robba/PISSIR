@@ -1,1 +1,29 @@
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+target/
+dist/
+out/
+build/
+*.class
+
+# Node
+node_modules/
+
+# IDEs and OS
+.idea/
+.vscode/
+.claude/
+*.swp
+.DS_Store
+
+# Misc
+.env
+
+# Existing
 BrokerMosquitto/data/

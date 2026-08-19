@@ -94,6 +94,7 @@ CREATE TABLE Guasti_Pervenuti_da_treni_o_Staz (
     severita        VARCHAR(20),   -- ESTENSIONE: gravita' (CRITICAL/WARNING/INFO)
     sorgenteTipo    VARCHAR(20),   -- ESTENSIONE: tipo sorgente (STAZIONE/TRENO)
     sorgenteId      VARCHAR(50),   -- ESTENSIONE: id della sorgente del guasto
+    origine         VARCHAR(30),   -- ESTENSIONE: SEGNALATO_CAMPO o DEDOTTO_CENTRALE
     messaggio       VARCHAR(500),  -- ESTENSIONE: descrizione leggibile
     ts_apertura     TIMESTAMP,     -- ESTENSIONE: istante di apertura
     ts_risoluzione  TIMESTAMP,     -- ESTENSIONE: istante di risoluzione (null se aperto)

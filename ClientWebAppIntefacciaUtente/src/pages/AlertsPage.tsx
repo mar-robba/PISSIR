@@ -3,6 +3,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { ShieldAlert, CheckCircle2, Wrench, Clock, Info, X } from 'lucide-react';
 import { useState } from 'react';
+import { useAuthStore } from '../store/authStore';
 
 export default function AlertsPage() {
   const alerts = useRailwayStore((s) => s.alerts);
@@ -15,6 +16,7 @@ export default function AlertsPage() {
   const notifications = useRailwayStore((s) => s.notifications);
   const dismissNotification = useRailwayStore((s) => s.dismissNotification);
   const [filter, setFilter] = useState<'all' | 'active' | 'resolved'>('active');
+  const user = useAuthStore((s) => s.user);
 
   const filteredAlerts = alerts.filter(a => {
     if (filter === 'active') return !a.acknowledged;
@@ -127,6 +129,9 @@ export default function AlertsPage() {
                       <Badge type={alert.severity === 'critical' ? 'danger' : alert.severity === 'warning' ? 'warning' : 'info'}>
                         {alert.type.toUpperCase().replace('_', ' ')}
                       </Badge>
+                      <Badge type={alert.origin === 'dedotto_centrale' ? 'info' : 'warning'}>
+                        {alert.origin === 'dedotto_centrale' ? 'DEDOTTO DALLA CENTRALE' : 'SEGNALATO DAL CAMPO'}
+                      </Badge>
                       <span className="text-xs text-muted flex items-center gap-1">
                         <Clock size={12} />
                         {new Date(alert.timestamp).toLocaleString()}
@@ -162,7 +167,7 @@ export default function AlertsPage() {
                       la squadra esattamente come gli altri, ma essendo classificati
                       sensore_offline restavano senza pulsante — e non c'è nessun altro
                       punto dell'interfaccia da cui mandare gli operatori (RF01.4.1). */}
-                  {alert.stationId && !station?.operatorsDispatched && !alert.acknowledged && (
+                  {alert.stationId && !station?.operatorsDispatched && !alert.acknowledged && user?.role === 'tecnico' && (
                     <button
                       onClick={() => handleDispatch(alert.stationId!, alert.id)}
                       className="btn btn-primary text-sm shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse"

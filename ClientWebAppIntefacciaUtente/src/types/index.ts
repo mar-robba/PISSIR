@@ -125,6 +125,7 @@ export interface Alert {
   message: string;
   stationId?: string; // associato opzionalmente ad una stazione
   trainId?: string;   // associato opzionalmente ad un treno
+  origin: 'segnalato_campo' | 'dedotto_centrale';
   timestamp: number;
   acknowledged: boolean; // false se da gestire, true se risolto/soppresso in dashboard
   resolvedAt?: number;

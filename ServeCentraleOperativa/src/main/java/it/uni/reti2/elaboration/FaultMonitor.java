@@ -264,6 +264,7 @@ public class FaultMonitor {
         guasto.severita = severita;
         guasto.sorgenteTipo = sorgenteTipo;
         guasto.sorgenteId = sorgenteId;
+        guasto.origine = IngestionService.ORIGINE_DEDOTTO_CENTRALE;
         guasto.messaggio = messaggio;
         guasto.timestamp = Instant.now();
         guasto.risolto = false;

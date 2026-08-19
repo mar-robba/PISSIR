@@ -59,6 +59,7 @@ export interface ApiAlertPayload {
   messaggio?: string;
   sorgenteId?: string;
   sorgenteTipo?: string;
+  origine?: 'SEGNALATO_CAMPO' | 'DEDOTTO_CENTRALE';
   timestamp?: string;
   risolto?: boolean;
   timestampRisoluzione?: string;

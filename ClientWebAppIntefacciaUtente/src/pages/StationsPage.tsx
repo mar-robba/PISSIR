@@ -2,12 +2,14 @@ import { useRailwayStore } from '../store/railwayStore';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { useState } from 'react';
-import { Building2, Wrench } from 'lucide-react';
+import { Building2, Wrench, CheckCircle } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 
 export default function StationsPage() {
-  const { stations, trains } = useRailwayStore();
+  const { stations, trains, completeMaintenance } = useRailwayStore();
   const [search, setSearch] = useState('');
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+  const user = useAuthStore((s) => s.user);
 
   const filteredStations = stations.filter(s => 
     s.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -99,7 +101,7 @@ export default function StationsPage() {
               <div className="mb-6">
                 <h3 className="text-xl mb-1">{selectedStation.name}</h3>
                 <p className="text-sm font-mono text-muted mb-3">Codice: {selectedStation.code}</p>
-                <Badge type={selectedStation.status === 'operativa' ? 'success' : 'danger'}>
+                <Badge type={selectedStation.status === 'operativa' ? 'success' : (selectedStation.status === 'manutenzione' ? 'warning' : 'danger')}>
                   Stato: {selectedStation.status.toUpperCase()}
                 </Badge>
                 
@@ -108,6 +110,15 @@ export default function StationsPage() {
                     <Wrench size={16} className="mt-0.5 flex-shrink-0" />
                     <span>{selectedStation.faultDescription}</span>
                   </div>
+                )}
+
+                {selectedStation.status === 'manutenzione' && user?.role === 'tecnico' && (
+                  <button
+                    onClick={() => completeMaintenance(selectedStation.id)}
+                    className="mt-3 btn btn-success text-sm w-full flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle size={16} /> Riparazione Compiuta
+                  </button>
                 )}
               </div>
 

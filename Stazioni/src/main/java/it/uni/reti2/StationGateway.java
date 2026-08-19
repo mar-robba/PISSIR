@@ -94,6 +94,17 @@ public class StationGateway {
                         LOG.info("🛠️ Operatori di manutenzione in arrivo verso la stazione!");
                     }
                     break;
+                case "GUASTO":
+                    // RF02.1.2.2.1: la Centrale ha dedotto che questa stazione è non
+                    // percorribile (es. convoglio deragliato). Si allinea lo stato locale.
+                    if ("STAZIONE".equals(json.path("sorgenteTipo").asText())
+                            && dbLocale.stazioneId.equals(sorgenteId)
+                            && "CRITICAL".equalsIgnoreCase(json.path("severita").asText(""))) {
+                        dbLocale.stato = "GUASTA";
+                        LOG.warnf("🚨 Stazione marcata GUASTA dalla Centrale: %s",
+                                json.path("messaggio").asText(""));
+                    }
+                    break;
                 default:
                     // Nessuna azione per gli altri eventi del canale condiviso
                     break;
