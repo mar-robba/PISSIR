@@ -1,0 +1,1097 @@
+
+[1;33m--- FILE: DBLocale.java ---[0m
+package it.uni.reti2;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+// da spostare in un sqlite per maggiore resilienza nel caso di un fault energetico da parte della stazione
+
+/**
+ * DBLocale funge da archivio di stato in-memory per il nodo Stazione.
+ * Essendo annotata con {@link ApplicationScoped}, l'istanza è unica e condivisa
+ * a livello applicativo. Contiene le informazioni di base per identificare 
+ * la stazione e tracciare il suo stato di salute e connettività.
+ */
+@ApplicationScoped
+public class DBLocale {
+
+    /**
+     * Identificativo univoco della stazione.
+     * Recuperato dalle properties di configurazione (es. application.properties).
+     * Il valore di default è "alessandria" per agevolare il testing locale.
+     */
+    @ConfigProperty(name = "stazione.id", defaultValue = "S1")
+    public String stazioneId;
+
+    /**
+     * Stato operativo attuale della stazione.
+     * - "ONLINE": stazione operativa, binari liberi da guasti.
+     * - "GUASTA": stazione inagibile (es. guasto ai sistemi di terra).
+     */
+    public String stato = "ONLINE";
+
+    // per il riconoscimento della stazione
+    public boolean stazioneRiconosciuta = false ;
+
+    /**
+     * Flag booleano che indica se la connessione verso il sistema centrale (Centrale Operativa)
+     * è attualmente attiva e funzionante. Viene utilizzato per gestire le logiche di buffering
+     * locale in caso di disconnessione (fallback mode).
+     */
+    public boolean connessioneCentrale = true;
+
+    /**
+     * Mappa dei treni fisicamente presenti in stazione in questo momento.
+     * Chiave: id del treno; valore: istante in cui il treno è entrato (evento ENTRATA).
+     * Viene aggiornata dai messaggi di passaggio ricevuti via MQTT.
+     */
+    public final Map<String, Instant> treniPresenti = new ConcurrentHashMap<>();
+
+    /**
+     * Mappa dei sensori di binario monitorati tramite keepalive.
+     * Chiave: id del sensore; valore: istante dell'ultimo battito ricevuto.
+     * Se un sensore non invia battiti oltre il timeout configurato viene
+     * segnalato un guasto alla Centrale e rimosso dalla mappa.
+     */
+    public final Map<String, Instant> sensoriUltimoBattito = new ConcurrentHashMap<>();
+}
+
+[1;33m--- FILE: diocane ---[0m
+
+[1;33m--- FILE: HeartbeatGenerator.java ---[0m
+package it.uni.reti2;
+
+import io.quarkus.scheduler.Scheduled;
+import io.smallrye.mutiny.Multi;
+import it.uni.reti2.DBLocale;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.eclipse.microprofile.reactive.messaging.Outgoing;
+import org.jboss.logging.Logger;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+
+/**
+ * Componente responsabile della generazione e dell'invio ciclico del segnale
+ * di vitalità (Heartbeat) della stazione verso la Centrale Operativa.
+ * Gestisce anche il meccanismo di Store and Forward per svuotare il buffer
+ * degli eventi pendenti non appena la connessione viene ristabilita, e il
+ * controllo di keepalive dei sensori di binario.
+ */
+@ApplicationScoped
+public class HeartbeatGenerator implements HeartbeatKA {
+    private static final Logger LOG = Logger.getLogger(HeartbeatGenerator.class);
+
+    @Inject
+    DBLocale dbLocale;
+
+    @Inject
+    LocalBuffer localBuffer;
+
+    /**
+     * Gateway verso la Centrale: usato per il flush reale del buffer
+     * e per segnalare i sensori che non rispondono più.
+     */
+    @Inject
+    StationGateway stationGateway;
+
+    /**
+     * Secondi di silenzio oltre i quali un sensore viene considerato guasto.
+     */
+    @ConfigProperty(name = "sensori.timeout.secondi", defaultValue = "30")
+    long timeoutSensoriSecondi;
+
+    /**
+     * Costruisce il messaggio JSON di heartbeat implementando l'interfaccia.
+     * Include la dimensione del buffer locale come informazione diagnostica.
+     */
+    @Override
+    public String generatePayload(String stazioneId, String stato, int bufferSize) {
+        return String.format(
+                "{\"stazioneId\":\"%s\",\"stato\":\"%s\",\"timestamp\":\"%s\",\"tipoEvento\":\"HEARTBEAT\",\"bufferSize\":%d}",
+                stazioneId, stato, Instant.now().toString(), bufferSize
+        );
+    }
+
+    /**
+     * Job periodico di manutenzione del nodo, volutamente SEPARATO dal flusso di heartbeat:
+     * - controlla i keepalive dei sensori di binario;
+     * - se la connessione è attiva e ci sono eventi pendenti, svuota il buffer
+     *   tramite il flush reale del Gateway (store and forward).
+     *
+     * Prima queste due operazioni giravano dentro l'.invoke() del Multi dell'heartbeat:
+     * siccome un Multi che fallisce termina, al primo errore MQTT si fermava anche lo
+     * store-and-forward e gli eventi bufferizzati non sarebbero mai più partiti.
+     * Con un job schedulato indipendente il buffer continua a svuotarsi comunque.
+     */
+    @Scheduled(every = "10s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    void manutenzionePeriodica() {
+        // Verifica dei sensori che non mandano più il keepalive
+        controllaSensori();
+
+        // Se la connessione è attiva e ci sono eventi che non erano stati inviati...
+        if (dbLocale.connessioneCentrale && !localBuffer.isEmpty()) {
+            LOG.infof("📡 Connessione ok, svuoto il buffer (%d eventi)...", localBuffer.size());
+            // Reinvia effettivamente gli eventi sugli emitter corretti
+            stationGateway.flush();
+        }
+    }
+
+    /**
+     * Producer reattivo che emette l'heartbeat sul canale MQTT dedicato ("heartbeat-out").
+     * Viene eseguito ogni 10 secondi in background.
+     * Se la connessione verso la Centrale è simulata come assente, il battito
+     * NON viene emesso (così la Centrale rileva la stazione come OFFLINE).
+     * Allo stesso modo, finché l'ID della stazione non è stato riconosciuto dal
+     * database centrale (validazione MQTT asincrona via StationDatabaseValidator)
+     * nessun battito viene emesso: il tick di Mutiny continua a scattare ogni 10s
+     * in background (costo trascurabile), ma resta filtrato finché
+     * dbLocale.stazioneRiconosciuta non diventa true; al tick successivo alla
+     * conferma l'heartbeat riparte da solo, senza alcun accoppiamento diretto
+     * con StationDatabaseValidator.
+     *
+     * @return Il flusso dati Multi di Mutiny contenente le stringhe JSON dei battiti cardiaci.
+     */
+    @Outgoing("heartbeat-out")
+    public Multi<String> generaHeartbeat() {
+        // Genera un evento reattivo periodico
+        return Multi.createFrom()
+                .ticks()
+                .every(Duration.ofSeconds(10))
+                .filter(tick -> {
+                    // ID non ancora validato dalla Centrale: nessun battito finché non arriva
+                    // la conferma via MQTT (StationDatabaseValidator.gestisciRispostaValidazione).
+                    if (!dbLocale.stazioneRiconosciuta) {
+                        LOG.warn("⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.");
+                        return false;
+                    }
+                    return true;
+                })
+                .filter(tick -> {
+                    // Rete simulata giù: si salta il battito, la Centrale ci vedrà OFFLINE
+                    if (!dbLocale.connessioneCentrale) {
+                        LOG.warn("🔌 Offline: heartbeat non inviato alla Centrale.");
+                        return false;
+                    }
+                    return true;
+                })
+                .map(tick -> {
+                    // Prepara il messaggio
+                    String json = generatePayload(dbLocale.stazioneId, dbLocale.stato, localBuffer.size());
+                    LOG.infof("💓 [HEARTBEAT] Invio heartbeat: %s", json);
+                    return json;
+                })
+                // Gestione reattiva degli errori di connessione sul canale di invio
+                .onFailure().invoke(e -> {
+                    LOG.error("🔌 Errore connessione MQTT Centrale!");
+                    // Contrassegna la connessione come persa in modo che Gateway sappia
+                    // che deve usare il buffer per i prossimi eventi.
+                    dbLocale.connessioneCentrale = false;
+                })
+                // invoke() esegue solo l'effetto collaterale: il flusso resterebbe comunque
+                // terminato e la stazione non batterebbe MAI più (per la Centrale sarebbe
+                // OFFLINE per sempre). Il retry con backoff riaggancia il canale da solo
+                // quando il broker torna disponibile.
+                .onFailure().retry().withBackOff(Duration.ofSeconds(1), Duration.ofSeconds(10)).indefinitely();
+    }
+
+   //boh
+
+    /**
+     * Controlla la mappa dei sensori monitorati: quelli il cui ultimo battito
+     * è più vecchio del timeout configurato vengono segnalati alla Centrale
+     * e rimossi dalla mappa, così la segnalazione avviene una sola volta.
+     *
+     * La severità è CRITICAL perché il PDF chiede che una stazione che non riceve
+     * più i keepalive dai propri sensori "segnali lo stato di guasta alla Centrale
+     * Operativa": inviaGuasto con CRITICAL porta dbLocale.stato a GUASTA, quindi i
+     * treni in arrivo vengono trattenuti finché non arriva la squadra di manutenzione.
+     */
+    private void controllaSensori() {
+        Instant limite = Instant.now().minusSeconds(timeoutSensoriSecondi);
+        for (Map.Entry<String, Instant> sensore : dbLocale.sensoriUltimoBattito.entrySet()) {
+            if (sensore.getValue().isBefore(limite)) {
+                LOG.warnf("⚠️ Sensore %s silente da oltre %d secondi: stazione GUASTA!", sensore.getKey(), timeoutSensoriSecondi);
+                // "sensore_offline" dichiarato esplicitamente: questo è davvero il guasto di
+                // un sensore di binario, e va distinto dagli altri guasti di terra.
+                stationGateway.inviaGuasto("Sensore " + sensore.getKey() + " non invia keepalive",
+                        "CRITICAL", "sensore_offline");
+                // Rimozione dalla mappa: evita di rigenerare lo stesso alert a ogni tick
+                dbLocale.sensoriUltimoBattito.remove(sensore.getKey());
+            }
+        }
+    }
+}
+
+[1;33m--- FILE: HeartbeatKA.java ---[0m
+package it.uni.reti2;
+
+/**
+ * Interfaccia per il sistema di Keep-Alive.
+ * Stabilisce il contratto per la generazione dei payload di heartbeat,
+ * che confermano la vitalità del nodo.
+ */
+public interface HeartbeatKA {
+
+    /**
+     * Genera la stringa JSON per il segnale di "battito cardiaco".
+     *
+     * @param stazioneId ID univoco del nodo che invia.
+     * @param stato Lo stato corrente del nodo (es. "ONLINE").
+     * @param bufferSize Numero di eventi in attesa nel buffer locale (diagnostica).
+     * @return Una stringa formattata contenente il payload.
+     */
+    String generatePayload(String stazioneId, String stato, int bufferSize);
+}
+
+[1;33m--- FILE: LocalBuffer.java ---[0m
+package it.uni.reti2;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+
+/**
+ * LocalBuffer implementa un meccanismo di persistenza temporanea (coda FIFO in-memory)
+ * per gli eventi generati dalla Stazione (es. transiti, guasti).
+ * Questo buffer è fondamentale quando la connessione verso la Centrale cade (Edge computing in offline mode),
+ * permettendo di accodare gli eventi e ritrasmetterli al ripristino della rete.
+ */
+@ApplicationScoped
+public class LocalBuffer {
+
+    /**
+     * Evento accodato in attesa di ritrasmissione.
+     * Oltre al payload JSON viene memorizzato anche il canale di destinazione
+     * ("transit" oppure "alert"), così al momento del flush ogni evento
+     * può essere reinviato sull'emitter MQTT corretto.
+     *
+     * @param canale  Canale logico di destinazione: "transit" o "alert".
+     * @param payload Il payload JSON dell'evento non recapitato.
+     */
+    public record EventoBufferizzato(String canale, String payload) {}
+
+    /**
+     * La coda vera e propria dove vengono stoccati gli eventi.
+     * Si usa un ArrayDeque (e non una LinkedList vista come Queue) perché serve
+     * poter reinserire un evento anche IN TESTA: se il reinvio fallisce a metà
+     * flush l'evento più vecchio deve restare il più vecchio, altrimenti la
+     * Centrale riceverebbe una USCITA prima della relativa ENTRATA.
+     */
+    private final Deque<EventoBufferizzato> bufferEventi = new ArrayDeque<>();
+
+    /**
+     * Aggiunge un nuovo evento in coda al buffer.
+     * Da invocare quando l'invio remoto fallisce o la stazione è offline.
+     *
+     * @param canale  Canale di destinazione dell'evento ("transit" o "alert").
+     * @param payload Il payload JSON dell'evento non recapitato.
+     */
+    public synchronized void add(String canale, String payload) {
+        bufferEventi.addLast(new EventoBufferizzato(canale, payload));
+    }
+
+    /**
+     * Rimette un evento IN TESTA al buffer, davanti a tutti gli altri.
+     * Serve al flush: l'evento che non è riuscito a partire deve essere
+     * ritentato per primo, così l'ordine cronologico (FIFO) è rispettato.
+     *
+     * @param canale  Canale di destinazione dell'evento ("transit" o "alert").
+     * @param payload Il payload JSON dell'evento non recapitato.
+     */
+    public synchronized void addFirst(String canale, String payload) {
+        bufferEventi.addFirst(new EventoBufferizzato(canale, payload));
+    }
+
+    /**
+     * Estrae e rimuove il primo evento inserito nella coda (modalità FIFO).
+     *
+     * @return L'evento più vecchio nel buffer, oppure null se il buffer è vuoto.
+     */
+    public synchronized EventoBufferizzato poll() {
+        return bufferEventi.pollFirst();
+    }
+
+    /**
+     * Verifica se il buffer locale è vuoto.
+     *
+     * @return true se non ci sono eventi pendenti, false altrimenti.
+     */
+    public synchronized boolean isEmpty() {
+        return bufferEventi.isEmpty();
+    }
+
+    /**
+     * Ritorna il numero di eventi attualmente in attesa di essere inviati.
+     *
+     * @return La dimensione della coda.
+     */
+    public synchronized int size() {
+        return bufferEventi.size();
+    }
+
+    /**
+     * Espone una COPIA della coda (non la struttura interna) per scopi diagnostici,
+     * es. la GET /stazione/buffer. Il metodo è synchronized come tutti gli altri:
+     * senza, la serializzazione JSON dell'endpoint poteva girare mentre il job di
+     * manutenzione modificava la coda (ConcurrentModificationException).
+     *
+     * @return La lista degli eventi pendenti, dal più vecchio al più recente.
+     */
+    public synchronized List<EventoBufferizzato> getBuffer() {
+        return new ArrayList<>(bufferEventi);
+    }
+}
+
+[1;33m--- FILE: main.java ---[0m
+package it.uni.reti2;
+
+import io.quarkus.runtime.Quarkus;
+import io.quarkus.runtime.QuarkusApplication;
+import io.quarkus.runtime.annotations.QuarkusMain;
+import jakarta.inject.Inject;
+import org.jboss.logging.Logger;
+
+@QuarkusMain
+public class main implements QuarkusApplication {
+    @Inject
+    DBLocale dbLocale;
+
+    @Inject
+    StationDatabaseValidator stationDatabaseValidator;
+
+    private static final Logger LOG = Logger.getLogger(main.class);
+    private static String STAZIONE_ID_PARAM;
+
+    public static void main(String[] args) {
+        if (args.length < 1 || args[0] == null || args[0].trim().isEmpty() || "null".equalsIgnoreCase(args[0].trim())) {
+            // In dev mode Quarkus non passa argomenti: non si esce, si usa la property "stazione.id"
+            LOG.warn("⚠️ ID della stazione non fornito come argomento: uso la property 'stazione.id'");
+            LOG.warn("Utilizzo consigliato: java -jar stazione-app.jar <STAZIONE_ID>");
+        } else {
+            String stazioneId = args[0].trim();
+            STAZIONE_ID_PARAM = stazioneId;
+            System.setProperty("stazione.id", stazioneId);
+            LOG.infof("🚉 Avvio processo Stazione con ID: %s", stazioneId);
+        }
+
+        Quarkus.run(main.class, args);
+    }
+
+    @Override
+    public int run(String... args) throws Exception {
+        // Se l'ID è arrivato da riga di comando sovrascrive quello della property,
+        // altrimenti resta il valore già iniettato in DBLocale dalla configurazione
+        if (STAZIONE_ID_PARAM != null) {
+            dbLocale.stazioneId = STAZIONE_ID_PARAM;
+        }
+
+        if (dbLocale.stazioneId == null || dbLocale.stazioneId.trim().isEmpty()) {
+            LOG.error("ID della stazione non impostato: impossibile avviare il processo.");
+            return 1;
+        }
+
+        LOG.infof("🔎 Verifica ID stazione '%s' nel database centrale...", dbLocale.stazioneId);
+        while (true) {
+            StationDatabaseValidator.EsitoVerifica esito = stationDatabaseValidator.verificaSeNecessario();
+            switch (esito) {
+                case VALIDATO:
+                    break;
+                case ID_NON_PRESENTE:
+                    LOG.error("❌ ERRORE FATALE: ID della stazione non presente nel database centrale. " +
+                            "Il processo verrà terminato.");
+                    return 1;
+                case RIPROVA:
+                    LOG.warn("ID stazione non ancora valido o il database centrale non è raggiungibile; riprovo tra 5 secondi...");
+                    Thread.sleep(5000);
+                    continue;
+            }
+            break;
+        }
+
+        LOG.info("✅ Processo Stazione AVVIATO CORRETTAMENTE");
+        LOG.info("🔄 Ingresso nel ciclo infinito di mantenimento del nodo Stazione...");
+        LOG.info("🌐 Server REST disponibile su http://localhost:8081/stazione/info");
+
+        while (true) {
+            Thread.sleep(1000);
+        }
+    }
+}
+
+[1;33m--- FILE: SecureHttpClient.java ---[0m
+package it.uni.reti2;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+import java.io.InputStream;
+import java.net.http.HttpClient;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyStore;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.time.Duration;
+/**
+ * Client HTTPS che considera attendibile solo la CA privata del progetto.
+ * Gemello di quello del Treno: oggi la Stazione parla con la Centrale solo via MQTT,
+ * ma la classe è pronta per le chiamate REST verso la Centrale
+ * (per esempio GET /api/prossima-stazione) sotto profilo tls.
+ */
+@ApplicationScoped
+public class SecureHttpClient {
+    private static final Logger LOG = Logger.getLogger(SecureHttpClient.class);
+
+    @ConfigProperty(name = "centrale.tls.ca.path")
+    String caPath;
+
+    private HttpClient client;
+
+    @PostConstruct
+    void init() {
+        try (InputStream input = Files.newInputStream(Path.of(caPath))) {
+            X509Certificate ca = (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(input);
+            KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            trustStore.load(null, null);
+            trustStore.setCertificateEntry("railway-ca", ca);
+            TrustManagerFactory trustManagers = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagers.init(trustStore);
+            SSLContext tls = SSLContext.getInstance("TLS");
+            tls.init(null, trustManagers.getTrustManagers(), null);
+            client = HttpClient.newBuilder().sslContext(tls).connectTimeout(Duration.ofSeconds(5)).build();
+        } catch (Exception e) {
+            // Senza certificati generati (profilo di default, tutto in chiaro sulla 8781)
+            // la stazione deve comunque partire: si usa il client HTTP standard.
+            // Prima qui volava una IllegalStateException e il bean non si sarebbe
+            // nemmeno costruito, bloccando l'avvio del nodo.
+            LOG.warnf("⚠️ CA TLS della Centrale non caricata (%s): uso il client HTTP in chiaro. Dettaglio: %s",
+                    caPath, e.getMessage());
+            client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+        }
+    }
+
+    public HttpClient get() { return client; }
+}
+
+[1;33m--- FILE: StationDatabaseValidator.java ---[0m
+package it.uni.reti2;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.reactive.messaging.Channel;
+import org.eclipse.microprofile.reactive.messaging.Emitter;
+import org.eclipse.microprofile.reactive.messaging.Incoming;
+import org.eclipse.microprofile.reactive.messaging.Message;
+import org.jboss.logging.Logger;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.CompletionStage;
+
+/**
+ * Verifica che l'ID della stazione sia valido tramite messaggistica MQTT:
+ * stesso pattern richiesta/risposta asincrona usato da TrainDatabaseValidator
+ * per il treno (topic railway/station/{id}/validation e .../validation-response,
+ * gestiti lato Centrale da ExistIdForEdgeStazione).
+ */
+@ApplicationScoped
+public class StationDatabaseValidator {
+
+    private static final Logger LOG = Logger.getLogger(StationDatabaseValidator.class);
+    private static final long RETRY_SECONDI = 15;
+
+    /** Risultato della verifica dell'ID nel database centrale. */
+    public enum EsitoVerifica {
+        /** L'ID è presente nel database: il processo può proseguire. */
+        VALIDATO,
+        /** La Centrale ha risposto che l'ID non esiste (errore fatale). */
+        ID_NON_PRESENTE,
+        /** Nessuna risposta ancora arrivata o richiesta non ancora inviata: riprovare. */
+        RIPROVA
+    }
+
+    @Inject
+    DBLocale dbLocale;
+
+    @Inject
+    ObjectMapper mapper;
+
+    // Emitter per l'invio della richiesta di verifica via MQTT
+    @Inject
+    @Channel("validation-request-out")
+    Emitter<String> validationEmitter;
+
+    private Instant ultimoTentativo = Instant.EPOCH;
+    private volatile EsitoVerifica esitoCorrente = EsitoVerifica.RIPROVA;
+
+    /**
+     * Verifica lo stato dell'ID. Se la risposta non è ancora arrivata,
+     * invia una richiesta di validazione via MQTT rispettando l'intervallo di retry.
+     */
+    public synchronized EsitoVerifica verificaSeNecessario() {
+        if (dbLocale.stazioneRiconosciuta || esitoCorrente == EsitoVerifica.VALIDATO) {
+            return EsitoVerifica.VALIDATO;
+        }
+
+        if (esitoCorrente == EsitoVerifica.ID_NON_PRESENTE) {
+            return EsitoVerifica.ID_NON_PRESENTE;
+        }
+
+        Instant adesso = Instant.now();
+        if (Duration.between(ultimoTentativo, adesso).getSeconds() < RETRY_SECONDI) {
+            return EsitoVerifica.RIPROVA;
+        }
+        ultimoTentativo = adesso;
+
+        String idStazione = dbLocale.stazioneId == null ? "" : dbLocale.stazioneId.trim();
+        if (idStazione.isEmpty()) {
+            LOG.error("Impossibile verificare il processo: ID della stazione vuoto");
+            return EsitoVerifica.RIPROVA;
+        }
+
+        // Pubblica il messaggio di richiesta sul broker MQTT
+        inviaRichiestaValidazione(idStazione);
+
+        return EsitoVerifica.RIPROVA;
+    }
+
+    private void inviaRichiestaValidazione(String idStazione) {
+        try {
+            ObjectNode payloadJson = mapper.createObjectNode();
+            payloadJson.put("stazioneId", idStazione);
+
+            validationEmitter.send(payloadJson.toString());
+            LOG.infof("📩 Richiesta di validazione inviata per la stazione: %s", idStazione);
+        } catch (Exception e) {
+            LOG.warnf("Errore durante l'invio della richiesta MQTT per ID '%s'; riprovo tra %ds: %s",
+                    idStazione, RETRY_SECONDI, e.getMessage());
+        }
+    }
+
+    /**
+     * Ascolta in modo asincrono la risposta dal server centrale sul canale di validation response.
+     */
+    @Incoming("validation-response-in")
+    public CompletionStage<Void> gestisciRispostaValidazione(Message<byte[]> messaggio) {
+        try {
+            String payload = new String(messaggio.getPayload());
+            JsonNode root = mapper.readTree(payload);
+
+            String stazioneIdRisposta = root.has("stazioneId") ? root.get("stazioneId").asText() : null;
+            String stazioneIdCorrente = dbLocale.stazioneId != null ? dbLocale.stazioneId.trim() : "";
+
+            // Verifica che la risposta appartenga a questa specifica stazione
+            if (stazioneIdRisposta != null && stazioneIdRisposta.equals(stazioneIdCorrente)) {
+                boolean esiste = root.has("esisteNelDb") && root.get("esisteNelDb").asBoolean();
+
+                if (esiste) {
+                    dbLocale.stazioneRiconosciuta = true;
+                    this.esitoCorrente = EsitoVerifica.VALIDATO;
+                    LOG.infof("🚉 Processo associato con successo alla chiave primaria del database: %s", stazioneIdRisposta);
+                } else {
+                    this.esitoCorrente = EsitoVerifica.ID_NON_PRESENTE;
+                    LOG.errorf("❌ L'ID '%s' non è presente nel database centrale: la stazione non è registrata.", stazioneIdRisposta);
+                }
+            }
+        } catch (JsonProcessingException e) {
+            LOG.error("Errore nel parsing del messaggio di risposta di validazione MQTT", e);
+        }
+
+        return messaggio.ack();
+    }
+}
+
+[1;33m--- FILE: StationGateway.java ---[0m
+package it.uni.reti2;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import it.uni.reti2.DBLocale;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.reactive.messaging.Channel;
+import org.eclipse.microprofile.reactive.messaging.Emitter;
+import org.eclipse.microprofile.reactive.messaging.Incoming;
+import org.jboss.logging.Logger;
+
+import java.time.Instant;
+import java.util.concurrent.CompletionStage;
+
+/**
+ * StationGateway si occupa della comunicazione asincrona tra il nodo Edge (Stazione)
+ * e il sistema Cloud (Centrale Operativa). Riceve messaggi e inoltra eventi
+ * garantendo la resilienza tramite l'uso del {@link LocalBuffer} in caso di disconnessione.
+ */
+@ApplicationScoped
+public class StationGateway {
+    private static final Logger LOG = Logger.getLogger(StationGateway.class);
+
+    /**
+     * Parser JSON per interpretare i payload dei messaggi MQTT in ingresso.
+     */
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    /**
+     * Database locale per accedere e aggiornare lo stato e la connettività della stazione.
+     */
+    @Inject
+    DBLocale dbLocale;
+
+    /**
+     * Coda di backup per salvare gli eventi quando la connessione (es. MQTT) non è disponibile.
+     */
+    @Inject
+    LocalBuffer localBuffer;
+
+    //==== Alias per l'uso dei topic in output(quelli in imput naturalmente devono possedere listener reattivi siccome si
+    // tratta di un flusso di dati)
+    /**
+     * Canale di uscita per l'invio di notifiche relative ai guasti della stazione.
+     */
+    @Inject
+    @Channel("alerts-out")
+    Emitter<String> alertsEmitter;
+
+    /**
+     * Canale di uscita per notificare l'entrata o l'uscita dei treni dai binari della stazione.
+     */
+    @Inject
+    @Channel("transit-out")
+    Emitter<String> transitEmitter;
+
+    // ------------------ END Alias per l'uso dei topic in output
+
+
+    // ==== listener per canali in imput
+    /**
+     * Intercetta gli eventi in ingresso dal canale condiviso railway/alerts.
+     * Il discriminante è il campo "tipoEvento" del payload:
+     * - RESOLVED riferito a questa stazione: la Centrale ha risolto il guasto, si torna ONLINE.
+     * - MAINTENANCE_DISPATCHED riferito a questa stazione: gli operatori sono in viaggio.
+     * Gli altri tipi (GUASTO, STOP, ITINERARIO_AGGIORNATO) non richiedono azioni lato stazione.
+     *
+     * @param message Il messaggio in arrivo dal broker.
+     * @return CompletionStage che indica il processamento completato.
+     */
+    @Incoming("alerts-in")
+    public CompletionStage<Void> riceviAlert(org.eclipse.microprofile.reactive.messaging.Message<byte[]> message) {
+        String payload = new String(message.getPayload());
+        LOG.warnf("🚨 [ALERT RICEVUTO] La Centrale dice: %s", payload);
+
+        try {
+            JsonNode json = mapper.readTree(payload);
+            String tipoEvento = json.path("tipoEvento").asText();
+            String sorgenteId = json.path("sorgenteId").asText();
+
+            switch (tipoEvento) {
+                case "RESOLVED":
+                    // La Centrale ha risolto un guasto: se riguarda questa stazione si riparte
+                    if ("STAZIONE".equals(json.path("sorgenteTipo").asText())
+                            && dbLocale.stazioneId.equals(sorgenteId)) {
+                        dbLocale.stato = "ONLINE";
+                        LOG.info("🔧 Stazione ripristinata dalla Centrale! Stato di nuovo ONLINE.");
+                    }
+                    break;
+                case "MAINTENANCE_DISPATCHED":
+                    // Notifica informativa: la Centrale ha inviato gli operatori
+                    if (dbLocale.stazioneId.equals(sorgenteId)) {
+                        LOG.info("🛠️ Operatori di manutenzione in arrivo verso la stazione!");
+                    }
+                    break;
+                case "GUASTO":
+                    // RF02.1.2.2.1: la Centrale ha dedotto che questa stazione è non
+                    // percorribile (es. convoglio deragliato). Si allinea lo stato locale.
+                    if ("STAZIONE".equals(json.path("sorgenteTipo").asText())
+                            && dbLocale.stazioneId.equals(sorgenteId)
+                            && "CRITICAL".equalsIgnoreCase(json.path("severita").asText(""))) {
+                        dbLocale.stato = "GUASTA";
+                        LOG.warnf("🚨 Stazione marcata GUASTA dalla Centrale: %s",
+                                json.path("messaggio").asText(""));
+                    }
+                    break;
+                default:
+                    // Nessuna azione per gli altri eventi del canale condiviso
+                    break;
+            }
+        } catch (Exception e) {
+            LOG.errorf("Payload alert non interpretabile: %s", payload);
+        }
+        return message.ack();
+    }
+
+    /**
+     * Intercetta i passaggi fisici dei treni pubblicati sul topic wildcard
+     * railway/train/+/passaggio. Ogni stazione riceve i passaggi di TUTTI i treni,
+     * quindi filtra i soli messaggi indirizzati al proprio stazioneId.
+     * Aggiorna la mappa dei treni presenti e notifica il transito ufficiale alla Centrale.
+     * Se la stazione è GUASTA e un treno entra, viene pubblicato un alert che lo trattiene.
+     *
+     * @param message Il messaggio di passaggio in arrivo dal broker.
+     * @return CompletionStage che indica il processamento completato.
+     */
+    @Incoming("passaggio-in")
+    public CompletionStage<Void> riceviPassaggio(org.eclipse.microprofile.reactive.messaging.Message<byte[]> message) {
+        String payload = new String(message.getPayload());
+
+        try {
+            JsonNode json = mapper.readTree(payload);
+            String stazioneId = json.path("stazioneId").asText();
+
+            // Il passaggio riguarda un'altra stazione: si ignora
+            if (!dbLocale.stazioneId.equals(stazioneId)) {
+                return message.ack();
+            }
+
+            String trenoId = json.path("trenoId").asText();
+            String tipo = json.path("tipo").asText();
+            LOG.infof("🚂 [PASSAGGIO] Treno %s in %s dalla stazione %s", trenoId, tipo, stazioneId);
+
+            // Aggiorna la fotografia locale dei binari
+            if ("ENTRATA".equals(tipo)) {
+                dbLocale.treniPresenti.put(trenoId, Instant.now());
+            } else if ("USCITA".equals(tipo)) {
+                dbLocale.treniPresenti.remove(trenoId);
+            }
+
+            // Notifica ufficiale del transito verso la Centrale (fonte per la storicizzazione)
+            inviaTransito(trenoId, tipo);
+
+            // Stazione guasta: il treno appena entrato viene trattenuto con un alert dedicato
+            if ("GUASTA".equals(dbLocale.stato) && "ENTRATA".equals(tipo)) {
+                inviaGuasto(String.format("Stazione %s guasta: treno %s trattenuto", dbLocale.stazioneId, trenoId), "CRITICAL");
+            }
+        } catch (Exception e) {
+            LOG.errorf("Payload passaggio non interpretabile: %s", payload);
+        }
+        return message.ack();
+    }
+
+    // ---------------- END  listener per canali in imput
+
+    // ================= inizion degli inviatori dei messaggi in out dalla stazione
+
+    /**
+     * Segnala un guasto infrastrutturale locale con severità CRITICAL (default).
+     *
+     * @param descrizione La descrizione del problema rilevato.
+     */
+    public void inviaGuasto(String descrizione) {
+        inviaGuasto(descrizione, "CRITICAL");
+    }
+
+    /**
+     * Segnala un guasto dell'infrastruttura di terra: è la stazione a non essere più
+     * agibile, quindi il tipo lasciato implicito è {@code stazione_guasta}.
+     *
+     * @param descrizione La descrizione del problema rilevato.
+     * @param severita "CRITICAL" oppure "WARNING".
+     */
+    public void inviaGuasto(String descrizione, String severita) {
+        inviaGuasto(descrizione, severita, null);
+    }
+
+    /**
+     * Segnala un guasto locale inviando un alert alla Centrale nel formato condiviso
+     * del canale railway/alerts (campo discriminante "tipoEvento").
+     * Con severità CRITICAL la stazione passa in stato GUASTA; con WARNING
+     * (es. sensore che non risponde) la stazione resta operativa.
+     * Se la rete è giù l'evento viene persistito nel buffer locale.
+     *
+     * <p>Il campo {@code tipoGuasto} è la classificazione dichiarata dalla sorgente. Prima
+     * non c'era e la Centrale la indovinava cercando la parola "sensore" nel testo del
+     * messaggio: siccome i guasti di terra parlano quasi sempre di sensori, finivano tutti
+     * classificati come {@code sensore_offline} e l'operatore si ritrovava senza il comando
+     * per mandare la squadra di manutenzione. Chi segnala il guasto sa che tipo è: lo dice.</p>
+     *
+     * @param descrizione La descrizione del problema rilevato.
+     * @param severita "CRITICAL" oppure "WARNING".
+     * @param tipoGuasto Classificazione ("sensore_offline"), oppure null per lasciar
+     *                   decidere alla Centrale in base al tipo di sorgente.
+     */
+    public void inviaGuasto(String descrizione, String severita, String tipoGuasto) {
+        if ("CRITICAL".equals(severita)) {
+            dbLocale.stato = "GUASTA";
+        }
+        String campoTipo = tipoGuasto != null ? String.format("\"tipoGuasto\":\"%s\",", tipoGuasto) : "";
+        String alertJson = String.format(
+                "{\"tipoEvento\":\"GUASTO\",\"sorgenteTipo\":\"STAZIONE\",\"sorgenteId\":\"%s\",%s\"severita\":\"%s\",\"messaggio\":\"%s\",\"timestamp\":\"%s\"}",
+                dbLocale.stazioneId, campoTipo, severita, descrizione, Instant.now().toString());
+
+        inviaOppureBufferizza("alert", alertJson, alertsEmitter);
+    }
+
+    /**
+     * Invia un evento telemetrico relativo al passaggio fisico di un treno.
+     * se l'invio del messaggio fallisce allora viene salvato l'evento nel buffer
+     *
+     * @param trenoId Identificativo del convoglio.
+     * @param tipo "ENTRATA" oppure "USCITA".
+     */
+    public void inviaTransito(String trenoId, String tipo) {
+        String payload = String.format(
+                "{\"stazioneId\":\"%s\",\"trenoId\":\"%s\",\"tipo\":\"%s\",\"timestamp\":\"%s\"}",
+                dbLocale.stazioneId, trenoId, tipo, Instant.now().toString());
+
+        inviaOppureBufferizza("transit", payload, transitEmitter);
+    }
+
+    /**
+     * Logica comune di invio con Store and Forward:
+     * - se la connessione verso la Centrale risulta giù NON si tenta nemmeno l'invio,
+     *   l'evento finisce direttamente nel buffer locale;
+     * - altrimenti si invia e, in caso di eccezione, si bufferizza e si marca la
+     *   connessione come persa.
+     *
+     * @param canale Canale logico dell'evento ("transit" o "alert").
+     * @param payload Il payload JSON da recapitare.
+     * @param emitter L'emitter MQTT su cui pubblicare.
+     */
+    private void inviaOppureBufferizza(String canale, String payload, Emitter<String> emitter) {
+        if (!dbLocale.connessioneCentrale) {
+            LOG.warnf("🔌 Offline: evento '%s' salvato nel buffer locale.", canale);
+            localBuffer.add(canale, payload);
+            return;
+        }
+        try {
+            emitter.send(payload);
+        } catch (Exception e) {
+            LOG.errorf("Impossibile inviare '%s', salvo nel buffer locale.", canale);
+            // Meccanismo Store and Forward: se il broker è irraggiungibile si accoda
+            localBuffer.add(canale, payload);
+            dbLocale.connessioneCentrale = false;
+        }
+    }
+
+    /**
+     * Svuota il buffer locale reinviando ogni evento pendente sull'emitter corretto
+     * (transit o alert) in ordine FIFO. Da chiamare quando la connessione verso
+     * la Centrale torna disponibile. Se un invio fallisce l'evento viene rimesso
+     * IN TESTA al buffer e il flush si interrompe (si riproverà al prossimo giro):
+     * rimetterlo in fondo lo farebbe diventare il più recente e la Centrale
+     * potrebbe ricevere l'USCITA di un treno prima della sua ENTRATA.
+     */
+    public void flush() {
+        while (!localBuffer.isEmpty()) {
+            LocalBuffer.EventoBufferizzato evento = localBuffer.poll();
+            if (evento == null) {
+                break;
+            }
+            try {
+                if ("alert".equals(evento.canale())) {
+                    alertsEmitter.send(evento.payload());
+                } else {
+                    transitEmitter.send(evento.payload());
+                }
+                LOG.infof("📤 Re-invio dal buffer [%s]: %s", evento.canale(), evento.payload());
+            } catch (Exception e) {
+                LOG.error("🔌 Flush interrotto: connessione ancora assente, evento rimesso in testa.");
+                // L'evento non è partito: torna davanti a tutti (mantiene l'ordine cronologico)
+                localBuffer.addFirst(evento.canale(), evento.payload());
+                dbLocale.connessioneCentrale = false;
+                break;
+            }
+        }
+    }
+}
+
+[1;33m--- FILE: StationIngestion.java ---[0m
+package it.uni.reti2;
+
+import it.uni.reti2.DBLocale;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Controller REST che espone le API del nodo Edge Stazione.
+ * Queste interfacce permettono l'interrogazione dello stato locale e 
+ * l'invocazione di eventi diagnostici / simulati, per esempio da parte 
+ * dei sensori RFID/boelis posizionati lungo i binari, o da terminali di manutenzione.
+ */
+@Path("/stazione")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class StationIngestion {
+
+    @Inject
+    DBLocale dbLocale;
+
+    @Inject
+    LocalBuffer localBuffer;
+
+    @Inject
+    StationGateway stationGateway;
+
+    /**
+     * Recupera le informazioni operative della stazione.
+     *
+     * @return Response HTTP contenente stato e flag di connettività in formato JSON.
+     */
+    @GET
+    @Path("/info")
+    public Response info() {
+        return Response.ok(Map.of(
+            "stazioneId", dbLocale.stazioneId,
+            "stato", dbLocale.stato,
+            "connessioneCentrale", dbLocale.connessioneCentrale
+        )).build();
+    }
+
+    /**
+     * Alias endpoint per convenienza operativa, identico a /info.
+     */
+    @GET
+    @Path("/stato")
+    public Response getStato() {
+        return info();
+    }
+
+    /**
+     * Consente l'ispezione della coda locale per scopi di debugging.
+     * È utile per vedere quali eventi non sono ancora stati inviati in caso di offline.
+     *
+     * @return Response con dimensione e contenuto degli eventi in coda.
+     */
+    @GET
+    @Path("/buffer")
+    public Response getBuffer() {
+        return Response.ok(Map.of(
+            "dimensione", localBuffer.size(),
+            "eventi", localBuffer.getBuffer()
+        )).build();
+    }
+
+    /**
+     * Simula il segnale di un sensore di binario che rileva il transito di un convoglio.
+     * Può essere chiamato dai veri attuatori/sensori fisici per iniettare l'evento nel sistema.
+     *
+     * @param dati Payload contenente "trenoId" e il "tipo" di transito (ENTRATA o USCITA).
+     * @return Response HTTP sull'esito dell'operazione.
+     */
+    @POST
+    @Path("/sensore/treno")
+    public Response rilevaTransitoTreno(Map<String, String> dati) {
+        String trenoId = dati.get("trenoId");
+        String tipo = dati.get("tipo"); // ENTRATA o USCITA
+        
+        // Verifica dei campi mandatori
+        if (trenoId == null || tipo == null) {
+            return Response.status(400).entity("trenoId e tipo sono obbligatori").build();
+        }
+
+        // Delega al Gateway l'invio asincrono verso il Cloud
+        stationGateway.inviaTransito(trenoId, tipo);
+
+        return Response.ok(Map.of("success", true, "messaggio", "Transito rilevato")).build();
+    }
+
+    /**
+     * Riceve la segnalazione di un'avaria da un sottosistema locale (scambi, alimentazione).
+     * Mette la stazione in stato di emergenza.
+     *
+     * @param dati Mappa con eventuale parametro "descrizione" del guasto.
+     * @return Conferma ricezione.
+     */
+    @POST
+    @Path("/sensore/guasto")
+    public Response rilevaGuasto(Map<String, String> dati) {
+        String descrizione = dati.getOrDefault("descrizione", "Guasto generico sensore");
+        // Delega al gateway la notifica immediata alla Centrale Operativa
+        stationGateway.inviaGuasto(descrizione);
+        return Response.ok(Map.of("success", true, "messaggio", "Guasto inviato e stato aggiornato a GUASTA")).build();
+    }
+
+    /**
+     * Riceve il segnale di keepalive periodico di un sensore di binario.
+     * Aggiorna la mappa locale sensore -> ultimo battito; se un sensore smette
+     * di chiamare questo endpoint verrà segnalato come guasto dal controllo periodico.
+     *
+     * @param dati Payload contenente "sensoreId".
+     * @return Conferma ricezione del battito.
+     */
+    @POST
+    @Path("/sensore/heartbeat")
+    public Response heartbeatSensore(Map<String, String> dati) {
+        String sensoreId = dati.get("sensoreId");
+
+        // Verifica del campo mandatorio
+        if (sensoreId == null || sensoreId.isBlank()) {
+            return Response.status(400).entity("sensoreId è obbligatorio").build();
+        }
+
+        dbLocale.sensoriUltimoBattito.put(sensoreId, Instant.now());
+        return Response.ok(Map.of("success", true, "messaggio", "Keepalive registrato per " + sensoreId)).build();
+    }
+
+    /**
+     * Simula la caduta della connessione verso la Centrale Operativa.
+     * Da questo momento gli eventi vengono accodati nel buffer locale
+     * e l'heartbeat non viene più emesso (demo del meccanismo di caching).
+     *
+     * @return Conferma del cambio di modalità.
+     */
+    @POST
+    @Path("/rete/offline")
+    public Response reteOffline() {
+        dbLocale.connessioneCentrale = false;
+        return Response.ok(Map.of("success", true, "messaggio", "Connessione verso la Centrale disattivata (simulazione)")).build();
+    }
+
+    /**
+     * Simula il ripristino della connessione verso la Centrale Operativa.
+     * Oltre a riattivare il flag esegue subito il flush del buffer locale,
+     * reinviando tutti gli eventi accodati durante l'offline.
+     *
+     * @return Conferma del cambio di modalità.
+     */
+    @POST
+    @Path("/rete/online")
+    public Response reteOnline() {
+        dbLocale.connessioneCentrale = true;
+        // Flush immediato: gli eventi accumulati partono subito verso la Centrale
+        stationGateway.flush();
+        return Response.ok(Map.of("success", true, "messaggio", "Connessione ripristinata, buffer svuotato")).build();
+    }
+
+    /**
+     * Restituisce l'elenco dei treni fisicamente presenti in stazione,
+     * con l'istante di ingresso di ciascuno.
+     *
+     * @return Response JSON con la lista dei treni presenti.
+     */
+    @GET
+    @Path("/treni")
+    public Response getTreniPresenti() {
+        List<Map<String, String>> treni = dbLocale.treniPresenti.entrySet().stream()
+                .map(e -> Map.of(
+                        "trenoId", e.getKey(),
+                        "dentroDa", e.getValue().toString()))
+                .collect(Collectors.toList());
+
+        return Response.ok(Map.of("treniPresenti", treni)).build();
+    }
+}

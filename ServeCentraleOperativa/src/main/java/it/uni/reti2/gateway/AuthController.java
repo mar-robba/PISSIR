@@ -2,6 +2,7 @@ package it.uni.reti2.gateway;
 
 import io.quarkus.security.identity.SecurityIdentity;
 import it.uni.reti2.entity.Utente;
+import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -38,6 +39,10 @@ public class AuthController {
     @Inject
     SecurityIdentity identita;
 
+    /** Unico punto da cui questa classe legge l'anagrafica degli operatori. */
+    @Inject
+    RailwayRepository repository;
+
     /**
      * Restituisce il profilo dell'utente che ha presentato il token.
      *
@@ -63,7 +68,7 @@ public class AuthController {
 
         // Riga di anagrafica corrispondente: serve per restituire lo stesso id_utente
         // (U1, U2, ...) usato dalle chiavi esterne dei guasti.
-        Utente utente = Utente.find("upper(matricola) = ?1", matricola.toUpperCase()).firstResult();
+        Utente utente = repository.trovaUtentePerMatricola(matricola);
 
         String nome = utente != null ? utente.nome : claimTestuale("given_name");
         String cognome = utente != null ? utente.cognome : claimTestuale("family_name");

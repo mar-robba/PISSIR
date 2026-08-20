@@ -99,16 +99,19 @@ public class StoricoGuasto extends PanacheEntityBase {
      * a mano: adesso li copia un metodo solo, così non possono divergere.
      *
      * @param guasto Il guasto appena creato o appena chiuso.
+     * @param nomeSorgente Nome leggibile del nodo che ha generato il guasto, da congelare
+     *                     nella riga. Lo cerca il repository: l'anagrafica si legge da lì,
+     *                     un'entità non fa query per conto suo.
      * @return La riga da persistere (non è ancora stata scritta).
      */
-    public static StoricoGuasto fotografiaDi(Guasto guasto) {
+    public static StoricoGuasto fotografiaDi(Guasto guasto, String nomeSorgente) {
         StoricoGuasto storico = new StoricoGuasto();
         storico.guastoId = guasto.id;
         storico.tipo = guasto.tipo;
         storico.severita = guasto.severita;
         storico.sorgenteTipo = guasto.sorgenteTipo;
         storico.sorgenteId = guasto.sorgenteId;
-        storico.nomeSorgente = nomeDellaSorgente(guasto.sorgenteTipo, guasto.sorgenteId);
+        storico.nomeSorgente = nomeSorgente;
         storico.messaggio = guasto.messaggio;
         storico.risolto = guasto.risolto;
         storico.tsApertura = guasto.timestamp != null ? guasto.timestamp : Instant.now();
@@ -119,21 +122,5 @@ public class StoricoGuasto extends PanacheEntityBase {
             storico.matricolaOperatore = guasto.operatore.matricola;
         }
         return storico;
-    }
-
-    /**
-     * Cerca il nome della sorgente da congelare nello storico. Per una stazione va letto
-     * dall'anagrafica (l'id da solo, tipo "S3", non dice niente a chi rilegge lo storico
-     * fra un mese); per un convoglio l'identificativo è già il nome.
-     */
-    private static String nomeDellaSorgente(String sorgenteTipo, String sorgenteId) {
-        if (sorgenteId == null || sorgenteId.isEmpty()) {
-            return null;
-        }
-        if ("STAZIONE".equalsIgnoreCase(sorgenteTipo)) {
-            Stazione stazione = Stazione.findById(sorgenteId);
-            return stazione != null ? stazione.nome : sorgenteId;
-        }
-        return sorgenteId;
     }
 }

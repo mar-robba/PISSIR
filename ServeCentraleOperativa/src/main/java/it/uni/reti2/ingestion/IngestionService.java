@@ -4,12 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.quarkus.narayana.jta.QuarkusTransaction;
-import io.quarkus.panache.common.Sort;
 import io.smallrye.common.annotation.Blocking;
 // quindi Anche Treno
 import it.uni.reti2.entity.*;
 import it.uni.reti2.elaboration.TrafficLogicEngine;
 import it.uni.reti2.gateway.RealtimeWebSocket;
+import it.uni.reti2.persistence.RailwayRepository;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -100,6 +100,10 @@ public class IngestionService {
 
     @Inject
     RealtimeWebSocket webSocket;
+
+    /** Unico punto da cui questa classe legge e scrive il database. */
+    @Inject
+    RailwayRepository repository;
 
 // Ste conversioni vanno messe a posto, bisogna fare solo un unico tipo di dato
     /**
@@ -228,7 +232,7 @@ public class IngestionService {
     private void salvaStatoTreno(String trenoId, String stato) {
         // è una operazione a postgres? sì ed è fornita dal framework come metodo statico
         // della classe entità, dunque sarebbe un metodo statico della classe Treno
-        Treno dbTreno = Treno.findById(trenoId);
+        Treno dbTreno = repository.trovaTreno(trenoId);
         if (dbTreno == null) {
             LOG.warnf("🚫 Il treno '%s' non è nella tabella Treni: nessuna scrittura", trenoId);
             return;
@@ -241,8 +245,7 @@ public class IngestionService {
         dbTreno.stato = stato;
 
         if (statoCambiato) {
-            StoricoStatoTreno storico = StoricoStatoTreno.fotografiaDi(dbTreno, statoPrecedente);
-            storico.persist();
+            repository.salvaStoricoStatoTreno(dbTreno, statoPrecedente);
         }
     }
 
@@ -286,7 +289,7 @@ public class IngestionService {
      */
     private List<Guasto> chiudiGuastiTrenoFermo(String trenoId) {
         List<Guasto> chiusi = new ArrayList<>();
-        List<Guasto> aperti = Guasto.list("sorgenteId = ?1 and sorgenteTipo = 'TRENO' and risolto = false", trenoId);
+        List<Guasto> aperti = repository.guastiApertiDi(trenoId, "TRENO");
         for (Guasto guasto : aperti) {
             if (guasto.messaggio == null || !guasto.messaggio.startsWith(MSG_TRENO_FERMO)) {
                 continue; // avaria dichiarata dal convoglio: la chiude un operatore
@@ -294,7 +297,7 @@ public class IngestionService {
             guasto.risolto = true;
             guasto.timestampRisoluzione = Instant.now();
 
-            StoricoGuasto storico = StoricoGuasto.find("guastoId", guasto.id).firstResult();
+            StoricoGuasto storico = repository.trovaStoricoGuasto(guasto.id);
             if (storico != null) {
                 storico.risolto = true;
                 storico.tsChiusura = guasto.timestampRisoluzione;
@@ -371,12 +374,11 @@ public class IngestionService {
      *                         il cambiamento e non solo il punto di arrivo.
      */
     private void storicizzaStatoStazione(String stazioneId, String stato, String statoPrecedente) {
-        Stazione dbStazione = Stazione.findById(stazioneId);
+        Stazione dbStazione = repository.trovaStazione(stazioneId);
         if (dbStazione == null) {
             return;
         }
-        StoricoStatoStazione storico = StoricoStatoStazione.fotografiaDi(dbStazione, stato, statoPrecedente);
-        storico.persist();
+        repository.salvaStoricoStatoStazione(dbStazione, stato, statoPrecedente);
     }
 
     /**
@@ -388,7 +390,7 @@ public class IngestionService {
      */
     private List<Guasto> chiudiGuastiHeartbeatPerso(String stazioneId) {
         List<Guasto> chiusi = new ArrayList<>();
-        List<Guasto> aperti = Guasto.list("sorgenteId = ?1 and sorgenteTipo = 'STAZIONE' and risolto = false", stazioneId);
+        List<Guasto> aperti = repository.guastiApertiDi(stazioneId, "STAZIONE");
         for (Guasto guasto : aperti) {
             if (guasto.messaggio == null || !guasto.messaggio.startsWith(MSG_HEARTBEAT_PERSO)) {
                 continue; // guasto dichiarato dalla stazione: lo chiude un operatore
@@ -396,7 +398,7 @@ public class IngestionService {
             guasto.risolto = true;
             guasto.timestampRisoluzione = Instant.now();
 
-            StoricoGuasto storico = StoricoGuasto.find("guastoId", guasto.id).firstResult();
+            StoricoGuasto storico = repository.trovaStoricoGuasto(guasto.id);
             if (storico != null) {
                 storico.risolto = true;
                 storico.tsChiusura = guasto.timestampRisoluzione;
@@ -462,8 +464,8 @@ public class IngestionService {
     private void registraTransito(String trenoId, String stazioneId, String tipo,
                                   Instant quandoEPassato, int ritardoMinuti) {
         Instant adesso = quandoEPassato != null ? quandoEPassato : Instant.now();
-        Treno dbTreno = Treno.findById(trenoId);
-        Stazione dbStazione = Stazione.findById(stazioneId);
+        Treno dbTreno = repository.trovaTreno(trenoId);
+        Stazione dbStazione = repository.trovaStazione(stazioneId);
         if (dbTreno == null || dbStazione == null) {
             LOG.warnf("🚫 Transito ignorato: treno '%s' o stazione '%s' non presenti a DB", trenoId, stazioneId);
             return;
@@ -478,15 +480,13 @@ public class IngestionService {
             transito.tratta = dbTreno.posizioneAttualeTratta;
             transito.tempoEntrata = adesso;
             transito.ritardoMinuti = ritardoMinuti;
-            transito.persist();
+            repository.salvaTransito(transito);
 
             // Storicizza subito l'apertura (record con tempoUscita null)
             storicizzaTransito(transito);
         } else {
             // USCITA: chiude il transito aperto per stesso treno+stazione
-            Transito aperto = Transito.find(
-                    "treno.id = ?1 and stazione.id = ?2 and tempoUscita is null",
-                    trenoId, stazioneId).firstResult();
+            Transito aperto = repository.trovaTransitoAperto(trenoId, stazioneId);
             if (aperto != null) {
                 aperto.tempoUscita = adesso;
                 aperto.ritardoMinuti = ritardoMinuti;
@@ -502,7 +502,7 @@ public class IngestionService {
                 transito.tempoEntrata = adesso;
                 transito.tempoUscita = adesso;
                 transito.ritardoMinuti = ritardoMinuti;
-                transito.persist();
+                repository.salvaTransito(transito);
                 storicizzaTransito(transito);
             }
         }
@@ -515,8 +515,7 @@ public class IngestionService {
      * lo storico non ha più chiavi esterne verso l'anagrafica (RF02.7).
      */
     private void storicizzaTransito(Transito transito) {
-        StoricoTransito storico = StoricoTransito.fotografiaDi(transito);
-        storico.persist();
+        repository.salvaStoricoTransito(transito);
     }
 
     /**
@@ -600,10 +599,8 @@ public class IngestionService {
             guasto.risolto = false;
 
             QuarkusTransaction.requiringNew().run(() -> {
-                guasto.persist();
-
-                StoricoGuasto storico = StoricoGuasto.fotografiaDi(guasto);
-                storico.persist();
+                repository.salvaGuasto(guasto);
+                repository.salvaStoricoGuasto(guasto);
             });
             statoRete.aggiungiGuasto(guasto);
             marcaSorgenteGuasta(sorgenteTipo, sorgenteId, severita);
@@ -725,27 +722,21 @@ public class IngestionService {
 
         try {
             QuarkusTransaction.requiringNew().run(() -> {
-                guastoStazione.persist();
-
-                StoricoGuasto storicoGuasto = StoricoGuasto.fotografiaDi(guastoStazione);
-                storicoGuasto.persist();
+                repository.salvaGuasto(guastoStazione);
+                repository.salvaStoricoGuasto(guastoStazione);
 
                 // Audit log sull'evento stazione
-                EventoStazione evento = new EventoStazione();
-                evento.stazioneId = stazioneId;
-                evento.nomeStazione = stazione.nome != null ? stazione.nome : stazioneId;
-                evento.stato = "GUASTA";
-                evento.tipoEvento = "CONVOGLIO_GUASTO";
-                evento.descrizione = "Convoglio " + treno.id
-                        + " guasto: stazione non percorribile";
-                evento.persist();
+                repository.salvaEventoStazione(
+                        stazioneId,
+                        stazione.nome != null ? stazione.nome : stazioneId,
+                        "GUASTA",
+                        "CONVOGLIO_GUASTO",
+                        "Convoglio " + treno.id + " guasto: stazione non percorribile");
 
                 // Storico del cambio di stato della stazione
-                Stazione dbStazione = Stazione.findById(stazioneId);
+                Stazione dbStazione = repository.trovaStazione(stazioneId);
                 if (dbStazione != null) {
-                    StoricoStatoStazione storicoStato = StoricoStatoStazione.fotografiaDi(
-                            dbStazione, "GUASTA", statoPrecedente);
-                    storicoStato.persist();
+                    repository.salvaStoricoStatoStazione(dbStazione, "GUASTA", statoPrecedente);
                 }
             });
         } catch (Exception e) {
@@ -785,7 +776,7 @@ public class IngestionService {
 
     /** Aggiorna il testo di un guasto già aperto (deduplica degli alert ripetuti). */
     private void aggiornaMessaggioGuasto(String guastoId, String messaggio) {
-        Guasto dbGuasto = Guasto.findById(guastoId);
+        Guasto dbGuasto = repository.trovaGuasto(guastoId);
         if (dbGuasto != null) {
             dbGuasto.messaggio = messaggio;
         }
@@ -1014,7 +1005,7 @@ public class IngestionService {
      * e calcola quale sarà la prossima stazione.
      */
     private EsitoPassaggio aggiornaPosizioneSuTratta(String trenoId, String stazioneId, String tipo, String direzione) {
-        Treno dbTreno = Treno.findById(trenoId);
+        Treno dbTreno = repository.trovaTreno(trenoId);
         if (dbTreno == null || dbTreno.itinerario == null) {
             return new EsitoPassaggio(null, null);
         }
@@ -1035,7 +1026,7 @@ public class IngestionService {
      * @return ID della prossima stazione, o null se capolinea/itinerario non noto.
      */
     private String calcolaProssimaStazione(String itinerarioId, String stazioneId, String direzione) {
-        List<String> stazioni = stazioniOrdinateDiItinerario(itinerarioId);
+        List<String> stazioni = repository.stazioniOrdinateDi(itinerarioId);
         int idx = stazioni.indexOf(stazioneId);
         if (idx < 0) return null;
 
@@ -1046,31 +1037,13 @@ public class IngestionService {
     }
 
     /**
-     * Ricostruisce la sequenza ordinata degli ID stazione di un itinerario
-     * a partire dalle righe di Itinerario_Tratta.
-     */
-    private List<String> stazioniOrdinateDiItinerario(String itinerarioId) {
-        List<ItinerarioTratta> tratte = ItinerarioTratta
-                .find("itinerario.id", Sort.by("ordine"), itinerarioId).list();
-        List<String> stazioni = new ArrayList<>();
-        if (!tratte.isEmpty()) {
-            stazioni.add(tratte.get(0).tratta.stazionePartenza.id);
-            for (ItinerarioTratta it : tratte) {
-                stazioni.add(it.tratta.stazioneArrivo.id);
-            }
-        }
-        return stazioni;
-    }
-
-    /**
      * Trova la tratta dell'itinerario coerente con l'evento di passaggio:
      * per una ENTRATA la tratta appena percorsa (arrivo = stazione), per una
      * USCITA la tratta che il treno sta imboccando (partenza = stazione).
      * In direzione "ritorno" i ruoli di partenza/arrivo si invertono.
      */
     private Tratta trovaTratta(String itinerarioId, String stazioneId, String tipo, String direzione) {
-        List<ItinerarioTratta> tratte = ItinerarioTratta
-                .find("itinerario.id", Sort.by("ordine"), itinerarioId).list();
+        List<ItinerarioTratta> tratte = repository.tratteOrdinateDi(itinerarioId);
         boolean andata = !"ritorno".equalsIgnoreCase(direzione);
         boolean entrata = "ENTRATA".equalsIgnoreCase(tipo);
         for (ItinerarioTratta it : tratte) {

@@ -2,22 +2,10 @@
 #+LATEX_HEADER: \usepackage{longtable}
 #+LATEX_HEADER: \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 #+LATEX_HEADER: \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
-#+begin_comment
-sas#+title:Monitoraggio e gestione del traffico ferroviario Documentazione
-// per mermid mettere il codice solo nel file .org e poi usare la foto del mermid compilato nel latex
-//nota: se non compilo/eseguo almeno un codice al salvataggio non mi fa la creazione del pdf
-C-c C-x v per aprire un'immagine linkata in emacs
-C-c C-, per inserire un blocco di codice velocemente
-C-c C-c per compilare il codice
-#+end_comment
 * Introduzione Descrizione Generale
 Cio che è realizzato è al fine della gestione di una rete ferroviaria e, in particolare, la gestione
 delle stazioni, dei treni che compongono tale rete.
 La gestione della rete è fornita attraverso in un app web che fornisce il neccessarrio per il monitoraggio e l'amiinistrazione della rete
-#+begin_comment
-i Diagrammi di sequenza e delle classi
-I diagrammi di sequenza stanno nel capitolo /Progettazione/, insieme alle macchine a stati e ai diagrammi delle classi: sono tre letture dello stesso codice e tenerle vicine e' l'unico modo per confrontarle.
-#+end_comment
 * Specifica
 ** Modellazione per casi d'uso
 
@@ -60,13 +48,6 @@ I diagrammi di sequenza stanno nel capitolo /Progettazione/, insieme alle macchi
   attestato.
 ** Vocabolario degli stati osservabili
 
-#+begin_comment
- sono le parole con cui il sistema
-risponde alla domanda "come sta questa cosa adesso", e chi legge una schermata deve poterle
-interpretare senza ambiguita'.
-
-#+end_comment
-
 *** Stato del convoglio
 
 #+attr_latex: :align |p{0.22\textwidth}|p{0.68\textwidth}|
@@ -89,13 +70,6 @@ contraddizione: e' la conseguenza di che cosa ciascuno dei due puo' sapere.
 | GUASTA       | la stazione, la centrale | la stazione non e' percorribile: i convogli non ci entrano e non ne escono |
 | OFFLINE      | solo la centrale       | la stazione non da' piu' notizie di se'                                   |
 | MANUTENZIONE | solo la centrale       | la squadra e' stata mandata sul posto e sta lavorando                    |
-#+begin_comment
-(non ho capito)
-*Perche' la stazione non dichiara OFFLINE e MANUTENZIONE*: il primo e' un giudizio che si puo' dare
-solo da fuori, perche' una stazione che si credesse offline avrebbe comunque il canale per dirlo, e
-allora non lo sarebbe; il secondo e' la conseguenza di una decisione presa da un utente, di cui la
-stazione e' destinataria e non autrice.
-#+end_comment
 
 ** Come si legge un requisito
 
@@ -121,16 +95,6 @@ tabelle /Riepilogo requisiti/ (in fondo a questo capitolo per le macchine a stat
 lo si legge.
 
 La numerazione è gerarchica per raggruppamenti e, come suvisto, presenta anche le dipendenze
-
-#+begin_comment
-La numerazione e' gerarchica e la gerarchia significa *decomposizione*: =RF0X.Y= e' una parte di
-=RF0X=, e =RF0X= e' soddisfatto quando lo sono tutte le sue parti. La *dipendenza* e' un'altra
-relazione: "A dipende da B" vuol dire che togliendo B il requisito A non e' piu' soddisfacibile
-(test di eliminazione). Le due relazioni sono distinte anche nel grafo in fondo al capitolo.
-
-
-Dal punto di vista della logica formale e booleana, il tuo ragionamento non fa una piega: se la soddisfazione di $RF0X$ è definita come $RF0X = RF0X.1 \land RF0X.2$, rimuovere $RF0X.1$ rende $RF0X$ irrealizzabile. Quindi, applicando il "test di eliminazione" alla lettera, sembra esistere una dipendenza.Tuttavia, nell'Ingegneria dei Requisiti (e nella teoria dei grafi applicata al software), la decomposizione e la dipendenza vengono tenute rigorosamente distinte. Il motivo è concettuale, metodologico e pratico.1. Identità vs Accoppiamento EsternoDecomposizione (Relazione Strutturale / Part-Of):$RF0X.1$ non è un requisito "esterno" o "separato", ma è un costituente interno di $RF0X$. Rimuovere $RF0X.1$ non significa far fallire un prerequisito di $RF0X$, ma ridefinire o distruggere l'identità stessa di $RF0X$.Dipendenza (Relazione Funzionale / Depends-On):Collega due requisiti semanticamente autonomi. Se $RF05$ ("Mostra posizione treno") dipende da $RF02$ ("Ricevi coordinate GPS"), i due requisiti esistono separatamente. Se elimini $RF02$, $RF05$ continua a esistere come concetto, ma non ha più i dati per funzionare.
-#+end_comment
 
 ** RF01 - Servizi offerti agli utenti
 
@@ -243,9 +207,6 @@ riservate all'amministratore; il tecnico vede tutto ma non modifica nulla.
 - esito atteso: o l'eliminazione viene rifiutata con una spiegazione comprensibile, oppure viene
   eseguita insieme a tutto cio' che senza quell'entita' non avrebbe piu' significato.
 - *perche' e' qui*:
-#+begin_comment
-allora forse è meglio metterla in RF2 porca la miseriaccia
-#+end_comment
  senza questo requisito la correttezza promessa da RF02 dura fino alla prima
   eliminazione.
 - stato di implementazione: completo. Ogni eliminazione o viene rifiutata dicendo il motivo (la
@@ -302,9 +263,6 @@ tre la fa per intero.
   identita', l'applicazione riceve solo l'attestato e l'uscita esplicita chiude la sessione.
 
 ** RF02 - Correttezza dello stato rappresentato
-#+begin_comment
-forse sarebbe stato meglio mettere questa parte come regole di dominio dopo lo studio del dominio
-#+end_comment
 *Enunciato*: lo stato che il sistema mostra e conserva corrisponde a quello che sta realmente
 accadendo sulla rete, anche in presenza di guasti, di interruzioni del collegamento e di modifiche
 fatte mentre il sistema e' in funzione.
@@ -571,9 +529,6 @@ grafo la dipendenza e' disegnata una volta sola sui tre rami invece che su ogni 
 e RF02.4.2.
 
 *** RF02.5 - Modifica dell'itinerario a sistema acceso
-#+begin_comment
-mancano la condizione di esistenza delle tratte per qualsiasi modifica all'itinerario che si voglia fare
-#+end_comment
 *Enunciato del ramo*: l'amministratore puo' cambiare le stazioni attraversate da un itinerario e i
 convogli assegnati mentre i convogli sono gia' in marcia, e il sistema resta coerente.
 
@@ -665,9 +620,6 @@ anche l'unico invisibile.
   non le scrive nessuno, compaiono solo nelle cancellazioni di pulizia.
 
 ** RF03 - Contratti di interazione fra le parti
-#+begin_comment
-anche queste sarebbero regole di dominio
-#+end_comment
 *Enunciato*: le parti del sistema interagiscono secondo obblighi dichiarati, in modo che ciascuna
 possa funzionare, fallire e ripartire senza trascinare con se' le altre.
 
@@ -920,890 +872,6 @@ passo.
 | RF03      | SV02, SV05                |
 | RF04      | verifica dedicata (RF04.2, RF04.3) |
 
-#+begin_comment
- Esclusioni dichiarate
-
-Quello che segue *non* fa parte della specifica. Lo scrivo qui perche' un confine taciuto viene
-scambiato per una dimenticanza.
-
-#+attr_latex: :align |p{0.36\textwidth}|p{0.54\textwidth}|
-| cosa non e' previsto                                | perche'                                                                                                   |
-|-----------------------------------------------------+-------------------------------------------------------------------------------------------------------------|
-| ordine di rallentare o fermare un convoglio a piacere | il fermo di un convoglio e' sempre la conseguenza di una condizione della rete (un guasto, un itinerario che cambia), mai un comando diretto sulla marcia |
-| previsione dell'orario di arrivo                     | il sistema calcola e mostra il ritardo *gia' accumulato*, che e' una misura; una stima dell'arrivo futuro sarebbe una previsione, ed e' un problema diverso |
-| assegnazione del binario al singolo convoglio        | la stazione e' trattata come un unico punto di transito: si sa quali convogli ci sono, non su quale via     |
-| precedenze e incroci fra convogli sulla stessa tratta | il sistema *osserva* il traffico, non lo regola: non decide chi passa per primo e non impedisce a due convogli di trovarsi sulla stessa tratta |
-| gestione dei passeggeri reali                        | il numero di passeggeri e' un valore simulato che serve a rendere leggibile la corsa; non c'e' nessuna prenotazione, nessuna vendita, nessun conteggio reale |
-| orario di servizio pianificato                       | gli itinerari hanno tempi di percorrenza previsti, non orari di partenza pianificati; il ritardo e' misurato rispetto alla percorrenza attesa e non rispetto a un orario ufficiale |
-| gestione degli utenti dall'applicazione web          | creare un operatore, cambiargli il ruolo o la password si fa sulla console del servizio di identita', non dalle schermate del sistema: l'anagrafica degli utenti non e' un'anagrafica della rete |
-| identita' per i nodi di campo                        | stazioni e convogli non sono utenti e non si identificano con credenziali: la loro verifica e' quella dell'identita' di nodo (RF02.4), ed e' un confine diverso da quello di RF04.1 |
-
-#+end_comment
-** Grafo delle dipendenze fra i requisiti
-#+begin_comment
-// Marco: prova a capire che vantaggi procettuali ti da il grafo delle dipendenze tra i requisiti
-#+end_comment
-
-Convenzioni: linea piena =*--= per la *decomposizione* (il requisito si specifica nelle sue parti),
-freccia tratteggiata =..>= per la *dipendenza*, cioe' "togliendo il bersaglio il requisito non e'
-piu' soddisfacibile". Dove tutte le parti di un requisito dipendono dalla stessa cosa, la freccia e'
-disegnata una volta sola sul padre.
-
-I grafi si chiamano =G1= ... =G8= e non =S1= ... =S8= per non confonderli con le macchine a
-stati della stazione, che nel capitolo /Progettazione/ portano gia' quelle sigle.
-
-Disegnato tutto insieme il grafo non si legge: quattro radici, sette aree di dominio e una trentina
-di frecce su un foglio solo. Qui e' spezzato in una *mappa generale*, che tiene solo le aree e le
-dipendenze fra aree, e otto *grafi di dettaglio* (=G1= ... =G8=) che si guardano uno per volta.
-
-Due cose da sapere per leggere i grafi di dettaglio:
-
-- un requisito che compare in un grafo ma e' *decomposto altrove* e' disegnato in bianco bordato di
-  grigio, con scritto sotto in quale grafo trovarlo: cosi' ogni figura si chiude da sola e si sa
-  sempre dove continuare;
-- una stessa freccia puo' comparire in due grafi, una volta come uscente e una come entrante. Non e'
-  una ripetizione per sbaglio: e' l'unico modo perche' chi legge il grafo del bersaglio veda da chi
-  e' tenuto in piedi.
-
-L'ultimo grafo, =G8=, non decompone niente: tiene solo le frecce di dipendenza attorno ai tre
-requisiti cardine, ed e' quello da guardare per rispondere alla domanda "se questo requisito cade,
-che cosa si porta dietro?".
-
-*** Mappa generale
-
-La decomposizione di RF02 qui e' resa dal *contenimento* invece che dagli archi =*--=: le aree stanno
-dentro il riquadro di RF02. E' l'unico modo per non riempire di nuovo la figura di linee lunghe.
-Le frecce fra aree portano l'etichetta del requisito preciso che fa da bersaglio; da quale foglia
-partano davvero si vede nel grafo di dettaglio.
-
-#+begin_src plantuml :file ./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_mappa.png
-@startuml rf_grafo_mappa
-
-skinparam backgroundColor #FEFEFE
-skinparam shadowing false
-skinparam ArrowColor #5F6368
-skinparam rectangle {
-    BackgroundColor #E8F0FE
-    BorderColor #1A73E8
-    FontColor #202124
-}
-skinparam rectangle<<radice>> {
-    BackgroundColor #D2E3FC
-    BorderColor #174EA6
-}
-skinparam rectangle<<dominio>> {
-    BackgroundColor #E6F4EA
-    BorderColor #137333
-}
-skinparam note {
-    BackgroundColor #FFF9C4
-    BorderColor #F9A825
-}
-
-title Mappa dei grafi delle dipendenze\nogni riquadro rimanda al grafo di dettaglio che lo sviluppa
-
-rectangle "RF01 - Servizi offerti\nagli utenti\n<size:11>dettaglio: G1</size>" as RF01 <<radice>>
-
-rectangle "RF02 - Correttezza dello stato rappresentato" as RF02 <<radice>> {
-    rectangle "RF02.1 - Gestione dei guasti\n<size:11>dettaglio: G2</size>" as RF0201 <<dominio>>
-    rectangle "RF02.2 - Gestione dei convogli\n<size:11>dettaglio: G3</size>" as RF0202 <<dominio>>
-    rectangle "RF02.3 - Gestione delle stazioni\n<size:11>dettaglio: G4</size>" as RF0203 <<dominio>>
-    rectangle "RF02.4 - Identita' del nodo\n<size:11>dettaglio: G5</size>" as RF0204 <<dominio>>
-    rectangle "RF02.5 - Modifica dell'itinerario\n<size:11>dettaglio: G5</size>" as RF0205 <<dominio>>
-    rectangle "RF02.6 - Anomalie dedotte\n<size:11>dettaglio: G6</size>" as RF0206 <<dominio>>
-    rectangle "RF02.7 - Memoria storica\n<size:11>dettaglio: G6</size>" as RF0207 <<dominio>>
-}
-
-rectangle "RF03 - Contratti di interazione\nfra le parti\n<size:11>dettaglio: G7</size>" as RF03 <<radice>>
-rectangle "RF04 - Accesso e protezione\n<size:11>dettaglio: G7</size>" as RF04 <<radice>>
-
-' ---- fra le radici ----
-RF01 ..> RF02 : l'interfaccia espone il dominio,\nnon lo corregge
-RF01 ..> RF04 : il ruolo senza controllo\nsui dati e' solo grafica
-RF02 ..> RF03 : senza i contratti di interazione\nnon arriva nessun dato
-
-' ---- fra le aree di RF02 ----
-RF0201 ..> RF0204 : dipende
-RF0202 ..> RF0204 : dipende
-RF0203 ..> RF0204 : dipende
-
-RF0201 ..> RF0202 : posizione del convoglio\n(RF02.2.2.1)
-RF0205 ..> RF0202 : posizione del convoglio\n(RF02.2.2.1)
-RF0206 ..> RF0202 : posizione e passaggi
-
-RF0202 ..> RF0201 : il ritardo cresce\nquando il convoglio e' fermo
-RF0203 ..> RF0201 : e' la stessa informazione\nlocale (RF02.1.1.1)
-RF0206 ..> RF0201 : unicita' del guasto\n(RF02.1.3)
-
-RF0201 ..> RF0203 : segnale di vita\n(RF02.3.2)
-RF0206 ..> RF0203 : segnale di vita\n(RF02.3.2)
-
-RF0207 ..> RF0202 : passaggi asimmetrici\n(RF02.2.4)
-RF0207 ..> RF03 : la storia si scrive sulla\nrilevazione a terra (RF03.3)
-RF0205 ..> RF03 : l'itinerario arriva\ndalla centrale (RF03.5)
-RF03 ..> RF0201 : il nodo lavora anche\nsenza centrale (RF03.2)
-
-note bottom of RF0204
-  Le tre frecce che arrivano qui sono fattorizzate sui rami:
-  senza la verifica dell'identita' nessun nodo entra in servizio,
-  quindi non arriva nessun dato e cadono RF02.1, RF02.2 e RF02.3
-  per intero. Il quadro completo dei cardini e' nel grafo G8.
-end note
-
-legend bottom
-  |= arco |= significato |
-  | riquadro dentro un riquadro | decomposizione: il requisito si specifica nelle sue parti |
-  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
-  | Gn | rimando al grafo di dettaglio |
-end legend
-
-@enduml
-#+end_src
-
-#+RESULTS:
-[[file:./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_mappa.png]]
-
-*** G1 - RF01, i servizi offerti agli utenti
-
-RF01 e' quello che l'utente vede: non aggiunge logica al dominio, la espone. Per questo tutte le sue
-frecce escono e nessuna entra, e ogni servizio punta al requisito di dominio che lo rende possibile.
-
-#+begin_src plantuml :file ./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s1_servizi.png
-@startuml rf_grafo_s1_servizi
-
-skinparam backgroundColor #FEFEFE
-skinparam shadowing false
-skinparam ArrowColor #5F6368
-skinparam rectangle {
-    BackgroundColor #E8F0FE
-    BorderColor #1A73E8
-    FontColor #202124
-}
-skinparam rectangle<<radice>> {
-    BackgroundColor #D2E3FC
-    BorderColor #174EA6
-}
-skinparam rectangle<<altrove>> {
-    BackgroundColor #FFFFFF
-    BorderColor #BDBDBD
-    FontColor #757575
-}
-skinparam note {
-    BackgroundColor #FFF9C4
-    BorderColor #F9A825
-}
-
-title G1 - RF01 : i servizi offerti agli utenti
-
-rectangle "RF01 - Servizi offerti\nagli utenti" as RF01 <<radice>>
-
-rectangle "RF01.1 - Visualizzazione\ndella situazione corrente" as RF0101
-rectangle "RF01.2 - Visualizzazione\ndei guasti" as RF0102
-rectangle "RF01.3 - Amministrazione\ndei dati della rete" as RF0103
-rectangle "RF01.4 - Comandi operativi" as RF0104
-rectangle "RF01.5 - Consultazione\ndello storico" as RF0105
-rectangle "RF01.6 - Accesso al sistema" as RF0106
-
-RF01 *-- RF0101
-RF01 *-- RF0102
-RF01 *-- RF0103
-RF01 *-- RF0104
-RF01 *-- RF0105
-RF01 *-- RF0106
-
-' i sei servizi messi su due file: in una sola riga il grafo viene
-' largo il triplo di quanto e' alto e in pagina non si legge piu'
-' Questi archi “forzano” il motore di layout a disporre i nodi in un certo ordine spaziale, senza che l’utente veda nulla.'
-RF0101 -[hidden]-> RF0104
-RF0102 -[hidden]-> RF0105
-RF0103 -[hidden]-> RF0106
-
-' ---- quello che sta fuori da questo grafo ----
-rectangle "RF02 - Correttezza dello\nstato rappresentato\n<size:11>mappa generale</size>" as RF02 <<altrove>>
-rectangle "RF02.2.2.1 - Posizione\ndel convoglio\n<size:11>G3</size>" as RF02020201 <<altrove>>
-rectangle "RF02.3.1 - Informazioni\nrese dalla stazione\n<size:11>G4</size>" as RF020301 <<altrove>>
-rectangle "RF02.1 - Gestione\ndei guasti\n<size:11>G2</size>" as RF0201 <<altrove>>
-rectangle "RF02.6 - Anomalie\ndedotte\n<size:11>G6</size>" as RF0206 <<altrove>>
-rectangle "RF02.5 - Modifica\ndell'itinerario\n<size:11>G5</size>" as RF0205 <<altrove>>
-rectangle "RF02.1.3 - Ciclo di vita\ndel guasto\n<size:11>G2</size>" as RF020103 <<altrove>>
-rectangle "RF02.7 - Memoria\nstorica\n<size:11>G6</size>" as RF0207 <<altrove>>
-rectangle "RF04.2 - Autorizzazione\nper ruolo\n<size:11>G7</size>" as RF0402 <<altrove>>
-
-RF01 ..> RF02 : l'interfaccia espone il dominio,\nnon lo corregge
-
-RF0101 ..> RF02020201 : posizione del convoglio
-RF0101 ..> RF020301 : stato della stazione
-RF0102 ..> RF0201 : dipende
-RF0102 ..> RF0206 : per distinguere segnalato\nda dedotto
-RF0103 ..> RF0205 : la modifica deve\nrestare corretta
-RF0104 ..> RF020103 : agisce sul ciclo\ndi vita del guasto
-RF0105 ..> RF0207 : legge la memoria storica
-RF0106 ..> RF0402 : il ruolo senza controllo\nsui dati e' solo grafica
-
-note top of RF01
-  La freccia su RF02 sta sulla radice e basta: vale per
-  tutti e sei i servizi, quindi si fattorizza una volta
-  sola invece di ripeterla sei volte.
-end note
-
-legend bottom
-  |= arco |= significato |
-  | linea piena (*--) | decomposizione: il requisito si specifica nelle sue parti |
-  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
-  | riquadro bianco bordato di grigio | requisito decomposto in un altro grafo |
-end legend
-
-@enduml
-#+end_src
-
-#+RESULTS:
-[[file:./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s1_servizi.png]]
-
-*** G2 - RF02.1, la gestione dei guasti
-
-Il guasto segnalato dal campo. Le conseguenze di un guasto sono tutte domande sulla posizione del
-convoglio, e la chiusura automatica e' una domanda sul segnale di vita: sono i due cardini che questo
-ramo consuma.
-
-#+begin_src plantuml :file ./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s2_guasti.png
-@startuml rf_grafo_s2_guasti
-
-skinparam backgroundColor #FEFEFE
-skinparam shadowing false
-skinparam ArrowColor #5F6368
-skinparam rectangle {
-    BackgroundColor #E8F0FE
-    BorderColor #1A73E8
-    FontColor #202124
-}
-skinparam rectangle<<dominio>> {
-    BackgroundColor #E6F4EA
-    BorderColor #137333
-}
-skinparam rectangle<<cardine>> {
-    BackgroundColor #FEF7E0
-    BorderColor #F9A825
-}
-skinparam rectangle<<altrove>> {
-    BackgroundColor #FFFFFF
-    BorderColor #BDBDBD
-    FontColor #757575
-}
-skinparam note {
-    BackgroundColor #FFF9C4
-    BorderColor #F9A825
-}
-
-title G2 - RF02.1 : la gestione dei guasti
-
-rectangle "RF02.1 - Gestione dei guasti" as RF0201 <<dominio>>
-
-rectangle "RF02.1.1.1 - Nessun dato perduto\ne ordine preservato" as RF02010101
-rectangle "RF02.1.1.2 - Stazione non percorribile:\nil convoglio si ferma e riparte\nsolo al ripristino" as RF02010102
-rectangle "RF02.1.2.2.1 - Convoglio guasto in stazione:\nstazione non percorribile" as RF0201020201
-rectangle "RF02.1.2.2.2 - Convoglio guasto in tratta:\ntratta non percorribile" as RF0201020202
-rectangle "RF02.1.3 - Ciclo di vita del guasto\n(unicita' per sorgente)" as RF020103
-rectangle "RF02.1.4 - Chiusura automatica\nquando la causa rientra" as RF020104
-
-RF0201 *-- RF02010101
-RF0201 *-- RF02010102
-RF0201 *-- RF0201020201
-RF0201 *-- RF0201020202
-RF0201 *-- RF020103
-RF0201 *-- RF020104
-
-' come sopra: due file invece di sei riquadri affiancati
-RF02010101 -[hidden]-> RF0201020201
-RF02010102 -[hidden]-> RF0201020202
-RF020103 -[hidden]-> RF020104
-
-' ---- quello che sta fuori da questo grafo ----
-rectangle "RF02.2.2.1 - Posizione:\nin quale stazione o su quale tratta\n<size:11>G3</size>" as RF02020201 <<altrove>>
-rectangle "RF02.3.2 - Segnale di vita\nstazione -> centrale\n<size:11>G4</size>" as RF020302 <<altrove>>
-rectangle "RF02.4 - Identita' del nodo\nverificata in centrale\n<size:11>G5</size>" as RF0204 <<altrove>>
-
-RF0201 ..> RF0204 : dipende
-RF02010102 ..> RF02020201 : dipende
-RF0201020201 ..> RF02020201 : dipende
-RF0201020202 ..> RF02020201 : dipende
-RF020104 ..> RF020302 : e' il ritorno del segnale\na chiudere il guasto
-
-note bottom of RF02010101
-  L'informazione che sopravvive all'interruzione e' una sola:
-  questa. RF02.3.1, in G4, non ne tiene una seconda, serve
-  alla visualizzazione proprio quello che qui non si perde.
-end note
-
-note top of RF0201
-  Chi dipende da quest'area, dagli altri grafi:
-  - RF01.2  visualizzazione dei guasti (G1)
-  - RF01.4  comandi operativi, su RF02.1.3 (G1)
-  - RF02.2.1 i ritardi crescono sui fermi (G3)
-  - RF02.6.1 unicita' del guasto, su RF02.1.3 (G6)
-  - RF03.2  il nodo lavora anche senza centrale (G7)
-end note
-
-legend bottom
-  |= arco |= significato |
-  | linea piena (*--) | decomposizione: il requisito si specifica nelle sue parti |
-  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
-  | riquadro bianco bordato di grigio | requisito decomposto in un altro grafo |
-end legend
-
-@enduml
-#+end_src
-
-#+RESULTS:
-[[file:./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s2_guasti.png]]
-
-*** G3 - RF02.2, la gestione dei convogli
-
-Qui dentro sta RF02.2.2.1, il primo dei tre cardini: la posizione del convoglio. Le frecce che gli
-arrivano da fuori sono sei e stanno tutte insieme in G8.
-
-#+begin_src plantuml :file ./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s3_convogli.png
-@startuml rf_grafo_s3_convogli
-
-skinparam backgroundColor #FEFEFE
-skinparam shadowing false
-skinparam ArrowColor #5F6368
-skinparam rectangle {
-    BackgroundColor #E8F0FE
-    BorderColor #1A73E8
-    FontColor #202124
-}
-skinparam rectangle<<dominio>> {
-    BackgroundColor #E6F4EA
-    BorderColor #137333
-}
-skinparam rectangle<<cardine>> {
-    BackgroundColor #FEF7E0
-    BorderColor #F9A825
-}
-skinparam rectangle<<altrove>> {
-    BackgroundColor #FFFFFF
-    BorderColor #BDBDBD
-    FontColor #757575
-}
-skinparam note {
-    BackgroundColor #FFF9C4
-    BorderColor #F9A825
-}
-
-title G3 - RF02.2 : la gestione dei convogli
-
-rectangle "RF02.2 - Gestione dei convogli" as RF0202 <<dominio>>
-
-rectangle "RF02.2.1 - Ritardi" as RF020201
-rectangle "RF02.2.2.1 - Posizione:\nin quale stazione o su quale tratta" as RF02020201 <<cardine>>
-rectangle "RF02.2.2.3 - Stato del convoglio\n(distinto dalla posizione)" as RF02020203
-rectangle "RF02.2.3 - Andata e ritorno\ncon inversione al capolinea" as RF020203
-rectangle "RF02.2.4 - Passaggi asimmetrici\n(esce senza entrare,\nentra senza uscire)" as RF020204
-
-RF0202 *-- RF020201
-RF0202 *-- RF02020201
-RF0202 *-- RF02020203
-RF0202 *-- RF020203
-RF0202 *-- RF020204
-
-RF020204 ..> RF020203 : le asimmetrie nascono\nai due capolinea
-
-' ---- quello che sta fuori da questo grafo ----
-rectangle "RF02.1 - Gestione\ndei guasti\n<size:11>G2</size>" as RF0201 <<altrove>>
-rectangle "RF02.4 - Identita' del nodo\nverificata in centrale\n<size:11>G5</size>" as RF0204 <<altrove>>
-
-RF0202 ..> RF0204 : dipende
-RF020201 ..> RF0201 : cresce quando\nil convoglio e' trattenuto
-
-note bottom of RF02020201
-  Cardine della specifica.
-  "Dove si trova il convoglio" e' la domanda da cui dipendono
-  la conseguenza di un guasto (stazione o tratta non percorribile),
-  la modifica dell'itinerario a sistema acceso e il riconoscimento
-  del convoglio fermo troppo a lungo.
-  Togli questa e cadono sei requisiti in una volta: il quadro
-  completo e' in G8.
-end note
-
-legend bottom
-  |= arco |= significato |
-  | linea piena (*--) | decomposizione: il requisito si specifica nelle sue parti |
-  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
-  | riquadro giallo | requisito cardine: da esso dipendono molti altri |
-  | riquadro bianco bordato di grigio | requisito decomposto in un altro grafo |
-end legend
-
-@enduml
-#+end_src
-
-#+RESULTS:
-[[file:./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s3_convogli.png]]
-
-*** G4 - RF02.3, la gestione delle stazioni
-
-Il secondo cardine e' qui: il segnale di vita della stazione. Il suo valore informativo sta
-nell'assenza, ed e' per questo che due requisiti di aree diverse ci si appoggiano.
-
-#+begin_src plantuml :file ./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s4_stazioni.png
-@startuml rf_grafo_s4_stazioni
-
-skinparam backgroundColor #FEFEFE
-skinparam shadowing false
-skinparam ArrowColor #5F6368
-skinparam rectangle {
-    BackgroundColor #E8F0FE
-    BorderColor #1A73E8
-    FontColor #202124
-}
-skinparam rectangle<<dominio>> {
-    BackgroundColor #E6F4EA
-    BorderColor #137333
-}
-skinparam rectangle<<cardine>> {
-    BackgroundColor #FEF7E0
-    BorderColor #F9A825
-}
-skinparam rectangle<<altrove>> {
-    BackgroundColor #FFFFFF
-    BorderColor #BDBDBD
-    FontColor #757575
-}
-skinparam note {
-    BackgroundColor #FFF9C4
-    BorderColor #F9A825
-}
-
-title G4 - RF02.3 : la gestione delle stazioni
-
-rectangle "RF02.3 - Gestione delle stazioni" as RF0203 <<dominio>>
-
-rectangle "RF02.3.1 - Informazioni\nrese dalla stazione" as RF020301
-rectangle "RF02.3.2 - Segnale di vita\nstazione -> centrale" as RF020302 <<cardine>>
-rectangle "RF02.3.3 - Segnale di vita\nsensori -> stazione" as RF020303
-
-RF0203 *-- RF020301
-RF0203 *-- RF020302
-RF0203 *-- RF020303
-
-' ---- quello che sta fuori da questo grafo ----
-rectangle "RF02.1.1.1 - Nessun dato perduto\ne ordine preservato\n<size:11>G2</size>" as RF02010101 <<altrove>>
-rectangle "RF02.4 - Identita' del nodo\nverificata in centrale\n<size:11>G5</size>" as RF0204 <<altrove>>
-
-RF0203 ..> RF0204 : dipende
-RF020301 ..> RF02010101 : e' la stessa informazione\nche sopravvive all'interruzione
-
-note bottom of RF020302
-  Il valore informativo del segnale di vita sta nella sua assenza:
-  senza un segnale emesso a prescindere dagli eventi, il silenzio
-  di una stazione non e' distinguibile dall'assenza di traffico.
-  Ci si appoggiano RF02.6.1 (stazione silenziosa) e RF02.1.4
-  (chiusura automatica del guasto): si vedono insieme in G8.
-end note
-
-legend bottom
-  |= arco |= significato |
-  | linea piena (*--) | decomposizione: il requisito si specifica nelle sue parti |
-  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
-  | riquadro giallo | requisito cardine: da esso dipendono molti altri |
-  | riquadro bianco bordato di grigio | requisito decomposto in un altro grafo |
-end legend
-
-@enduml
-#+end_src
-
-#+RESULTS:
-[[file:./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s4_stazioni.png]]
-
-*** G5 - RF02.4 e RF02.5, chi entra nel sistema e chi cambia strada
-
-Due aree piccole ma messe insieme non per comodita': una dice a quali condizioni un nodo entra in
-servizio, l'altra a quali condizioni un itinerario puo' cambiare mentre il sistema e' acceso. Sono le
-due porte del sistema, una in ingresso e una in corsa.
-
-#+begin_src plantuml :file ./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s5_identita_itinerario.png
-@startuml rf_grafo_s5_identita_itinerario
-
-skinparam backgroundColor #FEFEFE
-skinparam shadowing false
-skinparam ArrowColor #5F6368
-skinparam rectangle {
-    BackgroundColor #E8F0FE
-    BorderColor #1A73E8
-    FontColor #202124
-}
-skinparam rectangle<<dominio>> {
-    BackgroundColor #E6F4EA
-    BorderColor #137333
-}
-skinparam rectangle<<cardine>> {
-    BackgroundColor #FEF7E0
-    BorderColor #F9A825
-}
-skinparam rectangle<<altrove>> {
-    BackgroundColor #FFFFFF
-    BorderColor #BDBDBD
-    FontColor #757575
-}
-skinparam note {
-    BackgroundColor #FFF9C4
-    BorderColor #F9A825
-}
-
-title G5 - RF02.4 identita' del nodo e RF02.5 modifica dell'itinerario
-
-' ---- RF02.4 : la porta d'ingresso ----
-rectangle "RF02.4 - Identita' del nodo\nverificata in centrale" as RF0204 <<cardine>>
-
-rectangle "RF02.1 - Gestione\ndei guasti\n<size:11>G2</size>" as RF0201 <<altrove>>
-rectangle "RF02.2 - Gestione\ndei convogli\n<size:11>G3</size>" as RF0202 <<altrove>>
-rectangle "RF02.3 - Gestione\ndelle stazioni\n<size:11>G4</size>" as RF0203 <<altrove>>
-
-RF0201 ..> RF0204 : dipende
-RF0202 ..> RF0204 : dipende
-RF0203 ..> RF0204 : dipende
-
-' ---- RF02.5 : il cambio di itinerario ----
-rectangle "RF02.5 - Modifica dell'itinerario\na sistema acceso" as RF0205 <<dominio>>
-rectangle "RF02.5.1 - Convoglio escluso:\nsi ferma in attesa di soppressione" as RF020501
-rectangle "RF02.5.2 - Convoglio assegnato:\nprosegue dal punto in cui si trova" as RF020502
-
-RF0205 *-- RF020501
-RF0205 *-- RF020502
-
-rectangle "RF02.2.2.1 - Posizione:\nin quale stazione o su quale tratta\n<size:11>G3</size>" as RF02020201 <<altrove>>
-rectangle "RF03.5 - L'itinerario e' fornito\ndalla centrale\n<size:11>G7</size>" as RF0305 <<altrove>>
-
-RF020501 ..> RF02020201 : dipende
-RF020502 ..> RF02020201 : dipende
-RF0205 ..> RF0305 : la nuova versione arriva\ndalla centrale
-
-note bottom of RF0204
-  Test di eliminazione: senza la verifica dell'identita' nessun nodo
-  entra in servizio, quindi non arriva nessun dato e cadono RF02.1,
-  RF02.2 e RF02.3 per intero. Per questo la freccia sta sui rami
-  e non su ogni foglia.
-end note
-
-note bottom of RF0205
-  I due casi sono la stessa domanda letta in due modi: per sapere se
-  un convoglio e' escluso o assegnato bisogna prima sapere dove si
-  trova. Chi puo' chiedere la modifica lo dice RF01.3, in G1.
-end note
-
-legend bottom
-  |= arco |= significato |
-  | linea piena (*--) | decomposizione: il requisito si specifica nelle sue parti |
-  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
-  | riquadro giallo | requisito cardine: da esso dipendono molti altri |
-  | riquadro bianco bordato di grigio | requisito decomposto in un altro grafo |
-end legend
-
-@enduml
-#+end_src
-
-#+RESULTS:
-[[file:./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s5_identita_itinerario.png]]
-
-*** G6 - RF02.6 e RF02.7, cio' che la centrale deduce e cio' che ricorda
-
-Le anomalie dedotte non sono segnalate da nessuno: la centrale le ricava da un silenzio o da un
-fermo che dura troppo. La memoria storica e' l'altra faccia della stessa cosa: e' quello che resta
-quando il momento e' passato.
-
-#+begin_src plantuml :file ./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s6_anomalie_storia.png
-@startuml rf_grafo_s6_anomalie_storia
-
-skinparam backgroundColor #FEFEFE
-skinparam shadowing false
-skinparam ArrowColor #5F6368
-skinparam rectangle {
-    BackgroundColor #E8F0FE
-    BorderColor #1A73E8
-    FontColor #202124
-}
-skinparam rectangle<<dominio>> {
-    BackgroundColor #E6F4EA
-    BorderColor #137333
-}
-skinparam rectangle<<altrove>> {
-    BackgroundColor #FFFFFF
-    BorderColor #BDBDBD
-    FontColor #757575
-}
-skinparam note {
-    BackgroundColor #FFF9C4
-    BorderColor #F9A825
-}
-
-title G6 - RF02.6 anomalie dedotte dalla centrale e RF02.7 memoria storica
-
-rectangle "RF02.6 - Anomalie dedotte\ndalla centrale" as RF0206 <<dominio>>
-rectangle "RF02.6.1 - Stazione silenziosa\noltre T_sil" as RF020601
-rectangle "RF02.6.2 - Convoglio fermo\nfuori stazione oltre T_fer" as RF020602
-rectangle "RF02.6.3 - Fotografia periodica\ndello stato" as RF020603
-
-RF0206 *-- RF020601
-RF0206 *-- RF020602
-RF0206 *-- RF020603
-
-rectangle "RF02.7 - Memoria storica\n(si registrano i cambiamenti)" as RF0207 <<dominio>>
-
-' ---- quello che sta fuori da questo grafo ----
-rectangle "RF02.2.2.1 - Posizione:\nin quale stazione o su quale tratta\n<size:11>G3</size>" as RF02020201 <<altrove>>
-rectangle "RF02.3.2 - Segnale di vita\nstazione -> centrale\n<size:11>G4</size>" as RF020302 <<altrove>>
-rectangle "RF02.1.3 - Ciclo di vita del guasto\n(unicita' per sorgente)\n<size:11>G2</size>" as RF020103 <<altrove>>
-rectangle "RF02.2.4 - Passaggi asimmetrici\n<size:11>G3</size>" as RF020204 <<altrove>>
-rectangle "RF03.3 - Due fonti di verita'\nper lo stesso passaggio\n<size:11>G7</size>" as RF0303 <<altrove>>
-
-RF020601 ..> RF020302 : senza segnale regolare\nnon c'e' silenzio da misurare
-RF020601 ..> RF020103 : senza unicita' un allarme\na ogni controllo
-RF020602 ..> RF02020201 : "fuori stazione" e'\nuna domanda sulla posizione
-RF0207 ..> RF020204 : la storia deve reggere\nle entrate/uscite spaiate
-RF0207 ..> RF0303 : la storia si scrive\nsulla rilevazione a terra
-
-note bottom of RF020603
-  La fotografia periodica non dipende da niente: si scatta a
-  intervalli fissi qualunque cosa stia succedendo, ed e' proprio
-  questo che la rende utile quando gli eventi non arrivano.
-end note
-
-note top of RF0207
-  Chi dipende da quest'area, dagli altri grafi:
-  RF01.5, la consultazione dello storico (G1); e su RF02.6
-  si appoggia RF01.2, per distinguere un guasto segnalato
-  da uno dedotto.
-end note
-
-legend bottom
-  |= arco |= significato |
-  | linea piena (*--) | decomposizione: il requisito si specifica nelle sue parti |
-  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
-  | riquadro bianco bordato di grigio | requisito decomposto in un altro grafo |
-end legend
-
-@enduml
-#+end_src
-
-#+RESULTS:
-[[file:./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s6_anomalie_storia.png]]
-
-*** G7 - RF03 e RF04, i contratti fra le parti e l'accesso
-
-Queste due radici non si vedono da nessuna schermata, ma stanno sotto tutto il resto: RF03 dice a
-quali condizioni le parti si parlano, RF04 a quali condizioni qualcuno puo' guardare e toccare.
-
-#+begin_src plantuml :file ./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s7_contratti_accesso.png
-@startuml rf_grafo_s7_contratti_accesso
-
-skinparam backgroundColor #FEFEFE
-skinparam shadowing false
-skinparam ArrowColor #5F6368
-skinparam rectangle {
-    BackgroundColor #E8F0FE
-    BorderColor #1A73E8
-    FontColor #202124
-}
-skinparam rectangle<<radice>> {
-    BackgroundColor #D2E3FC
-    BorderColor #174EA6
-}
-skinparam rectangle<<altrove>> {
-    BackgroundColor #FFFFFF
-    BorderColor #BDBDBD
-    FontColor #757575
-}
-skinparam note {
-    BackgroundColor #FFF9C4
-    BorderColor #F9A825
-}
-
-title G7 - RF03 contratti di interazione e RF04 accesso e protezione
-
-rectangle "RF03 - Contratti di interazione\nfra le parti" as RF03 <<radice>>
-rectangle "RF03.1 - Autonomia dei nodi" as RF0301
-rectangle "RF03.2 - Disaccoppiamento\ncampo <-> centrale" as RF0302
-rectangle "RF03.3 - Due fonti di verita'\nper lo stesso passaggio" as RF0303
-rectangle "RF03.4 - I sensori usano solo\nl'interfaccia pubblica del nodo" as RF0304
-rectangle "RF03.5 - L'itinerario e' fornito\ndalla centrale" as RF0305
-
-RF03 *-- RF0301
-RF03 *-- RF0302
-RF03 *-- RF0303
-RF03 *-- RF0304
-RF03 *-- RF0305
-
-' due file anche qui
-RF0301 -[hidden]-> RF0304
-RF0302 -[hidden]-> RF0305
-
-rectangle "RF04 - Accesso e protezione" as RF04 <<radice>>
-rectangle "RF04.1 - Autenticazione\n(credenziali note a una parte sola)" as RF0401
-rectangle "RF04.2 - Autorizzazione per ruolo\n(controllo lato dati)" as RF0402
-rectangle "RF04.3 - Protezione dei canali" as RF0403
-
-RF04 *-- RF0401
-RF04 *-- RF0402
-RF04 *-- RF0403
-
-RF0402 ..> RF0401 : il ruolo si legge\ndall'attestato
-
-' ---- quello che sta fuori da questo grafo ----
-rectangle "RF02 - Correttezza dello\nstato rappresentato\n<size:11>mappa generale</size>" as RF02 <<altrove>>
-rectangle "RF02.1.1.1 - Nessun dato perduto\ne ordine preservato\n<size:11>G2</size>" as RF02010101 <<altrove>>
-rectangle "RF01.6 - Accesso\nal sistema\n<size:11>G1</size>" as RF0106 <<altrove>>
-rectangle "RF02.5 - Modifica\ndell'itinerario\n<size:11>G5</size>" as RF0205 <<altrove>>
-rectangle "RF02.7 - Memoria\nstorica\n<size:11>G6</size>" as RF0207 <<altrove>>
-
-RF02 ..> RF03 : senza i contratti di interazione\nnon arriva nessun dato
-RF0302 ..> RF02010101 : il nodo lavora\nanche senza centrale
-RF0205 ..> RF0305 : dipende
-RF0207 ..> RF0303 : dipende
-RF0106 ..> RF0402 : dipende
-
-note bottom of RF0302
-  Le due frecce fra RF02 e RF03
-  non si annullano: RF02 ha bisogno
-  dei contratti per ricevere i dati,
-  e il disaccoppiamento ha bisogno
-  che il nodo sappia conservare cio'
-  che produce mentre la centrale non
-  c'e'. E' una condizione reciproca,
-  non un errore di disegno.
-end note
-
-note bottom of RF0403
-  La protezione dei canali non ha
-  frecce perche' non e' presupposto
-  di nessun requisito funzionale:
-  se cade, il sistema continua a
-  funzionare, solo che lo fa in chiaro.
-end note
-
-legend bottom
-  |= arco |= significato |
-  | linea piena (*--) | decomposizione: il requisito si specifica nelle sue parti |
-  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
-  | riquadro bianco bordato di grigio | requisito decomposto in un altro grafo |
-end legend
-
-@enduml
-#+end_src
-
-#+RESULTS:
-[[file:./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s7_contratti_accesso.png]]
-
-*** G8 - i tre cardini
-
-Qui non c'e' nessun arco di decomposizione: ci sono solo i tre requisiti cardine e tutto quello che
-cade insieme a loro. E' il grafo da guardare per il test di eliminazione, cioe' per rispondere alla
-domanda "se tolgo questo, che cosa non e' piu' soddisfacibile?".
-
-#+begin_src plantuml :file ./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s8_cardini.png
-@startuml rf_grafo_s8_cardini
-
-skinparam backgroundColor #FEFEFE
-skinparam shadowing false
-skinparam ArrowColor #5F6368
-skinparam rectangle {
-    BackgroundColor #E8F0FE
-    BorderColor #1A73E8
-    FontColor #202124
-}
-skinparam rectangle<<dominio>> {
-    BackgroundColor #E6F4EA
-    BorderColor #137333
-}
-skinparam rectangle<<cardine>> {
-    BackgroundColor #FEF7E0
-    BorderColor #F9A825
-}
-skinparam note {
-    BackgroundColor #FFF9C4
-    BorderColor #F9A825
-}
-
-title G8 - i tre requisiti cardine e cio' che cade con loro\n(giallo = cardine; nessun arco di decomposizione, solo dipendenze)
-
-' ===================== CARDINE 1 : LA POSIZIONE ========================
-rectangle "RF02.1.1.2 - Stazione non percorribile:\nil convoglio si ferma\n<size:11>G2</size>" as RF02010102
-rectangle "RF02.1.2.2.1 - Convoglio guasto in stazione:\nstazione non percorribile\n<size:11>G2</size>" as RF0201020201
-rectangle "RF02.1.2.2.2 - Convoglio guasto in tratta:\ntratta non percorribile\n<size:11>G2</size>" as RF0201020202
-rectangle "RF02.5.1 - Convoglio escluso:\nsi ferma in attesa di soppressione\n<size:11>G5</size>" as RF020501
-rectangle "RF02.5.2 - Convoglio assegnato:\nprosegue dal punto in cui si trova\n<size:11>G5</size>" as RF020502
-rectangle "RF02.6.2 - Convoglio fermo\nfuori stazione oltre T_fer\n<size:11>G6</size>" as RF020602
-rectangle "RF01.1 - Visualizzazione\ndella situazione corrente\n<size:11>G1</size>" as RF0101
-
-rectangle "RF02.2.2.1 - Posizione:\nin quale stazione o su quale tratta\n<size:11>G3</size>" as RF02020201 <<cardine>>
-
-RF02010102 ..> RF02020201 : dipende
-RF0201020201 ..> RF02020201 : dipende
-RF0201020202 ..> RF02020201 : dipende
-RF020501 ..> RF02020201 : dipende
-RF020502 ..> RF02020201 : dipende
-RF020602 ..> RF02020201 : "fuori stazione" e'\nuna domanda sulla posizione
-RF0101 ..> RF02020201 : posizione del convoglio
-
-' i dipendenti messi in colonna, senno' vengono tutti in fila
-RF02010102 -[hidden]-> RF0201020201
-RF0201020201 -[hidden]-> RF0201020202
-RF0201020202 -[hidden]-> RF020501
-RF020501 -[hidden]-> RF020502
-RF020502 -[hidden]-> RF020602
-RF020602 -[hidden]-> RF0101
-
-' ===================== CARDINE 2 : IL SEGNALE DI VITA ==================
-rectangle "RF02.6.1 - Stazione silenziosa\noltre T_sil\n<size:11>G6</size>" as RF020601
-rectangle "RF02.1.4 - Chiusura automatica\nquando la causa rientra\n<size:11>G2</size>" as RF020104
-
-rectangle "RF02.3.2 - Segnale di vita\nstazione -> centrale\n<size:11>G4</size>" as RF020302 <<cardine>>
-
-RF020601 ..> RF020302 : senza segnale regolare\nnon c'e' silenzio da misurare
-RF020104 ..> RF020302 : e' il ritorno del segnale\na chiudere il guasto
-
-RF020601 -[hidden]-> RF020104
-
-' ===================== CARDINE 3 : L'IDENTITA' DEL NODO ================
-rectangle "RF02.1 - Gestione\ndei guasti\n<size:11>G2</size>" as RF0201 <<dominio>>
-rectangle "RF02.2 - Gestione\ndei convogli\n<size:11>G3</size>" as RF0202 <<dominio>>
-rectangle "RF02.3 - Gestione\ndelle stazioni\n<size:11>G4</size>" as RF0203 <<dominio>>
-
-rectangle "RF02.4 - Identita' del nodo\nverificata in centrale\n<size:11>G5</size>" as RF0204 <<cardine>>
-
-RF0201 ..> RF0204 : dipende
-RF0202 ..> RF0204 : dipende
-RF0203 ..> RF0204 : dipende
-
-note bottom of RF02020201
-  Sette requisiti su una domanda sola. Ed e' anche il motivo per cui
-  la posizione e' tenuta distinta dallo stato del convoglio
-  (RF02.2.2.3): se le due cose stessero insieme, ognuno di questi
-  sette dipenderebbe anche da informazioni che non gli servono.
-end note
-
-note bottom of RF020302
-  Cardine per assenza: quello che porta informazione non e' il
-  segnale che arriva, e' quello che non arriva piu'.
-end note
-
-note bottom of RF0204
-  Cardine per posizione: non e' un'informazione che serve a
-  qualcuno, e' la porta d'ingresso. Senza, tre aree intere
-  restano a secco di dati.
-end note
-
-legend bottom
-  |= arco |= significato |
-  | freccia tratteggiata (..>) | dipendenza: togliendo il bersaglio il requisito non e' piu' soddisfacibile |
-  | riquadro giallo | requisito cardine |
-  | Gn | grafo di dettaglio in cui il requisito e' decomposto |
-end legend
-
-@enduml
-#+end_src
-
-#+RESULTS:
-[[file:./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/rf_grafo_s8_cardini.png]]
-
 ** Riepilogo requisiti - macchine a stati
 
 È la lettura al contrario delle righe "requisiti coperti" che stanno sopra ogni diagramma del
@@ -1876,91 +944,10 @@ scritto (RF02.2.4). Dove i due giudizi divergono vale quello scritto accanto al 
 | RF04.1       | M9          |              |                                                                               |
 | RF04.2       | M9          | M10          | il controllo è sul lato che possiede i dati, non sull'interfaccia             |
 | RF04.3       |             |              | non è una macchina: è il profilo =%tls= sui canali, vedi la sezione /Topic/   |
-#+begin_comment
-I requisiti scoperti sono da tenere presenti, non sono una svista della tabella:
-- RF02.1.2.2.1 e RF02.1.2.2.2: un convoglio che si guasta congela sé stesso (T4, T6) ma non rende
-  non percorribile né la stazione né la tratta. Nella centrale solo un alert con sorgenteTipo
-  STAZIONE e severità CRITICAL porta la stazione a GUASTA, quindi il contagio dal convoglio
-  all'infrastruttura non esiste.
-- RF02.5.2: dopo ITINERARIO_AGGIORNATO il treno svuota l'itinerario e riavvia il viaggio, e
-  =avviaViaggio()= riparte da =indiceStazione= uguale a zero, quindi l'itinerario nuovo non viene ripreso dal
-  punto in cui il convoglio si trovava.
-- RF02.2.4: i passaggi asimmetrici avvengono davvero (T7 inverte al capolinea e la stazione di
-  partenza produce una uscita senza entrata), ma nessuna macchina li riconosce come caso a sé: chi
-  legge lo storico deve saperlo dalla specifica.
-- RF01.4.2 e RF02.1.3, la parte sulla presa in carico: il ciclo di vita del guasto ha due stati e non
-  tre, perché =Guasto= porta solo il booleano =risolto=, e l'assegnatario non viene mai scritto. La
-  colonna =OperatoreCheSeNeStaOccupandoFK= e la tabella =Storico_Assegnazioni_Guasti= esistono nello
-  schema ma restano vuote: =Guasto.operatore= non è valorizzato da nessuna parte del codice. Chiuso un
-  allarme non si sa più chi lo ha chiuso.
-- RF01.4.1: =dispacciaManutenzione= imposta MANUTENZIONE e rimette ONLINE dentro la stessa chiamata.
-  I due passaggi adesso vengono annunciati sulla websocket (evento =STATION_STATUS=), ma partono a
-  distanza di pochi millisecondi l'uno dall'altro, quindi il browser riceve MANUTENZIONE e subito
-  dopo ONLINE: lo stato attraversa il canale e non resta piu' confinato dentro il metodo, pero'
-  quanto a durata resta invisibile. Il requisito chiede che la stazione /risulti/ in manutenzione,
-  e per essere soddisfatto davvero il ritorno a ONLINE andrebbe staccato dal comando e legato alla
-  fine effettiva dell'intervento.
-- RF01.4.3: la precondizione "il convoglio è fermo in una stazione" non è verificata: il comando
-  sopprime anche un convoglio in mezzo a una tratta.
-- RF01.2.2: la centrale distingue davvero il guasto dedotto da quello segnalato, ma solo al proprio
-  interno e con un prefisso nel testo del messaggio (=Heartbeat assente:= per la stazione,
-  =Convoglio fermo:= per il treno). Il tipo non lo indovina piu' leggendo il messaggio: lo dichiara
-  la sorgente nel campo =tipoGuasto=, e in mancanza lo decide il tipo di sorgente. Resta pero' che
-  il fail-stop dedotto e il sensore guasto segnalato dalla stazione hanno tutti e due tipo
-  =sensore_offline=, e il DTO degli allarmi non porta nessun campo sull'origine: le due strade
-  finiscono ancora indistinguibili nell'elenco.
-- RF02.7, per due delle cinque cose elencate nell'enunciato: =Storico_Itinerari= e
-  =Storico_Assegnazioni_Guasti= non vengono mai scritte (compaiono solo nelle DELETE di pulizia),
-  quindi gli itinerari percorsi e le assegnazioni degli operatori non lasciano storia.
-- RF04.3: la protezione dei canali è una configurazione, non un comportamento, e per questo non ha
-  una macchina a stati che la descriva.
-#+end_comment
 * Progettazione
 ** Diagramma delle componenti
 [[./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/diagrammaDelleComponenti.png]]
 ** Stack tecnologico
-#+begin_comment
-// bo roba ovvia e troppo prolissa
-Tutta la parte server è Java 25 con Quarkus 3.37.3, compilata con Maven (ogni modulo ha il
-suo =mvnw=). Centrale, Stazione e Treno sono tre progetti separati ma con lo stesso stack:
-cambiano solo le estensioni che ognuno si porta dentro.
-#+begin_comment
-Usare lo stesso framework per tutti
-e tre è stato comodo per tre motivi concreti:
-- la messaggistica MQTT si *dichiara* invece di programmarla: con =quarkus-messaging-mqtt=
-  (SmallRye Reactive Messaging) i canali stanno in =application.properties= e nel codice
-  restano solo =@Incoming=, =@Outgoing= e gli =Emitter= per i topic che dipendono dal
-  destinatario; non ho scritto una riga di client MQTT a mano;
-- la configurazione ha i *profili*, e il profilo =%tls= mi ha permesso di aggiungere la
-  cifratura (variante 6) senza duplicare niente: stesso jar, =-Dquarkus.profile=tls= e tutti
-  i canali passano dalla 1883 alla 8883;
-- =@Scheduled= dà i job periodici che il sistema usa in tre punti (heartbeat della stazione,
-  keepalive dei sensori, watchdog della Centrale) senza scrivere thread e timer a mano.
-Le differenze fra i tre nodi sono solo di estensioni. La Centrale è l'unica con
-=hibernate-orm-panache= e =jdbc-postgresql= (l'unico database vero), con
-=quarkus-websockets= per spingere gli aggiornamenti alla web app e con =quarkus-rest= per
-l'API dell'operatore. Treno e Stazione hanno il minimo: MQTT, =quarkus-arc= (la CDI, che uso
-per tenere =TrainDB= e =DBLocale= come singleton in memoria), lo scheduler e un
-=quarkus-rest= che serve solo ai sensori, più un =HttpClient= del JDK (=SecureHttpClient=)
-per scaricare l'itinerario dalla Centrale.
-
-L'autenticazione non è scritta da me: è delegata a *Keycloak 26*, che gira in Docker e fa da
-Identity Provider OAuth2 / OpenID Connect. Lato Centrale l'unica cosa aggiunta è l'estensione
-=quarkus-oidc=, che scarica le chiavi pubbliche del realm e verifica da sola la firma dei
-token; lato web app non ho aggiunto nessuna libreria, il dialogo OIDC è un file di
-duecento righe (=src/api/keycloak.ts=) scritto con le API di crittografia del browser. Il
-perchè di questa scelta e come funziona il flusso stanno nella sezione /Autenticazione e
-autorizzazione/ più avanti.
-
-Il lato web è React 18 con TypeScript, buildato da Vite: =react-router-dom= per le pagine,
-=zustand= per lo stato globale (=authStore= per la sessione, =railwayStore= per i dati della
-rete), =lucide-react= per le icone. Non ho usato librerie di mappe: la mappa della rete è
-disegnata a mano in SVG dentro =TrafficMapPage=, con le coordinate delle stazioni prese dal
-database. Verso la Centrale ci sono due canali: la =fetch= nativa per le REST e una
-=WebSocket= nativa incapsulata in =WebSocketClient=, che si riconnette da sola quando cade;
-entrambi gli URL vengono da variabili d'ambiente di Vite (=VITE_API_BASE_URL=,
-=VITE_WS_URL=), così per passare al profilo TLS non serve ricompilare.
-#+end_comment
 
 #+ATTR_LATEX: :environment longtable :align L{0.24\textwidth}L{0.36\textwidth}L{0.32\textwidth} :font \small
 | a che serve                   | tecnologia                                                         | dove                                                        |
@@ -1979,20 +966,6 @@ entrambi gli URL vengono da variabili d'ambiente di Vite (=VITE_API_BASE_URL=,
 | database dei test             | H2 in memoria, schema rigenerato a ogni esecuzione                 | =src/test/resources/application.properties= della Centrale  |
 
 
-#+begin_comment
-Sul deploy non c'è niente di sofisticato, ed è voluto: le tre cose che non ho scritto io
-girano in Docker (=postgres:15= e =quay.io/keycloak/keycloak:26.0= nel =docker-compose.yml=
-alla radice, =eclipse-mosquitto= nel suo dentro =BrokerMosquitto/=), mentre i nodi sono
-processi normali. Ogni stazione e ogni treno è una JVM a sè,
-lanciata dallo stesso =quarkus-run.jar= con l'id passato come argomento e la porta HTTP in
-variabile d'ambiente: gli script =avvioStazioni.sh= e =avvioTreni.sh= fanno esattamente
-questo in ciclo (stazioni da 8080, treni da 9080, un file di log per istanza). Quali nodi
-far partire non è però scritto dentro gli script: la lista sta in due file di testo a parte
-(=stazioni.conf= e =treni.conf=, un id per riga), così per cambiare la composizione della
-rete simulata si tocca solo il dato e non la logica di avvio. È il modo più
-diretto di soddisfare RF03.1, cioè che i nodi siano davvero autonomi e non thread di un
-unico simulatore.
-#+end_comment
 Anche questa documentazione ha il suo piccolo stack: è scritta in org-mode ed esportata in
 LaTeX, e i diagrammi (stati, sequenza, classi) sono sorgenti PlantUML tenuti dentro il
 documento stesso e compilati in png.
@@ -2025,14 +998,55 @@ e tuple morte da far digerire all'autovacuum, per dati che diventano obsoleti do
 e che non ha senso rendere durabili. È il caso d'uso per cui in esercizio si affianca al database
 un archivio in memoria: qui la stessa funzione la assolve una =ConcurrentHashMap=, che per un
 sistema a nodo singolo è la semplificazione ragionevole.
-#+begin_comment
-Marco : ma chissene frega il progetto non è fatto per avere più centrali cioè è ovvio
-*Il limite che ne consegue non è la memoria ma la replicabilità*: lo stato vive dentro il
-processo, quindi la Centrale non può essere avviata in più copie dietro un bilanciatore, perché
-ognuna avrebbe la propria fotografia della rete e il watchdog aprirebbe guasti doppi (la
-deduplica di =getGuastoApertoPerSorgente= vale solo all'interno di un processo). Superarlo vuol
-dire spostare lo stato condiviso fuori dal processo, non spostarlo su PostgreSQL così com'è.
-#+end_comment
+
+*** Tutte le query stanno in una classe sola
+
+Le chiamate a Panache prima stavano dove servivano: novantaquattro punti sparsi in otto classi, cioè
+=RestApiGateway= con 61, =IngestionService= con 23, =TrafficLogicEngine= con 3, =FaultMonitor= con
+3, poi =AuthController= e i due validatori dell'id con una a testa, e una perfino dentro un'entità,
+=StoricoGuasto=. Adesso stanno tutte dentro =RailwayRepository= (package =persistence=), un bean
+=@ApplicationScoped= con 46 metodi: nel resto della Centrale non c'è più nessun =findById=,
+=persist= o =delete=.
+
+*Il motivo non è l'ordine formale ma le copie.* Con le query scritte sul posto la stessa lettura
+finiva riscritta ogni volta che serviva. Le tratte di un itinerario in ordine di percorrenza
+(=ItinerarioTratta.find("itinerario.id", Sort.by("ordine"))=) comparivano in cinque punti, tre nel
+gateway e due nell'ingestione; il metodo che da quelle tratte ricava la sequenza delle stazioni
+esisteva in due copie identiche con due nomi diversi (=stazioniOrdinate= nel gateway,
+=stazioniOrdinateDiItinerario= nell'ingestione); i guasti ancora aperti di una sorgente erano
+quattro stringhe JPQL quasi uguali, con il tipo della sorgente incollato dentro la stringa ('TRENO'
+in un punto, 'STAZIONE' negli altri tre). Adesso sono =tratteOrdinateDi=, =stazioniOrdinateDi= e
+=guastiApertiDi(sorgenteId, sorgenteTipo)=, e il tipo è un parametro invece di una costante scritta
+nel testo della query.
+
+*Le transazioni sono rimaste ai chiamanti, ed è una scelta.* Nel repository non c'è nessun
+=@Transactional= e nessun =QuarkusTransaction=: i suoi metodi girano dentro la transazione di chi
+li chiama. La ragione è che i confini attuali non sono casuali. Il gateway apre la transazione
+sull'endpoint, mentre l'ingestione e il =FaultMonitor= chiamano =QuarkusTransaction.requiringNew()=
+*dentro* il =try=, così il commit avviene prima delle notifiche su MQTT e WebSocket e una
+violazione di vincolo non risale fino al connettore reattivo spegnendo il canale (è il motivo per
+cui i consumatori non sono =@Transactional=, spiegato in C4). Se il repository si mettesse a
+dichiarare transazioni per conto suo, quei confini si sposterebbero senza che si veda dal codice
+del chiamante.
+
+*Quello che il repository non fa.* Non costruisce =Response=, non valida niente e non scrive
+messaggi d'errore: codici HTTP e testi restano nel gateway, accanto alla regola che li produce. E
+non tocca lo stato in RAM: il =TrafficLogicEngine= lo usa una volta sola, all'avvio, per riempirsi.
+
+*Il limite, detto chiaro.* Non è il pattern Repository dei libri, quello in cui il dominio non sa
+come è fatta la persistenza. Le entità restano =PanacheEntityBase= in stile /active record/, e il
+repository restituisce oggetti *gestiti* da Hibernate: chi riceve un =Treno= e gli cambia un campo
+se lo ritrova scritto al commit, senza chiamare nessun metodo di salvataggio. È esattamente quello
+che succede in =salvaStatoTreno=, che assegna =dbTreno.stato= e non salva niente. Qui dunque il
+repository raccoglie le query, non isola il modello dal database: per farlo davvero servirebbero
+entità staccate dal contesto di persistenza, che in un progetto di questa taglia costerebbero più
+di quanto rendono.
+
+*Perché una classe sola e non un DAO per tabella.* Le entità toccate sono tredici, ma le query per
+entità sono poche, spesso una o due: tredici classi da tre metodi avrebbero solo spostato la
+dispersione di un livello. Con un file solo, per sapere chi legge i transiti ancora aperti c'è un
+posto solo in cui guardare, e le sezioni interne (stazioni, treni, itinerari e tratte, transiti,
+guasti, storici, utenti) fanno da indice.
 
 *** I test hanno un database loro, non quello di lavoro
 
@@ -4749,7 +3763,7 @@ state "Risposta pubblicata\n-> .../validation-response" as Risposta
 
 Ascolto --> Verifica : richiesta di validazione
 Verifica --> Ascolto : [payload non JSON o ID assente] /\nlog di errore, ack
-Verifica --> Risposta : [ID presente] /\nfindById in transazione,\nesisteNelDb = true oppure false
+Verifica --> Risposta : [ID presente] /\nesisteTreno/esisteStazione in transazione,\nesisteNelDb = true oppure false
 Risposta --> Ascolto : / ack
 
 note right of Risposta
@@ -5836,6 +4850,10 @@ Come si leggono:
   e' il punto in cui le due parti smettono di conoscersi
 - i blocchi alternativi sono i rami veri del codice, comprese le uscite di errore; i riquadri
   gialli spiegano perche' una cosa e' fatta cosi' e non in un altro modo
+- la corsia =PostgreSQL= e' il database, non una classe: le frecce che ci arrivano passano tutte dal
+  =RailwayRepository=, e per questo l'etichetta porta il nome del suo metodo. Non l'ho disegnato come
+  partecipante a se' perche' avrebbe aggiunto una corsia a quindici figure senza dire niente di
+  nuovo; chi lo chiama e per che cosa si vede in =C5=
 
 *** mappa dei diagrammi
 - non e' una conversazione: e' l'indice delle altre diciotto, raggruppate per il momento in cui si presentano nella vita del sistema
@@ -5979,7 +4997,7 @@ end legend
 '    it.uni.reti2.TrainDatabaseValidator#inviaRichiestaValidazione
 '    it.uni.reti2.TrainDatabaseValidator#gestisciRispostaValidazione
 '    it.uni.reti2.DbValidator.ExistIdForEdge#interrogaIlDPerValidazione (Centrale)
-'    it.uni.reti2.entity.Treno#findById
+'    it.uni.reti2.persistence.RailwayRepository#esisteTreno
 '
 '  Topic: railway/train/{id}/validation  ->  railway/train/{id}/validation-response
 '  Macchine a stati corrispondenti: T1, T2 (treno) e M2 (centrale)
@@ -6040,7 +5058,7 @@ loop finche' l'esito e' RIPROVA (sleep 5s fra un giro e l'altro)
         BROKER -> EXIST : interrogaIlDPerValidazione(messaggio)
         deactivate BROKER
         activate EXIST
-        EXIST -> PG : QuarkusTransaction.requiringNew()\nTreno.findById(trenoId)
+        EXIST -> PG : QuarkusTransaction.requiringNew()\nrepository.esisteTreno(trenoId)
         activate PG
         PG --> EXIST : entita' oppure null
         deactivate PG
@@ -6100,7 +5118,7 @@ end
 '    it.uni.reti2.StationDatabaseValidator#verificaSeNecessario
 '    it.uni.reti2.StationDatabaseValidator#gestisciRispostaValidazione
 '    it.uni.reti2.DbValidator.ExistIdForEdgeStazione#interrogaIlDbPerValidazione
-'    it.uni.reti2.entity.Stazione#findById
+'    it.uni.reti2.persistence.RailwayRepository#esisteStazione
 '
 '  Topic: railway/station/{id}/validation -> railway/station/{id}/validation-response
 '  Macchine a stati corrispondenti: S1, S2 (stazione) e M2 (centrale)
@@ -6156,7 +5174,7 @@ loop finche' l'esito e' RIPROVA (sleep 5s)
         BROKER -> EXIST : interrogaIlDbPerValidazione(messaggio)
         deactivate BROKER
         activate EXIST
-        EXIST -> PG : Stazione.findById(stazioneId)
+        EXIST -> PG : repository.esisteStazione(stazioneId)
         activate PG
         PG --> EXIST : entita' oppure null
         deactivate PG
@@ -6267,7 +5285,7 @@ loop finche' l'itinerario e' vuoto, un tentativo ogni 15 secondi
     FILTRO -> REST : getItinerarioTreno(id)
     deactivate FILTRO
     activate REST
-    REST -> PG : Treno.findById(id)\nItinerarioTratta.find("itinerario.id", Sort.by("ordine"))
+    REST -> PG : repository.trovaTreno(id)\nrepository.tratteOrdinateDi(itinerarioId)
     activate PG
     PG --> REST : tratte ordinate
     deactivate PG
@@ -6532,7 +5550,7 @@ else stazione nota
     ING -> ING : statoCambiato = stato != statoPrecedente\ntornataDalFailStop = statoPrecedente == "OFFLINE"
     ING -> CACHE : aggiornaStazione(stato, ultimoHeartbeat = now)
     opt statoCambiato
-        ING -> PG : QuarkusTransaction.requiringNew()\nStoricoStatoStazione.persist()
+        ING -> PG : QuarkusTransaction.requiringNew()\nrepository.salvaStoricoStatoStazione(...)
         note right of PG
           Anche qui si storicizza solo al cambio: a ogni battito
           sarebbero circa 8.600 righe identiche al giorno per stazione.
@@ -6810,7 +5828,7 @@ end
 BROKER -> ING : onAlert(Message)
 activate ING
 ING -> ING : tipoEvento == "GUASTO" e origine != CENTRALE\ntipoGuastoPerFrontend -> "sensore_offline"\n(il messaggio contiene "sensore")
-ING -> PG : Guasto.persist() + StoricoGuasto.persist()
+ING -> PG : repository.salvaGuasto + salvaStoricoGuasto
 ING -> WS : broadcast({"eventType":"ALERT", ...})
 deactivate ING
 
@@ -7064,7 +6082,7 @@ alt esiste gia' un guasto aperto per questa sorgente e tipo
       "risolvi" ne chiuderebbe una sola e l'allarme resterebbe.
     end note
 else nessun guasto aperto
-    ING -> PG : QuarkusTransaction.requiringNew()\nGuasto.persist() + StoricoGuasto.persist()
+    ING -> PG : QuarkusTransaction.requiringNew()\nrepository.salvaGuasto + salvaStoricoGuasto
     ING -> CACHE : aggiungiGuasto(guasto)
 end
 ING -> WS : broadcastAlert({"eventType":"ALERT","id","type",\n"severity","message","trainId","timestamp"})
@@ -7164,7 +6182,7 @@ loop ogni 10 secondi
         FM -> CACHE : stato = "OFFLINE"
         opt nessun guasto "sensore_offline" gia' aperto per questa stazione
             FM -> FM : creaGuastoAutomatico("sensore_offline", "CRITICAL",\n"STAZIONE", id, MSG_HEARTBEAT_PERSO + ...)
-            FM -> PG : Guasto.persist() + StoricoGuasto.persist()\n+ EventoStazione (HEARTBEAT_LOST)
+            FM -> PG : repository.salvaGuasto + salvaStoricoGuasto\n+ salvaEventoStazione (HEARTBEAT_LOST)
             note right of PG
               L'id del guasto porta un suffisso casuale: i due job
               girano entrambi ogni 10 secondi e due guasti creati nello
@@ -7305,7 +6323,7 @@ loop ogni 10 secondi
         FM -> FM : inStazione = stazioneCorrente non vuota\nimmobile = velocita == 0\n  oppure ultimoAggiornamento piu' vecchio di 90s
         alt immobile e NON in stazione e nessun guasto "treno_fermo" gia' aperto
             FM -> FM : creaGuastoAutomatico("treno_fermo", "warning",\n"TRENO", trenoId, "fermo tra stazioni con stato attivo")
-            FM -> PG : Guasto.persist() + StoricoGuasto.persist()
+            FM -> PG : repository.salvaGuasto + salvaStoricoGuasto
             FM -> CACHE : aggiungiGuasto(guasto)
             FM -> ING : broadcastAlert(guasto)
             ING -> WS : {"eventType":"ALERT","type":"treno_fermo",\n"severity":"warning","trainId",...}
@@ -7584,7 +6602,7 @@ else credenziali corrette
     AUTH -> API : getProfilo()
     API -> CTRL : GET /api/auth/me\nAuthorization: Bearer <JWT>
     activate CTRL
-    CTRL -> PG : Utente.find(upper(matricola) = claim "matricola")
+    CTRL -> PG : repository.trovaUtentePerMatricola(claim "matricola")
     activate PG
     PG --> CTRL : riga di anagrafica (oppure null)
     deactivate PG
@@ -7761,7 +6779,7 @@ else stazione trovata
     REST -> BROKER : {"tipoEvento":"MAINTENANCE_DISPATCHED",\n"sorgenteId","timestamp"}
     BROKER -> SGW : riceviAlert -> log "operatori in arrivo"
 
-    REST -> PG : Guasto.list("sorgenteId = ?1 and\nsorgenteTipo = 'STAZIONE' and risolto = false")
+    REST -> PG : repository.guastiApertiDi(id, "STAZIONE")
     activate PG
     PG --> REST : guasti ancora aperti
     deactivate PG
@@ -8050,7 +7068,7 @@ alt itinerario inesistente
     REST --> API : 404
 else itinerario trovato
     opt sono arrivate almeno due stazioni
-        REST -> PG : ItinerarioTratta.delete("id.idItinerario", id)
+        REST -> PG : repository.eliminaTratteDellItinerario(id)
         REST -> REST : componiItinerario(itinerario, stazioni, travelTimes)
         loop per ogni coppia consecutiva di stazioni
             REST -> PG : Tratta esistente fra A e B?
@@ -8255,7 +7273,7 @@ REST -> PG : Tratta.count("stazionePartenza.id = ?1\nor stazioneArrivo.id = ?1")
 alt la stazione e' estremo di almeno una tratta
     REST --> API : 409 "Stazione referenziata da N tratte: eliminarle prima"
 else nessuna tratta la usa
-    REST -> PG : cancella prima StoricoTransito, Transito,\nStoricoStatoStazione, EventoStazione\npoi la Stazione
+    REST -> PG : cancella i Transiti vivi, poi la Stazione\n(lo storico non si tocca: RF02.7)
     REST -> CACHE : rimuoviStazione(id)
     REST --> API : 204
 end
@@ -8280,7 +7298,7 @@ deactivate REST
 USER -> API : elimina un convoglio
 API -> REST : DELETE /api/treni/{id}
 activate REST
-REST -> PG : cancellazione a cascata di StoricoStatoTreno,\nStoricoTransito, Transito, StoricoItinerario\npoi il Treno
+REST -> PG : cancella i Transiti vivi, poi il Treno\n(lo storico non si tocca: RF02.7)
 REST -> CACHE : rimuoviTreno(id)
 REST -> BROKER : {"tipoEvento":"STOP","target":"<id>",\n"motivo":"Treno eliminato da operatore"}
 REST --> API : 204
@@ -8515,9 +7533,9 @@ nel capitolo /Specifica/: qui si dice quale conversazione lo mostra, non se il s
 
 ** Diagrammi delle classi
 
-Cinque diagrammi e una mappa: =C1= il nodo Treno, =C2= il nodo Stazione, la mappa della Centrale che
-tiene insieme =C3= e =C4=, e =C6= la Web App. Le entita' JPA non hanno un diagramma a se': stanno nel
-capitolo /Modello/.
+Sei diagrammi e una mappa: =C1= il nodo Treno, =C2= il nodo Stazione, la mappa della Centrale che
+tiene insieme =C3=, =C4= e =C5=, e =C6= la Web App. Le entita' JPA non hanno un diagramma a se':
+stanno nel capitolo /Modello/.
 
 *Legenda degli archi.* Sono quelli di UML e in tutto il capitolo ne compaiono sei:
 
@@ -8896,7 +7914,7 @@ end note
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-D7O87v/plantuml-w5kRwR.png]]
+[[file:/tmp/babel-vRTivD/plantuml-FNfkR2.png]]
 
 *** Il componente Centrale: mappa dei due diagrammi
 
@@ -8919,12 +7937,20 @@ end note
 '  quelli che attraversano davvero il confine, quelli interni a una vista
 '  si guardano nel diagramma relativo.
 '
-'  I tre archi sono verificati sul codice (ServeCentraleOperativa):
+'  I tre archi fra le due viste sono verificati sul codice
+'  (ServeCentraleOperativa):
 '    RestApiGateway.statoRete            -> TrafficLogicEngine
 '    IngestionService.webSocket          -> RealtimeWebSocket
 '    FaultMonitor.webSocket              -> RealtimeWebSocket
 '  e sono gli unici: nessun'altra classe di un lato ne inietta una
 '  dell'altro.
+'
+'  Sotto tutte e due c'e' pero' una terza cosa in comune, il
+'  RailwayRepository (C5). Lo iniettano sette classi: cinque di C4
+'  (IngestionService, FaultMonitor, i due validatori e il
+'  TrafficLogicEngine, che pero' lo usa solo all'avvio) e due di C3
+'  (RestApiGateway e AuthController). Non sta in nessuna delle due viste
+'  perche' non e' di nessuna delle due: e' il piano di sotto.
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -8951,6 +7977,10 @@ skinparam rectangle<<incontro>> {
     BackgroundColor #FCE8E6
     BorderColor #C5221F
 }
+skinparam rectangle<<persistenza>> {
+    BackgroundColor #FEF7E0
+    BorderColor #B06000
+}
 skinparam note {
     BackgroundColor #FFF9C4
     BorderColor #F9A825
@@ -8975,6 +8005,10 @@ rectangle "C4 - verso il campo\n<size:11>il campo entra da qui: cinque topic MQT
     rectangle "TrafficLogicEngine\n<size:11>la cache di rete tenuta in RAM:</size>\n<size:11>treni, stazioni, guasti attivi</size>" as CACHE <<incontro>>
 }
 
+rectangle "C5 - la persistenza\n<size:11>non e' una vista: sta sotto tutte e due</size>" as C5 <<persistenza>> {
+    rectangle "RailwayRepository\n<size:11>46 metodi, l'unico punto della Centrale</size>\n<size:11>che parla con PostgreSQL. Nessuna</size>\n<size:11>transazione propria: gira in quella</size>\n<size:11>di chi lo chiama</size>" as REPO <<classe>>
+}
+
 ' archi invisibili: servono solo a mandare le classi su due righe,
 ' se no le cinque di C4 si mettono in fila e la figura viene lunga
 ' il doppio della pagina
@@ -8987,15 +8021,20 @@ GATEWAY --> CACHE : la legge a ogni GET e la riscrive\nquando l'operatore tocca 
 INGEST --> WS : gli eventi appena\narrivano dal campo
 WATCHDOG --> WS : lo SNAPSHOT\nogni 10 s
 
-note as CONFINE
-  Il confine fra C3 e C4 non e' una chiamata di servizio: i due lati si
-  incontrano su questi due oggetti e nient'altro, e ognuno dei due sta in
-  casa dell'altro. E' per questo che sono due diagrammi distinti e non due
-  meta' dello stesso.
+C3 --> C5 : gli endpoint leggono\ne scrivono solo da qui
+C4 --> C5 : scritture del campo, validazione\ndegli id, riempimento della cache
 
-  Le tre classi che restano senza archi non sono dimenticate: AuthController
-  e i due validatori guardano solo le entita' JPA, che stanno nel capitolo
-  Modello e non in nessuna delle due viste.
+note as CONFINE
+  Il confine fra C3 e C4 non e' una chiamata di servizio: sul piano delle
+  due viste i lati si incontrano su questi due oggetti e nient'altro, e
+  ognuno dei due sta in casa dell'altro. E' per questo che sono due
+  diagrammi distinti e non due meta' dello stesso.
+
+  Il RailwayRepository e' un incontro di natura diversa: non sta in casa di
+  nessuno dei due, sta sotto tutti e due, ed e' per questo che ha un
+  riquadro suo. Da quando c'e' lui, AuthController e i due validatori non
+  interrogano piu' le entita' JPA per conto loro: erano proprio le tre
+  classi che in questa mappa restavano senza nessun arco.
 end note
 CONFINE .. C3
 
@@ -9004,6 +8043,7 @@ legend bottom
   | riquadro grande | una vista, cioe' un diagramma delle classi a se' |
   | riquadro bianco | una classe di quella vista |
   | riquadro rosso | la classe su cui le due viste si incontrano, disegnata in casa di chi la possiede |
+  | riquadro giallo | il piano di sotto: non e' di nessuna delle due viste, ma le serve tutte e due |
   | freccia | l'altra vista la usa: e' un arco che attraversa il confine |
 end legend
 
@@ -9032,6 +8072,11 @@ end legend
 '  Con il passaggio a Keycloak SessioniAttive e' stata cancellata: la
 '  Centrale non tiene piu' nessun registro di sessioni, l'identita' gliela
 '  costruisce quarkus-oidc a partire dal token firmato.
+'
+'  Da quando le query stanno nel RailwayRepository (C5) qui dentro non c'e'
+'  piu' nessuna chiamata a Panache: gli endpoint validano, decidono il
+'  codice HTTP e rispondono, mentre a leggere e scrivere ci va il
+'  repository, nella transazione aperta dall'endpoint stesso.
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -9088,6 +8133,7 @@ class FiltroAutorizzazione <<@Provider>> <<sicurezza>> {
 
 class AuthController <<@Path("/api/auth")>> {
   - identita : SecurityIdentity <<@Inject>>
+  - repository : RailwayRepository <<@Inject>>
   + profilo() : Response
   - claimTestuale(nomeClaim : String) : String
   - componiNomeCompleto(nome, cognome, matricola) : String
@@ -9180,7 +8226,7 @@ FiltroAutorizzazione ..|> ContainerRequestFilter
 OIDC ..> SecurityIdentity : costruisce
 FiltroAutorizzazione --> SecurityIdentity : hasRole(...)
 AuthController --> SecurityIdentity : getPrincipal(),\nclaim "matricola"
-AuthController ..> "entita' Utente\n<size:11>(modello)</size>" : ritrova l'id_utente\npartendo dalla matricola
+AuthController --> "RailwayRepository\n<size:11>(C5)</size>" : trovaUtentePerMatricola:\nritrova l'id_utente partendo\ndalla matricola del token
 
 RestApiGateway +-- StazioneDTO
 RestApiGateway +-- TrenoDTO
@@ -9195,6 +8241,7 @@ FiltroAutorizzazione ..> RestApiGateway : lascia passare\no rifiuta 401/403
 FiltroAutorizzazione ..> AuthController : /api/auth/me\ncome ogni altra rotta protetta
 
 RestApiGateway ..> "TrafficLogicEngine\n(C4)" : legge e aggiorna la cache
+RestApiGateway --> "RailwayRepository\n<size:11>(C5)</size>" : ogni lettura e ogni scrittura\nsul database, dentro la\ntransazione dell'endpoint
 RestApiGateway ..> "Emitter alerts-out" : STOP, RESOLVED,\nMAINTENANCE_DISPATCHED,\nITINERARIO_AGGIORNATO
 RealtimeWebSocket <.. "IngestionService\ne FaultMonitor (C4)" : broadcast
 
@@ -9249,6 +8296,12 @@ end note
 '  Qui entrano tutti i messaggi del campo e da qui esce tutto cio' che la
 '  Centrale decide per conto suo. Il TrafficLogicEngine e' la sola cosa
 '  che questo lato condivide con il lato REST (C3).
+'
+'  Le cinque classi di questa vista non toccano piu' il database da se':
+'  le query stanno nel RailwayRepository (C5). Qui restano la decisione di
+'  che cosa scrivere e il confine della transazione, che per l'ingestione
+'  e per il watchdog e' QuarkusTransaction.requiringNew() chiamato dentro
+'  il try.
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -9293,7 +8346,6 @@ class IngestionService <<ApplicationScoped>> <<canale>> {
   - aggiornaMessaggioGuasto(guastoId : String, messaggio : String) : void
   - aggiornaPosizioneSuTratta(trenoId, stazioneId, tipo, direzione) : EsitoPassaggio
   - calcolaProssimaStazione(itinerarioId, stazioneId, direzione) : String
-  - stazioniOrdinateDiItinerario(itinerarioId : String) : List<String>
   - trovaTratta(itinerarioId, stazioneId, tipo, direzione) : Tratta
   .. uscite ..
   + broadcastAlert(guasto : Guasto) : void
@@ -9354,20 +8406,22 @@ IngestionService +-- EsitoPassaggio
 
 IngestionService --> TrafficLogicEngine : legge e aggiorna\nla fotografia della rete
 IngestionService ..> "RealtimeWebSocket\n(C3)" : broadcast degli eventi
-IngestionService ..> "entita' JPA\n<size:11>(modello)</size>" : persist e query Panache
+IngestionService --> "RailwayRepository\n<size:11>(C5)</size>" : tutte le scritture del campo,\nstorico compreso, dentro la\ntransazione aperta qui
 
 FaultMonitor --> TrafficLogicEngine : scorre stazioni e treni,\ncontrolla i duplicati
 FaultMonitor --> IngestionService : broadcastAlert +\npubblicaGuastoSuMqtt
 FaultMonitor ..> "RealtimeWebSocket\n(C3)" : SNAPSHOT ogni 10s
+FaultMonitor --> "RailwayRepository\n<size:11>(C5)</size>" : il guasto automatico, la sua riga\ndi storico e l'evento di audit
 
-ExistIdForEdge ..> "entita' Treno\n<size:11>(modello)</size>" : findById
-ExistIdForEdgeStazione ..> "entita' Stazione\n<size:11>(modello)</size>" : findById
+ExistIdForEdge --> "RailwayRepository\n<size:11>(C5)</size>" : esisteTreno
+ExistIdForEdgeStazione --> "RailwayRepository\n<size:11>(C5)</size>" : esisteStazione
 
-TrafficLogicEngine ..> "entita' JPA\n<size:11>(modello)</size>" : listAll all'avvio
+TrafficLogicEngine --> "RailwayRepository\n<size:11>(C5)</size>" : tutteLeStazioni, tuttiITreni,\nguastiNonRisolti: solo all'avvio
 
 note right of TrafficLogicEngine
   E' una cache in RAM, non un secondo database: viene riempita
-  all'avvio con listAll e poi tenuta viva dai messaggi del campo.
+  all'avvio dalle tre letture del repository e poi tenuta viva
+  dai messaggi del campo.
   Le API REST leggono da qui, ed e' per questo che rispondono
   senza toccare PostgreSQL a ogni richiesta.
   Le tre mappe sono ConcurrentHashMap perche' ci scrivono in
@@ -9386,6 +8440,163 @@ note bottom of FaultMonitor
   Tre job da 10 secondi, tutti con ConcurrentExecution.SKIP: due
   esecuzioni sovrapposte leggerebbero la stessa cache e aprirebbero
   lo stesso guasto due volte.
+end note
+
+@enduml
+
+#+end_src
+
+*** Il componente Centrale: la persistenza (C5)
+- non e' una terza vista ma il piano sotto le altre due: e' l'unica classe della Centrale che chiama Panache, e la usano sia il lato operatore (C3) sia il lato campo (C4)
+- requisiti coperti: nessuno in proprio; da qui passano le scritture della memoria storica (RF02.7) e le letture dell'anagrafica che servono a RF01.3
+#+begin_src  plantuml file: classi_05_persistenza.png
+@startuml C5 - Classi della persistenza della Centrale
+' =========================================================================
+'  DIAGRAMMA DELLE CLASSI C5 - Centrale Operativa, la persistenza
+'
+'  Sorgente: ServeCentraleOperativa/src/main/java/it/uni/reti2/
+'    persistence/RailwayRepository.java
+'
+'  E' l'unico punto della Centrale che chiama Panache. Le stesse chiamate
+'  prima erano novantaquattro, sparse in otto classi: RestApiGateway 61,
+'  IngestionService 23, TrafficLogicEngine 3, FaultMonitor 3,
+'  AuthController 1, i due validatori dell'id 1 a testa e una perfino
+'  dentro l'entita' StoricoGuasto.
+'
+'  I sette riquadri intorno sono i clienti (a sinistra quelli di C3, a
+'  destra quelli di C4) e la freccia dice per che cosa lo usano. Le entita'
+'  in basso sono le tredici che il repository tocca, e stanno nel capitolo
+'  Modello.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam class {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+}
+skinparam class<<persistenza>> {
+    BackgroundColor #FEF7E0
+    BorderColor #B06000
+}
+skinparam class<<campo>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam class<<modello>> {
+    BackgroundColor #F1F3F4
+    BorderColor #9AA0A6
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+hide empty members
+
+title C5 - Centrale Operativa: l'unica classe che parla con PostgreSQL
+
+class RestApiGateway <<C3>>
+class AuthController <<C3>>
+class IngestionService <<C4>> <<campo>>
+class FaultMonitor <<C4>> <<campo>>
+class ExistIdForEdge <<C4>> <<campo>>
+class ExistIdForEdgeStazione <<C4>> <<campo>>
+class TrafficLogicEngine <<C4>> <<campo>>
+
+class RailwayRepository <<ApplicationScoped>> <<persistenza>> {
+  .. stazioni ..
+  + trovaStazione(id : String) : Stazione
+  + esisteStazione(id : String) : boolean
+  + tutteLeStazioni() : List<Stazione>
+  + salvaStazione(stazione : Stazione) : void
+  + eliminaStazione(stazione : Stazione) : void
+  + contaTratteConStazione(idStazione : String) : long
+  + eliminaTransitiDiStazione(idStazione : String) : long
+  .. treni ..
+  + trovaTreno(id : String) : Treno
+  + esisteTreno(id : String) : boolean
+  + tuttiITreni() : List<Treno>
+  + contaTreniInPosizioneSuTratta(idTratta : String) : long
+  + salvaTreno(treno : Treno) : void
+  + eliminaTreno(treno : Treno) : void
+  + eliminaTransitiDiTreno(idTreno : String) : long
+  .. itinerari e tratte ..
+  + trovaItinerario(id : String) : Itinerario
+  + tuttiGliItinerari() : List<Itinerario>
+  + salvaItinerario(itinerario : Itinerario) : void
+  + eliminaItinerario(itinerario : Itinerario) : void
+  + trovaTratta(id : String) : Tratta
+  + tutteLeTratte() : List<Tratta>
+  + trovaTrattaFra(idPartenza, idArrivo : String) : Tratta
+  + salvaTratta(tratta : Tratta) : void
+  + eliminaTratta(tratta : Tratta) : void
+  + tratteOrdinateDi(idItinerario : String) : List<ItinerarioTratta>
+  + stazioniOrdinateDi(idItinerario : String) : List<String>
+  + contaItinerariCheUsano(idTratta : String) : long
+  + contaAltriItinerariCheUsano(idTratta, idItinerario) : long
+  + salvaItinerarioTratta(riga : ItinerarioTratta) : void
+  + eliminaTratteDellItinerario(idItinerario : String) : long
+  .. transiti ..
+  + trovaTransitoAperto(idTreno, idStazione : String) : Transito
+  + contaTransitiSuTratta(idTratta : String) : long
+  + salvaTransito(transito : Transito) : void
+  + ultimiTransitiStorici(quanti : int) : List<StoricoTransito>
+  .. guasti ..
+  + trovaGuasto(id : String) : Guasto
+  + tuttiIGuastiRecenti() : List<Guasto>
+  + guastiApertiDi(sorgenteId, sorgenteTipo : String) : List<Guasto>
+  + guastiNonRisolti() : List<Guasto>
+  + guastiDerivatiDaConvoglio() : List<Guasto>
+  + salvaGuasto(guasto : Guasto) : void
+  .. storici ..
+  + trovaStoricoGuasto(guastoId : String) : StoricoGuasto
+  + salvaStoricoGuasto(guasto : Guasto) : void
+  + salvaStoricoStatoTreno(treno : Treno, statoPrecedente : String) : void
+  + salvaStoricoStatoStazione(stazione, stato, statoPrecedente) : void
+  + salvaEventoStazione(stazioneId, nomeStazione, stato, tipoEvento, descrizione) : void
+  + salvaStoricoTransito(transito : Transito) : void
+  - nomeDellaSorgente(guasto : Guasto) : String
+  .. utenti ..
+  + trovaUtentePerMatricola(matricola : String) : Utente
+}
+
+class "entita' JPA\n<size:11>Stazione, Treno, Tratta, Itinerario, ItinerarioTratta, Transito,</size>\n<size:11>Guasto, EventoStazione, Utente e i quattro storici scritti</size>" as ENTITA <<modello>>
+
+RestApiGateway --> RailwayRepository : anagrafica, comandi operativi,\nitinerario dei nodi di campo
+AuthController --> RailwayRepository : trovaUtentePerMatricola,\ncon la matricola presa dal token
+IngestionService --> RailwayRepository : stato dei treni, transiti,\nguasti e storici
+FaultMonitor --> RailwayRepository : guasto automatico,\nstorico ed evento di audit
+ExistIdForEdge --> RailwayRepository : esisteTreno
+ExistIdForEdgeStazione --> RailwayRepository : esisteStazione
+TrafficLogicEngine --> RailwayRepository : le tre letture dell'avvio
+
+RailwayRepository ..> ENTITA : findById, list, persist, delete\n(metodi statici di Panache)
+
+note right of RailwayRepository
+  Tre cose che questa classe NON fa, e sono scelte:
+
+  1. non apre transazioni. Niente @Transactional e niente
+     QuarkusTransaction: i confini restano nei chiamanti, dove
+     servono cosi' come sono (l'ingestione e il FaultMonitor
+     devono chiudere la transazione DENTRO il try, se no le
+     notifiche partirebbero prima del commit).
+  2. non decide niente: nessuna Response, nessuna validazione,
+     nessun messaggio d'errore. Quelli restano in C3.
+  3. non tocca la cache in RAM: il TrafficLogicEngine e' un'altra
+     cosa, e infatti lo usa solo all'avvio.
+end note
+
+note bottom of ENTITA
+  Le entita' restano PanacheEntityBase in stile active record, quindi
+  questo non e' il pattern Repository dei libri: gli oggetti tornano
+  GESTITI da Hibernate e chi ne cambia un campo se lo ritrova scritto
+  al commit, senza chiamare nessun metodo di salvataggio. Qui si
+  raccolgono le query, non si isola il modello dal database.
+
+  E' anche il motivo per cui l'unica query che stava dentro un'entita'
+  e' sparita: StoricoGuasto.fotografiaDi() cercava da se' il nome della
+  stazione sorgente, adesso quel nome glielo passa il repository.
 end note
 
 @enduml
@@ -9708,7 +8919,7 @@ end note
 | RF02.4              |            | C1, C2, C4      | i due validatori di campo e i due bean che rispondono in centrale          |
 | RF02.5              |            | C3, C1          | il metodo che ricompone l'itinerario e il motore che lo riscarica, ma ripartendo da capo |
 | RF02.6              |            | C4              | il watchdog con i suoi tre lavori periodici                                |
-| RF02.7              |            | modello         | le sei tabelle di storico stanno nel Modello e non in un diagramma; due di esse restano sempre vuote |
+| RF02.7              |            | modello, C5     | le sei tabelle di storico stanno nel Modello e non in un diagramma; a scriverle e' tutte il repository, che e' l'unica classe che parla col database; due di esse restano sempre vuote |
 | RF03.1              |            | C1, C2          | ogni nodo ha il proprio stato e il proprio punto di ingresso               |
 | RF03.2              |            | C1, C2, C4      | nessuna classe condivisa fra i processi: e' la mappa C0 a dirlo            |
 | RF03.3              |            | C4              | due consumatori distinti per lo stesso fatto fisico                        |
@@ -9730,8 +8941,9 @@ quattro o cinque volte e la mappatura non direbbe piu' niente. Qui ogni macchina
 sola, sulla riga della classe che ne *scrive le transizioni*, cioe' quella che assegna il valore
 nuovo alla variabile di stato. Le classi che servono la macchina senza farla transitare hanno un
 trattino, e la nota dice di quale macchina sono il contorno: sono i tre contenitori di stato
-(=TrainDB=, =DBLocale=, =TrafficLogicEngine=), che tengono in RAM le variabili ma non le muovono, e i
-client (=Sensori=, =SecureHttpClient=, le pagine della web app).
+(=TrainDB=, =DBLocale=, =TrafficLogicEngine=), che tengono in RAM le variabili ma non le muovono, i
+client (=Sensori=, =SecureHttpClient=, le pagine della web app) e il =RailwayRepository=, che le
+variabili le scrive su disco ma solo quando gliel'ha detto qualcun altro.
 
 #+ATTR_LATEX: :environment longtable :align L{0.30\textwidth}L{0.13\textwidth}L{0.44\textwidth} :font \small
 | classe                                 | macchine       | perche' e' lei il cuore (oppure di che cosa e' il contorno)                  |
@@ -9769,6 +8981,9 @@ client (=Sensori=, =SecureHttpClient=, le pagine della web app).
 | ExistIdForEdge, ExistIdForEdgeStazione | M2             | una macchina sola in due classi gemelle: cambiano il topic e la tabella interrogata, non il comportamento |
 | TrafficLogicEngine                     | --             | e' la cache dove vivono le variabili di M12 e M13, come =TrainDB= a bordo: le transizioni gliele scrivono le altre tre classi |
 |----------------------------------------+----------------+-----------------------------------------------------------------------------|
+| *C5 - la persistenza*                   |                |                                                                             |
+| RailwayRepository                      | --             | non fa transitare niente: esegue le query per conto delle altre. E' il contorno di tutte le macchine della centrale che lasciano una traccia su database, cioe' M3-M6, M8 e M10 |
+|----------------------------------------+----------------+-----------------------------------------------------------------------------|
 | *C6 - la Web App*                       |                |                                                                             |
 | keycloak, authStore                    | M9 (meta' browser) | PKCE, scambio del codice e rinnovo del token: M9 e' l'unica macchina che attraversa due componenti |
 | apiClient, WebSocketClient, railwayStore, useRealtimeUpdates, le pagine | -- | sono i consumatori di M10 e M11: ridisegnano quello che ricevono, nessuno stato del dominio nasce qui |
@@ -9787,11 +9002,3 @@ altre quattro sono tutte della centrale e mancano per due motivi diversi:
   nessuna delle tre ne e' il cuore: e' il caso in cui la variabile e' l'unica cosa che tiene insieme
   la macchina, ed e' proprio quello che il capitolo /Diagrammi degli stati/ chiama macchina di
   dominio.
-#+begin_comment
-Letta al contrario la tabella dice una cosa che nei diagrammi delle classi non si vede: le macchine
-non sono distribuite in modo uniforme. Su ogni nodo di campo ce ne sono due che ne portano quasi
-tutte (=TrainJourneyEngine= con quattro, =StationGateway= con sei), mentre nella centrale sono piu'
-sparse, perche' li' ogni canale MQTT e' gia' una macchina a se'. Non e' un difetto e non e' nemmeno
-una scelta: sul nodo di campo le variabili di stato sono quattro in croce e ci scrive sopra chi
-riceve i messaggi, quindi le macchine si addensano dove arriva il traffico.
-#+end_comment

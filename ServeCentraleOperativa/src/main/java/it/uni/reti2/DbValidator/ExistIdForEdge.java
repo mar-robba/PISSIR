@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import it.uni.reti2.entity.Treno;
+import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.reactive.messaging.Channel;
@@ -24,6 +25,10 @@ public class ExistIdForEdge {
 
     @Inject
     ObjectMapper mapper;
+
+    /** Unico punto da cui questa classe interroga il database. */
+    @Inject
+    RailwayRepository repository;
 
     // 1. Iniettiamo l'Emitter per inviare il messaggio di risposta
     @Inject
@@ -49,8 +54,8 @@ public class ExistIdForEdge {
             String trenoId = root.has("trenoId") ? root.get("trenoId").asText() : null;
 
             if (trenoId != null) {
-                // Check sul DB tramite il pattern Active Record di Panache
-                boolean esiste = QuarkusTransaction.requiringNew().call(() -> Treno.findById(trenoId) != null);
+                // Check sul DB: la query sta nel repository, qui resta solo la transazione
+                boolean esiste = QuarkusTransaction.requiringNew().call(() -> repository.esisteTreno(trenoId));
 
                 // 3. Creiamo la risposta aggiungendo la conferma dell'esistenza a DB
                 ObjectNode responseNode = root.deepCopy();

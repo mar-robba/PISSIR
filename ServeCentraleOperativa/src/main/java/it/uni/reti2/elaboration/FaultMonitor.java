@@ -4,13 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.scheduler.Scheduled;
-import it.uni.reti2.entity.EventoStazione;
 import it.uni.reti2.entity.Guasto;
 import it.uni.reti2.entity.Stazione;
-import it.uni.reti2.entity.StoricoGuasto;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.gateway.RealtimeWebSocket;
 import it.uni.reti2.ingestion.IngestionService;
+import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -49,6 +48,10 @@ public class FaultMonitor {
 
     @Inject
     IngestionService ingestion;
+
+    /** Unico punto da cui questa classe legge e scrive il database. */
+    @Inject
+    RailwayRepository repository;
 
     /* È una classe fondamentale che fa parte della libreria Jackson (il motore JSON standard usato da Quarkus). Il suo compito principale è fare due cose:
     Serializzazione (Object → JSON): Prende un normale oggetto Java (POJO) e lo trasforma in una stringa di testo in formato JSON.
@@ -271,23 +274,20 @@ public class FaultMonitor {
 
         try {
             QuarkusTransaction.requiringNew().run(() -> {
-                guasto.persist();
-
-                StoricoGuasto storico = StoricoGuasto.fotografiaDi(guasto);
-                storico.persist();
+                repository.salvaGuasto(guasto);
+                repository.salvaStoricoGuasto(guasto);
 
                 if (tipoEventoStazione != null) {
-                    // Audit log dell'evento sulla tabella eventi_stazioni
+                    // Audit log dell'evento sulla tabella eventi_stazioni. Il nome va
+                    // congelato qui: la tabella non ha una chiave esterna verso la stazione
+                    // (RF02.7), quindi è l'unico posto dove resta scritto.
                     Stazione stazione = statoRete.getStazione(sorgenteId);
-                    EventoStazione evento = new EventoStazione();
-                    evento.stazioneId = sorgenteId;
-                    // Il nome va congelato qui: la tabella non ha una chiave esterna verso
-                    // la stazione (RF02.7), quindi è l'unico posto dove resta scritto.
-                    evento.nomeStazione = stazione != null ? stazione.nome : sorgenteId;
-                    evento.stato = "OFFLINE";
-                    evento.tipoEvento = tipoEventoStazione;
-                    evento.descrizione = "Heartbeat mancante, guasto automatico " + guasto.id;
-                    evento.persist();
+                    repository.salvaEventoStazione(
+                            sorgenteId,
+                            stazione != null ? stazione.nome : sorgenteId,
+                            "OFFLINE",
+                            tipoEventoStazione,
+                            "Heartbeat mancante, guasto automatico " + guasto.id);
                 }
             });
         } catch (Exception e) {

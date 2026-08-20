@@ -1,31 +1,24 @@
 package it.uni.reti2.persistence;
 
 import io.quarkus.panache.common.Sort;
-import it.uni.reti2.entity.DatiOperatore;
+import it.uni.reti2.entity.EventoStazione;
 import it.uni.reti2.entity.Guasto;
 import it.uni.reti2.entity.Itinerario;
 import it.uni.reti2.entity.ItinerarioTratta;
 import it.uni.reti2.entity.Stazione;
-import it.uni.reti2.entity.StoricoAssegnazioneGuasto;
 import it.uni.reti2.entity.StoricoGuasto;
-import it.uni.reti2.entity.StoricoInterventoManutenzione;
-import it.uni.reti2.entity.StoricoItinerario;
-import it.uni.reti2.entity.StoricoItinerarioTratta;
 import it.uni.reti2.entity.StoricoStatoStazione;
-import it.uni.reti2.entity.StoricoStatoTratta;
 import it.uni.reti2.entity.StoricoStatoTreno;
 import it.uni.reti2.entity.StoricoTransito;
 import it.uni.reti2.entity.Transito;
 import it.uni.reti2.entity.Tratta;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.entity.Utente;
-import it.uni.reti2.eventi.CausaEvento;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Unico punto della Centrale che parla con il database.
@@ -116,26 +109,14 @@ public class RailwayRepository {
         return Treno.listAll();
     }
 
-    /** I convogli attualmente assegnati a un itinerario. */
-    public List<Treno> treniDellItinerario(String idItinerario) {
-        return Treno.list("itinerario.id", idItinerario);
-    }
-
     /**
-     * Toglie la posizione corrente ai convogli che risultano su questa tratta, perché l'arco
-     * sta per sparire dalla rete e {@code Treni.PosizioneAttualeTrattaOStazione} è una chiave
-     * esterna verso Tratte: senza questo passaggio la DELETE la rifiuterebbe Postgres.
-     *
-     * <p>Non è una perdita di informazione: la posizione è stato corrente, la scrive la
-     * telemetria a ogni passaggio e il primo frame utile la riscrive.</p>
-     *
-     * @param idTratta L'arco che si sta eliminando.
-     * @return I convogli rimasti senza posizione, per aggiornare anche la copia in cache.
+     * Quanti convogli risultano fermi su questa tratta. {@code Treni.PosizioneAttualeTrattaOStazione}
+     * è una chiave esterna verso Tratte: se il conteggio è maggiore di zero la DELETE dell'arco
+     * la rifiuterebbe Postgres, e l'amministratore si prenderebbe un 500 con l'eccezione invece
+     * del 409 con la spiegazione che chiede RF01.3.5.
      */
-    public List<Treno> liberaTreniInPosizioneSuTratta(String idTratta) {
-        List<Treno> treni = Treno.list("posizioneAttualeTratta.id", idTratta);
-        for (Treno treno : treni) treno.posizioneAttualeTratta = null;
-        return treni;
+    public long contaTreniInPosizioneSuTratta(String idTratta) {
+        return Treno.count("posizioneAttualeTratta.id", idTratta);
     }
 
     public void salvaTreno(Treno treno) {
@@ -258,6 +239,15 @@ public class RailwayRepository {
                 idTreno, idStazione).firstResult();
     }
 
+    /**
+     * Quanti transiti VIVI insistono su una tratta. Serve prima di eliminare l'arco: verso
+     * Tratte la tabella dei transiti correnti ha davvero una chiave esterna (sui transiti
+     * STORICI invece è caduta con RF02.7, e infatti quelli non si contano).
+     */
+    public long contaTransitiSuTratta(String idTratta) {
+        return Transito.count("tratta.id", idTratta);
+    }
+
     public void salvaTransito(Transito transito) {
         transito.persist();
     }
@@ -293,24 +283,18 @@ public class RailwayRepository {
     }
 
     /** Tutti i guasti non ancora risolti: la cache dei guasti attivi parte da qui. */
-    /**
-     * I guasti ancora aperti che appartengono alla stessa catena di eventi, cioè che discendono
-     * dalla stessa avaria. Serve alla chiusura: la stazione resa impercorribile da un convoglio
-     * guasto sui suoi binari è un guasto vero, che l'operatore deve vedere, ma non è un'avaria
-     * in più, e quando la causa viene riparata deve chiudersi con lei.
-     *
-     * @param catenaId Catena di appartenenza (null o vuota: nessun risultato, un guasto senza
-     *                 catena non ha conseguenze riconoscibili).
-     */
-    public List<Guasto> guastiApertiDellaCatena(String catenaId) {
-        if (catenaId == null || catenaId.isBlank()) {
-            return new ArrayList<>();
-        }
-        return Guasto.list("catenaId = ?1 and risolto = false", catenaId);
-    }
-
     public List<Guasto> guastiNonRisolti() {
         return Guasto.list("risolto", false);
+    }
+
+    /**
+     * I guasti di stazione ancora aperti che sono stati generati da un convoglio fermatosi
+     * guasto sui suoi binari. Non sono avarie della stazione: quando il convoglio viene
+     * riparato vanno chiusi con lui, e per ritrovarli serve il tipo, non la sorgente
+     * (la sorgente di queste righe è la stazione, non il treno che le ha causate).
+     */
+    public List<Guasto> guastiDerivatiDaConvoglio() {
+        return Guasto.list("tipo = 'convoglio_guasto_in_stazione' and risolto = false");
     }
 
     public void salvaGuasto(Guasto guasto) {
@@ -326,62 +310,40 @@ public class RailwayRepository {
         return StoricoGuasto.find("guastoId", guastoId).firstResult();
     }
 
-    /** Scrive la riga di Storico_Guasti congelando anche il nome della sorgente. */
+    /** Scrive la riga di Storico_Guasti copiando i dati dal guasto. */
     public void salvaStoricoGuasto(Guasto guasto) {
         StoricoGuasto storico = StoricoGuasto.fotografiaDi(guasto, nomeDellaSorgente(guasto));
         storico.persist();
     }
 
     public void salvaStoricoStatoTreno(Treno treno, String statoPrecedente) {
-        salvaStoricoStatoTreno(treno, statoPrecedente, null);
-    }
-
-    /**
-     * Come sopra, ma la riga porta anche la causa del cambiamento: chi l'ha provocato e a quale
-     * catena di eventi appartiene. È quello che rende leggibile a posteriori una reazione a
-     * catena, dove il convoglio non si è fermato da solo ma perché qualcos'altro è successo.
-     *
-     * @param treno            Il convoglio con lo stato nuovo già assegnato.
-     * @param statoPrecedente  Lo stato che aveva prima.
-     * @param causa            La causa del cambiamento (null se il convoglio ha deciso da solo).
-     */
-    public void salvaStoricoStatoTreno(Treno treno, String statoPrecedente, CausaEvento causa) {
-        StoricoStatoTreno storico = StoricoStatoTreno.fotografiaDi(treno, statoPrecedente, causa);
+        StoricoStatoTreno storico = StoricoStatoTreno.fotografiaDi(treno, statoPrecedente);
         storico.persist();
     }
 
     public void salvaStoricoStatoStazione(Stazione stazione, String stato, String statoPrecedente) {
-        salvaStoricoStatoStazione(stazione, stato, statoPrecedente, null);
-    }
-
-    /**
-     * Come sopra, con la causa del cambiamento.
-     *
-     * @param stazione        La stazione interessata.
-     * @param stato           Lo stato nuovo.
-     * @param statoPrecedente Lo stato che aveva prima.
-     * @param causa           La causa del cambiamento (null se la stazione ha deciso da sola).
-     */
-    public void salvaStoricoStatoStazione(Stazione stazione, String stato, String statoPrecedente,
-                                          CausaEvento causa) {
-        StoricoStatoStazione storico = StoricoStatoStazione.fotografiaDi(stazione, stato, statoPrecedente, causa);
+        StoricoStatoStazione storico = StoricoStatoStazione.fotografiaDi(stazione, stato, statoPrecedente);
         storico.persist();
     }
 
     /**
-     * Scrive la riga di {@code Storico_Stato_Tratte}: com'era la percorribilità dell'arco, com'è
-     * adesso e per colpa di chi. Come per le stazioni, la percorribilità corrente è
-     * {@code @Transient} e a database va solo il cambiamento.
+     * Riga di audit sulla tabella eventi_stazioni. È complementare a Storico_Stato_Stazioni:
+     * quello registra il cambio di stato, questa registra il fatto che l'ha provocato.
      *
-     * @param tratta          L'arco interessato.
-     * @param stato           La percorribilità nuova.
-     * @param statoPrecedente Quella che aveva prima.
-     * @param causa           La causa del cambiamento (null se non è nota).
+     * <p>Il nome della stazione lo passa il chiamante e non lo si rilegge dall'anagrafica:
+     * chi scrive questi eventi (watchdog e ingestion) ha in mano la copia in cache, che è
+     * quella coerente con l'istante dell'evento. La tabella non ha una chiave esterna verso
+     * la stazione (RF02.7), quindi è l'unico posto dove quel nome resta scritto.</p>
      */
-    public void salvaStoricoStatoTratta(Tratta tratta, String stato, String statoPrecedente,
-                                        CausaEvento causa) {
-        StoricoStatoTratta storico = StoricoStatoTratta.fotografiaDi(tratta, stato, statoPrecedente, causa);
-        storico.persist();
+    public void salvaEventoStazione(String stazioneId, String nomeStazione, String stato,
+                                    String tipoEvento, String descrizione) {
+        EventoStazione evento = new EventoStazione();
+        evento.stazioneId = stazioneId;
+        evento.nomeStazione = nomeStazione;
+        evento.stato = stato;
+        evento.tipoEvento = tipoEvento;
+        evento.descrizione = descrizione;
+        evento.persist();
     }
 
     public void salvaStoricoTransito(Transito transito) {
@@ -389,228 +351,7 @@ public class RailwayRepository {
         storico.persist();
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // STORICO DEGLI ITINERARI PERCORSI (RF02.7)
-    // ──────────────────────────────────────────────────────────────
 
-    /**
-     * L'itinerario che il convoglio sta percorrendo adesso, come riga di storico ancora
-     * aperta (senza istante di completamento).
-     *
-     * <p>È null quando il convoglio non ha un itinerario, ma anche quando ce l'ha e nessuno
-     * ha mai registrato l'assegnazione: sono i convogli assegnati prima che questa
-     * registrazione esistesse, quelli che sistema {@link #allineaItinerariPercorsi()}.</p>
-     *
-     * @param idTreno Il convoglio.
-     * @return La riga aperta di Storico_Itinerari, oppure null.
-     */
-    public StoricoItinerario itinerarioPercorsoAperto(String idTreno) {
-        return StoricoItinerario.find("trenoId = ?1 and tsCompletamento is null", idTreno)
-                .firstResult();
-    }
-
-    /**
-     * Registra che da adesso il convoglio percorre questo itinerario: chiude l'assegnazione
-     * precedente e ne apre una nuova, copiandosi dentro il percorso di oggi tratta per tratta.
-     *
-     * <p><b>Registra i cambiamenti, non i campionamenti</b> (è la regola di RF02.7): se il
-     * convoglio stava già percorrendo quell'itinerario <em>con quel percorso</em> non viene
-     * scritto niente. Senza questo controllo ogni PUT su /api/tratte, che rimanda sempre
-     * l'elenco completo dei convogli assegnati, lascerebbe una riga nuova per ciascuno anche
-     * non avendo cambiato nulla.</p>
-     *
-     * <p>Il confronto è sul percorso e non solo sull'identificativo perché l'itinerario in
-     * sé è solo un id: se l'amministratore ne riscrive le tappe, da quel momento i convogli
-     * assegnati ne stanno percorrendo un altro, e quello vecchio va chiuso.</p>
-     *
-     * @param idTreno    Il convoglio a cui l'itinerario è stato assegnato.
-     * @param itinerario L'itinerario assegnato.
-     */
-    public void registraAssegnazioneItinerario(String idTreno, Itinerario itinerario) {
-        List<ItinerarioTratta> tratte = tratteOrdinateDi(itinerario.id);
-        StoricoItinerario storico = StoricoItinerario.fotografiaDi(idTreno, itinerario, tratte);
-
-        StoricoItinerario aperto = itinerarioPercorsoAperto(idTreno);
-        if (aperto != null) {
-            if (aperto.itinerarioId.equals(itinerario.id)
-                    && Objects.equals(aperto.descrizionePercorso, storico.descrizionePercorso)) {
-                return; // stesso itinerario e stesse tappe: non è cambiato niente
-            }
-            aperto.tsCompletamento = Instant.now();
-        }
-
-        // La persist() è qui e non in fondo apposta: la colonna è IDENTITY, quindi l'id lo
-        // assegna il database all'INSERT ed è quello che le righe figlie devono puntare.
-        storico.persist();
-        for (ItinerarioTratta riga : tratte) {
-            StoricoItinerarioTratta.fotografiaDi(storico.id, riga).persist();
-        }
-    }
-
-    /**
-     * Apre la riga di storico dei convogli che <em>stanno già</em> percorrendo un itinerario
-     * ma non ne hanno una aperta.
-     *
-     * <p>Serve perché la registrazione degli itinerari percorsi è arrivata dopo i convogli:
-     * chi era già assegnato non ha lasciato traccia dell'assegnazione, e senza questo
-     * allineamento non ne lascerebbe mai una — la riga la apre solo un <em>cambio</em>, e
-     * per quei convogli il cambio è già avvenuto. Il risultato sarebbe una memoria storica
-     * che dice "nessuno sta percorrendo niente" mentre i convogli viaggiano.</p>
-     *
-     * <p>Si esegue a ogni avvio ed è idempotente: al secondo giro quei convogli la riga ce
-     * l'hanno e vengono saltati. L'unica cosa che di loro non si può sapere è <em>quando</em>
-     * l'assegnazione è cominciata davvero, perché nessuno l'aveva scritta: il
-     * {@code ts_assegnazione} di queste righe è il momento dell'allineamento e non quello
-     * dell'assegnazione. Da qui in avanti le due cose coincidono.</p>
-     *
-     * @return Quante righe sono state aperte.
-     */
-    public int allineaItinerariPercorsi() {
-        int aperte = 0;
-        for (Treno treno : tuttiITreni()) {
-            if (treno.itinerario == null) {
-                continue; // convoglio senza itinerario: non sta percorrendo niente
-            }
-            if (itinerarioPercorsoAperto(treno.id) != null) {
-                continue; // la sua riga c'è già
-            }
-            registraAssegnazioneItinerario(treno.id, treno.itinerario);
-            aperte++;
-        }
-        return aperte;
-    }
-
-    /**
-     * Chiude l'itinerario che il convoglio stava percorrendo, se ne aveva uno: succede
-     * quando viene sganciato, quando il suo itinerario viene cancellato e quando il
-     * convoglio stesso viene rottamato.
-     *
-     * <p>{@code ts_completamento} vuol dire "qui il convoglio ha smesso di percorrerlo", non
-     * "è arrivato a destinazione": il capolinea nel sistema non chiude niente, il digital
-     * twin inverte la marcia e riparte, quindi un istante di arrivo vero non esiste.</p>
-     *
-     * @param idTreno Il convoglio che smette di percorrere il proprio itinerario.
-     */
-    public void registraFineItinerario(String idTreno) {
-        StoricoItinerario aperto = itinerarioPercorsoAperto(idTreno);
-        if (aperto != null) {
-            aperto.tsCompletamento = Instant.now();
-        }
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // STORICO DELLE ASSEGNAZIONI DEGLI OPERATORI (RF02.7)
-    // ──────────────────────────────────────────────────────────────
-
-    /**
-     * La presa in carico ancora aperta di un guasto, cioè l'operatore che ci sta lavorando
-     * in questo momento.
-     *
-     * @param guastoId Il guasto.
-     * @return La riga aperta di Storico_Assegnazioni_Guasti, oppure null.
-     */
-    public StoricoAssegnazioneGuasto assegnazioneApertaDi(String guastoId) {
-        return StoricoAssegnazioneGuasto.find("guastoId = ?1 and tsRisoluzione is null", guastoId)
-                .firstResult();
-    }
-
-    /**
-     * Apre la presa in carico di un guasto da parte di un operatore. Se quel guasto era già
-     * stato preso in carico da qualcun altro la riga di prima viene chiusa: il passaggio di
-     * mano resta scritto, e a lavorarci non risulta mai più di uno alla volta.
-     *
-     * @param guasto    Il guasto preso in carico.
-     * @param operatore Chi lo prende in carico.
-     */
-    public void apriAssegnazioneGuasto(Guasto guasto, DatiOperatore operatore) {
-        StoricoAssegnazioneGuasto aperta = assegnazioneApertaDi(guasto.id);
-        if (aperta != null) {
-            if (operatore.id().equals(aperta.operatoreId)) {
-                return; // lo stesso operatore lo aveva già preso in carico
-            }
-            aperta.tsRisoluzione = Instant.now();
-        }
-        StoricoAssegnazioneGuasto.fotografiaDi(guasto, nomeDellaSorgente(guasto), operatore).persist();
-    }
-
-    /**
-     * Chiude la presa in carico di un guasto appena risolto.
-     *
-     * <p>Se non ce n'era una aperta e a chiudere è stato un operatore, la riga si scrive
-     * adesso già chiusa: chi ha risolto un allarme senza prima prenderlo in carico se n'è
-     * occupato lo stesso, e RF02.7 vuole sapere chi è stato. Se invece l'operatore non c'è
-     * (chiusura automatica di M3 e M4, dove il guasto si richiude perché la condizione è
-     * rientrata da sola) non si scrive niente: non c'è nessuna assegnazione da registrare.
-     * Resta il caso di mezzo, cioè la condizione che rientra mentre qualcuno ci stava
-     * lavorando: lì la riga aperta c'è e va chiusa, altrimenti quell'operatore risulterebbe
-     * al lavoro per sempre su un allarme già finito.</p>
-     *
-     * @param guasto    Il guasto risolto.
-     * @param operatore Chi lo ha risolto, oppure null se si è chiuso da solo.
-     */
-    public void chiudiAssegnazioneGuasto(Guasto guasto, DatiOperatore operatore) {
-        StoricoAssegnazioneGuasto aperta = assegnazioneApertaDi(guasto.id);
-        if (aperta == null) {
-            if (operatore == null) {
-                return;
-            }
-            aperta = StoricoAssegnazioneGuasto.fotografiaDi(guasto, nomeDellaSorgente(guasto), operatore);
-            aperta.persist();
-        }
-        aperta.tsRisoluzione = guasto.timestampRisoluzione != null
-                ? guasto.timestampRisoluzione
-                : Instant.now();
-    }
-
-    /**
-     * Apre la riga della squadra di manutenzione mandata a una stazione: è l'altra faccia
-     * delle "assegnazioni degli operatori" di RF02.7, quella fisica.
-     *
-     * <p>La riga nasce <b>aperta</b> ({@code ts_rientro} nullo), perché l'intervento comincia
-     * adesso e finisce quando la squadra ha finito. Prima nasceva già chiusa: invio e rientro
-     * stavano nella stessa chiamata e fra i due timestamp passavano millisecondi.</p>
-     *
-     * @param stazione   La stazione dove è stata mandata la squadra.
-     * @param guastoId   Il guasto che ha motivato l'invio, oppure null.
-     * @param operatore  Chi ha dato il comando dalla web app.
-     * @param statoPrima Lo stato della stazione prima dell'intervento.
-     * @param tsInvio    Istante in cui la squadra è stata mandata.
-     * @param catenaId   Catena coniata per questo intervento.
-     */
-    public void apriInterventoManutenzione(Stazione stazione, String guastoId,
-                                           DatiOperatore operatore,
-                                           String statoPrima, Instant tsInvio, String catenaId) {
-        StoricoInterventoManutenzione storico = StoricoInterventoManutenzione.invioSquadra(
-                stazione, guastoId, operatore, statoPrima, tsInvio, catenaId);
-        storico.persist();
-    }
-
-    /**
-     * L'intervento ancora in corso su una stazione, cioè la riga con il rientro non ancora
-     * scritto. Se ce n'è più di una (invii ripetuti) vale la più recente.
-     *
-     * @param stazioneId La stazione.
-     * @return La riga aperta, oppure null se nessuna squadra è sul posto.
-     */
-    public StoricoInterventoManutenzione interventoApertoDi(String stazioneId) {
-        return StoricoInterventoManutenzione
-                .find("stazioneId = ?1 and tsRientro is null", Sort.by("tsInvio").descending(), stazioneId)
-                .firstResult();
-    }
-
-    /**
-     * Chiude l'intervento: la squadra ha finito e la stazione è tornata nello stato indicato.
-     *
-     * @param intervento La riga aperta da {@link #apriInterventoManutenzione}.
-     * @param statoDopo  Lo stato in cui la stazione è rimasta a lavoro concluso.
-     */
-    public void chiudiInterventoManutenzione(StoricoInterventoManutenzione intervento, String statoDopo) {
-        if (intervento == null) {
-            return;
-        }
-        intervento.tsRientro = Instant.now();
-        intervento.statoStazioneDopo = statoDopo;
-    }
 
     /**
      * Nome della sorgente da congelare nello storico del guasto. Per una stazione va letto

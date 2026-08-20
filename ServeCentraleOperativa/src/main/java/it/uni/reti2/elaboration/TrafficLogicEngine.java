@@ -3,7 +3,9 @@ package it.uni.reti2.elaboration;
 import it.uni.reti2.entity.Guasto;
 import it.uni.reti2.entity.Stazione;
 import it.uni.reti2.entity.Treno;
+import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.enterprise.event.Observes;
 import jakarta.transaction.Transactional;
 import io.quarkus.runtime.StartupEvent;
@@ -13,27 +15,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-/**tesi
+/*
+ Dove si scrive sul database, e perché non qui.
 
- Ruolo TrafficLogicEngine: è una cache in-memory aggiornata dal consumer MQTT (IngestionService) e usata dalle API REST; non è il componente che normalmente scrive sul DB. Vedi TrafficLogicEngine.java:37-66.
- Quando il DB viene aggiornato (e dove)
+ Questa classe è una cache in RAM: la riempie all'avvio leggendo dal database e poi la
+ tiene aggiornata il consumer MQTT (IngestionService). Le API REST la leggono per non
+ ripassare dal database a ogni richiesta.
 
- Telemetria (treni): scrive/crea Treno e inserisce righe di storico quando cambia stato — vedi treno.persist() e StoricoStatoTreno.persist() in IngestionService.java:120-160.
- Heartbeat (stazioni): crea/aggiorna Stazione e registra uno StoricoStatoStazione — vedi stazione.persist() e storico.persist() in IngestionService.java:180-210.
- Transiti / Passaggi: crea/chiude Transito e inserisce StoricoTransito — vedi transito.persist() e storicizzaTransito(...) in IngestionService.java:236-308.
- Allarmi (guasti): crea Guasto e relativo storico — vedi guasto.persist() e StoricoGuasto.persist() in IngestionService.java:340-364.
- Aggiornamento posizione treno: l'endpoint/consumer aggiorna dbTreno.posizioneAttualeTratta (persistente) in IngestionService.java:447-453.
- Operazioni REST amministrative: anche gli endpoint HTTP del RestApiGateway possono persistere entità (es. stazione.persist(), treno.persist()), vedi RestApiGateway.java:120-140 e [..#L220-L240].
- Nota sul TrafficLogicEngine e persistenza
+ Da quando esiste RailwayRepository ogni lettura e ogni scrittura passa da lì: nessuna
+ classe chiama più findById, list o persist sulle entità. I punti in cui il database
+ cambia davvero restano due:
+   - l'IngestionService, che a ogni messaggio MQTT aggiorna treni, stazioni, transiti e
+     guasti e ne scrive le righe di storico (repository.salvaTreno, salvaStoricoTransito,
+     salvaGuasto, ...);
+   - gli endpoint amministrativi del RestApiGateway, che creano e cancellano stazioni,
+     convogli, tratte e itinerari (repository.salvaStazione, eliminaTratta, ...).
 
- TrafficLogicEngine.onStart() è annotato @Transactional e carica la cache dal DB all'avvio; nel ciclo di inizializzazione imposta alcuni campi volatili (es. s.stato, t.ultimoAggiornamento) che sono marcati @Transient e quindi NON vengono persistiti (vedi Stazione.java:68-76 e Treno.java:1-30).
- Eccezione: durante l’inizializzazione onStart() il codice imposta default per campi persistenti di Guasto (es. timestamp, severita) — questi campi sono persistiti nel DB perché non sono @Transient (vedi Guasto.java:57-74 e TrafficLogicEngine.java:62-64). Quindi un aggiornamento puntuale al DB può avvenire all'avvio per quei campi.
- Conclusione breve
-
- Sì: la funzionalità di aggiornare il DB è prevista e avviene principalmente nel IngestionService (gestione MQTT) e negli endpoint REST amministrativi; TrafficLogicEngine è pensato come cache e non è il punto primario di scrittura runtime (salvo i default per Guasto eseguiti in start-up).
- Vuoi che punti esattamente altre righe o che generi una mappa delle chiamate di persistenza per ogni evento MQTT?
-
- GPT-5 mini • 1x**/
+ Un'eccezione c'è ed è qui sotto, in onStart(): i campi di Guasto sistemati al caricamento
+ (timestamp, severita) sono persistenti e non @Transient, quindi la @Transactional del
+ metodo li scrive davvero. I campi di Stazione e Treno toccati nello stesso ciclo invece
+ sono @Transient e restano solo in memoria.
+*/
 
 /**
  * Cache in-memory dello stato corrente della rete ferroviaria.
@@ -53,6 +55,10 @@ public class TrafficLogicEngine {
     
     /** Mappa thread-safe per tenere traccia dei guasti attualmente segnalati e non ancora risolti */
     private final Map<String, Guasto> guastiAttivi = new ConcurrentHashMap<>();
+    /** Unico punto da cui questa classe legge il database (la cache qui sopra è RAM). */
+    @Inject
+    RailwayRepository repository;
+
 /*Prevenire errori di "Lazy Loading" (Caricamento Pigro): Se la tua entità Stazioni ha dei campi collegati (ad esempio una lista di Sensori o di Storici) che non vengono caricati immediatamente dalla query principale, l'ORM (come Hibernate) proverà a leggerli nel momento in cui accedi a quei campi. Senza una transazione aperta, riceveresti un blocco totale (il famoso errore LazyInitializationException).***/
     @Transactional
     void onStart(@Observes StartupEvent ev) {
@@ -64,7 +70,7 @@ public class TrafficLogicEngine {
         // nessuna stazione ha ancora battuto (marcarle ONLINE faceva vedere per 30
         // secondi una rete tutta operativa anche a nodi spenti). Il FaultMonitor
         // salta le stazioni con heartbeat nullo, quindi non apre falsi guasti.
-        for (Stazione s : Stazione.<Stazione>listAll()) {
+        for (Stazione s : repository.tutteLeStazioni()) {
             stazioni.put(s.id, s);
         }
         System.out.println("Caricate " + stazioni.size() + " stazioni.");
@@ -76,14 +82,14 @@ public class TrafficLogicEngine {
         // Centrale faceva sembrare "appena visti" treni il cui processo non è nemmeno acceso.
         // Il FaultMonitor salta i treni con ultimoAggiornamento nullo, quindi non apre più i
         // guasti "treno fermo" falsi che comparivano dieci secondi dopo ogni riavvio.
-        for (Treno t : Treno.<Treno>listAll()) {
+        for (Treno t : repository.tuttiITreni()) {
             treni.put(t.id, t);
         }
         System.out.println("Caricati " + treni.size() + " treni.");
 
         // Popola Guasti: tipo/severita/timestamp sono ora persistiti,
         // quindi non vanno sovrascritti; si applicano solo default per righe legacy.
-        for (Guasto g : Guasto.<Guasto>list("risolto", false)) {
+        for (Guasto g : repository.guastiNonRisolti()) {
             if (g.timestamp == null) g.timestamp = Instant.now();
             if (g.severita == null) g.severita = "warning";
             guastiAttivi.put(g.id, g);

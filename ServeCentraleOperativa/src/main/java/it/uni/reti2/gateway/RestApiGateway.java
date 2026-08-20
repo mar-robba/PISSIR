@@ -1,10 +1,10 @@
 package it.uni.reti2.gateway;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
-import io.quarkus.panache.common.Sort;
 import it.uni.reti2.entity.*;
 import it.uni.reti2.elaboration.TrafficLogicEngine;
 import it.uni.reti2.ingestion.IngestionService;
+import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
@@ -44,6 +44,10 @@ public class RestApiGateway {
     /** Referenza alla logica e cache di sistema. */
     @Inject
     TrafficLogicEngine statoRete;
+
+    /** Unico punto da cui questa classe legge e scrive il database: nessuna query qui dentro. */
+    @Inject
+    RailwayRepository repository;
 
     /**
      * Serve per rimandare al frontend i cambi di stato delle stazioni decisi da qui
@@ -160,7 +164,7 @@ public class RestApiGateway {
         if (dto == null || dto.id == null || dto.id.isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("errore", "id mancante")).build();
         }
-        if (Stazione.findById(dto.id) != null) {
+        if (repository.trovaStazione(dto.id) != null) {
             return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Stazione già esistente")).build();
         }
         Stazione stazione = new Stazione(
@@ -170,7 +174,7 @@ public class RestApiGateway {
                 dto.longitudine != null ? dto.longitudine : 0.0,
                 dto.binari != null ? dto.binari : 1);
         stazione.stato = dto.stato != null ? normalizzaStatoStazione(dto.stato) : "OFFLINE";
-        stazione.persist();
+        repository.salvaStazione(stazione);
         statoRete.aggiornaStazione(stazione);
         return Response.status(Response.Status.CREATED).entity(stazione).build();
     }
@@ -185,7 +189,7 @@ public class RestApiGateway {
     @Path("/stazioni/{id}")
     @Transactional
     public Response updateStazione(@PathParam("id") String id, StazioneDTO dto) {
-        Stazione dbStazione = Stazione.findById(id);
+        Stazione dbStazione = repository.trovaStazione(id);
         if (dbStazione == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
@@ -230,11 +234,11 @@ public class RestApiGateway {
     @Path("/stazioni/{id}")
     @Transactional
     public Response deleteStazione(@PathParam("id") String id) {
-        Stazione dbStazione = Stazione.findById(id);
+        Stazione dbStazione = repository.trovaStazione(id);
         if (dbStazione == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
-        long tratteCollegate = Tratta.count("stazionePartenza.id = ?1 or stazioneArrivo.id = ?1", id);
+        long tratteCollegate = repository.contaTratteConStazione(id);
         if (tratteCollegate > 0) {
             return Response.status(Response.Status.CONFLICT)
                     .entity(Map.of("errore", "Stazione referenziata da " + tratteCollegate + " tratte: eliminarle prima"))
@@ -243,8 +247,8 @@ public class RestApiGateway {
         // Restano da cancellare solo i transiti VIVI: Transiti è una tabella dello stato
         // corrente (il treno dentro la stazione) e ha davvero una chiave esterna verso
         // Stazione. Lo storico invece sopravvive alla stazione.
-        Transito.delete("stazione.id", id);
-        dbStazione.delete();
+        repository.eliminaTransitiDiStazione(id);
+        repository.eliminaStazione(dbStazione);
         statoRete.rimuoviStazione(id);
         return Response.noContent().build();
     }
@@ -301,7 +305,7 @@ public class RestApiGateway {
     /** Inserisce il treno nella tabella Treni. Gira dentro la transazione aperta dal chiamante. */
     private EsitoScritturaTreno creaTrenoSuDb(String nomeConvoglio, TrenoDTO dto) {
         EsitoScritturaTreno esito = new EsitoScritturaTreno();
-        if (Treno.findById(nomeConvoglio) != null) {
+        if (repository.trovaTreno(nomeConvoglio) != null) {
             esito.errore = Response.status(Response.Status.CONFLICT)
                     .entity(Map.of("errore", "Esiste già un treno con il nome '" + nomeConvoglio + "'")).build();
             return esito;
@@ -311,12 +315,12 @@ public class RestApiGateway {
 
         String itinerarioId = estraiItinerarioId(dto);
         if (itinerarioId != null) {
-            Itinerario itinerario = Itinerario.findById(itinerarioId);
+            Itinerario itinerario = repository.trovaItinerario(itinerarioId);
             if (itinerario != null) {
                 treno.itinerario = itinerario;
             }
         }
-        treno.persist();
+        repository.salvaTreno(treno);
         esito.treno = treno;
         return esito;
     }
@@ -372,7 +376,7 @@ public class RestApiGateway {
     /** Applica sul database i campi presenti nel DTO. Gira dentro la transazione aperta dal chiamante. */
     private EsitoScritturaTreno aggiornaTrenoSuDb(String id, TrenoDTO dto) {
         EsitoScritturaTreno esito = new EsitoScritturaTreno();
-        Treno dbTreno = Treno.findById(id);
+        Treno dbTreno = repository.trovaTreno(id);
         if (dbTreno == null) {
             esito.errore = Response.status(Response.Status.NOT_FOUND).build();
             return esito;
@@ -383,7 +387,7 @@ public class RestApiGateway {
         if (itinerarioId != null) {
             String attuale = dbTreno.itinerario != null ? dbTreno.itinerario.id : null;
             if (!itinerarioId.equals(attuale)) {
-                Itinerario itinerario = Itinerario.findById(itinerarioId);
+                Itinerario itinerario = repository.trovaItinerario(itinerarioId);
                 if (itinerario == null) {
                     esito.errore = Response.status(Response.Status.BAD_REQUEST)
                             .entity(Map.of("errore", "Itinerario inesistente: " + itinerarioId)).build();
@@ -413,13 +417,13 @@ public class RestApiGateway {
     @Path("/treni/{id}")
     @Transactional
     public Response deleteTreno(@PathParam("id") String id) {
-        Treno dbTreno = Treno.findById(id);
+        Treno dbTreno = repository.trovaTreno(id);
         if (dbTreno == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
         // Solo i transiti vivi: è la tabella dello stato corrente e ha la chiave esterna.
-        Transito.delete("treno.id", id);
-        dbTreno.delete();
+        repository.eliminaTransitiDiTreno(id);
+        repository.eliminaTreno(dbTreno);
         statoRete.rimuoviTreno(id);
 
         String alertJson = String.format(
@@ -441,7 +445,7 @@ public class RestApiGateway {
     @Transactional
     public List<Map<String, Object>> getTratteElementari() {
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Tratta tratta : Tratta.<Tratta>listAll(Sort.by("id"))) result.add(trattaElementoToDto(tratta));
+        for (Tratta tratta : repository.tutteLeTratte()) result.add(trattaElementoToDto(tratta));
         return result;
     }
 
@@ -453,16 +457,16 @@ public class RestApiGateway {
                 || dto.stazionePartenzaId == null || dto.stazioneArrivoId == null) {
             return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("errore", "id e stazioni di partenza/arrivo sono obbligatori")).build();
         }
-        if (Tratta.findById(dto.id) != null) return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Tratta già esistente")).build();
-        Stazione partenza = Stazione.findById(dto.stazionePartenzaId);
-        Stazione arrivo = Stazione.findById(dto.stazioneArrivoId);
+        if (repository.trovaTratta(dto.id) != null) return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Tratta già esistente")).build();
+        Stazione partenza = repository.trovaStazione(dto.stazionePartenzaId);
+        Stazione arrivo = repository.trovaStazione(dto.stazioneArrivoId);
         if (partenza == null || arrivo == null) return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("errore", "Stazione di partenza o arrivo inesistente")).build();
         Tratta tratta = new Tratta();
         tratta.id = dto.id;
         tratta.stazionePartenza = partenza;
         tratta.stazioneArrivo = arrivo;
         tratta.tempoPercorrenzaMinuti = dto.tempoPercorrenzaMinuti != null ? dto.tempoPercorrenzaMinuti : 15;
-        tratta.persist();
+        repository.salvaTratta(tratta);
         return Response.status(Response.Status.CREATED).entity(trattaElementoToDto(tratta)).build();
     }
 
@@ -470,15 +474,15 @@ public class RestApiGateway {
     @Path("/tratte-elementari/{id}")
     @Transactional
     public Response updateTrattaElemento(@PathParam("id") String id, TrattaElementoDTO dto) {
-        Tratta tratta = Tratta.findById(id);
+        Tratta tratta = repository.trovaTratta(id);
         if (tratta == null) return Response.status(Response.Status.NOT_FOUND).build();
         if (dto.stazionePartenzaId != null) {
-            Stazione s = Stazione.findById(dto.stazionePartenzaId);
+            Stazione s = repository.trovaStazione(dto.stazionePartenzaId);
             if (s == null) return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("errore", "Stazione di partenza inesistente")).build();
             tratta.stazionePartenza = s;
         }
         if (dto.stazioneArrivoId != null) {
-            Stazione s = Stazione.findById(dto.stazioneArrivoId);
+            Stazione s = repository.trovaStazione(dto.stazioneArrivoId);
             if (s == null) return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("errore", "Stazione di arrivo inesistente")).build();
             tratta.stazioneArrivo = s;
         }
@@ -490,29 +494,29 @@ public class RestApiGateway {
     @Path("/tratte-elementari/{id}")
     @Transactional
     public Response deleteTrattaElemento(@PathParam("id") String id) {
-        Tratta tratta = Tratta.findById(id);
+        Tratta tratta = repository.trovaTratta(id);
         if (tratta == null) return Response.status(Response.Status.NOT_FOUND).build();
-        long usi = ItinerarioTratta.count("id.idTratta", id);
+        long usi = repository.contaItinerariCheUsano(id);
         if (usi > 0) return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Tratta usata da " + usi + " itinerari: modificare prima gli itinerari")).build();
         // Il rifiuto resta per la tabella viva Transiti, che verso Tratte ha davvero una
         // chiave esterna. Sui transiti STORICI invece è caduto con RF02.7: la riga di
         // storico si porta dentro l'id e la descrizione della tratta, quindi togliere
         // l'arco dalla rete non cancella più il percorso dei passaggi già avvenuti.
-        if (Transito.count("tratta.id", id) > 0) {
+        if (repository.contaTransitiSuTratta(id) > 0) {
             return Response.status(Response.Status.CONFLICT).entity(Map.of("errore", "Tratta presente nei transiti e non eliminabile")).build();
         }
         // Treni.PosizioneAttualeTrattaOStazione è una chiave esterna verso Tratte: senza
         // questo controllo la DELETE partiva lo stesso, Postgres la rifiutava per violazione
         // di vincolo e l'amministratore si prendeva un 500 con l'eccezione invece del 409
         // con la spiegazione che chiede RF01.3.5.
-        long treniFermiQui = Treno.count("posizioneAttualeTratta.id", id);
+        long treniFermiQui = repository.contaTreniInPosizioneSuTratta(id);
         if (treniFermiQui > 0) {
             return Response.status(Response.Status.CONFLICT)
                     .entity(Map.of("errore", "Tratta usata come posizione corrente di " + treniFermiQui
                             + " convogli: spostarli prima di eliminarla"))
                     .build();
         }
-        tratta.delete();
+        repository.eliminaTratta(tratta);
         return Response.noContent().build();
     }
 
@@ -524,7 +528,7 @@ public class RestApiGateway {
     @Path("/tratte")
     @Transactional
     public List<Map<String, Object>> getTratte() {
-        List<Itinerario> itinerari = Itinerario.listAll();
+        List<Itinerario> itinerari = repository.tuttiGliItinerari();
         List<Map<String, Object>> result = new ArrayList<>();
         for (Itinerario it : itinerari) {
             result.add(trattaToDto(it));
@@ -549,7 +553,7 @@ public class RestApiGateway {
         }
         String id = (dto.id != null && !dto.id.isEmpty()) ? dto.id
                 : "IT-" + UUID.randomUUID().toString().substring(0, 8);
-        if (Itinerario.findById(id) != null) {
+        if (repository.trovaItinerario(id) != null) {
             return Response.status(Response.Status.CONFLICT)
                     .entity(Map.of("errore", "Itinerario già esistente: " + id)).build();
         }
@@ -559,7 +563,7 @@ public class RestApiGateway {
 
         Itinerario itinerario = new Itinerario();
         itinerario.id = id;
-        itinerario.persist();
+        repository.salvaItinerario(itinerario);
 
         Response errore = componiItinerario(itinerario, dto.stazioni, dto.travelTimes);
         if (errore != null) return errore;
@@ -580,7 +584,7 @@ public class RestApiGateway {
     @Path("/tratte/{id}")
     @Transactional
     public Response updateTratta(@PathParam("id") String id, TrattaDTO dto) {
-        Itinerario itinerario = Itinerario.findById(id);
+        Itinerario itinerario = repository.trovaItinerario(id);
         if (itinerario == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
@@ -599,7 +603,7 @@ public class RestApiGateway {
             Response tratteMancanti = verificaTratteEsistenti(dto.stazioni);
             if (tratteMancanti != null) return tratteMancanti;
 
-            ItinerarioTratta.delete("id.idItinerario", id);
+            repository.eliminaTratteDellItinerario(id);
             Response errore = componiItinerario(itinerario, dto.stazioni, dto.travelTimes);
             if (errore != null) return errore;
         }
@@ -639,7 +643,7 @@ public class RestApiGateway {
     @Path("/tratte/{id}")
     @Transactional
     public Response deleteTratta(@PathParam("id") String id) {
-        Itinerario itinerario = Itinerario.findById(id);
+        Itinerario itinerario = repository.trovaItinerario(id);
         if (itinerario == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
@@ -658,10 +662,10 @@ public class RestApiGateway {
                 statoRete.aggiornaTreno(cache);
             }
         }
-        ItinerarioTratta.delete("id.idItinerario", id);
+        repository.eliminaTratteDellItinerario(id);
         // Storico_Itinerari resta: i viaggi già fatti su questo itinerario sono avvenuti
         // e la riga di storico si porta dentro il percorso (RF02.7).
-        itinerario.delete();
+        repository.eliminaItinerario(itinerario);
 
         // Ricevuto ITINERARIO_AGGIORNATO il twin scarta l'itinerario in memoria e ne chiede
         // uno nuovo: non essendocene più resta fermo e visibile in attesa di essere soppresso.
@@ -684,10 +688,7 @@ public class RestApiGateway {
     @Path("/transiti")
     @Transactional
     public List<Map<String, Object>> getTransiti() {
-        List<StoricoTransito> transiti = StoricoTransito
-                .findAll(Sort.descending("tsStoricizzazione"))
-                .page(0, 200)
-                .list();
+        List<StoricoTransito> transiti = repository.ultimiTransitiStorici(200);
         List<Map<String, Object>> result = new ArrayList<>();
         for (StoricoTransito t : transiti) {
             Instant timestamp = t.tempoUscita != null ? t.tempoUscita : t.tempoEntrata;
@@ -720,7 +721,7 @@ public class RestApiGateway {
     @Path("/allarmi")
     @Transactional
     public List<Map<String, Object>> getAllarmi() {
-        List<Guasto> guasti = Guasto.listAll(Sort.descending("timestamp"));
+        List<Guasto> guasti = repository.tuttiIGuastiRecenti();
         List<Map<String, Object>> result = new ArrayList<>();
         for (Guasto g : guasti) {
             Map<String, Object> dto = new HashMap<>();
@@ -751,7 +752,7 @@ public class RestApiGateway {
     @Path("/allarmi/{id}/risolvi")
     @Transactional
     public Response risolviAllarme(@PathParam("id") String id) {
-        Guasto guasto = Guasto.findById(id);
+        Guasto guasto = repository.trovaGuasto(id);
         if (guasto == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
@@ -785,13 +786,12 @@ public class RestApiGateway {
                 treno.stato = "fermo";
                 statoRete.aggiornaTreno(treno);
             }
-            Treno dbTreno = Treno.findById(guasto.sorgenteId);
+            Treno dbTreno = repository.trovaTreno(guasto.sorgenteId);
             if (dbTreno != null && "rotto".equalsIgnoreCase(dbTreno.stato)) {
                 String statoPrecedente = dbTreno.stato;
                 dbTreno.stato = "fermo";
 
-                StoricoStatoTreno storico = StoricoStatoTreno.fotografiaDi(dbTreno, statoPrecedente);
-                storico.persist();
+                repository.salvaStoricoStatoTreno(dbTreno, statoPrecedente);
             }
 
             // RF02.1.2.2.1: se il convoglio guasto aveva reso inagibile una stazione,
@@ -827,13 +827,12 @@ public class RestApiGateway {
             statoRete.aggiornaTreno(treno);
 
             // Aggiorna anche il salvataggio su DB persistente (stato canonico)
-            Treno dbTreno = Treno.findById(id);
+            Treno dbTreno = repository.trovaTreno(id);
             if (dbTreno != null) {
                 String statoPrecedente = dbTreno.stato;
                 dbTreno.stato = "in manutenzione";
 
-                StoricoStatoTreno storico = StoricoStatoTreno.fotografiaDi(dbTreno, statoPrecedente);
-                storico.persist();
+                repository.salvaStoricoStatoTreno(dbTreno, statoPrecedente);
             }
 
             // Invia asincronamente il comando di STOP sul canale di allarme
@@ -879,8 +878,7 @@ public class RestApiGateway {
         // Il filtro su sorgenteTipo serve perché sorgenteId da solo non è univoco:
         // un treno con lo stesso identificativo di una stazione si vedrebbe chiudere
         // i propri guasti insieme a quelli della stazione.
-        List<Guasto> aperti = Guasto.list(
-                "sorgenteId = ?1 and sorgenteTipo = 'STAZIONE' and risolto = false", id);
+        List<Guasto> aperti = repository.guastiApertiDi(id, "STAZIONE");
         for (Guasto guasto : aperti) {
             chiudiGuasto(guasto);
             if (guasto.sorgenteTipo == null) guasto.sorgenteTipo = "STAZIONE";
@@ -896,10 +894,9 @@ public class RestApiGateway {
         // Una riga sola, quella del rientro in servizio: il passaggio per MANUTENZIONE
         // resta non storicizzato perché dura il tempo di questo metodo (è il limite già
         // dichiarato di RF01.4.1, non una dimenticanza).
-        Stazione dbStazione = Stazione.findById(id);
+        Stazione dbStazione = repository.trovaStazione(id);
         if (dbStazione != null) {
-            StoricoStatoStazione storico = StoricoStatoStazione.fotografiaDi(dbStazione, "ONLINE", statoPrima);
-            storico.persist();
+            repository.salvaStoricoStatoStazione(dbStazione, "ONLINE", statoPrima);
         }
         return Response.ok(stazione).build();
     }
@@ -920,13 +917,12 @@ public class RestApiGateway {
     @Path("/treni/{id}/itinerario")
     @Transactional
     public Response getItinerarioTreno(@PathParam("id") String id) {
-        Treno treno = Treno.findById(id);
+        Treno treno = repository.trovaTreno(id);
         if (treno == null || treno.itinerario == null) {
             return Response.status(Response.Status.NOT_FOUND)
                     .entity(Map.of("errore", "Treno inesistente o senza itinerario")).build();
         }
-        List<ItinerarioTratta> tratte = ItinerarioTratta
-                .find("itinerario.id", Sort.by("ordine"), treno.itinerario.id).list();
+        List<ItinerarioTratta> tratte = repository.tratteOrdinateDi(treno.itinerario.id);
         if (tratte.isEmpty()) {
             return Response.status(Response.Status.NOT_FOUND)
                     .entity(Map.of("errore", "Itinerario senza tratte")).build();
@@ -959,12 +955,12 @@ public class RestApiGateway {
     public Response getProssimaStazione(@QueryParam("treno") String trenoId,
                                         @QueryParam("stazione") String stazioneId,
                                         @QueryParam("direzione") @DefaultValue("A") String direzione) {
-        Treno treno = trenoId != null ? Treno.findById(trenoId) : null;
+        Treno treno = trenoId != null ? repository.trovaTreno(trenoId) : null;
         if (treno == null || treno.itinerario == null) {
             return Response.status(Response.Status.NOT_FOUND)
                     .entity(Map.of("errore", "Treno inesistente o senza itinerario")).build();
         }
-        List<String> stazioni = stazioniOrdinate(treno.itinerario.id);
+        List<String> stazioni = repository.stazioniOrdinateDi(treno.itinerario.id);
         int idx = stazioni.indexOf(stazioneId);
 
         Map<String, Object> result = new HashMap<>();
@@ -972,7 +968,7 @@ public class RestApiGateway {
         if (idx >= 0) {
             int next = "R".equalsIgnoreCase(direzione) ? idx - 1 : idx + 1;
             if (next >= 0 && next < stazioni.size()) {
-                Stazione prossima = Stazione.findById(stazioni.get(next));
+                Stazione prossima = repository.trovaStazione(stazioni.get(next));
                 if (prossima != null) {
                     Map<String, Object> dto = new HashMap<>();
                     dto.put("id", prossima.id);
@@ -1010,19 +1006,6 @@ public class RestApiGateway {
         return tappa;
     }
 
-    /** Ricostruisce la sequenza ordinata di ID stazione dell'itinerario. */
-    private List<String> stazioniOrdinate(String itinerarioId) {
-        List<ItinerarioTratta> tratte = ItinerarioTratta
-                .find("itinerario.id", Sort.by("ordine"), itinerarioId).list();
-        List<String> stazioni = new ArrayList<>();
-        if (!tratte.isEmpty()) {
-            stazioni.add(tratte.get(0).tratta.stazionePartenza.id);
-            for (ItinerarioTratta it : tratte) {
-                stazioni.add(it.tratta.stazioneArrivo.id);
-            }
-        }
-        return stazioni;
-    }
 
     /**
      * Controlla che ogni coppia di stazioni consecutive dell'elenco abbia già la sua tratta
@@ -1058,8 +1041,8 @@ public class RestApiGateway {
                         .build();
             }
 
-            Stazione partenza = Stazione.findById(partenzaId);
-            Stazione arrivo = Stazione.findById(arrivoId);
+            Stazione partenza = repository.trovaStazione(partenzaId);
+            Stazione arrivo = repository.trovaStazione(arrivoId);
             if (partenza == null || arrivo == null) {
                 return Response.status(Response.Status.BAD_REQUEST)
                         .entity(Map.of("errore", "Stazione inesistente: " + (partenza == null ? partenzaId : arrivoId)))
@@ -1067,9 +1050,7 @@ public class RestApiGateway {
             }
             // La tratta è ORIENTATA: l'arco A->B non vale come B->A, e infatti in rete
             // i due versi sono due righe distinte.
-            long esiste = Tratta.count("stazionePartenza.id = ?1 and stazioneArrivo.id = ?2",
-                    partenzaId, arrivoId);
-            if (esiste == 0) {
+            if (repository.trovaTrattaFra(partenzaId, arrivoId) == null) {
                 String nomePartenza = partenza.nome != null ? partenza.nome : partenzaId;
                 String nomeArrivo = arrivo.nome != null ? arrivo.nome : arrivoId;
                 descrizioni.add(nomePartenza + " -> " + nomeArrivo);
@@ -1105,8 +1086,7 @@ public class RestApiGateway {
             String arrivoId = stazioni.get(i + 1);
             Integer tempo = (travelTimes != null && i < travelTimes.size()) ? travelTimes.get(i) : null;
 
-            Tratta tratta = Tratta.find("stazionePartenza.id = ?1 and stazioneArrivo.id = ?2",
-                    partenzaId, arrivoId).firstResult();
+            Tratta tratta = repository.trovaTrattaFra(partenzaId, arrivoId);
             if (tratta == null) {
                 // Non ci si arriva passando dalla verifica: resta come rete di sicurezza
                 // se la tratta viene cancellata fra il controllo e la composizione.
@@ -1120,8 +1100,7 @@ public class RestApiGateway {
                 // il tempo da qui cambierebbe di nascosto anche gli altri percorsi.
                 // Lo si aggiorna solo se nessun altro itinerario usa quell'arco;
                 // altrimenti il tempo si modifica dalla pagina "Tratte elementari".
-                long usataAltrove = ItinerarioTratta.count(
-                        "id.idTratta = ?1 and id.idItinerario <> ?2", tratta.id, itinerario.id);
+                long usataAltrove = repository.contaAltriItinerariCheUsano(tratta.id, itinerario.id);
                 if (usataAltrove == 0) {
                     tratta.tempoPercorrenzaMinuti = tempo;
                 } else {
@@ -1135,7 +1114,7 @@ public class RestApiGateway {
             riga.ordine = i + 1;
             riga.itinerario = itinerario;
             riga.tratta = tratta;
-            riga.persist();
+            repository.salvaItinerarioTratta(riga);
         }
         return null;
     }
@@ -1162,7 +1141,7 @@ public class RestApiGateway {
         }
         if (treniIds == null) return;
         for (String trenoId : treniIds) {
-            Treno dbTreno = Treno.findById(trenoId);
+            Treno dbTreno = repository.trovaTreno(trenoId);
             if (dbTreno != null) {
                 dbTreno.itinerario = itinerario;
                 Treno cache = statoRete.getTreno(trenoId);
@@ -1180,8 +1159,7 @@ public class RestApiGateway {
         dto.put("id", it.id);
 
         // Trova le tratte ordinate per questo itinerario
-        List<ItinerarioTratta> tratte = ItinerarioTratta
-                .find("itinerario.id", Sort.by("ordine"), it.id).list();
+        List<ItinerarioTratta> tratte = repository.tratteOrdinateDi(it.id);
 
         List<String> stazioni = new ArrayList<>();
         List<String> nomiStazioni = new ArrayList<>();
@@ -1234,15 +1212,14 @@ public class RestApiGateway {
         guasto.risolto = true;
         guasto.timestampRisoluzione = Instant.now();
 
-        StoricoGuasto storico = StoricoGuasto.find("guastoId", guasto.id).firstResult();
+        StoricoGuasto storico = repository.trovaStoricoGuasto(guasto.id);
         if (storico != null) {
             storico.risolto = true;
             storico.tsChiusura = guasto.timestampRisoluzione;
         } else {
             // Guasto senza storico (per esempio aperto prima che la tabella esistesse):
             // la riga si scrive adesso, già chiusa.
-            storico = StoricoGuasto.fotografiaDi(guasto);
-            storico.persist();
+            repository.salvaStoricoGuasto(guasto);
         }
         statoRete.risolviGuasto(guasto.id);
     }
@@ -1266,8 +1243,7 @@ public class RestApiGateway {
      * @param trenoId Identificativo del convoglio il cui guasto è stato risolto.
      */
     private void risolviGuastoStazioneDerivatoDaConvoglio(String trenoId) {
-        List<Guasto> guastiDerivativi = Guasto.list(
-                "tipo = 'convoglio_guasto_in_stazione' and risolto = false");
+        List<Guasto> guastiDerivativi = repository.guastiDerivatiDaConvoglio();
         for (Guasto gs : guastiDerivativi) {
             if (gs.messaggio == null || !gs.messaggio.contains(trenoId)) {
                 continue;
@@ -1276,10 +1252,7 @@ public class RestApiGateway {
             pubblicaResolved(gs);
 
             // Se la stazione non ha più guasti aperti, torna operativa
-            long altriGuasti = Guasto.count(
-                    "sorgenteId = ?1 and sorgenteTipo = 'STAZIONE' and risolto = false",
-                    gs.sorgenteId);
-            if (altriGuasti == 0) {
+            if (repository.guastiApertiDi(gs.sorgenteId, "STAZIONE").isEmpty()) {
                 Stazione stazione = statoRete.getStazione(gs.sorgenteId);
                 if (stazione != null && "GUASTA".equalsIgnoreCase(stazione.stato)) {
                     String statoPrima = stazione.stato;
@@ -1288,11 +1261,9 @@ public class RestApiGateway {
                     statoRete.aggiornaStazione(stazione);
                     ingestion.broadcastStatoStazione(stazione);
 
-                    Stazione dbStazione = Stazione.findById(gs.sorgenteId);
+                    Stazione dbStazione = repository.trovaStazione(gs.sorgenteId);
                     if (dbStazione != null) {
-                        StoricoStatoStazione storicoStato = StoricoStatoStazione.fotografiaDi(
-                                dbStazione, "ONLINE", statoPrima);
-                        storicoStato.persist();
+                        repository.salvaStoricoStatoStazione(dbStazione, "ONLINE", statoPrima);
                     }
                 }
             }
