@@ -21,7 +21,199 @@ I diagrammi di sequenza stanno nel capitolo /Progettazione/, insieme alle macchi
 * Specifica
 ** Modellazione per casi d'uso
 
-[[./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/diocane.png]]
+Il diagramma raccoglie i servizi che il sistema offre agli utenti (RF01) e la ripartizione dei
+permessi fra i due ruoli (RF04.2). Ogni caso d'uso porta accanto il requisito che lo enuncia, cosi'
+il disegno e il capitolo si leggono uno accanto all'altro.
+
+Quattro cose vanno dette prima di leggerlo:
+
+- *Utente* non e' un terzo ruolo: e' l'attore astratto che raccoglie cio' che tecnico e
+  amministratore fanno entrambi, cioe' la consultazione e l'accesso. I due ruoli reali lo
+  specializzano, quindi ereditano tutte le sue associazioni e il disegno non deve ripeterle due
+  volte.
+- I ruoli dei *comandi operativi* sono quelli della consegna: la squadra sulla stazione guasta la
+  manda il tecnico, la corsa la sopprime l'amministratore. La chiusura dell'allarme sta sul tecnico
+  perche' e' il seguito dell'invio degli operatori, che e' compito suo.
+- Il *tecnico* e' chi usa l'applicazione, non la squadra che va sul posto: e' lui a mandare gli
+  operatori, non a essere mandato. Nel diagramma vecchio /invia Tecnico/ partiva dall'attore tecnico,
+  ed era il verso sbagliato.
+- La *marcatura* dei casi d'uso, spiegata nella legenda, dice due cose insieme: quanto di quel caso
+  d'uso e' realizzato e se la consegna lo chiede. Nessun caso d'uso e' del tutto mancante; tre sono
+  realizzati a meta' e sono segnati =«parziale»=.
+
+Restano fuori dal disegno tre cose, e nessuna per dimenticanza: RF01.1.4, l'aggiornamento continuo
+delle schermate, perche' e' una proprieta' di tutte le visualizzazioni e non un caso d'uso a se'; i
+nodi di campo, perche' non sono utenti e non si identificano con credenziali, la loro verifica e'
+RF02.4; l'inclusione di /Accedi al sistema/ da parte di ogni altro caso d'uso, che vale per tutti e
+disegnata su tutti renderebbe il diagramma illeggibile.
+
+#+begin_src  plantuml file: casi_uso_00_attori_e_casi_uso.png
+@startuml UC0 - Attori e casi d'uso del sistema
+' =========================================================================
+'  MODELLAZIONE PER CASI D'USO
+'
+'  Il diagramma copre RF01 (i servizi che il sistema offre agli utenti) e la
+'  ripartizione dei permessi di RF04.2, e segue la consegna: il tecnico
+'  visualizza e manda gli operatori sulla stazione guasta, l'amministratore
+'  visualizza, tiene l'anagrafica della rete e sopprime le corse.
+'
+'  Come e' costruito:
+'    - Utente e' l'attore astratto che raccoglie cio' che i due ruoli reali
+'      fanno entrambi (la consultazione e l'accesso); tecnico e
+'      amministratore lo specializzano e ne ereditano le associazioni;
+'    - ogni caso d'uso porta fra parentesi il requisito che lo enuncia;
+'    - la marcatura dice quanto ne e' realizzato e se la consegna lo chiede
+'      (vedi la legenda in fondo al diagramma).
+'
+'  I nodi di campo (convogli e stazioni) non compaiono: non sono utenti e
+'  non si identificano con credenziali, il loro riconoscimento e' RF02.4.
+' =========================================================================
+
+top to bottom direction
+skinparam backgroundColor #FEFEFE
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    ArrowColor #1A73E8
+}
+skinparam usecase<<parziale>> {
+    BackgroundColor #FEF7E0
+    BorderColor #F29900
+}
+skinparam usecase<<aggiunta>> {
+    BackgroundColor #F1F3F4
+    BorderColor #9AA0A6
+}
+skinparam actor {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+}
+skinparam rectangle {
+    BorderColor #5F6368
+}
+skinparam legend {
+    BackgroundColor #FFFFFF
+    BorderColor #5F6368
+}
+
+actor "Tecnico" as TECNICO
+actor "Utente" as UTENTE
+actor "Amministratore" as ADMIN
+actor "Servizio di identita'" as IDP <<sistema>>
+
+TECNICO --|> UTENTE
+
+rectangle "Monitoraggio e gestione del traffico ferroviario" {
+
+  rectangle "Consultazione (RF01.1, RF01.2, RF01.5)" as G1 {
+    usecase "Visualizza la mappa\ndel traffico\n(RF01.1.1)" as UC01
+    usecase "Consulta l'elenco\ndei convogli\n(RF01.1.2)" as UC02
+    usecase "Consulta l'elenco\ndelle stazioni\n(RF01.1.3)" as UC03
+    usecase "Consulta le tratte\ne gli itinerari\n(RF01.3, sola lettura)" as UC06
+    usecase "Consulta gli allarmi\naperti\n(RF01.2)" as UC05
+    usecase "Consulta gli indicatori\ndi sintesi\n(RF01.1.5)" as UC04 <<aggiunta>>
+    usecase "Consulta lo storico\ndei transiti\n(RF01.5)" as UC07 <<aggiunta>>
+  }
+
+  rectangle "Comandi operativi (RF01.4)" as G2 {
+    usecase "Invia la squadra\ndi manutenzione\n(RF01.4.1)" as UC08 <<parziale>>
+    usecase "Dichiara risolto\nun allarme\n(RF01.4.2)" as UC09 <<parziale>>
+    usecase "Sopprimi una corsa\n(RF01.4.3)" as UC10 <<parziale>>
+  }
+
+  rectangle "Accesso (RF01.6)" as G4 {
+    usecase "Accedi al sistema" as UC15
+    usecase "Esci dal sistema" as UC16
+  }
+
+  rectangle "Anagrafica della rete (RF01.3)" as G3 {
+    usecase "Gestisci le tratte\nelementari\n(RF01.3.3)" as UC13
+    usecase "Gestisci gli itinerari e\nl'assegnazione dei convogli\n(RF01.3.4)" as UC14
+    usecase "Gestisci le stazioni\n(RF01.3.1)" as UC11 <<aggiunta>>
+    usecase "Gestisci i convogli\n(RF01.3.2)" as UC12 <<aggiunta>>
+  }
+}
+
+' ---- cio' che i due ruoli fanno entrambi ----
+UTENTE -- UC01
+UTENTE -- UC02
+UTENTE -- UC03
+UTENTE -- UC04
+UTENTE -- UC05
+UTENTE -- UC06
+UTENTE -- UC07
+UTENTE -- UC15
+UTENTE -- UC16
+
+' ---- compito del tecnico: la stazione guasta e il suo ripristino ----
+TECNICO -- UC08
+TECNICO -- UC09
+
+' ---- riservato all'amministratore ----
+UC10 -- ADMIN
+UC11 -- ADMIN
+UC12 -- ADMIN
+UC13 -- ADMIN
+UC14 -- ADMIN
+UTENTE <|-- ADMIN
+
+' ---- le credenziali si digitano fuori dall'applicazione (RF04.1) ----
+UC15 -- IDP
+UC16 -- IDP
+
+' ---- vincoli di sola impaginazione: distribuiscono i gruppi su tre file ----
+UC01 -[hidden]down- UC08
+UC02 -[hidden]down- UC09
+UC03 -[hidden]down- UC10
+UC06 -[hidden]down- UC15
+UC05 -[hidden]down- UC16
+UC08 -[hidden]down- UC13
+UC09 -[hidden]down- UC14
+UC10 -[hidden]down- UC11
+UC15 -[hidden]down- UC12
+
+legend bottom
+  <b>Marcatura dei casi d'uso</b>
+  nessuna marca : chiesto dalla consegna e realizzato per intero
+  <b>«parziale»</b> : chiesto dalla consegna, realizzato solo in parte; il pezzo
+  che manca sta nello stato di implementazione del requisito
+  <b>«aggiunta»</b> : non chiesto dalla consegna, realizzato lo stesso
+endlegend
+@enduml
+#+end_src
+
+*** Corrispondenza con la consegna
+
+La consegna descrive i servizi della centrale in due elenchi, uno per il tecnico e uno per
+l'amministratore. Questa tabella li rilegge uno per uno e dice dove sono finiti nella specifica,
+cosi' si vede subito che cosa e' coperto e con quale riserva.
+
+#+attr_latex: :align |p{0.09\textwidth}|p{0.40\textwidth}|p{0.18\textwidth}|p{0.23\textwidth}|
+| ruolo | cosa chiede la consegna                                              | requisito         | stato                                    |
+|-------+----------------------------------------------------------------------+-------------------+------------------------------------------|
+| tecnico | visualizza la situazione corrente del traffico e le tratte          | RF01.1.1, RF01.1.2 | completo                                |
+| tecnico | quali tratte segue un certo treno                                   | RF01.1.2, RF01.3.4 | completo, in lettura                    |
+| tecnico | quali treni sono attesi in ingresso e in uscita in una stazione     | RF01.1.3          | completo                                 |
+| tecnico | manda gli operatori a riparare una stazione guasta                  | RF01.4.1          | parziale: MANUTENZIONE non dura          |
+| amministratore | visualizza la situazione corrente del traffico e le tratte   | RF01.1, RF01.2    | completo, come il tecnico                |
+| amministratore | aggiunge ed elimina tratte                                   | RF01.3.3          | completo                                 |
+| amministratore | modifica le stazioni attraversate dai treni                  | RF01.3.4, RF02.5  | parziale: il convoglio in marcia riparte dal capolinea |
+| amministratore | (eventualmente) sopprime treni fermi in stazione             | RF01.4.3          | parziale: la precondizione non e' verificata |
+| entrambi | il server e' accessibile da due tipologie di utenti con permessi diversi | RF04.1, RF04.2 | parziale: sui tre comandi operativi il ruolo non viene distinto |
+
+Quello che c'e' in piu' rispetto alla consegna e' segnato =«aggiunta»= nel diagramma, e resta nella
+specifica perche' e' realizzato e funzionante: gli indicatori di sintesi (RF01.1.5), la consultazione
+dello storico dei transiti (RF01.5 — la consegna chiede di *memorizzarlo*, che e' RF02.7, non di
+mostrarlo), la gestione delle stazioni (RF01.3.1) e quella dei convogli (RF01.3.2). Le ultime due
+non sono un capriccio: la consegna da' per scontata una rete gia' popolata, e senza un posto in cui
+crearla non ci sarebbero ne' le tratte da aggiungere ne' i treni a cui cambiare le stazioni
+attraversate.
+
+Un punto va detto esplicitamente perche' e' l'unico in cui il sistema realizzato e' piu' *permissivo*
+della consegna: i tre comandi operativi sono concessi a tutti e due i ruoli, mentre la consegna ne
+assegna uno al tecnico e uno all'amministratore. Il diagramma disegna la ripartizione della consegna,
+il controllo dei permessi non la fa rispettare, ed e' per questo che RF04.2 e' parziale.
 
 ** Glossario dei termini di dominio
 
@@ -185,6 +377,7 @@ dei tre e' completo.
 **** RF01.1.5 - Indicatori di sintesi
 - enunciato: una schermata di riepilogo riassume in pochi numeri i convogli in circolazione, le
   stazioni operative, i guasti aperti e il ritardo medio.
+- rispetto alla consegna: e' un'aggiunta, la consegna non la chiede.
 - stato di implementazione: completo. I numeri li calcola la centrale e viaggiano dentro la stessa
   fotografia periodica di RF01.1.4, quindi si aggiornano da soli come il resto.
 
@@ -214,6 +407,12 @@ dei tre e' completo.
 
 *Enunciato del ramo*: la creazione, la modifica e l'eliminazione dell'anagrafica della rete sono
 riservate all'amministratore; il tecnico vede tutto ma non modifica nulla.
+
+*Rispetto alla consegna*: la consegna chiede all'amministratore di aggiungere ed eliminare le tratte
+(RF01.3.3) e di modificare le stazioni attraversate dai treni (RF01.3.4). La gestione delle stazioni
+(RF01.3.1) e quella dei convogli (RF01.3.2) sono un'aggiunta, e stanno qui perche' la consegna da'
+per scontata una rete gia' popolata: senza un posto in cui crearla non ci sarebbero ne' le tratte da
+aggiungere ne' i treni a cui cambiare le stazioni attraversate.
 
 *Stato di implementazione*: completo, tutte e cinque le voci.
 
@@ -256,11 +455,23 @@ allora forse è meglio metterla in RF2 porca la miseriaccia
 
 *** RF01.4 - Comandi operativi
 
+*Chi puo' dare quale comando*: lo dice la consegna, e non e' lo stesso ruolo per tutti e tre. La
+squadra sulla stazione guasta la manda il *tecnico*; la corsa la sopprime l'*amministratore*, e la
+consegna mette questo comando fra parentesi come facoltativo. La chiusura dell'allarme la consegna
+non la assegna esplicitamente: sta sul tecnico perche' e' il seguito dell'invio degli operatori, che
+e' compito suo.
+
+*Limite comune a tutti e tre*: la ripartizione qui sopra e' quella disegnata nei casi d'uso, ma il
+controllo dei permessi non la fa rispettare — i tre comandi sono concessi a entrambi i ruoli. E' il
+solo punto in cui il sistema realizzato e' piu' permissivo della consegna, ed e' il motivo per cui
+RF04.2 non e' completo.
+
 *Stato di implementazione*: parziale — tutti e tre i comandi fanno la cosa principale, nessuno dei
 tre la fa per intero.
 
 **** RF01.4.1 - Invio della squadra di manutenzione
-- enunciato: l'operatore manda la squadra su una stazione guasta.
+- enunciato: il tecnico manda la squadra su una stazione guasta.
+- soggetto: il tecnico, che nella consegna e' il ruolo a cui questo compito e' assegnato.
 - esito atteso: la stazione risulta in MANUTENZIONE e i nodi interessati ne sono informati.
 - stato di implementazione: parziale. Il comando parte, il campo viene avvisato, i guasti aperti
   sulla stazione vengono chiusi e la stazione passa a MANUTENZIONE; solo che il ritorno a ONLINE sta
@@ -269,7 +480,9 @@ tre la fa per intero.
   requisito il ritorno andrebbe staccato dal comando e legato alla fine vera dell'intervento.
 
 **** RF01.4.2 - Presa in carico e chiusura di un allarme
-- enunciato: l'operatore dichiara risolto un guasto.
+- enunciato: il tecnico dichiara risolto un guasto.
+- soggetto: il tecnico, per la ragione scritta sopra al ramo: chiudere l'allarme e' il seguito
+  dell'invio degli operatori.
 - esito atteso: il guasto passa a chiuso, resta traccia di chi lo ha preso in carico e quando, e cio'
   che era bloccato per causa sua riprende.
 - dipende da: RF02.1.3.
@@ -278,8 +491,11 @@ tre la fa per intero.
   occupato vengono scritti da nessuna parte, quindi a guasto chiuso non si sa piu' chi lo ha chiuso.
 
 **** RF01.4.3 - Soppressione di un convoglio fermo in stazione
-- enunciato: l'operatore annulla una corsa; il convoglio passa in SOPPRESSO e non viaggia piu'.
+- enunciato: l'amministratore annulla una corsa; il convoglio passa in SOPPRESSO e non viaggia piu'.
+- soggetto: l'amministratore, che nella consegna e' il ruolo a cui questo comando e' assegnato.
 - precondizione: il convoglio e' fermo in una stazione.
+- rispetto alla consegna: la consegna lo scrive fra parentesi, come comando facoltativo; e' stato
+  realizzato lo stesso.
 - stato di implementazione: parziale. L'effetto e' quello richiesto, ma la precondizione non viene
   verificata da nessuna parte: il comando sopprime anche un convoglio in mezzo a una tratta, e la
   sopprimibilita' resta affidata al buon senso di chi preme il bottone.
@@ -288,6 +504,8 @@ tre la fa per intero.
 
 - enunciato: sono consultabili i transiti passati, ciascuno con il convoglio, la stazione, la tratta,
   il verso (entrata o uscita) e l'istante.
+- rispetto alla consegna: e' un'aggiunta. La consegna chiede alla centrale di *memorizzare* lo
+  storico dei transiti, e quello e' RF02.7; mostrarlo in una schermata non lo chiede nessuno.
 - dipende da: RF02.7.
 - stato di implementazione: completo.
 
@@ -742,8 +960,9 @@ cosa, che cosa una parte puo' e non puo' toccare dell'altra.
 
 ** RF04 - Accesso e protezione
 
-*Stato di implementazione*: parziale — accesso e permessi sono completi, la protezione dei canali si
-ferma dove dice il limite dichiarato in RF04.3.
+*Stato di implementazione*: parziale — l'accesso e' completo; l'autorizzazione per ruolo vale per le
+letture e per l'anagrafica ma non distingue i ruoli sui tre comandi operativi (RF04.2); la protezione
+dei canali si ferma dove dice il limite dichiarato in RF04.3.
 
 *** RF04.1 - Autenticazione
 - enunciato: gli utenti sono registrati presso il servizio di identita' e accedono dichiarando li'
@@ -763,7 +982,9 @@ ferma dove dice il limite dichiarato in RF04.3.
 
 *** RF04.2 - Autorizzazione per ruolo
 - enunciato: ogni operazione e' permessa o negata in base al ruolo di chi la chiede: le letture sono
-  permesse a entrambi i ruoli, la modifica dell'anagrafica della rete al solo amministratore.
+  permesse a entrambi i ruoli, la modifica dell'anagrafica della rete al solo amministratore, e
+  ciascun comando operativo al ruolo che la consegna gli assegna — l'invio della squadra al tecnico,
+  la soppressione della corsa all'amministratore (RF01.4).
 - *requisito fondamentale*: il controllo dei permessi e' fatto dalla parte che possiede i dati, non
   dall'interfaccia. Un'interfaccia che si limita a nascondere i comandi non consentiti non soddisfa
   questo requisito, perche' chiunque puo' formulare la stessa richiesta senza passare
@@ -780,11 +1001,14 @@ ferma dove dice il limite dichiarato in RF04.3.
     identita' di utente: i nodi non sono utenti e non si identificano con credenziali, la loro
     verifica e' quella dell'identita' di nodo (RF02.4). Sono letture, non modifiche, ed e' un confine
     che vale la pena tenere stretto a due sole operazioni.
-- stato di implementazione: completo, con esattamente le tre eccezioni dichiarate qui sopra e
-  nessun'altra. Il controllo sta dalla parte che possiede i dati e il ruolo viene letto dentro
-  l'attestato: nascondere i comandi nell'interfaccia non serve a passare il controllo. Resta fuori
-  la sola websocket, che non e' un'operazione sui dati ma una porta di sola lettura, ed e' un limite
-  dichiarato nel capitolo /Progettazione/.
+- stato di implementazione: parziale, e il pezzo che manca e' la ripartizione dei comandi operativi.
+  Il controllo sta dalla parte che possiede i dati e il ruolo viene letto dentro l'attestato:
+  nascondere i comandi nell'interfaccia non serve a passare il controllo, e su letture e anagrafica
+  la ripartizione e' rispettata per intero, con esattamente le tre eccezioni dichiarate qui sopra e
+  nessun'altra. I tre comandi operativi pero' sono concessi a entrambi i ruoli: il tecnico puo'
+  sopprimere una corsa e l'amministratore puo' mandare la squadra, mentre la consegna li assegna uno
+  per ruolo. Resta fuori anche la sola websocket, che non e' un'operazione sui dati ma una porta di
+  sola lettura, ed e' un limite dichiarato nel capitolo /Progettazione/.
 
 *** RF04.3 - Protezione dei canali
 - enunciato: il sistema puo' funzionare con tutti i canali di comunicazione protetti, in modo che il
@@ -837,8 +1061,8 @@ passo.
   2. il convoglio in arrivo si ferma prima di entrare in B e passa a FERMO;
   3. il convoglio gia' in sosta in B non riparte a fine sosta;
   4. il ritardo di entrambi cresce finche' restano fermi;
-  5. l'operatore manda la squadra: B passa a MANUTENZIONE;
-  6. l'operatore dichiara risolto il guasto: B torna ONLINE, l'allarme risulta chiuso e conservato
+  5. il tecnico manda la squadra: B passa a MANUTENZIONE;
+  6. il tecnico dichiara risolto il guasto: B torna ONLINE, l'allarme risulta chiuso e conservato
      nella storia;
   7. entrambi i convogli riprendono la corsa dal punto in cui erano, senza altri comandi.
 - requisiti coperti :: RF01.2.1, RF01.4.1, RF01.4.2, RF02.1.1.2, RF02.1.3, RF02.2.1.1.
@@ -1878,7 +2102,7 @@ scritto (RF02.2.4). Dove i due giudizi divergono vale quello scritto accanto al 
 | RF03.4       | T10, S6     |              | i sensori entrano solo dalle API REST del nodo                                |
 | RF03.5       | M10         | T3           |                                                                               |
 | RF04.1       | M9          |              |                                                                               |
-| RF04.2       | M9          | M10          | il controllo è sul lato che possiede i dati, non sull'interfaccia             |
+| RF04.2       |             | M9, M10      | il controllo è sul lato che possiede i dati, non sull'interfaccia; sui tre comandi operativi il ruolo però non viene distinto |
 | RF04.3       |             |              | non è una macchina: è il profilo =%tls= sui canali, vedi la sezione /Topic/   |
 #+begin_comment
 I requisiti scoperti sono da tenere presenti, non sono una svista della tabella:
@@ -1921,7 +2145,173 @@ I requisiti scoperti sono da tenere presenti, non sono una svista della tabella:
 #+end_comment
 * Progettazione
 ** Diagramma delle componenti
-[[./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/diagrammaDelleComponenti.png]]
+- e' la vista d'insieme, a livello di moduli e non del loro interno: le cinque componenti eseguibili (web app, Centrale, Stazione, Treno, broker) piu' i due servizi di supporto che girano in Docker, Keycloak e PostgreSQL
+- le interfacce non hanno nomi di comodo: dentro ci sono i percorsi REST, il percorso del WebSocket e i topic MQTT veri, quelli che stanno in =application.properties= e nelle classi di ingresso
+- linea continua = interfaccia *offerta* dalla componente, freccia tratteggiata = interfaccia *richiesta*
+#+begin_src  plantuml file: diagramma_delle_componenti.png
+@startuml Diagramma delle componenti
+' =========================================================================
+'  DIAGRAMMA DELLE COMPONENTI
+'
+'  Solo i moduli, non il loro interno: le cinque componenti eseguibili del
+'  sistema (web app, Centrale, Stazione, Treno, broker) piu' i due servizi
+'  di supporto che girano in Docker, Keycloak e PostgreSQL.
+'
+'  I nomi delle interfacce non sono nomi di comodo: dentro ci sono i
+'  percorsi e i topic veri, presi da
+'    */src/main/resources/application.properties      (porte, topic, %tls)
+'    ServeCentraleOperativa/.../gateway/              (/api, /ws/realtime)
+'    Stazioni/.../StationIngestion.java               (/stazione/sensore/*)
+'    Treni/.../TrainIngestion.java                    (/treno/sensore/*)
+'
+'  Convenzione: linea continua = interfaccia OFFERTA dalla componente,
+'  freccia tratteggiata = interfaccia RICHIESTA (dipendenza).
+'
+'  Lo stereotipo <<esterno>> sta solo sui sensori: non sono moduli miei ne'
+'  servizi di supporto, sono i dispositivi che stanno fuori dal sistema e
+'  che nel progetto vengono simulati (console dei sensori del treno,
+'  chiamate REST a mano per la stazione).
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle uml2
+skinparam wrapWidth 200
+skinparam nodesep 30
+skinparam ranksep 45
+skinparam component {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+}
+skinparam component<<centrale>> {
+    BackgroundColor #FCE8E6
+    BorderColor #C5221F
+}
+skinparam component<<campo>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam component<<infra>> {
+    BackgroundColor #F1F3F4
+    BorderColor #9AA0A6
+}
+skinparam component<<esterno>> {
+    BackgroundColor #FFF8E1
+    BorderColor #B26A00
+}
+skinparam database {
+    BackgroundColor #F3E8FD
+    BorderColor #8430CE
+}
+skinparam interface {
+    BackgroundColor #FFF3E0
+    BorderColor #E8710A
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title Diagramma delle componenti
+
+' =====================================================
+'  COMPONENTI
+' =====================================================
+component "Client Web App\nReact 18 + TypeScript + Vite" <<webapp>> as WebApp
+component "Keycloak 26\nIdentity Provider (Docker)" <<infra>> as Keycloak
+component "Centrale Operativa\nQuarkus :8781 (:8444 tls)" <<centrale>> as Centrale
+database "PostgreSQL 15\ndb railway (Docker)" as DB
+component "Broker MQTT\nEclipse Mosquitto (Docker)" <<infra>> as Broker
+component "Stazione\nQuarkus :8081 (N istanze)" <<campo>> as Stazione
+component "Treno\nQuarkus :8082 (N istanze)" <<campo>> as Treno
+component "Sensori di stazione\npassaggio, guasto, keepalive\n(simulati)" <<esterno>> as SensoriStaz
+component "Sensori di bordo\nguasto, passaggio\n(simulati)" <<esterno>> as SensoriTreno
+
+' =====================================================
+'  INTERFACCE
+' =====================================================
+interface "IAutenticazione\nOAuth2/OIDC :8180" as IAuth
+interface "IChiaviPubbliche\nJWKS" as IJwks
+interface "IApiOperatore\nREST /api\n:8781 (:8444 tls)" as IApi
+interface "ITempoReale\nWebSocket /ws/realtime" as IRealtime
+interface "IApiDiCampo\nGET /api/treni/{id}/itinerario" as IApiCampo
+interface "ITopicTree\nMQTT railway/#\n:1883 (:8883 tls)" as ITopic
+interface "IPersistenza\nJDBC :5432" as IPersistenza
+interface "ISensoriStazione\nREST /stazione/sensore/*\n:8081" as ISensStaz
+interface "ISensoriTreno\nREST /treno/sensore/*\n:8082" as ISensTreno
+
+' =====================================================
+'  LATO OPERATORE
+' =====================================================
+WebApp .down.> IApi : comandi e letture\ncon Bearer token
+WebApp .down.> IRealtime : aggiornamenti spinti\ndalla Centrale
+WebApp .right.> IAuth : login PKCE, refresh,\nlogout
+Keycloak -up- IAuth
+Keycloak -up- IJwks
+Centrale .right.> IJwks : firma RS256\ne ruoli del token
+
+Centrale -up- IApi
+Centrale -up- IRealtime
+Centrale -up- IApiCampo
+
+' =====================================================
+'  PERSISTENZA
+' =====================================================
+Centrale .down.> IPersistenza : storicizza transiti, guasti,\nstati e itinerari
+DB -up- IPersistenza
+
+' =====================================================
+'  CAMPO
+' =====================================================
+Centrale .down.> ITopic : sottoscrive telemetria, transiti,\nbattiti e validazioni,\npubblica gli allarmi
+Broker -up- ITopic
+Stazione .up.> ITopic : pubblica transiti e battiti,\nsottoscrive allarmi
+Treno .up.> ITopic : pubblica telemetria e passaggi,\nsottoscrive allarmi
+Treno .up.> IApiCampo : scarica l'itinerario\nall'avvio (HTTP)
+
+Stazione -down- ISensStaz
+Treno -down- ISensTreno
+SensoriStaz .up.> ISensStaz
+SensoriTreno .up.> ISensTreno
+
+note as Legenda
+  <b>Come si legge</b>
+  linea continua = interfaccia <b>offerta</b> dalla componente
+  freccia tratteggiata = interfaccia <b>richiesta</b>
+  sotto il profilo <i>%tls</i> MQTT passa da 1883 a 8883
+  e la Centrale da HTTP 8781 a HTTPS 8444
+end note
+
+@enduml
+#+end_src
+
+Le cose da leggere nel diagramma sono quattro.
+
+*La web app parla su tre canali diversi e non su uno solo.* Le chiamate =/api= servono per
+leggere l'anagrafica e per mandare i comandi, il WebSocket =/ws/realtime= porta gli
+aggiornamenti che partono dalla Centrale senza che nessuno li chieda, e il terzo canale non
+tocca affatto la Centrale: il login va diretto a Keycloak, ed e' il motivo per cui
+=IAutenticazione= e =IChiaviPubbliche= sono due interfacce separate. La prima la usa il
+browser per farsi dare il token, la seconda la usa la Centrale per verificarne la firma
+senza richiamare Keycloak a ogni richiesta.
+
+*Dal campo verso la Centrale si passa dal broker, tranne un caso.* Telemetria, transiti,
+battiti, validazioni degli ID e allarmi viaggiano tutti su =ITopicTree=: la Centrale e i nodi
+non si conoscono e non si chiamano fra loro. L'unica eccezione e' il treno che al boot
+scarica il proprio itinerario in HTTP (=IApiDiCampo=), perche' e' un dato di configurazione
+che serve una volta sola e che non ha senso far girare come messaggio.
+
+*I sensori entrano solo dalle API REST del nodo.* =ISensoriStazione= e =ISensoriTreno= sono le
+uniche porte di ingresso dei sensori: un sensore non pubblica su MQTT e non conosce la
+Centrale, parla con il nodo che ha vicino e basta. Sono disegnati con lo stereotipo
+/esterno/ perche' stanno fuori dal sistema, e nel progetto sono simulati: quelli di bordo
+dalla console dei sensori del treno, quelli di stazione da chiamate REST fatte a mano.
+
+*Una sola componente scrive su disco.* Stazione e Treno tengono il loro stato in memoria e
+non hanno nessun database: l'unica che parla con PostgreSQL e' la Centrale. E' anche il motivo
+per cui la stazione, quando la rete cade, si tiene i messaggi in una cache locale e li rimanda
+al rientro invece di scriverli da qualche parte.
 ** Stack tecnologico
 #+begin_comment
 // bo roba ovvia e troppo prolissa
@@ -5349,7 +5739,7 @@ end note
 - gli stati non sono piu' "sessione aperta / chiusa" lato Centrale, perche' la Centrale non tiene piu' nessuna sessione: quello che ha un ciclo di vita e' il token, e vive nel browser
 - la macchina si legge in due meta': in alto il token visto dalla web app (assente, valido, scaduto, rinnovato), in basso la singola richiesta vista dalla Centrale
 - la validita' del token (firma, scadenza, emittente, audience) la stabilisce =quarkus-oidc= prima del filtro; il filtro decide solo chi puo' fare cosa
-- requisiti coperti: RF04.1 e RF04.2 completi, con le eccezioni dichiarate nella specifica (le richieste preliminari del browser e le due sole letture di cui hanno bisogno i nodi di campo), e RF01.6 completo lato centrale: il controllo dei permessi e' fatto qui, dalla parte che possiede i dati, non nascondendo i comandi nell'interfaccia
+- requisiti coperti: RF04.1 completo e RF04.2 parziale (le eccezioni dichiarate nella specifica ci sono tutte — le richieste preliminari del browser e le due sole letture di cui hanno bisogno i nodi di campo — ma i tre comandi operativi restano aperti a entrambi i ruoli), e RF01.6 completo lato centrale: il controllo dei permessi e' fatto qui, dalla parte che possiede i dati, non nascondendo i comandi nell'interfaccia
 #+begin_src  plantuml file: 09_macchina_sessione_autorizzazione.png
 @startuml M9 - Ciclo di vita del token e autorizzazione delle API REST
 ' =========================================================================
@@ -7480,7 +7870,7 @@ end note
 - la Centrale verifica la firma del token in locale con le chiavi pubbliche del realm, scaricate una volta sola: non richiama Keycloak a ogni chiamata
 - i tre esiti del filtro sono quelli osservabili dall'esterno: passa, 401 se il token manca o non vale, 403 se il ruolo non basta
 - il logout non e' cancellare il token: senza passare dall'end_session_endpoint Keycloak terrebbe viva la sessione SSO e il rientro successivo non chiederebbe la password
-- requisiti coperti: RF01.6, RF04.1 e RF04.2 completi; RF04.3 non e' una macchina ne' una sequenza, e' il profilo tls sui canali
+- requisiti coperti: RF01.6 e RF04.1 completi, RF04.2 parziale perche' il ruolo non viene distinto sui tre comandi operativi; RF04.3 non e' una macchina ne' una sequenza, e' il profilo tls sui canali
 #+begin_src  plantuml file: sq_13_login_e_ruoli.png
 @startuml SQ13 - Accesso OAuth2 e permessi per ruolo
 ' =========================================================================
@@ -8513,7 +8903,7 @@ nel capitolo /Specifica/: qui si dice quale conversazione lo mostra, non se il s
 | RF03.4       | SQ07       | SQ09         | i sensori di terra e quelli di bordo usano solo le API pubbliche del nodo      |
 | RF03.5       | SQ03       |              |                                                                               |
 | RF04.1       | SQ13       |              |                                                                               |
-| RF04.2       | SQ13       | SQ16, SQ17   | il 403 sull'anagrafica e' la parte visibile del ruolo                          |
+| RF04.2       |            | SQ13, SQ16, SQ17 | il 403 sull'anagrafica e' la parte visibile del ruolo; sui comandi operativi di SQ14 e SQ15 il ruolo non viene distinto |
 | RF04.3       |            |              | non e' una conversazione: e' il profilo =%tls= sui canali, vedi la sezione /Topic/ |
 
 

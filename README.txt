@@ -3,19 +3,38 @@
 Runnare il sistema
 
 1. Avviare i servizi infrastrutturali (Database centrale, Keycloak e Broker MQTT)
-1.1  Database Centrale + Keycloak
 $ docker-compose up -d
 
-   Lo stesso compose fa partire due container:
+   C'e' un unico docker-compose.yml nella radice del progetto e fa partire tutti
+   e tre i container:
      railway-postgres  -> database, porta 5432
      railway-keycloak  -> Identity Provider, porta 8180 (admin/admin)
+     broker-mosquitto  -> broker MQTT, porte 1883 (in chiaro), 8883 (TLS) e
+                          9001 (WebSocket, quella che usa la web app)
    Al primo avvio Keycloak importa da solo il realm "railway" con ruoli e utenti
    (Keycloak/realm-railway.json). La Centrale non parte finche' Keycloak non
    risponde: ci prova per una trentina di secondi e poi si arrende.
+   La configurazione del broker resta dov'era (BrokerMosquitto/config,
+   BrokerMosquitto/tls, ...): il compose la monta da li'.
 
-1.2 Broker Mosquitto*
-$ cd BrokerMosquitto
-$ docker-compose up -d
+
+1.1 Popolare il database
+
+Le tabelle le crea Hibernate da solo al primo avvio della Centrale, ma nascono
+vuote. Per rimetterci dentro l'anagrafica (stazioni, tratte, itinerari, treni e
+operatori) c'e' lo script nella radice:
+
+$ ./popola_db.sh
+
+Legge populate_db.sql e lo esegue dentro il container railway-postgres. Si puo'
+rilanciare quante volte si vuole: gli INSERT hanno ON CONFLICT DO NOTHING, quindi
+le righe gia' presenti non vengono toccate. Volendo si puo' passare un altro file
+SQL da eseguire al posto di quello di default:
+
+$ ./popola_db.sh un_altro_script.sql
+
+Transiti, guasti e tabelle Storico_* non stanno nello script: li riempie il
+sistema mentre gira.
 
 
 2. Avviare il Codice
@@ -31,15 +50,17 @@ $ ./mvnw quarkus:dev
 
 2.3 Stazione
 $ cd Stazioni
-$ ./mvnw quarkus:dev -Dstazione.id=S1 -Dquarkus.http.port=8081
+$ ./mvnw quarkus:dev -Dstazione.id=MI -Dquarkus.http.port=8081
 
 2.4 Treno
 $ cd Treni
-$ ./mvnw quarkus:dev -Dtreno.id=TRN001 -Dquarkus.http.port=8082
+$ ./mvnw quarkus:dev -Dtreno.id=Jaz -Dquarkus.http.port=8082
 
 NOTA: gli ID passati qui devono esistere nelle tabelle Stazione / Treni del
-database centrale (vedi import.sql), altrimenti la validazione via MQTT li
+database centrale (vedi populate_db.sql), altrimenti la validazione via MQTT li
 rifiuta e il processo si chiude con "ID non presente nel database centrale".
+Con i dati attuali le stazioni sono MI, TO, FI, BO, PA, BE, CA, PAL e i treni
+Jaz, LUNGO, Smeraldo, Rosso, Pietra.
 
 
 3. Istanze multiple (piu' stazioni e piu' treni sulla stessa macchina)
@@ -48,13 +69,13 @@ Ogni processo apre il proprio server HTTP, quindi la porta va cambiata a mano:
 lanciando un secondo treno senza -Dquarkus.http.port il bind fallisce
 ("Address already in use").
 
-$ cd Stazioni && ./mvnw quarkus:dev -Dstazione.id=S1 -Dquarkus.http.port=8081
-$ cd Stazioni && ./mvnw quarkus:dev -Dstazione.id=S2 -Dquarkus.http.port=8091
-$ cd Treni    && ./mvnw quarkus:dev -Dtreno.id=TRN001 -Dquarkus.http.port=8082
-$ cd Treni    && ./mvnw quarkus:dev -Dtreno.id=TRN002 -Dquarkus.http.port=8092
+$ cd Stazioni && ./mvnw quarkus:dev -Dstazione.id=MI -Dquarkus.http.port=8081
+$ cd Stazioni && ./mvnw quarkus:dev -Dstazione.id=FI -Dquarkus.http.port=8091
+$ cd Treni    && ./mvnw quarkus:dev -Dtreno.id=Jaz -Dquarkus.http.port=8082
+$ cd Treni    && ./mvnw quarkus:dev -Dtreno.id=Rosso -Dquarkus.http.port=8092
 
 Con i jar l'ID si puo' passare anche come primo argomento:
-$ java -Dquarkus.http.port=8092 -jar Treni/target/quarkus-app/quarkus-run.jar TRN002
+$ java -Dquarkus.http.port=8092 -jar Treni/target/quarkus-app/quarkus-run.jar Rosso
 
 3.1 Script di avvio in blocco
 
@@ -80,8 +101,8 @@ $ cd BrokerMosquitto/tls && ./gen-certs.sh
 
 4.2 Avviare i tre servizi con il profilo tls (MQTT sulla 8883, REST sulla 8444)
 $ cd ServeCentraleOperativa && ./mvnw quarkus:dev -Dquarkus.profile=tls
-$ cd Stazioni && ./mvnw quarkus:dev -Dquarkus.profile=tls -Dstazione.id=S1 -Dquarkus.http.port=8081
-$ cd Treni    && ./mvnw quarkus:dev -Dquarkus.profile=tls -Dtreno.id=TRN001 -Dquarkus.http.port=8082
+$ cd Stazioni && ./mvnw quarkus:dev -Dquarkus.profile=tls -Dstazione.id=MI -Dquarkus.http.port=8081
+$ cd Treni    && ./mvnw quarkus:dev -Dquarkus.profile=tls -Dtreno.id=Jaz -Dquarkus.http.port=8082
 
 4.3 Far puntare la web app all'HTTPS
 $ cd ClientWebAppIntefacciaUtente && cp .env.example .env

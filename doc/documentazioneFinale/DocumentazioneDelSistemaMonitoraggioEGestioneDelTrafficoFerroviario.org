@@ -2,14 +2,159 @@
 #+LATEX_HEADER: \usepackage{longtable}
 #+LATEX_HEADER: \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 #+LATEX_HEADER: \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
-* Introduzione Descrizione Generale
-Cio che è realizzato è al fine della gestione di una rete ferroviaria e, in particolare, la gestione
-delle stazioni, dei treni che compongono tale rete.
-La gestione della rete è fornita attraverso in un app web che fornisce il neccessarrio per il monitoraggio e l'amiinistrazione della rete
+#+LATEX_HEADER: \usepackage{titlesec}
+#+LATEX_HEADER: \titleformat{\paragraph}[hang]{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
+#+LATEX_HEADER: \titlespacing*{\paragraph}{0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+#+LATEX_HEADER: \titleformat{\subparagraph}[hang]{\normalfont\normalsize\bfseries}{\thesubparagraph}{1em}{}
+#+LATEX_HEADER: \titlespacing*{\subparagraph}{0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+#+LATEX_HEADER: \setcounter{secnumdepth}{5}
+#+OPTIONS: H:5 toc:5
 * Specifica
+** Introduzione Descrizione Generale
+Il sistema è al fine della gestione e del monitoraggio di una rete ferroviaria, in particolare
+delle stazioni e dei treni che la compongono.
+Tale servizio è Fornito attraverso una app web che fornisce il neccessarrio
 ** Modellazione per casi d'uso
 
-[[./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/diocane.png]]
+
+#+begin_src  plantuml file: casi_uso_00_attori_e_casi_uso.png
+@startuml UC0 - Attori e casi d'uso del sistema
+' =========================================================================
+'  MODELLAZIONE PER CASI D'USO
+'
+'  Il diagramma copre RF01 (i servizi che il sistema offre agli utenti) e la
+'  ripartizione dei permessi di RF04.2, e segue la consegna: il tecnico
+'  visualizza e manda gli operatori sulla stazione guasta, l'amministratore
+'  visualizza, tiene l'anagrafica della rete e sopprime le corse.
+'
+'  Come e' costruito:
+'    - Utente e' l'attore astratto che raccoglie cio' che i due ruoli reali
+'      fanno entrambi (la consultazione e l'accesso); tecnico e
+'      amministratore lo specializzano e ne ereditano le associazioni;
+'    - ogni caso d'uso porta fra parentesi il requisito che lo enuncia;
+'    - la marcatura dice quanto ne e' realizzato e se la consegna lo chiede
+'      (vedi la legenda in fondo al diagramma).
+'
+'  I nodi di campo (convogli e stazioni) non compaiono: non sono utenti e
+'  non si identificano con credenziali, il loro riconoscimento e' RF02.4.
+' =========================================================================
+
+top to bottom direction
+skinparam backgroundColor #FEFEFE
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    ArrowColor #1A73E8
+}
+skinparam usecase<<parziale>> {
+    BackgroundColor #FEF7E0
+    BorderColor #F29900
+}
+skinparam usecase<<aggiunta>> {
+    BackgroundColor #F1F3F4
+    BorderColor #9AA0A6
+}
+skinparam actor {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+}
+skinparam rectangle {
+    BorderColor #5F6368
+}
+skinparam legend {
+    BackgroundColor #FFFFFF
+    BorderColor #5F6368
+}
+
+actor "Tecnico" as TECNICO
+actor "Utente" as UTENTE
+actor "Amministratore" as ADMIN
+actor "Servizio di identita'" as IDP <<sistema>>
+
+TECNICO --|> UTENTE
+
+rectangle "Monitoraggio e gestione del traffico ferroviario" {
+
+  rectangle "Consultazione (RF01.1, RF01.2, RF01.5)" as G1 {
+    usecase "Visualizza la mappa\ndel traffico\n(RF01.1.1)" as UC01
+    usecase "Consulta l'elenco\ndei convogli\n(RF01.1.2)" as UC02
+    usecase "Consulta l'elenco\ndelle stazioni\n(RF01.1.3)" as UC03
+    usecase "Consulta le tratte\ne gli itinerari\n(RF01.3, sola lettura)" as UC06
+    usecase "Consulta gli allarmi\naperti\n(RF01.2)" as UC05
+    usecase "Consulta gli indicatori\ndi sintesi\n(RF01.1.5)" as UC04 <<aggiunta>>
+    usecase "Consulta lo storico\ndei transiti\n(RF01.5)" as UC07 <<aggiunta>>
+  }
+
+  rectangle "Comandi operativi (RF01.4)" as G2 {
+    usecase "Invia la squadra\ndi manutenzione\n(RF01.4.1)" as UC08 <<parziale>>
+    usecase "Dichiara risolto\nun allarme\n(RF01.4.2)" as UC09 <<parziale>>
+    usecase "Sopprimi una corsa\n(RF01.4.3)" as UC10 <<parziale>>
+  }
+
+  rectangle "Accesso (RF01.6)" as G4 {
+    usecase "Accedi al sistema" as UC15
+    usecase "Esci dal sistema" as UC16
+  }
+
+  rectangle "Anagrafica della rete (RF01.3)" as G3 {
+    usecase "Gestisci le tratte\nelementari\n(RF01.3.3)" as UC13
+    usecase "Gestisci gli itinerari e\nl'assegnazione dei convogli\n(RF01.3.4)" as UC14
+    usecase "Gestisci le stazioni\n(RF01.3.1)" as UC11 <<aggiunta>>
+    usecase "Gestisci i convogli\n(RF01.3.2)" as UC12 <<aggiunta>>
+  }
+}
+
+' ---- cio' che i due ruoli fanno entrambi ----
+UTENTE -- UC01
+UTENTE -- UC02
+UTENTE -- UC03
+UTENTE -- UC04
+UTENTE -- UC05
+UTENTE -- UC06
+UTENTE -- UC07
+UTENTE -- UC15
+UTENTE -- UC16
+
+' ---- compito del tecnico: la stazione guasta e il suo ripristino ----
+TECNICO -- UC08
+TECNICO -- UC09
+
+' ---- riservato all'amministratore ----
+UC10 -- ADMIN
+UC11 -- ADMIN
+UC12 -- ADMIN
+UC13 -- ADMIN
+UC14 -- ADMIN
+UTENTE <|-- ADMIN
+
+' ---- le credenziali si digitano fuori dall'applicazione (RF04.1) ----
+UC15 -- IDP
+UC16 -- IDP
+
+' ---- vincoli di sola impaginazione: distribuiscono i gruppi su tre file ----
+UC01 -[hidden]down- UC08
+UC02 -[hidden]down- UC09
+UC03 -[hidden]down- UC10
+UC06 -[hidden]down- UC15
+UC05 -[hidden]down- UC16
+UC08 -[hidden]down- UC13
+UC09 -[hidden]down- UC14
+UC10 -[hidden]down- UC11
+UC15 -[hidden]down- UC12
+
+legend bottom
+  <b>Marcatura dei casi d'uso</b>
+  nessuna marca : chiesto dalla consegna e realizzato per intero
+  <b>«parziale»</b> : chiesto dalla consegna, realizzato solo in parte; il pezzo
+  che manca sta nello stato di implementazione del requisito
+  <b>«aggiunta»</b> : non chiesto dalla consegna, realizzato lo stesso
+endlegend
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-25gpgG/plantuml-5VTOFG.png]]
 
 ** Glossario dei termini di dominio
 
@@ -46,907 +191,149 @@ La gestione della rete è fornita attraverso in un app web che fornisce il necce
 - Rinnovo :: sostituzione di un attestato in scadenza con uno nuovo, fatta senza chiedere di
   nuovo le credenziali all'utente. Serve perche' una sessione di lavoro dura piu' di un
   attestato.
-** Vocabolario degli stati osservabili
-
-*** Stato del convoglio
-
-#+attr_latex: :align |p{0.22\textwidth}|p{0.68\textwidth}|
-| stato      | significato                                                                    |
-|------------+--------------------------------------------------------------------------------|
-| FERMO      | e' in sosta in una stazione, oppure e' trattenuto e non puo' ripartire          |
-| IN_VIAGGIO | sta percorrendo una tratta elementare fra due stazioni                         |
-| EMERGENZA  | e' aperto un guasto che lo riguarda; la corsa e' sospesa dove si trovava        |
-| SOPPRESSO  | la corsa e' stata annullata: il convoglio non viaggia piu' e non riprendera'    |
-
-*** Stato operativo della stazione
-
-La stazione e' vista da due punti di osservazione, che dispongono di informazione diversa. Non e' una
-contraddizione: e' la conseguenza di che cosa ciascuno dei due puo' sapere.
-
-#+attr_latex: :align |p{0.26\textwidth}|p{0.20\textwidth}|p{0.40\textwidth}|
-| stato        | chi lo puo' dichiarare | significato                                                              |
-|--------------+------------------------+--------------------------------------------------------------------------|
-| ONLINE       | la stazione, la centrale | la stazione e' viva, raggiungibile e percorribile                        |
-| GUASTA       | la stazione, la centrale | la stazione non e' percorribile: i convogli non ci entrano e non ne escono |
-| OFFLINE      | solo la centrale       | la stazione non da' piu' notizie di se'                                   |
-| MANUTENZIONE | solo la centrale       | la squadra e' stata mandata sul posto e sta lavorando                    |
-
-** Come si legge un requisito
-
-Ogni requisito e' scritto con questi campi, e quelli che non servono vengono omessi:
-
-- *enunciato* :: cosa il sistema deve fare, in una frase, al presente indicativo;
-- *soggetto* :: chi ha l'obbligo (quale parte del sistema) e nei confronti di chi;
-- *precondizione* :: in quali condizioni il requisito si applica;
-- *esito atteso* :: cosa deve risultare vero quando il requisito e' soddisfatto;
-- *dipende da* :: quale altro requisito deve valere perche' questo abbia senso;
-- *stato di implementazione* :: quanto di quel requisito il sistema realizzato soddisfa davvero.
-
-Lo stato di implementazione ha tre soli valori:
-
-- *completo* :: il sistema fa quello che il requisito chiede, per intero;
-- *parziale* :: ne fa una parte, e accanto al valore c'e' sempre scritto quale pezzo manca;
-- *non realizzato* :: nessuna parte del sistema lo soddisfa.
-
-Sui requisiti che ne raggruppano altri lo stato non e' un giudizio a se': segue la decomposizione,
-quindi un ramo e' completo solo quando lo sono tutte le sue parti. E' la stessa cosa che dicono le
-tabelle /Riepilogo requisiti/ (in fondo a questo capitolo per le macchine a stati, in fondo a
-/Progettazione/ per i diagrammi di sequenza), messa pero' accanto all'enunciato, dove serve mentre
-lo si legge.
-
-La numerazione è gerarchica per raggruppamenti e, come suvisto, presenta anche le dipendenze
-
-** RF01 - Servizi offerti agli utenti
-
-*Enunciato*: il sistema espone a tecnico e amministratore, attraverso un'unica applicazione web, la
-situazione corrente della rete, la sua storia e i comandi previsti per il loro ruolo.
-
-*Nota di lettura*: RF01 non stabilisce nessuna verita' sul dominio, la *espone*. Se lo stato
-descritto da RF02 e' sbagliato, RF01 mostra correttamente un dato sbagliato: per questo ogni ramo di
-RF01 dipende dal corrispondente ramo di RF02.
-
-*Stato di implementazione*: parziale — la visualizzazione, l'amministrazione dei dati, lo storico e
-l'accesso ci sono per intero; i tre comandi operativi di RF01.4 fanno la cosa principale ma nessuno
-dei tre e' completo.
-
-*** RF01.1 - Visualizzazione della situazione corrente
-
-*Stato di implementazione*: completo, tutte e cinque le voci.
-
-**** RF01.1.1 - Mappa del traffico
-- enunciato: la posizione dei convogli e' rappresentata su una mappa geografica, insieme al percorso
-  che stanno seguendo e al loro stato.
-- dipende da: RF02.2.2.
-- stato di implementazione: completo. Il convoglio viene disegnato sulla posizione interpolata fra
-  le due stazioni della tratta che sta percorrendo, con sopra il percorso e il colore dello stato.
-
-**** RF01.1.2 - Elenco dei convogli
-- enunciato: per ogni convoglio sono visibili il numero, la stazione o la tratta su cui si trova, lo
-  stato, il ritardo accumulato e i passeggeri a bordo.
-- dipende da: RF02.2.
-- stato di implementazione: completo.
-
-**** RF01.1.3 - Elenco delle stazioni
-- enunciato: per ogni stazione sono visibili lo stato operativo, i convogli fermi sui binari in quel
-  momento, quelli attesi in ingresso e quelli attesi in uscita.
-- dipende da: RF02.3.1.
-- stato di implementazione: completo. Lo stato operativo lo tiene la centrale, i convogli sui binari
-  li dichiara il nodo di stazione: la schermata mette insieme le due cose.
-
-**** RF01.1.4 - Aggiornamento continuo
-- enunciato: le schermate si aggiornano da sole mentre l'operatore le guarda, senza che lui debba
-  ricaricare la pagina o chiedere l'aggiornamento.
-- esito atteso: un evento rilevante (un transito, un cambio di stato, un guasto, l'esito di un
-  comando) e' visibile sulla schermata entro pochi secondi dal momento in cui accade; inoltre, ogni
-  =P_ria=, la schermata riceve una fotografia completa dello stato corrente.
-- *distinzione che conta*: l'aggiornamento e' *spinto dal sistema quando l'evento accade*, non
-  ottenuto da interrogazioni a orologio da parte della schermata. La fotografia periodica non e' il
-  meccanismo di aggiornamento: serve a riallineare chi si e' collegato dopo o ha perso qualcosa.
-- stato di implementazione: completo, ed e' completa anche la distinzione qui sopra: l'evento viene
-  spinto sulla websocket nel momento in cui accade, e la fotografia periodica viaggia sullo stesso
-  canale senza che il browser chieda niente.
-
-**** RF01.1.5 - Indicatori di sintesi
-- enunciato: una schermata di riepilogo riassume in pochi numeri i convogli in circolazione, le
-  stazioni operative, i guasti aperti e il ritardo medio.
-- stato di implementazione: completo. I numeri li calcola la centrale e viaggiano dentro la stessa
-  fotografia periodica di RF01.1.4, quindi si aggiornano da soli come il resto.
-
-*** RF01.2 - Visualizzazione dei guasti
-
-*Stato di implementazione*: completo, entrambe le voci.
-
-**** RF01.2.1 - Elenco degli allarmi aperti
-- enunciato: sono visibili i guasti attivi con la sorgente (quale stazione, quale convoglio, quale
-  tratta), il tipo, la severita' e l'istante di apertura.
-- dipende da: RF02.1.
-- stato di implementazione: completo.
-
-**** RF01.2.2 - Distinzione fra guasto segnalato e guasto dedotto
-- enunciato: l'elenco distingue il guasto *segnalato dal campo* (qualcuno lo ha dichiarato) da quello
-  *dedotto dalla centrale* (un nodo ha smesso di dare notizie).
-- *perche' e' un requisito e non un dettaglio*: sono due condizioni con cause diverse e con reazioni
-  diverse. Un guasto segnalato indica un problema del nodo; un guasto dedotto puo' indicare anche
-  soltanto un problema di collegamento, e chi decide se mandare la squadra deve poterli distinguere
-  senza indovinare.
-- dipende da: RF02.6.
-- stato di implementazione: completo. L'API e gli eventi in tempo reale portano l'origine
-  dell'allarme, e la schermata la mostra esplicitamente come "segnalato dal campo" oppure
-  "dedotto dalla centrale".
-
-*** RF01.3 - Amministrazione dei dati della rete
-
-*Enunciato del ramo*: la creazione, la modifica e l'eliminazione dell'anagrafica della rete sono
-riservate all'amministratore; il tecnico vede tutto ma non modifica nulla.
-
-*Stato di implementazione*: completo, tutte e cinque le voci.
-
-**** RF01.3.1 - Stazioni
-- enunciato: l'amministratore crea, modifica ed elimina le stazioni della rete.
-- stato di implementazione: completo.
-
-**** RF01.3.2 - Convogli
-- enunciato: l'amministratore crea, modifica ed elimina i convogli.
-- stato di implementazione: completo.
-
-**** RF01.3.3 - Tratte elementari
-- enunciato: l'amministratore crea, modifica ed elimina i collegamenti diretti fra due stazioni
-  adiacenti.
-- stato di implementazione: completo.
-
-**** RF01.3.4 - Itinerari e assegnazione dei convogli
-- enunciato: l'amministratore compone un itinerario come sequenza ordinata di stazioni con i tempi di
-  percorrenza previsti, e vi assegna sopra i convogli che devono percorrerlo.
-- dipende da: RF02.5, perche' la modifica deve restare corretta anche con convogli gia' in marcia.
-- stato di implementazione: completo per la parte di composizione e assegnazione; quello che succede
-  ai convogli gia' in marcia e' invece il ramo RF02.5, che completo non e'.
-
-**** RF01.3.5 - Integrita' dei dati alle eliminazioni
-- enunciato: l'eliminazione di un'entita' non lascia riferimenti pendenti, e non e' permessa finche'
-  qualcosa la sta ancora usando.
-- esito atteso: o l'eliminazione viene rifiutata con una spiegazione comprensibile, oppure viene
-  eseguita insieme a tutto cio' che senza quell'entita' non avrebbe piu' significato.
-- *perche' e' qui*:
- senza questo requisito la correttezza promessa da RF02 dura fino alla prima
-  eliminazione.
-- stato di implementazione: completo. Ogni eliminazione o viene rifiutata dicendo il motivo (la
-  stazione ancora usata da una tratta, la tratta ancora usata da un itinerario o gia' finita nei
-  transiti storici), oppure porta via con se' i record che senza quell'entita' non vorrebbero piu'
-  dire niente. Una parte della garanzia pero' la tengono i vincoli del database e non i controlli
-  scritti a mano.
-
-*** RF01.4 - Comandi operativi
-
-*Stato di implementazione*: parziale — tutti e tre i comandi fanno la cosa principale, nessuno dei
-tre la fa per intero.
-
-**** RF01.4.1 - Invio della squadra di manutenzione
-- enunciato: l'operatore manda la squadra su una stazione guasta.
-- esito atteso: la stazione risulta in MANUTENZIONE e i nodi interessati ne sono informati.
-- stato di implementazione: parziale. Il comando parte, il campo viene avvisato, i guasti aperti
-  sulla stazione vengono chiusi e la stazione passa a MANUTENZIONE; solo che il ritorno a ONLINE sta
-  dentro la stessa chiamata, a pochi millisecondi di distanza. Lo stato attraversa il canale ma non
-  dura: la stazione non /risulta/ in manutenzione a nessuno che la guardi. Per soddisfare il
-  requisito il ritorno andrebbe staccato dal comando e legato alla fine vera dell'intervento.
-
-**** RF01.4.2 - Presa in carico e chiusura di un allarme
-- enunciato: l'operatore dichiara risolto un guasto.
-- esito atteso: il guasto passa a chiuso, resta traccia di chi lo ha preso in carico e quando, e cio'
-  che era bloccato per causa sua riprende.
-- dipende da: RF02.1.3.
-- stato di implementazione: parziale. La chiusura c'e' e funziona, e cio' che era trattenuto
-  riprende davvero la corsa; la presa in carico no. Ne' l'operatore ne' il momento in cui se n'e'
-  occupato vengono scritti da nessuna parte, quindi a guasto chiuso non si sa piu' chi lo ha chiuso.
-
-**** RF01.4.3 - Soppressione di un convoglio fermo in stazione
-- enunciato: l'operatore annulla una corsa; il convoglio passa in SOPPRESSO e non viaggia piu'.
-- precondizione: il convoglio e' fermo in una stazione.
-- stato di implementazione: parziale. L'effetto e' quello richiesto, ma la precondizione non viene
-  verificata da nessuna parte: il comando sopprime anche un convoglio in mezzo a una tratta, e la
-  sopprimibilita' resta affidata al buon senso di chi preme il bottone.
-
-*** RF01.5 - Consultazione dello storico
-
-- enunciato: sono consultabili i transiti passati, ciascuno con il convoglio, la stazione, la tratta,
-  il verso (entrata o uscita) e l'istante.
-- dipende da: RF02.7.
-- stato di implementazione: completo.
-
-*** RF01.6 - Accesso al sistema
-
-- enunciato: l'uso dell'applicazione richiede di identificarsi; l'identita' accompagna tutte le
-  operazioni successive e termina con l'uscita esplicita.
-- l'identificazione avviene *fuori dall'applicazione*, sulla schermata del servizio di identita':
-  l'applicazione non raccoglie e non vede mai le credenziali, riceve solo l'attestato di accesso.
-- rimando: il dettaglio dei permessi e' in RF04.
-- stato di implementazione: completo. L'identificazione avviene sulla schermata del servizio di
-  identita', l'applicazione riceve solo l'attestato e l'uscita esplicita chiude la sessione.
-
-** RF02 - Correttezza dello stato rappresentato
-*Enunciato*: lo stato che il sistema mostra e conserva corrisponde a quello che sta realmente
-accadendo sulla rete, anche in presenza di guasti, di interruzioni del collegamento e di modifiche
-fatte mentre il sistema e' in funzione.
-
-*Stato di implementazione*: parziale. Sono completi il ramo dei convogli (RF02.2), quello delle
-stazioni (RF02.3), l'identita' dei nodi di campo (RF02.4) e le anomalie che la centrale deduce da
-sola (RF02.6). Non sono realizzate le conseguenze del guasto del convoglio sull'infrastruttura
-(RF02.1.2.2) e la ripresa dal punto giusto dopo una modifica dell'itinerario (RF02.5.2); sono
-parziali il ciclo di vita del guasto, che non registra la presa in carico (RF02.1.3), e la memoria
-storica, che di cinque cose ne scrive tre (RF02.7).
-
-*** RF02.1 - Gestione dei guasti
-
-*Stato di implementazione*: parziale — il guasto della stazione e la chiusura automatica ci sono;
-restano fuori le conseguenze del guasto del convoglio (RF02.1.2.2) e la presa in carico nel ciclo di
-vita del guasto (RF02.1.3).
-
-**** RF02.1.1 - Guasto della stazione
-
-*Stato di implementazione*: parziale, per il solo RF02.1.1.2.3.
-
-***** RF02.1.1.1 - Interruzione del collegamento con la centrale
-
-*Stato di implementazione*: completo.
-
-****** RF02.1.1.1.1 - Nessun dato perduto durante l'interruzione
-- enunciato: mentre il collegamento con la centrale non e' disponibile, la stazione conserva
-  localmente tutto cio' che produce e lo consegna quando il collegamento torna.
-- precondizione: la stazione continua a funzionare e i suoi sensori continuano a rilevare.
-- esito atteso: al ritorno del collegamento la centrale riceve tutti gli eventi prodotti durante
-  l'interruzione, nessuno escluso.
-- stato di implementazione: completo, nei limiti della precondizione. Il nodo continua a rilevare e
-  accoda cio' che non riesce a consegnare, e svuota la coda quando il collegamento torna. La coda
-  pero' vive in memoria: vale finche' il nodo resta acceso, un suo riavvio si porterebbe via quello
-  che non era ancora partito.
-
-****** RF02.1.1.1.2 - Ordine di consegna preservato
-- enunciato: la consegna differita rispetta l'ordine in cui gli eventi sono stati generati; se una
-  singola consegna fallisce, l'evento non consegnato precede comunque quelli successivi.
-- *perche' e' un requisito a se'*: senza questo vincolo l'entrata e l'uscita di uno stesso convoglio
-  possono arrivare invertite, e lo storico racconterebbe un convoglio che esce da una stazione prima
-  di entrarci.
-- dipende da: RF02.7.
-- stato di implementazione: completo. L'evento che non riesce a partire rientra in *testa* alla
-  coda, ed e' esattamente questo che impedisce a un'uscita di precedere la propria entrata.
-
-***** RF02.1.1.2 - Stazione non percorribile
-
-*Stato di implementazione*: parziale, per il solo RF02.1.1.2.3.
-
-****** RF02.1.1.2.1 - Il convoglio diretto alla stazione guasta si ferma
-- enunciato: se la prossima stazione dell'itinerario e' guasta, il convoglio non vi entra e resta
-  fermo dove si trova.
-- esito atteso: il convoglio risulta FERMO, la sua posizione non avanza e il ritardo cresce.
-- dipende da: RF02.2.2.1.
-- stato di implementazione: completo.
-
-****** RF02.1.1.2.2 - Riparte solo al ripristino
-- enunciato: il convoglio trattenuto riprende la corsa quando arriva il ripristino di quella
-  stazione, non prima e non per scadenza di un tempo.
-- stato di implementazione: completo. Lo sblocco arriva solo con il ripristino e riprende la fase
-  che era in corso: nel codice non c'e' nessun tempo massimo che faccia ripartire il convoglio da
-  solo.
-
-****** RF02.1.1.2.3 - Il blocco vale anche per chi e' gia' fermo li'
-- enunciato: un convoglio gia' in sosta nella stazione che si guasta non riparte finche' il guasto e'
-  aperto.
-- *perche' e' un requisito a se'*: senza di esso il guasto bloccherebbe solo chi arriva dopo, e la
-  stazione non risulterebbe davvero non percorribile.
-- stato di implementazione: parziale. Il convoglio gia' in sosta viene trattenuto, ma per un'altra
-  strada: si tiene l'elenco delle stazioni che ha visto dichiararsi guaste e lo ricontrolla quando
-  sta per ripartire. E' il controllo alla ripartenza a tenerlo fermo, non la stazione che smette di
-  essere percorribile, e la differenza si vede quando l'avviso non gli arriva.
-
-**** RF02.1.2 - Guasto del convoglio
-
-*Stato di implementazione*: parziale — il guasto viene registrato, le conseguenze sull'infrastruttura
-no.
-
-***** RF02.1.2.1 - Il guasto viene registrato in centrale
-- enunciato: quando un convoglio si guasta, la centrale apre e conserva il guasto corrispondente.
-- stato di implementazione: completo.
-
-***** RF02.1.2.2 - Conseguenze del guasto
-
-*Stato di implementazione*: non realizzato, in nessuno dei due casi.
-
-****** RF02.1.2.2.1 - Convoglio guasto *in stazione*: la stazione diventa non percorribile
-- enunciato: se il convoglio si guasta mentre e' fermo in una stazione, quella stazione risulta
-  guasta.
-- dipende da: RF02.2.2.1, perche' la conseguenza si sceglie in base a dove si trova il convoglio.
-- stato di implementazione: non realizzato. Il convoglio che si guasta congela se' stesso ma non
-  contagia l'infrastruttura: in centrale solo un guasto dichiarato con sorgente STAZIONE e severita'
-  critica porta la stazione a GUASTA, quindi dopo un guasto di bordo la stazione resta percorribile e
-  gli altri convogli ci entrano tranquillamente.
-
-****** RF02.1.2.2.2 - Convoglio guasto *in tratta*: la tratta diventa non percorribile
-- enunciato: se il convoglio si guasta fra due stazioni, e' la tratta elementare che sta percorrendo
-  a risultare non percorribile; nessuna stazione cambia stato.
-- dipende da: RF02.2.2.1.
-- stato di implementazione: non realizzato, per lo stesso motivo di RF02.1.2.2.1. L'allarme si apre
-  sul convoglio, ma la tratta non ha nessuno stato di percorribilita' che qualcuno cambi: continua a
-  risultare libera e nessun altro convoglio viene fermato. Vale anche per l'allarme che la centrale
-  deduce da sola (RF02.6.2).
-
-**** RF02.1.3 - Ciclo di vita del guasto
-- enunciato: un guasto ha uno stato di lavorazione (aperto, preso in carico, chiuso), un
-  assegnatario e una traccia di come e' evoluto; sulla stessa sorgente e per lo stesso motivo non
-  esiste piu' di un guasto aperto per volta.
-- *perche' l'unicita' e' un requisito*: le anomalie dedotte vengono ricontrollate a ritmo periodico,
-  e senza unicita' la stessa condizione genererebbe un allarme nuovo a ogni controllo, rendendo
-  l'elenco inutilizzabile proprio quando serve.
-- stato di implementazione: parziale. L'unicita' del guasto aperto per sorgente c'e', da qualunque
-  parte arrivi il guasto, ed e' quella che tiene leggibile l'elenco; apertura e chiusura lasciano
-  traccia nello storico. Gli stati pero' sono due e non tre, perche' il guasto porta solo un
-  "risolto" vero o falso, e l'assegnatario non viene mai valorizzato: la colonna e la tabella delle
-  assegnazioni esistono nello schema ma restano vuote.
-
-**** RF02.1.4 - Chiusura automatica quando la causa rientra
-- enunciato: un guasto aperto perche' un nodo taceva si chiude da solo quando il nodo torna a dare
-  notizie, senza bisogno dell'intervento di un operatore.
-- *perche'*: un guasto dedotto deve essere disfatto dalla stessa deduzione che lo ha creato,
-  altrimenti l'elenco degli allarmi si riempie di condizioni gia' rientrate che nessuno chiude.
-- precondizione: il guasto e' stato aperto per deduzione e non per segnalazione.
-- dipende da: RF02.3.2.
-- stato di implementazione: completo. Il battito che torna richiude il guasto dedotto sulla stazione
-  e il convoglio che riprende a muoversi richiude il proprio, in tutti e due i casi senza che nessuno
-  debba premere niente; la chiusura automatica riguarda solo i guasti che la centrale ha dedotto,
-  come dice la precondizione.
-
-*** RF02.2 - Gestione dei convogli
-
-*Stato di implementazione*: completo.
-
-**** RF02.2.1 - Ritardi
-
-*Stato di implementazione*: completo.
-
-***** RF02.2.1.1 - Il ritardo si accumula quando il convoglio e' fermo e dovrebbe circolare
-- enunciato: finche' il convoglio e' trattenuto pur avendo una tappa da percorrere, il suo ritardo
-  cresce; quando circola regolarmente non cresce.
-- dipende da: RF02.1, perche' il fermo nasce dai guasti.
-- stato di implementazione: completo.
-
-**** RF02.2.2 - Informazioni di stato del convoglio
-
-*Stato di implementazione*: completo, tutte e quattro le informazioni.
-
-***** RF02.2.2.1 - Posizione
-- enunciato: il convoglio dichiara in modo non ambiguo dove si trova: in quale stazione e' fermo,
-  oppure fra quali due stazioni sta viaggiando e in quale direzione.
-- esito atteso: la risposta alla domanda "il convoglio e' in stazione o in tratta?" e' sempre
-  definita, in ogni istante della corsa.
-- *nota*: questo e' il *predicato centrale della specifica*. Da "dove si trova il convoglio"
-  dipendono la scelta della conseguenza di un guasto (stazione o tratta non percorribile), la
-  gestione della modifica dell'itinerario a sistema acceso e il riconoscimento dell'anomalia del
-  convoglio fermo troppo a lungo. Se questa informazione non e' affidabile, cadono sei requisiti
-  insieme.
-- stato di implementazione: completo. Il convoglio dichiara o la stazione in cui e' fermo o la
-  tratta che sta percorrendo con la direzione, e la centrale la corregge con i passaggi rilevati a
-  terra.
-
-***** RF02.2.2.2 - Ritardo accumulato
-- enunciato: il convoglio dichiara il ritardo accumulato dall'inizio della corsa.
-- dipende da: RF02.2.1.
-- stato di implementazione: completo.
-
-***** RF02.2.2.3 - Stato del convoglio
-- enunciato: il convoglio dichiara come sta, con uno dei valori del vocabolario degli stati, e questa
-  informazione e' distinta dalla posizione.
-- stato di implementazione: completo, e la distinzione dalla posizione e' rispettata anche a
-  database, dove la colonna dello stato accetta solo i quattro valori del vocabolario.
-
-***** RF02.2.2.4 - Velocita' e passeggeri a bordo
-- enunciato: il convoglio dichiara la velocita' corrente e il numero di passeggeri a bordo.
-- *nota di ambito*: sono valori simulati che rendono leggibile la corsa sulla mappa; non provengono
-  da nessuna rilevazione reale e non alimentano nessuna decisione del sistema.
-- stato di implementazione: completo, con l'ambito dichiarato qui sopra: sono numeri generati dal
-  convoglio a ogni fermata.
-
-**** RF02.2.3 - Andata e ritorno sullo stesso itinerario
-- enunciato: raggiunto il capolinea, il convoglio inverte la marcia e ripercorre l'itinerario in
-  senso contrario; il tempo di percorrenza di ogni tappa e' quello previsto per il verso che sta
-  percorrendo.
-- esito atteso: la corsa e' continua, senza che il convoglio scompaia e riappaia all'altro capolinea.
-- stato di implementazione: completo. Al capolinea la direzione si inverte, l'itinerario viene
-  ripercorso al contrario e ogni tappa usa il tempo di percorrenza del verso che sta percorrendo.
-
-**** RF02.2.4 - Passaggi asimmetrici in stazione
-- enunciato: un convoglio puo' uscire da una stazione senza esservi entrato, e puo' entrare in una
-  stazione senza uscirne.
-- precondizione: il primo caso si presenta alla stazione da cui la corsa comincia, il secondo al
-  capolinea in cui la corsa si conclude prima dell'inversione.
-- *perche' va scritto*: e' il caso che rompe l'abbinamento ingenuo fra entrate e uscite nello
-  storico. Chi conta le coppie deve sapere che la prima e l'ultima sono spaiate per costruzione, e
-  che questo non e' un errore di rilevazione.
-- stato di implementazione: completo. I due casi sono gestiti e non scartati: l'uscita senza entrata
-  diventa un transito puntuale, in cui entrata e uscita coincidono, e l'entrata senza uscita resta un
-  transito aperto. Nello storico pero' non sono marcati come caso a se': chi conta le coppie deve
-  saperlo da qui.
-
-*** RF02.3 - Gestione delle stazioni
-
-*Stato di implementazione*: completo.
-
-**** RF02.3.1 - Informazioni rese dalla stazione
-- enunciato: la stazione sa dire quali convogli ha sui binari in questo momento, chi e' entrato e
-  quando, chi e' uscito e quando.
-- dipende da: RF02.1.1.1.1 — l'informazione locale che serve alla visualizzazione *e' la stessa* che
-  permette alla stazione di sopravvivere a un'interruzione del collegamento. Non sono due memorie
-  distinte, ed e' un vincolo di specifica: se fossero due potrebbero divergere.
-- stato di implementazione: completo, vincolo compreso: la fotografia che la stazione tiene in
-  memoria e' la stessa che risponde alle interrogazioni locali e che alimenta la coda di RF02.1.1.1.1.
-
-**** RF02.3.2 - Segnale di vita verso la centrale
-- enunciato: la stazione emette un battito periodico verso la centrale, con periodo =P_bat=, anche
-  quando non ha nulla da dichiarare.
-- *perche' anche quando non c'e' niente da dire*: senza un segnale emesso a prescindere dagli eventi,
-  il silenzio di una stazione non e' distinguibile dall'assenza di traffico su quella stazione.
-- stato di implementazione: completo.
-
-**** RF02.3.3 - Segnale di vita dei sensori verso la stazione
-- enunciato: i sensori dichiarano periodicamente alla stazione di essere vivi, con periodo =P_kal=;
-  se uno smette, la stazione lo considera guasto e lo segnala alla centrale.
-- esito atteso: la stazione con un sensore muto dichiara il proprio stato come GUASTA.
-- stato di implementazione: completo, esito compreso. Il limite del meccanismo e' che la stazione
-  non sa quanti sensori dovrebbero esserci: li conosce solo quando la chiamano, quindi un sensore che
-  non ha mai battuto non puo' risultare guasto.
-
-**** RF02.3.4 - Stato che la stazione dichiara di se'
-- enunciato: la stazione dichiara di se' soltanto ONLINE o GUASTA.
-- rimando: la motivazione e' nella sezione sul vocabolario degli stati osservabili.
-- stato di implementazione: completo. Il nodo dichiara due stati, la centrale ne tiene quattro:
-  l'asimmetria voluta dal requisito c'e' tutta.
-
-*** RF02.4 - Identita' del nodo di campo
-
-*Stato di implementazione*: completo.
-
-**** RF02.4.1 - L'identita' dichiarata viene verificata
-- enunciato: un nodo che entra in servizio dichiara la propria identita' alla centrale, che la
-  verifica sull'anagrafica della rete prima di accettarne qualsiasi dato.
-- *perche'*: senza questa verifica chiunque avvii un nodo con un'identita' inventata inquina lo stato
-  della centrale con la telemetria di un convoglio che non esiste, e la correttezza promessa da RF02
-  non e' piu' difendibile.
-- stato di implementazione: completo. Il nodo chiede alla centrale se esiste e non manda niente
-  finche' non ha avuto la risposta: la verifica non puo' auto-validarsi con il primo dato che arriva.
-
-**** RF02.4.2 - Esito negativo: il nodo non entra in servizio
-- enunciato: se l'identita' non e' riconosciuta, il nodo non entra in servizio e termina, invece di
-  restare attivo senza poter comunicare.
-- *perche' terminare e non restare in attesa*: un nodo acceso ma non riconosciuto e' indistinguibile
-  da un nodo sano dal punto di vista di chi guarda i processi, ed e' una sorgente di confusione
-  durante la diagnosi.
-- stato di implementazione: completo. Il nodo non riconosciuto termina con codice di uscita 1, non
-  resta acceso in attesa.
-
-**** RF02.4.3 - Portata della dipendenza
-Non e' un requisito a se': e' la regola di lettura del grafo. Senza RF02.4 nessun nodo entra in
-servizio, quindi non arriva nessun dato e cadono per intero RF02.1, RF02.2 e RF02.3. Per questo nel
-grafo la dipendenza e' disegnata una volta sola sui tre rami invece che su ogni foglia.
-
-*Stato di implementazione*: non ne ha uno proprio, non essendo un requisito; vale quello di RF02.4.1
-e RF02.4.2.
-
-*** RF02.5 - Modifica dell'itinerario a sistema acceso
-*Enunciato del ramo*: l'amministratore puo' cambiare le stazioni attraversate da un itinerario e i
-convogli assegnati mentre i convogli sono gia' in marcia, e il sistema resta coerente.
-
-*Stato di implementazione*: parziale — il convoglio escluso e' gestito, quello che resta assegnato
-riparte dal capolinea invece che da dove si trovava.
-
-**** RF02.5.1 - Convoglio escluso dall'itinerario
-- enunciato: se dopo la modifica un convoglio non e' piu' assegnato ad alcun itinerario, smette di
-  viaggiare e resta fermo in attesa di essere soppresso.
-- esito atteso: il convoglio non produce piu' transiti e non avanza; resta visibile nelle schermate,
-  perche' un convoglio fermo su un binario e' un fatto che l'operatore deve vedere.
-- *punto delicato della specifica*: la notifica della modifica deve raggiungere *anche* i convogli
-  che la modifica esclude. Un convoglio escluso a cui nessuno dice niente continuerebbe a percorrere
-  l'itinerario vecchio senza saperlo, ed e' il caso peggiore possibile, perche' il sistema mostrerebbe
-  uno stato plausibile ma falso.
-- stato di implementazione: completo, punto delicato compreso: l'avviso parte anche verso i convogli
-  che la modifica esclude, e chi resta senza itinerario si dichiara fermo invece di continuare a
-  raccontare di essere in marcia.
-
-**** RF02.5.2 - Convoglio ancora assegnato
-- enunciato: se dopo la modifica il convoglio e' ancora assegnato all'itinerario, prosegue sul nuovo
-  itinerario a partire dal punto in cui la modifica lo ha colto, conservando direzione e ritardo
-  accumulato.
-- precondizione: la stazione da cui il convoglio e' appena passato appartiene ancora al nuovo
-  itinerario.
-- esito atteso: la posizione mostrata non compie salti; il convoglio non ricomincia la corsa da capo.
-- caso limite: se la stazione da cui e' appena passato non fa piu' parte dell'itinerario, il convoglio
-  riprende dal capolinea del nuovo itinerario, perche' non esiste un punto di ripresa sensato.
-- dipende da: RF02.2.2.1.
-- stato di implementazione: non realizzato. L'avviso arriva e l'itinerario nuovo viene ricaricato,
-  ma il viaggio viene fatto ripartire dalla prima tappa in direzione andata: il convoglio conserva il
-  ritardo accumulato e non la posizione, e sulla mappa fa il salto che il requisito voleva evitare.
-  In pratica il sistema si comporta *sempre* come nel caso limite, anche quando un punto di ripresa
-  sensato ci sarebbe.
-
-*** RF02.6 - Anomalie dedotte dalla centrale
-
-*Enunciato del ramo*: la centrale riconosce da sola le anomalie che i nodi di campo non sono in grado
-di segnalare, a partire dalla propria caduta.
-
-*Perche' esiste questo ramo*: un nodo guasto puo' non essere in condizione di dire di esserlo. Se il
-sistema si fidasse solo delle segnalazioni, il caso peggiore (il nodo che smette del tutto) sarebbe
-anche l'unico invisibile.
-
-*Stato di implementazione*: completo, tutti e tre.
-
-**** RF02.6.1 - Stazione silenziosa oltre la soglia
-- enunciato: se una stazione non da' notizie di se' per piu' di =T_sil=, la centrale la considera
-  caduta, la mostra come OFFLINE e apre un guasto su di essa.
-- dipende da: RF02.3.2, perche' senza un segnale regolare non c'e' un silenzio da misurare.
-- si chiude da solo per RF02.1.4.
-- stato di implementazione: completo, e il guasto aperto non resta dentro la centrale: viene
-  pubblicato verso il campo, cosi' i convogli diretti alla stazione caduta si fermano come se il
-  guasto lo avesse dichiarato lei.
-
-**** RF02.6.2 - Convoglio fermo fuori stazione oltre la soglia
-- enunciato: se un convoglio resta fermo fra due stazioni per piu' di =T_fer=, la centrale apre un
-  allarme su di esso.
-- precondizione: il convoglio non e' in una stazione e non e' soppresso.
-- dipende da: RF02.2.2.1, perche' "fuori stazione" e' una domanda sulla posizione.
-- stato di implementazione: completo per quanto riguarda l'allarme; quello che l'allarme *non* fa
-  e' rendere non percorribile la tratta, ed e' il limite di RF02.1.2.2.2.
-
-**** RF02.6.3 - Fotografia periodica dello stato
-- enunciato: ogni =P_ria= la centrale rende disponibile alle schermate una fotografia completa dello
-  stato corrente della rete.
-- *a cosa serve*: a riallineare chi si e' collegato dopo che gli eventi erano gia' avvenuti, o chi ne
-  ha persi. Non e' il meccanismo con cui le schermate si aggiornano (RF01.1.4), e' la rete di
-  sicurezza sotto di esso.
-- stato di implementazione: completo. La fotografia porta i numeri di sintesi e anche l'elenco
-  completo di convogli e stazioni, quindi rimette a posto il browser e non solo i contatori.
-
-*** RF02.7 - Memoria storica
-
-- enunciato: oltre allo stato corrente, il sistema conserva la traccia di cio' che e' accaduto:
-  transiti, cambi di stato dei convogli e delle stazioni, guasti, assegnazioni degli operatori e
-  itinerari percorsi.
-- esito atteso: la storia e' consultabile anche dopo che i nodi che l'hanno prodotta sono stati
-  spenti e riavviati.
-- *regola di registrazione*: la storia registra i *cambiamenti*, non i campionamenti. Un convoglio
-  che dichiara la propria telemetria a ritmo regolare per un'ora, senza mai cambiare stato, deve
-  lasciare una sola riga di storia e non una per ogni dichiarazione. Senza questa regola lo storico
-  cresce in proporzione al tempo invece che agli avvenimenti, e diventa illeggibile proprio dove
-  serve.
-- stato di implementazione: parziale. Delle cinque cose elencate nell'enunciato ne vengono scritte
-  tre — transiti, cambi di stato dei convogli e delle stazioni, guasti — e vengono scritte ai
-  cambiamenti e non a ogni campionamento, quindi la regola di registrazione e' rispettata. Gli
-  itinerari percorsi e le assegnazioni degli operatori no: le due tabelle esistono nello schema ma
-  non le scrive nessuno, compaiono solo nelle cancellazioni di pulizia.
-
-** RF03 - Contratti di interazione fra le parti
-*Enunciato*: le parti del sistema interagiscono secondo obblighi dichiarati, in modo che ciascuna
-possa funzionare, fallire e ripartire senza trascinare con se' le altre.
-
-*Nota di lettura*: questo ramo non prescrive tecnologie. Prescrive proprieta' dell'interazione che si
-osservano dall'esterno: chi deve poter sopravvivere a chi, quale informazione e' fonte di verita' per
-cosa, che cosa una parte puo' e non puo' toccare dell'altra.
-
-*Stato di implementazione*: completo.
-
-*** RF03.1 - Autonomia dei nodi
-- enunciato: ogni convoglio e ogni stazione sono parti autonome, avviabili, arrestabili e riavviabili
-  una indipendentemente dall'altra.
-- esito atteso: l'arresto di un nodo non ferma gli altri; la rete continua a funzionare in modo
-  ridotto, con l'assenza segnalata come anomalia (RF02.6.1) e non come blocco generale.
-- stato di implementazione: completo. Ogni convoglio e ogni stazione sono processi a se', si
-  avviano con il proprio identificativo passato da riga di comando e se ne possono tenere accesi
-  quanti se ne vuole sulla stessa macchina.
-
-*** RF03.2 - Disaccoppiamento fra campo e centrale
-- enunciato: quando un nodo di campo comunica con la centrale non resta in attesa che la centrale sia
-  presente per poter continuare a lavorare.
-- esito atteso: con la centrale non raggiungibile, i nodi di campo continuano a rilevare, a
-  registrare e ad accumulare cio' che dovranno consegnare; nessuna funzione locale si arresta.
-- dipende da: RF02.1.1.1.1.
-- stato di implementazione: completo. Fra campo e centrale c'e' sempre il broker, quindi nessuno dei
-  due aspetta l'altro: il nodo pubblica e va avanti.
-
-*** RF03.3 - Due fonti di verita' distinte per lo stesso passaggio
-- enunciato: lo stesso passaggio fisico e' conosciuto per due vie indipendenti: la rilevazione a
-  terra fatta dai sensori di stazione e la dichiarazione fatta dal convoglio. Le due vie non si
-  sostituiscono a vicenda.
-- ripartizione degli obblighi:
-  - la rilevazione a terra e' la *fonte di verita' per la storia dei transiti*: esiste anche se il
-    convoglio tace, ed e' quella che deve finire nello storico;
-  - la dichiarazione del convoglio e' la *fonte di verita' per la posizione corrente*: e' disponibile
-    prima e con piu' dettaglio, ed e' quella che alimenta il tempo reale.
-- *perche' due e non una*: eliminando la prima si perde la storia quando il convoglio non parla;
-  eliminando la seconda si perde il tempo reale fra una stazione e l'altra, dove nessun sensore vede
-  niente. Sono due requisiti diversi serviti da due vie diverse, non una ridondanza da ottimizzare.
-- stato di implementazione: completo, ripartizione degli obblighi compresa: le due vie arrivano in
-  centrale su canali distinti e restano trattate separatamente, nessuna delle due sovrascrive
-  l'altra.
-
-*** RF03.4 - I sensori usano solo l'interfaccia pubblica del nodo
-- enunciato: i sensori dichiarano cio' che rilevano attraverso l'interfaccia che il nodo espone
-  verso l'esterno, senza nessun accesso privilegiato al suo stato interno.
-- *perche' e' un requisito e non una scelta interna*: e' cio' che rende il nodo verificabile. Se i
-  sensori potessero modificare direttamente lo stato del nodo, il comportamento osservato durante una
-  prova non sarebbe lo stesso di quello in esercizio, e la specifica non sarebbe piu' controllabile
-  dall'esterno.
-- esito atteso: una dichiarazione fatta a mano da uno strumento di prova e una fatta dal sensore reale
-  producono nel nodo esattamente lo stesso effetto.
-- stato di implementazione: completo, sia per i sensori di binario sia per quelli di bordo: passano
-  tutti dalle sole chiamate che il nodo espone verso l'esterno, e infatti tutte le prove dei guasti
-  si fanno da li'.
-
-*** RF03.5 - L'itinerario e' fornito dalla centrale
-- enunciato: il convoglio non conosce l'itinerario per conto proprio: lo riceve dalla centrale, che
-  ne e' l'unica depositaria.
-- due modalita' ammesse, entrambe valide:
-  - il convoglio riceve l'itinerario completo quando entra in servizio e lo tiene per la corsa;
-  - il convoglio chiede di volta in volta quale sia la prossima stazione, data la stazione in cui si
-    trova e la direzione.
-- *perche' l'unicita' della fonte conta*: se il convoglio conservasse un itinerario proprio, dopo una
-  modifica fatta a sistema acceso esisterebbero due versioni dell'itinerario e RF02.5 non sarebbe
-  garantibile.
-- stato di implementazione: completo. Delle due modalita' ammesse e' realizzata la prima: il
-  convoglio riceve l'itinerario intero quando entra in servizio e lo richiede di nuovo a ogni
-  modifica. Anche la seconda esiste ed e' funzionante — c'e' l'operazione che risponde "data questa
-  stazione e questa direzione, qual e' la prossima" — ma nessuno la usa: e' li' perche' il requisito
-  le dichiara entrambe valide.
-
-** RF04 - Accesso e protezione
-
-*Stato di implementazione*: parziale — accesso e permessi sono completi, la protezione dei canali si
-ferma dove dice il limite dichiarato in RF04.3.
-
-*** RF04.1 - Autenticazione
-- enunciato: gli utenti sono registrati presso il servizio di identita' e accedono dichiarando li'
-  le proprie credenziali; l'accesso produce un attestato che accompagna le operazioni successive.
-- *requisito fondamentale*: le credenziali sono conosciute da una parte sola. Chi custodisce i dati
-  della rete non conserva password e non ne verifica nessuna: si limita a controllare che
-  l'attestato esibito sia autentico e non scaduto. Una realizzazione in cui la centrale confronta
-  una password con una propria copia *non* soddisfa questo requisito.
-- l'attestato e' verificabile da solo: chi lo riceve stabilisce se e' buono senza dover interrogare
-  il servizio di identita' a ogni richiesta. E' questo che rende il controllo indipendente dalla
-  disponibilita' momentanea di quel servizio.
-- l'attestato ha una durata limitata (=T_att=) e viene rinnovato senza disturbare l'utente finche'
-  la sessione presso il servizio di identita' resta aperta (=T_ina=, =T_ses=).
-- stato di implementazione: completo, requisito fondamentale compreso: chi custodisce i dati della
-  rete non conserva nessuna password e si limita a controllare la firma dell'attestato, senza
-  interpellare il servizio di identita' a ogni richiesta.
-
-*** RF04.2 - Autorizzazione per ruolo
-- enunciato: ogni operazione e' permessa o negata in base al ruolo di chi la chiede: le letture sono
-  permesse a entrambi i ruoli, la modifica dell'anagrafica della rete al solo amministratore.
-- *requisito fondamentale*: il controllo dei permessi e' fatto dalla parte che possiede i dati, non
-  dall'interfaccia. Un'interfaccia che si limita a nascondere i comandi non consentiti non soddisfa
-  questo requisito, perche' chiunque puo' formulare la stessa richiesta senza passare
-  dall'interfaccia.
-- il ruolo e' scritto *dentro l'attestato* dal servizio di identita': chi possiede i dati lo legge
-  da li' e non lo deduce da una propria tabella. Cambiare il ruolo di un utente e' un'operazione che
-  si fa in un posto solo, e ha effetto dal primo attestato successivo.
-- eccezioni dichiarate, ciascuna con la sua motivazione:
-  - l'identificazione avviene presso il servizio di identita' e non fra le operazioni protette:
-    non c'e' quindi nessuna operazione di accesso da lasciare aperta su chi possiede i dati;
-  - le richieste preliminari che i browser inviano prima di una chiamata vera non portano identita' e
-    devono poter passare, altrimenti la chiamata vera non parte nemmeno;
-  - le due sole letture di cui i nodi di campo hanno bisogno (RF03.5) restano accessibili senza
-    identita' di utente: i nodi non sono utenti e non si identificano con credenziali, la loro
-    verifica e' quella dell'identita' di nodo (RF02.4). Sono letture, non modifiche, ed e' un confine
-    che vale la pena tenere stretto a due sole operazioni.
-- stato di implementazione: completo, con esattamente le tre eccezioni dichiarate qui sopra e
-  nessun'altra. Il controllo sta dalla parte che possiede i dati e il ruolo viene letto dentro
-  l'attestato: nascondere i comandi nell'interfaccia non serve a passare il controllo. Resta fuori
-  la sola websocket, che non e' un'operazione sui dati ma una porta di sola lettura, ed e' un limite
-  dichiarato nel capitolo /Progettazione/.
-
-*** RF04.3 - Protezione dei canali
-- enunciato: il sistema puo' funzionare con tutti i canali di comunicazione protetti, in modo che il
-  contenuto scambiato fra le parti non sia leggibile ne' alterabile da un osservatore della rete.
-- esito atteso: la protezione e' una condizione dell'*intero* sistema e non della singola parte: o
-  tutti i canali sono protetti, o la garanzia non vale.
-- *conseguenza da tenere presente*: se un solo canale resta in chiaro mentre gli altri sono protetti,
-  cio' che si osserva non e' un errore di sicurezza ma un nodo che non riesce a entrare in servizio.
-  E' un sintomo che punta lontano dalla causa, e va messo per iscritto qui perche' e' proprio in
-  fase di verifica che si presenta.
-- *limite dichiarato*: il canale verso il servizio di identita' non e' compreso nella protezione. E'
-  l'unico tratto che resta in chiaro quando tutti gli altri sono protetti, ed e' proprio quello su
-  cui viaggiano le credenziali: va detto, perche' altrimenti la garanzia di questo requisito
-  sembrerebbe piu' ampia di quello che e'. La realizzazione e le sue conseguenze sono nel capitolo
-  /Progettazione/, sezione /Autenticazione e autorizzazione/.
-- stato di implementazione: parziale, ed e' parziale esattamente quanto dice il limite dichiarato.
-  Con il profilo apposta tutti i canali fra le parti sono protetti — MQTT sulla porta cifrata,
-  compresi i canali con cui i nodi si fanno riconoscere, e HTTPS verso la centrale, che la schermata
-  segue cambiando due indirizzi senza essere ricompilata — ma il canale verso il servizio di
-  identita' resta in chiaro, ed e' proprio quello su cui viaggiano le credenziali.
-
-** Requisiti non funzionali osservabili
-
-Sono proprieta' del sistema nel suo insieme. Le tengo separate dai requisiti funzionali perche' non
-descrivono una funzione, ma una qualita' che ogni funzione deve avere.
-
-#+attr_latex: :align |p{0.07\textwidth}|p{0.17\textwidth}|p{0.31\textwidth}|p{0.29\textwidth}|
-| #     | requisito                     | enunciato                                                                                       | come si verifica                                                                 |
-|-------+-------------------------------+-------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------|
-| RNF01 | prontezza                     | un evento accaduto sul campo e' visibile all'operatore entro pochi secondi                       | si cronometra la distanza fra l'evento provocato e la sua comparsa sulla schermata   |
-| RNF02 | nessuna perdita dei transiti  | nessun transito rilevato va perduto, nemmeno in presenza di interruzioni del collegamento        | si contano i transiti provocati e li si ritrova tutti nello storico                  |
-| RNF03 | degradazione per parti        | il guasto di una parte riduce le funzioni disponibili ma non ferma il sistema                    | si arrestano nodi uno alla volta e si controlla cosa resta funzionante               |
-| RNF04 | riservatezza                  | il contenuto scambiato fra le parti non e' leggibile da un osservatore della rete                | si osserva il traffico con la protezione attiva                                      |
-| RNF05 | numerosita' dei nodi          | il sistema regge piu' stazioni e piu' convogli contemporaneamente, senza modifiche               | si avviano piu' istanze e si controlla che ciascuna sia distinguibile e indipendente |
-| RNF06 | riavviabilita'                | un nodo riavviato torna in servizio da solo e si riallinea, senza interventi manuali             | si arresta e si riavvia un nodo mentre il sistema e' in funzione                     |
-
-** Scenari di verifica
-
-Gli scenari servono a controllare i requisiti *insieme*, come li vede un utente. Ogni scenario e'
-scritto con la situazione di partenza, l'evento che lo innesca e il comportamento atteso passo per
-passo.
-
-*** SV01 - Stazione non percorribile e successivo ripristino
-
-- situazione :: un convoglio sta percorrendo la tratta che porta alla stazione B; in B c'e' gia' un
-  altro convoglio in sosta.
-- evento :: B viene dichiarata guasta.
-- comportamento atteso ::
-  1. B risulta GUASTA nelle schermate e compare un allarme con B come sorgente;
-  2. il convoglio in arrivo si ferma prima di entrare in B e passa a FERMO;
-  3. il convoglio gia' in sosta in B non riparte a fine sosta;
-  4. il ritardo di entrambi cresce finche' restano fermi;
-  5. l'operatore manda la squadra: B passa a MANUTENZIONE;
-  6. l'operatore dichiara risolto il guasto: B torna ONLINE, l'allarme risulta chiuso e conservato
-     nella storia;
-  7. entrambi i convogli riprendono la corsa dal punto in cui erano, senza altri comandi.
-- requisiti coperti :: RF01.2.1, RF01.4.1, RF01.4.2, RF02.1.1.2, RF02.1.3, RF02.2.1.1.
-
-*** SV02 - Interruzione del collegamento fra stazione e centrale
-
-- situazione :: la stazione A e' operativa e i convogli transitano regolarmente.
-- evento :: il collegamento fra A e la centrale viene interrotto.
-- comportamento atteso ::
-  1. A continua a rilevare i transiti e a rispondere alle interrogazioni locali;
-  2. la centrale, passato =T_sil=, mostra A come OFFLINE e apre un allarme;
-  3. nel frattempo transitano dei convogli da A;
-  4. il collegamento viene ripristinato;
-  5. la centrale riceve tutti i transiti avvenuti durante l'interruzione, nell'ordine giusto;
-  6. l'allarme aperto per silenzio si chiude da solo e A torna ONLINE.
-- requisiti coperti :: RF02.1.1.1, RF02.1.4, RF02.6.1, RF03.2, RNF02.
-
-*** SV03 - Guasto del convoglio, in stazione e in tratta
-
-- situazione :: due convogli, uno fermo nella stazione C e uno a meta' della tratta D-E.
-- evento :: entrambi dichiarano un guasto di bordo.
-- comportamento atteso ::
-  1. per il primo, la stazione C risulta non percorribile;
-  2. per il secondo, e' la tratta D-E a risultare non percorribile, mentre D ed E restano operative;
-  3. entrambi i convogli passano a EMERGENZA e restano dove sono;
-  4. i due allarmi risultano segnalati dal campo e non dedotti.
-- requisiti coperti :: RF01.2.2, RF02.1.2, RF02.2.2.1.
-
-*** SV04 - Convoglio fermo fra due stazioni
-
-- situazione :: un convoglio e' fermo fra due stazioni per una causa qualsiasi.
-- evento :: passa il tempo =T_fer= senza che si muova.
-- comportamento atteso ::
-  1. la centrale apre da sola un allarme sul convoglio, senza che nessuno lo abbia segnalato;
-  2. l'allarme risulta dedotto e non segnalato;
-  3. finche' la condizione resta, non ne compaiono altri sulla stessa sorgente.
-- requisiti coperti :: RF02.1.3, RF02.6.2, RF01.2.2.
-
-*** SV05 - Modifica dell'itinerario a convogli in marcia
-
-- situazione :: un itinerario con due convogli assegnati, entrambi in marcia in punti diversi.
-- evento :: l'amministratore modifica la sequenza delle stazioni e toglie uno dei due convogli.
-- comportamento atteso ::
-  1. il convoglio rimasto assegnato prosegue sul nuovo itinerario dal punto in cui si trovava, senza
-     salti di posizione e conservando il ritardo;
-  2. il convoglio escluso si ferma e resta in attesa di soppressione, restando visibile;
-  3. nessuno dei due continua a percorrere l'itinerario vecchio.
-- requisiti coperti :: RF01.3.4, RF02.5, RF03.5.
-
-*** SV06 - Corsa completa con inversione al capolinea
-
-- situazione :: un convoglio all'inizio della corsa, nella stazione di partenza.
-- evento :: la corsa viene svolta per intero, andata e ritorno.
-- comportamento atteso ::
-  1. dalla stazione di partenza risulta una uscita senza una entrata che la preceda;
-  2. per ogni stazione intermedia risultano una entrata e una uscita, in quest'ordine;
-  3. al capolinea risulta una entrata; la direzione dichiarata passa da andata a ritorno;
-  4. la corsa di ritorno percorre le stesse stazioni in ordine inverso;
-  5. lo storico contiene tutti i transiti nell'ordine reale.
-- requisiti coperti :: RF01.5, RF02.2.3, RF02.2.4, RF02.7.
-
-*** Copertura dei requisiti da parte degli scenari
-
-| requisito | scenari che lo verificano |
-|-----------+---------------------------|
-| RF01.1    | SV01, SV05                |
-| RF01.2    | SV01, SV03, SV04          |
-| RF01.3    | SV05                      |
-| RF01.4    | SV01                      |
-| RF01.5    | SV06                      |
-| RF01.6    | tutti (accesso preliminare) |
-| RF02.1    | SV01, SV02, SV03          |
-| RF02.2    | SV01, SV03, SV06          |
-| RF02.3    | SV02                      |
-| RF02.4    | preliminare a tutti       |
-| RF02.5    | SV05                      |
-| RF02.6    | SV02, SV04                |
-| RF02.7    | SV02, SV06                |
-| RF03      | SV02, SV05                |
-| RF04      | verifica dedicata (RF04.2, RF04.3) |
-
-** Riepilogo requisiti - macchine a stati
-
-È la lettura al contrario delle righe "requisiti coperti" che stanno sopra ogni diagramma del
-capitolo /Progettazione/: qui si parte dal requisito e si trovano le macchine, lì si parte dalla
-macchina e si trovano i requisiti. T = treno, S = stazione, M = centrale, e i numeri sono quelli
-delle macchine a stati, non quelli dei grafi G1...G8 di questa specifica.
-
-Un requisito è in *coperto da* quando le macchine elencate lo soddisfano per intero, in
-*parzialmente* quando ci contribuiscono senza chiuderlo da sole. Le righe vuote in entrambe le
-colonne sono i requisiti che il sistema realizzato non soddisfa: sono lasciate apposta, perché una
-tabella che non le mostra racconta una copertura che non c'è.
-
-Questa tabella però non va letta come lo *stato di implementazione* scritto accanto a ogni
-requisito: lì la domanda è "il sistema lo fa?", qui è "quale macchina lo mostra?", e le due risposte
-non coincidono sempre. Un paio di requisiti sono realizzati per intero senza che nessuna macchina li
-chiuda, perché a tenerli sono i vincoli del database (RF01.3.5) o il modo in cui il dato viene
-scritto (RF02.2.4). Dove i due giudizi divergono vale quello scritto accanto al requisito.
-
-#+ATTR_LATEX: :environment longtable :align L{0.13\textwidth}L{0.13\textwidth}L{0.13\textwidth}L{0.48\textwidth} :font \small
-| requisito    | coperto da  | parzialmente | nota                                                                        |
-|--------------+-------------+--------------+-------------------------------------------------------------------------------|
-| RF01.1.1     | M11         | T8, M3       | T8 e M3 producono la posizione, M11 è il canale che la spinge alla mappa      |
-| RF01.1.2     | M11         | T8, M3       |                                                                               |
-| RF01.1.3     | M11, M12    | S11          | i presenti sui binari li sa il nodo (S11), gli stati la centrale (M12)        |
-| RF01.1.4     | M11         |              | il websocket: l'evento arriva quando accade, non a interrogazione             |
-| RF01.1.5     | M11         | M8           | i numeri di sintesi li calcola il watchdog ogni 10 secondi                    |
-| RF01.2.1     | M11         | M7           |                                                                               |
-| RF01.2.2     |             | M6, M8, M11  | M6 è la porta del segnalato, M8 quella del dedotto, ma le due origini finiscono nello stesso tipo e l'elenco non le separa |
-| RF01.3       | M9, M10     |              | M9 decide chi può, M10 esegue                                                 |
-| RF01.3.5     |             | M10          | l'integrità alle eliminazioni la tengono i vincoli del db, non una macchina   |
-| RF01.4.1     |             | M10, M12, S9 | il comando parte da M10, il nodo lo riceve in S9 e M11 ne annuncia il cambio di stato, ma MANUTENZIONE dura quanto la chiamata: l'evento parte, lo stato no |
-| RF01.4.2     |             | M10, M7, T9, S9 | la chiusura c'è e il ripristino sblocca chi era trattenuto; la presa in carico no, nessun operatore viene registrato |
-| RF01.4.3     |             | M10, T6, T9  | l'effetto c'è, la precondizione "fermo in stazione" non viene verificata      |
-| RF01.5       | M10, M5     |              | M5 scrive lo storico, M10 lo serve alla dashboard                             |
-| RF01.6       | M9          |              |                                                                               |
-| RF02.1.1.1.1 | S4, S5      | S7           | è il caching locale con reinvio in massa                                      |
-| RF02.1.1.1.2 | S4, S5      |              | il rientro in TESTA alla coda è ciò che conserva l'ordine                     |
-| RF02.1.1.2.1 | T5, T9, T11 | S8           |                                                                               |
-| RF02.1.1.2.2 | T5, T9, T11 | S9, M10      | riparte al ripristino, non per scadenza di un tempo                           |
-| RF02.1.1.2.3 |             | S8, T11      | chi era già in sosta viene trattenuto solo se ripassa dall'alert di S8        |
-| RF02.1.2.1   | M6, M7, M13 | T10, M3      |                                                                               |
-| RF02.1.2.2.1 |             |              | non coperto da nessuna macchina: vedi la nota qui sotto                       |
-| RF02.1.2.2.2 |             | M8           | M8 apre solo un allarme sul convoglio, la tratta resta percorribile           |
-| RF02.1.3     |             | M7, M6, M8   | l'unicità per sorgente c'è ed è ciò che tiene leggibile l'elenco; mancano lo stato "preso in carico" e l'assegnatario |
-| RF02.1.4     | M4, M3      | M8           | il battito che torna chiude il guasto dedotto sulla stazione (M4), il convoglio che riprende a muoversi chiude il proprio (M3): in tutti e due i casi solo quelli con il prefisso della centrale |
-| RF02.2.1.1   | T5          | T9, T11      |                                                                               |
-| RF02.2.2.1   | T5, M3      | T7, T8, M5   | il cardine della specifica: sei macchine ci si appoggiano                     |
-| RF02.2.2.2   | T5, M3      | T8           |                                                                               |
-| RF02.2.2.3   | T6, M13     | M3           | lo stato è tenuto distinto dalla posizione, come chiede il requisito          |
-| RF02.2.2.4   | T8          |              | valori simulati, non alimentano nessuna decisione                             |
-| RF02.2.3     | T7          |              |                                                                               |
-| RF02.2.4     |             | T7           | i passaggi spaiati nascono ai capolinea, nessuna macchina li tratta a parte   |
-| RF02.3.1     | S11, M5     | S6, S8       |                                                                               |
-| RF02.3.2     | S3, M4      | M8           | S3 emette il battito, M8 ne misura il silenzio                                |
-| RF02.3.3     | S7          | S6           |                                                                               |
-| RF02.3.4     | S10, M12    |              | due stati sul nodo, quattro in centrale: è la asimmetria voluta dal requisito |
-| RF02.4.1     | T2, S2, M2  | T1, S1       | i due lati della stessa conversazione MQTT                                    |
-| RF02.4.2     | T1, S1      |              | il nodo non riconosciuto termina con codice 1, non resta acceso               |
-| RF02.5.1     | T9, T5, M10 | T4, T6       | la fase SENZA_ITINERARIO e' il "resta fermo in attesa": senza di essa il convoglio escluso continuava a dichiararsi in marcia |
-| RF02.5.2     |             | T3, T9, M10  | l'itinerario nuovo arriva, ma il viaggio riparte dalla prima tappa            |
-| RF02.6.1     | M8          | S3, M12      |                                                                               |
-| RF02.6.2     | M8          |              |                                                                               |
-| RF02.6.3     | M8          | M11          | M8 scatta la fotografia, M11 la porta al browser                              |
-| RF02.7       |             | M5, M3, M13  | si registrano i cambiamenti e non i campionamenti, ma solo per transiti, stati e guasti: assegnazioni degli operatori e itinerari percorsi non vengono mai scritti |
-| RF03.1       | T1, S1, M1  |              | tre processi distinti, avviabili e arrestabili uno per volta                  |
-| RF03.2       | S4          | S5, S7       |                                                                               |
-| RF03.3       | M5          | T8, S8       | M5 è il punto in cui le due fonti restano trattate separatamente              |
-| RF03.4       | T10, S6     |              | i sensori entrano solo dalle API REST del nodo                                |
-| RF03.5       | M10         | T3           |                                                                               |
-| RF04.1       | M9          |              |                                                                               |
-| RF04.2       | M9          | M10          | il controllo è sul lato che possiede i dati, non sull'interfaccia             |
-| RF04.3       |             |              | non è una macchina: è il profilo =%tls= sui canali, vedi la sezione /Topic/   |
 * Progettazione
 ** Diagramma delle componenti
-[[./immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/diagrammaDelleComponenti.png]]
+#+begin_src  plantuml file: diagramma_delle_componenti.png
+@startuml Diagramma delle componenti
+' =========================================================================
+'  DIAGRAMMA DELLE COMPONENTI
+'
+'  Solo i moduli, non il loro interno: le cinque componenti eseguibili del
+'  sistema (web app, Centrale, Stazione, Treno, broker) piu' i due servizi
+'  di supporto che girano in Docker, Keycloak e PostgreSQL.
+'
+'  I nomi delle interfacce non sono nomi di comodo: dentro ci sono i
+'  percorsi e i topic veri, presi da
+'    */src/main/resources/application.properties      (porte, topic, %tls)
+'    ServeCentraleOperativa/.../gateway/              (/api, /ws/realtime)
+'    Stazioni/.../StationIngestion.java               (/stazione/sensore/*)
+'    Treni/.../TrainIngestion.java                    (/treno/sensore/*)
+'
+'  Convenzione: linea continua = interfaccia OFFERTA dalla componente,
+'  freccia tratteggiata = interfaccia RICHIESTA (dipendenza).
+'
+'  Lo stereotipo <<esterno>> sta solo sui sensori: non sono moduli miei ne'
+'  servizi di supporto, sono i dispositivi che stanno fuori dal sistema e
+'  che nel progetto vengono simulati (console dei sensori del treno,
+'  chiamate REST a mano per la stazione).
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle uml2
+skinparam wrapWidth 200
+skinparam nodesep 30
+skinparam ranksep 45
+skinparam component {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+}
+skinparam component<<centrale>> {
+    BackgroundColor #FCE8E6
+    BorderColor #C5221F
+}
+skinparam component<<campo>> {
+    BackgroundColor #E6F4EA
+    BorderColor #137333
+}
+skinparam component<<infra>> {
+    BackgroundColor #F1F3F4
+    BorderColor #9AA0A6
+}
+skinparam component<<esterno>> {
+    BackgroundColor #FFF8E1
+    BorderColor #B26A00
+}
+skinparam database {
+    BackgroundColor #F3E8FD
+    BorderColor #8430CE
+}
+skinparam interface {
+    BackgroundColor #FFF3E0
+    BorderColor #E8710A
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+
+title Diagramma delle componenti
+
+' =====================================================
+'  COMPONENTI
+' =====================================================
+component "Client Web App\nReact 18 + TypeScript + Vite" <<webapp>> as WebApp
+component "Keycloak 26\nIdentity Provider (Docker)" <<infra>> as Keycloak
+component "Centrale Operativa\nQuarkus :8781 (:8444 tls)" <<centrale>> as Centrale
+database "PostgreSQL 15\ndb railway (Docker)" as DB
+component "Broker MQTT\nEclipse Mosquitto (Docker)" <<infra>> as Broker
+component "Stazione\nQuarkus :8081 (N istanze)" <<campo>> as Stazione
+component "Treno\nQuarkus :8082 (N istanze)" <<campo>> as Treno
+component "Sensori di stazione\npassaggio, guasto, keepalive\n(simulati)" <<esterno>> as SensoriStaz
+component "Sensori di bordo\nguasto, passaggio\n(simulati)" <<esterno>> as SensoriTreno
+
+' =====================================================
+'  INTERFACCE
+' =====================================================
+interface "IAutenticazione\nOAuth2/OIDC :8180" as IAuth
+interface "IChiaviPubbliche\nJWKS" as IJwks
+interface "IApiOperatore\nREST /api\n:8781 (:8444 tls)" as IApi
+interface "ITempoReale\nWebSocket /ws/realtime" as IRealtime
+interface "IApiDiCampo\nGET /api/treni/{id}/itinerario" as IApiCampo
+interface "ITopicTree\nMQTT railway/#\n:1883 (:8883 tls)" as ITopic
+interface "IPersistenza\nJDBC :5432" as IPersistenza
+interface "ISensoriStazione\nREST /stazione/sensore/*\n:8081" as ISensStaz
+interface "ISensoriTreno\nREST /treno/sensore/*\n:8082" as ISensTreno
+
+' =====================================================
+'  LATO OPERATORE
+' =====================================================
+WebApp .down.> IApi : comandi e letture\ncon Bearer token
+WebApp .down.> IRealtime : aggiornamenti spinti\ndalla Centrale
+WebApp .right.> IAuth : login PKCE, refresh,\nlogout
+Keycloak -up- IAuth
+Keycloak -up- IJwks
+Centrale .right.> IJwks : firma RS256\ne ruoli del token
+
+Centrale -up- IApi
+Centrale -up- IRealtime
+Centrale -up- IApiCampo
+
+' =====================================================
+'  PERSISTENZA
+' =====================================================
+Centrale .down.> IPersistenza : storicizza transiti, guasti,\nstati e itinerari
+DB -up- IPersistenza
+
+' =====================================================
+'  CAMPO
+' =====================================================
+Centrale .down.> ITopic : sottoscrive telemetria, transiti,\nbattiti e validazioni,\npubblica gli allarmi
+Broker -up- ITopic
+Stazione .up.> ITopic : pubblica transiti e battiti,\nsottoscrive allarmi
+Treno .up.> ITopic : pubblica telemetria e passaggi,\nsottoscrive allarmi
+Treno .up.> IApiCampo : scarica l'itinerario\nall'avvio (HTTP)
+
+Stazione -down- ISensStaz
+Treno -down- ISensTreno
+SensoriStaz .up.> ISensStaz
+SensoriTreno .up.> ISensTreno
+
+note as Legenda
+  <b>Come si legge</b>
+  linea continua = interfaccia <b>offerta</b> dalla componente
+  freccia tratteggiata = interfaccia <b>richiesta</b>
+  sotto il profilo <i>%tls</i> MQTT passa da 1883 a 8883
+  e la Centrale da HTTP 8781 a HTTPS 8444
+end note
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-SxrZR3/plantuml-LxXXA5.png]]
+
 ** Stack tecnologico
 
 #+ATTR_LATEX: :environment longtable :align L{0.24\textwidth}L{0.36\textwidth}L{0.32\textwidth} :font \small
@@ -998,55 +385,6 @@ e tuple morte da far digerire all'autovacuum, per dati che diventano obsoleti do
 e che non ha senso rendere durabili. È il caso d'uso per cui in esercizio si affianca al database
 un archivio in memoria: qui la stessa funzione la assolve una =ConcurrentHashMap=, che per un
 sistema a nodo singolo è la semplificazione ragionevole.
-
-*** Tutte le query stanno in una classe sola
-
-Le chiamate a Panache prima stavano dove servivano: novantaquattro punti sparsi in otto classi, cioè
-=RestApiGateway= con 61, =IngestionService= con 23, =TrafficLogicEngine= con 3, =FaultMonitor= con
-3, poi =AuthController= e i due validatori dell'id con una a testa, e una perfino dentro un'entità,
-=StoricoGuasto=. Adesso stanno tutte dentro =RailwayRepository= (package =persistence=), un bean
-=@ApplicationScoped= con 46 metodi: nel resto della Centrale non c'è più nessun =findById=,
-=persist= o =delete=.
-
-*Il motivo non è l'ordine formale ma le copie.* Con le query scritte sul posto la stessa lettura
-finiva riscritta ogni volta che serviva. Le tratte di un itinerario in ordine di percorrenza
-(=ItinerarioTratta.find("itinerario.id", Sort.by("ordine"))=) comparivano in cinque punti, tre nel
-gateway e due nell'ingestione; il metodo che da quelle tratte ricava la sequenza delle stazioni
-esisteva in due copie identiche con due nomi diversi (=stazioniOrdinate= nel gateway,
-=stazioniOrdinateDiItinerario= nell'ingestione); i guasti ancora aperti di una sorgente erano
-quattro stringhe JPQL quasi uguali, con il tipo della sorgente incollato dentro la stringa ('TRENO'
-in un punto, 'STAZIONE' negli altri tre). Adesso sono =tratteOrdinateDi=, =stazioniOrdinateDi= e
-=guastiApertiDi(sorgenteId, sorgenteTipo)=, e il tipo è un parametro invece di una costante scritta
-nel testo della query.
-
-*Le transazioni sono rimaste ai chiamanti, ed è una scelta.* Nel repository non c'è nessun
-=@Transactional= e nessun =QuarkusTransaction=: i suoi metodi girano dentro la transazione di chi
-li chiama. La ragione è che i confini attuali non sono casuali. Il gateway apre la transazione
-sull'endpoint, mentre l'ingestione e il =FaultMonitor= chiamano =QuarkusTransaction.requiringNew()=
-*dentro* il =try=, così il commit avviene prima delle notifiche su MQTT e WebSocket e una
-violazione di vincolo non risale fino al connettore reattivo spegnendo il canale (è il motivo per
-cui i consumatori non sono =@Transactional=, spiegato in C4). Se il repository si mettesse a
-dichiarare transazioni per conto suo, quei confini si sposterebbero senza che si veda dal codice
-del chiamante.
-
-*Quello che il repository non fa.* Non costruisce =Response=, non valida niente e non scrive
-messaggi d'errore: codici HTTP e testi restano nel gateway, accanto alla regola che li produce. E
-non tocca lo stato in RAM: il =TrafficLogicEngine= lo usa una volta sola, all'avvio, per riempirsi.
-
-*Il limite, detto chiaro.* Non è il pattern Repository dei libri, quello in cui il dominio non sa
-come è fatta la persistenza. Le entità restano =PanacheEntityBase= in stile /active record/, e il
-repository restituisce oggetti *gestiti* da Hibernate: chi riceve un =Treno= e gli cambia un campo
-se lo ritrova scritto al commit, senza chiamare nessun metodo di salvataggio. È esattamente quello
-che succede in =salvaStatoTreno=, che assegna =dbTreno.stato= e non salva niente. Qui dunque il
-repository raccoglie le query, non isola il modello dal database: per farlo davvero servirebbero
-entità staccate dal contesto di persistenza, che in un progetto di questa taglia costerebbero più
-di quanto rendono.
-
-*Perché una classe sola e non un DAO per tabella.* Le entità toccate sono tredici, ma le query per
-entità sono poche, spesso una o due: tredici classi da tre metodi avrebbero solo spostato la
-dispersione di un livello. Con un file solo, per sapere chi legge i transiti ancora aperti c'è un
-posto solo in cui guardare, e le sezioni interne (stazioni, treni, itinerari e tratte, transiti,
-guasti, storici, utenti) fanno da indice.
 
 *** I test hanno un database loro, non quello di lavoro
 
@@ -1234,7 +572,32 @@ Il passaggio dei treni viaggia volutamente su due topic distinti: =railway/train
 è quello che dichiara il treno, =railway/station/{id}/transit= è quello che rilevano i sensori
 della stazione. Sono due punti di vista sullo stesso evento e la Centrale li tratta separatamente.
 
-** Autenticazione e autorizzazione
+** Vocabolario degli stati osservabili
+
+*** Stato del convoglio
+
+#+attr_latex: :align |p{0.22\textwidth}|p{0.68\textwidth}|
+| stato      | significato                                                                    |
+|------------+--------------------------------------------------------------------------------|
+| FERMO      | e' in sosta in una stazione, oppure e' trattenuto e non puo' ripartire          |
+| IN_VIAGGIO | sta percorrendo una tratta elementare fra due stazioni                         |
+| EMERGENZA  | e' aperto un guasto che lo riguarda; la corsa e' sospesa dove si trovava        |
+| SOPPRESSO  | la corsa e' stata annullata: il convoglio non viaggia piu' e non riprendera'    |
+
+*** Stato operativo della stazione
+
+La stazione e' vista da due punti di osservazione, che dispongono di informazione diversa. Non e' una
+contraddizione: e' la conseguenza di che cosa ciascuno dei due puo' sapere.
+
+#+attr_latex: :align |p{0.26\textwidth}|p{0.20\textwidth}|p{0.40\textwidth}|
+| stato        | chi lo puo' dichiarare | significato                                                              |
+|--------------+------------------------+--------------------------------------------------------------------------|
+| ONLINE       | la stazione, la centrale | la stazione e' viva, raggiungibile e percorribile                        |
+| GUASTA       | la stazione, la centrale | la stazione non e' percorribile: i convogli non ci entrano e non ne escono |
+| OFFLINE      | solo la centrale       | la stazione non da' piu' notizie di se'                                   |
+| MANUTENZIONE | solo la centrale       | la squadra e' stata mandata sul posto e sta lavorando                    |
+
+** COMMENT Autenticazione e autorizzazione
 
 *** Perchè OAuth2 e non un login fatto in casa
 
@@ -4359,7 +3722,7 @@ end note
 - gli stati non sono piu' "sessione aperta / chiusa" lato Centrale, perche' la Centrale non tiene piu' nessuna sessione: quello che ha un ciclo di vita e' il token, e vive nel browser
 - la macchina si legge in due meta': in alto il token visto dalla web app (assente, valido, scaduto, rinnovato), in basso la singola richiesta vista dalla Centrale
 - la validita' del token (firma, scadenza, emittente, audience) la stabilisce =quarkus-oidc= prima del filtro; il filtro decide solo chi puo' fare cosa
-- requisiti coperti: RF04.1 e RF04.2 completi, con le eccezioni dichiarate nella specifica (le richieste preliminari del browser e le due sole letture di cui hanno bisogno i nodi di campo), e RF01.6 completo lato centrale: il controllo dei permessi e' fatto qui, dalla parte che possiede i dati, non nascondendo i comandi nell'interfaccia
+- requisiti coperti: RF04.1 completo e RF04.2 parziale (le eccezioni dichiarate nella specifica ci sono tutte — le richieste preliminari del browser e le due sole letture di cui hanno bisogno i nodi di campo — ma i tre comandi operativi restano aperti a entrambi i ruoli), e RF01.6 completo lato centrale: il controllo dei permessi e' fatto qui, dalla parte che possiede i dati, non nascondendo i comandi nell'interfaccia
 #+begin_src  plantuml file: 09_macchina_sessione_autorizzazione.png
 @startuml M9 - Ciclo di vita del token e autorizzazione delle API REST
 ' =========================================================================
@@ -4826,6 +4189,78 @@ end note
 
 #+end_src
 
+*** Riepilogo requisiti - macchine a stati
+
+È la lettura al contrario delle righe "requisiti coperti" che stanno sopra ogni diagramma del
+capitolo /Progettazione/: qui si parte dal requisito e si trovano le macchine, lì si parte dalla
+macchina e si trovano i requisiti. T = treno, S = stazione, M = centrale, e i numeri sono quelli
+delle macchine a stati, non quelli dei grafi G1...G8 di questa specifica.
+
+Un requisito è in *coperto da* quando le macchine elencate lo soddisfano per intero, in
+*parzialmente* quando ci contribuiscono senza chiuderlo da sole. Le righe vuote in entrambe le
+colonne sono i requisiti che il sistema realizzato non soddisfa: sono lasciate apposta, perché una
+tabella che non le mostra racconta una copertura che non c'è.
+
+Questa tabella però non va letta come lo *stato di implementazione* scritto accanto a ogni
+requisito: lì la domanda è "il sistema lo fa?", qui è "quale macchina lo mostra?", e le due risposte
+non coincidono sempre. Un paio di requisiti sono realizzati per intero senza che nessuna macchina li
+chiuda, perché a tenerli sono i vincoli del database (RF01.3.5) o il modo in cui il dato viene
+scritto (RF02.2.4). Dove i due giudizi divergono vale quello scritto accanto al requisito.
+
+#+ATTR_LATEX: :environment longtable :align L{0.13\textwidth}L{0.13\textwidth}L{0.13\textwidth}L{0.48\textwidth} :font \small
+| requisito    | coperto da  | parzialmente | nota                                                                        |
+|--------------+-------------+--------------+-------------------------------------------------------------------------------|
+| RF01.1.1     | M11         | T8, M3       | T8 e M3 producono la posizione, M11 è il canale che la spinge alla mappa      |
+| RF01.1.2     | M11         | T8, M3       |                                                                               |
+| RF01.1.3     | M11, M12    | S11          | i presenti sui binari li sa il nodo (S11), gli stati la centrale (M12)        |
+| RF01.1.4     | M11         |              | il websocket: l'evento arriva quando accade, non a interrogazione             |
+| RF01.1.5     | M11         | M8           | i numeri di sintesi li calcola il watchdog ogni 10 secondi                    |
+| RF01.2.1     | M11         | M7           |                                                                               |
+| RF01.2.2     |             | M6, M8, M11  | M6 è la porta del segnalato, M8 quella del dedotto, ma le due origini finiscono nello stesso tipo e l'elenco non le separa |
+| RF01.3       | M9, M10     |              | M9 decide chi può, M10 esegue                                                 |
+| RF01.3.5     |             | M10          | l'integrità alle eliminazioni la tengono i vincoli del db, non una macchina   |
+| RF01.4.1     |             | M10, M12, S9 | il comando parte da M10, il nodo lo riceve in S9 e M11 ne annuncia il cambio di stato, ma MANUTENZIONE dura quanto la chiamata: l'evento parte, lo stato no |
+| RF01.4.2     |             | M10, M7, T9, S9 | la chiusura c'è e il ripristino sblocca chi era trattenuto; la presa in carico no, nessun operatore viene registrato |
+| RF01.4.3     |             | M10, T6, T9  | l'effetto c'è, la precondizione "fermo in stazione" non viene verificata      |
+| RF01.5       | M10, M5     |              | M5 scrive lo storico, M10 lo serve alla dashboard                             |
+| RF01.6       | M9          |              |                                                                               |
+| RF02.1.1.1.1 | S4, S5      | S7           | è il caching locale con reinvio in massa                                      |
+| RF02.1.1.1.2 | S4, S5      |              | il rientro in TESTA alla coda è ciò che conserva l'ordine                     |
+| RF02.1.1.2.1 | T5, T9, T11 | S8           |                                                                               |
+| RF02.1.1.2.2 | T5, T9, T11 | S9, M10      | riparte al ripristino, non per scadenza di un tempo                           |
+| RF02.1.1.2.3 |             | S8, T11      | chi era già in sosta viene trattenuto solo se ripassa dall'alert di S8        |
+| RF02.1.2.1   | M6, M7, M13 | T10, M3      |                                                                               |
+| RF02.1.2.2.1 |             |              | non coperto da nessuna macchina: vedi la nota qui sotto                       |
+| RF02.1.2.2.2 |             | M8           | M8 apre solo un allarme sul convoglio, la tratta resta percorribile           |
+| RF02.1.3     |             | M7, M6, M8   | l'unicità per sorgente c'è ed è ciò che tiene leggibile l'elenco; mancano lo stato "preso in carico" e l'assegnatario |
+| RF02.1.4     | M4, M3      | M8           | il battito che torna chiude il guasto dedotto sulla stazione (M4), il convoglio che riprende a muoversi chiude il proprio (M3): in tutti e due i casi solo quelli con il prefisso della centrale |
+| RF02.2.1.1   | T5          | T9, T11      |                                                                               |
+| RF02.2.2.1   | T5, M3      | T7, T8, M5   | il cardine della specifica: sei macchine ci si appoggiano                     |
+| RF02.2.2.2   | T5, M3      | T8           |                                                                               |
+| RF02.2.2.3   | T6, M13     | M3           | lo stato è tenuto distinto dalla posizione, come chiede il requisito          |
+| RF02.2.2.4   | T8          |              | valori simulati, non alimentano nessuna decisione                             |
+| RF02.2.3     | T7          |              |                                                                               |
+| RF02.2.4     |             | T7           | i passaggi spaiati nascono ai capolinea, nessuna macchina li tratta a parte   |
+| RF02.3.1     | S11, M5     | S6, S8       |                                                                               |
+| RF02.3.2     | S3, M4      | M8           | S3 emette il battito, M8 ne misura il silenzio                                |
+| RF02.3.3     | S7          | S6           |                                                                               |
+| RF02.3.4     | S10, M12    |              | due stati sul nodo, quattro in centrale: è la asimmetria voluta dal requisito |
+| RF02.4.1     | T2, S2, M2  | T1, S1       | i due lati della stessa conversazione MQTT                                    |
+| RF02.4.2     | T1, S1      |              | il nodo non riconosciuto termina con codice 1, non resta acceso               |
+| RF02.5.1     | T9, T5, M10 | T4, T6       | la fase SENZA_ITINERARIO e' il "resta fermo in attesa": senza di essa il convoglio escluso continuava a dichiararsi in marcia |
+| RF02.5.2     |             | T3, T9, M10  | l'itinerario nuovo arriva, ma il viaggio riparte dalla prima tappa            |
+| RF02.6.1     | M8          | S3, M12      |                                                                               |
+| RF02.6.2     | M8          |              |                                                                               |
+| RF02.6.3     | M8          | M11          | M8 scatta la fotografia, M11 la porta al browser                              |
+| RF02.7       |             | M5, M3, M13  | si registrano i cambiamenti e non i campionamenti, ma solo per transiti, stati e guasti: assegnazioni degli operatori e itinerari percorsi non vengono mai scritti |
+| RF03.1       | T1, S1, M1  |              | tre processi distinti, avviabili e arrestabili uno per volta                  |
+| RF03.2       | S4          | S5, S7       |                                                                               |
+| RF03.3       | M5          | T8, S8       | M5 è il punto in cui le due fonti restano trattate separatamente              |
+| RF03.4       | T10, S6     |              | i sensori entrano solo dalle API REST del nodo                                |
+| RF03.5       | M10         | T3           |                                                                               |
+| RF04.1       | M9          |              |                                                                               |
+| RF04.2       |             | M9, M10      | il controllo è sul lato che possiede i dati, non sull'interfaccia; sui tre comandi operativi il ruolo però non viene distinto |
+| RF04.3       |             |              | non è una macchina: è il profilo =%tls= sui canali, vedi la sezione /Topic/   |
 ** Diagrammi di sequenza
 
 Le macchine a stati del paragrafo precedente dicono come cambia lo stato di /un/ nodo. Qui si
@@ -6494,7 +5929,7 @@ end note
 - la Centrale verifica la firma del token in locale con le chiavi pubbliche del realm, scaricate una volta sola: non richiama Keycloak a ogni chiamata
 - i tre esiti del filtro sono quelli osservabili dall'esterno: passa, 401 se il token manca o non vale, 403 se il ruolo non basta
 - il logout non e' cancellare il token: senza passare dall'end_session_endpoint Keycloak terrebbe viva la sessione SSO e il rientro successivo non chiederebbe la password
-- requisiti coperti: RF01.6, RF04.1 e RF04.2 completi; RF04.3 non e' una macchina ne' una sequenza, e' il profilo tls sui canali
+- requisiti coperti: RF01.6 e RF04.1 completi, RF04.2 parziale perche' il ruolo non viene distinto sui tre comandi operativi; RF04.3 non e' una macchina ne' una sequenza, e' il profilo tls sui canali
 #+begin_src  plantuml file: sq_13_login_e_ruoli.png
 @startuml SQ13 - Accesso OAuth2 e permessi per ruolo
 ' =========================================================================
@@ -7527,9 +6962,8 @@ nel capitolo /Specifica/: qui si dice quale conversazione lo mostra, non se il s
 | RF03.4       | SQ07       | SQ09         | i sensori di terra e quelli di bordo usano solo le API pubbliche del nodo      |
 | RF03.5       | SQ03       |              |                                                                               |
 | RF04.1       | SQ13       |              |                                                                               |
-| RF04.2       | SQ13       | SQ16, SQ17   | il 403 sull'anagrafica e' la parte visibile del ruolo                          |
+| RF04.2       |            | SQ13, SQ16, SQ17 | il 403 sull'anagrafica e' la parte visibile del ruolo; sui comandi operativi di SQ14 e SQ15 il ruolo non viene distinto |
 | RF04.3       |            |              | non e' una conversazione: e' il profilo =%tls= sui canali, vedi la sezione /Topic/ |
-
 
 ** Diagrammi delle classi
 
@@ -9002,3 +8436,814 @@ altre quattro sono tutte della centrale e mancano per due motivi diversi:
   nessuna delle tre ne e' il cuore: e' il caso in cui la variabile e' l'unica cosa che tiene insieme
   la macchina, ed e' proprio quello che il capitolo /Diagrammi degli stati/ chiama macchina di
   dominio.
+** Requisiti funzionali
+La numerazione è gerarchica per raggruppamenti e presenta anche le dipendenze
+
+*** RF01 - Servizi offerti agli utenti
+
+*Enunciato*: il sistema espone a tecnico e amministratore, attraverso un'unica applicazione web, la
+situazione corrente della rete, la sua storia e i comandi previsti per il loro ruolo.
+
+*Nota di lettura*: RF01 non stabilisce nessuna verita' sul dominio, la *espone*. Se lo stato
+descritto da RF02 e' sbagliato, RF01 mostra correttamente un dato sbagliato: per questo ogni ramo di
+RF01 dipende dal corrispondente ramo di RF02.
+
+*Stato di implementazione*: parziale — la visualizzazione, l'amministrazione dei dati, lo storico e
+l'accesso ci sono per intero; i tre comandi operativi di RF01.4 fanno la cosa principale ma nessuno
+dei tre e' completo.
+
+**** RF01.1 - Visualizzazione della situazione corrente
+
+*Stato di implementazione*: completo, tutte e cinque le voci.
+
+***** RF01.1.1 - Mappa del traffico
+- enunciato: la posizione dei convogli e' rappresentata su una mappa geografica, insieme al percorso
+  che stanno seguendo e al loro stato.
+- dipende da: RF02.2.2.
+- stato di implementazione: completo. Il convoglio viene disegnato sulla posizione interpolata fra
+  le due stazioni della tratta che sta percorrendo, con sopra il percorso e il colore dello stato.
+
+***** RF01.1.2 - Elenco dei convogli
+- enunciato: per ogni convoglio sono visibili il numero, la stazione o la tratta su cui si trova, lo
+  stato, il ritardo accumulato e i passeggeri a bordo.
+- dipende da: RF02.2.
+- stato di implementazione: completo.
+
+***** RF01.1.3 - Elenco delle stazioni
+- enunciato: per ogni stazione sono visibili lo stato operativo, i convogli fermi sui binari in quel
+  momento, quelli attesi in ingresso e quelli attesi in uscita.
+- dipende da: RF02.3.1.
+- stato di implementazione: completo. Lo stato operativo lo tiene la centrale, i convogli sui binari
+  li dichiara il nodo di stazione: la schermata mette insieme le due cose.
+
+***** RF01.1.4 - Aggiornamento continuo
+- enunciato: le schermate si aggiornano da sole mentre l'operatore le guarda, senza che lui debba
+  ricaricare la pagina o chiedere l'aggiornamento.
+- esito atteso: un evento rilevante (un transito, un cambio di stato, un guasto, l'esito di un
+  comando) e' visibile sulla schermata entro pochi secondi dal momento in cui accade; inoltre, ogni
+  =P_ria=, la schermata riceve una fotografia completa dello stato corrente.
+- *distinzione che conta*: l'aggiornamento e' *spinto dal sistema quando l'evento accade*, non
+  ottenuto da interrogazioni a orologio da parte della schermata. La fotografia periodica non e' il
+  meccanismo di aggiornamento: serve a riallineare chi si e' collegato dopo o ha perso qualcosa.
+- stato di implementazione: completo, ed e' completa anche la distinzione qui sopra: l'evento viene
+  spinto sulla websocket nel momento in cui accade, e la fotografia periodica viaggia sullo stesso
+  canale senza che il browser chieda niente.
+
+***** RF01.1.5 - Indicatori di sintesi
+- enunciato: una schermata di riepilogo riassume in pochi numeri i convogli in circolazione, le
+  stazioni operative, i guasti aperti e il ritardo medio.
+- rispetto alla consegna: e' un'aggiunta, la consegna non la chiede.
+- stato di implementazione: completo. I numeri li calcola la centrale e viaggiano dentro la stessa
+  fotografia periodica di RF01.1.4, quindi si aggiornano da soli come il resto.
+
+**** RF01.2 - Visualizzazione dei guasti
+
+*Stato di implementazione*: completo, entrambe le voci.
+
+***** RF01.2.1 - Elenco degli allarmi aperti
+- enunciato: sono visibili i guasti attivi con la sorgente (quale stazione, quale convoglio, quale
+  tratta), il tipo, la severita' e l'istante di apertura.
+- dipende da: RF02.1.
+- stato di implementazione: completo.
+
+***** RF01.2.2 - Distinzione fra guasto segnalato e guasto dedotto
+- enunciato: l'elenco distingue il guasto *segnalato dal campo* (qualcuno lo ha dichiarato) da quello
+  *dedotto dalla centrale* (un nodo ha smesso di dare notizie).
+- *perche' e' un requisito e non un dettaglio*: sono due condizioni con cause diverse e con reazioni
+  diverse. Un guasto segnalato indica un problema del nodo; un guasto dedotto puo' indicare anche
+  soltanto un problema di collegamento, e chi decide se mandare la squadra deve poterli distinguere
+  senza indovinare.
+- dipende da: RF02.6.
+- stato di implementazione: completo. L'API e gli eventi in tempo reale portano l'origine
+  dell'allarme, e la schermata la mostra esplicitamente come "segnalato dal campo" oppure
+  "dedotto dalla centrale".
+
+**** RF01.3 - Amministrazione dei dati della rete
+
+*Enunciato del ramo*: la creazione, la modifica e l'eliminazione dell'anagrafica della rete sono
+riservate all'amministratore; il tecnico vede tutto ma non modifica nulla.
+
+*Rispetto alla consegna*: la consegna chiede all'amministratore di aggiungere ed eliminare le tratte
+(RF01.3.3) e di modificare le stazioni attraversate dai treni (RF01.3.4). La gestione delle stazioni
+(RF01.3.1) e quella dei convogli (RF01.3.2) sono un'aggiunta, e stanno qui perche' la consegna da'
+per scontata una rete gia' popolata: senza un posto in cui crearla non ci sarebbero ne' le tratte da
+aggiungere ne' i treni a cui cambiare le stazioni attraversate.
+
+*Stato di implementazione*: completo, tutte e cinque le voci.
+
+***** RF01.3.1 - Stazioni
+- enunciato: l'amministratore crea, modifica ed elimina le stazioni della rete.
+- stato di implementazione: completo.
+
+***** RF01.3.2 - Convogli
+- enunciato: l'amministratore crea, modifica ed elimina i convogli.
+- stato di implementazione: completo.
+
+***** RF01.3.3 - Tratte elementari
+- enunciato: l'amministratore crea, modifica ed elimina i collegamenti diretti fra due stazioni
+  adiacenti.
+- stato di implementazione: completo.
+
+***** RF01.3.4 - Itinerari e assegnazione dei convogli
+- enunciato: l'amministratore compone un itinerario come sequenza ordinata di stazioni con i tempi di
+  percorrenza previsti, e vi assegna sopra i convogli che devono percorrerlo.
+- dipende da: RF02.5, perche' la modifica deve restare corretta anche con convogli gia' in marcia.
+- stato di implementazione: completo per la parte di composizione e assegnazione; quello che succede
+  ai convogli gia' in marcia e' invece il ramo RF02.5, che completo non e'.
+
+***** RF01.3.5 - Integrita' dei dati alle eliminazioni
+- enunciato: l'eliminazione di un'entita' non lascia riferimenti pendenti, e non e' permessa finche'
+  qualcosa la sta ancora usando.
+- esito atteso: o l'eliminazione viene rifiutata con una spiegazione comprensibile, oppure viene
+  eseguita insieme a tutto cio' che senza quell'entita' non avrebbe piu' significato.
+- *perche' e' qui*:
+ senza questo requisito la correttezza promessa da RF02 dura fino alla prima
+  eliminazione.
+- stato di implementazione: completo. Ogni eliminazione o viene rifiutata dicendo il motivo (la
+  stazione ancora usata da una tratta, la tratta ancora usata da un itinerario o gia' finita nei
+  transiti storici), oppure porta via con se' i record che senza quell'entita' non vorrebbero piu'
+  dire niente. Una parte della garanzia pero' la tengono i vincoli del database e non i controlli
+  scritti a mano.
+
+**** RF01.4 - Comandi operativi
+
+*Chi puo' dare quale comando*: lo dice la consegna, e non e' lo stesso ruolo per tutti e tre. La
+squadra sulla stazione guasta la manda il *tecnico*; la corsa la sopprime l'*amministratore*, e la
+consegna mette questo comando fra parentesi come facoltativo. La chiusura dell'allarme la consegna
+non la assegna esplicitamente: sta sul tecnico perche' e' il seguito dell'invio degli operatori, che
+e' compito suo.
+
+*Limite comune a tutti e tre*: la ripartizione qui sopra e' quella disegnata nei casi d'uso, ma il
+controllo dei permessi non la fa rispettare — i tre comandi sono concessi a entrambi i ruoli. E' il
+solo punto in cui il sistema realizzato e' piu' permissivo della consegna, ed e' il motivo per cui
+RF04.2 non e' completo.
+
+*Stato di implementazione*: parziale — tutti e tre i comandi fanno la cosa principale, nessuno dei
+tre la fa per intero.
+
+***** RF01.4.1 - Invio della squadra di manutenzione
+- enunciato: il tecnico manda la squadra su una stazione guasta.
+- soggetto: il tecnico, che nella consegna e' il ruolo a cui questo compito e' assegnato.
+- esito atteso: la stazione risulta in MANUTENZIONE e i nodi interessati ne sono informati.
+- stato di implementazione: parziale. Il comando parte, il campo viene avvisato, i guasti aperti
+  sulla stazione vengono chiusi e la stazione passa a MANUTENZIONE; solo che il ritorno a ONLINE sta
+  dentro la stessa chiamata, a pochi millisecondi di distanza. Lo stato attraversa il canale ma non
+  dura: la stazione non /risulta/ in manutenzione a nessuno che la guardi. Per soddisfare il
+  requisito il ritorno andrebbe staccato dal comando e legato alla fine vera dell'intervento.
+
+***** RF01.4.2 - Presa in carico e chiusura di un allarme
+- enunciato: il tecnico dichiara risolto un guasto.
+- soggetto: il tecnico, per la ragione scritta sopra al ramo: chiudere l'allarme e' il seguito
+  dell'invio degli operatori.
+- esito atteso: il guasto passa a chiuso, resta traccia di chi lo ha preso in carico e quando, e cio'
+  che era bloccato per causa sua riprende.
+- dipende da: RF02.1.3.
+- stato di implementazione: parziale. La chiusura c'e' e funziona, e cio' che era trattenuto
+  riprende davvero la corsa; la presa in carico no. Ne' l'operatore ne' il momento in cui se n'e'
+  occupato vengono scritti da nessuna parte, quindi a guasto chiuso non si sa piu' chi lo ha chiuso.
+
+***** RF01.4.3 - Soppressione di un convoglio fermo in stazione
+- enunciato: l'amministratore annulla una corsa; il convoglio passa in SOPPRESSO e non viaggia piu'.
+- soggetto: l'amministratore, che nella consegna e' il ruolo a cui questo comando e' assegnato.
+- precondizione: il convoglio e' fermo in una stazione.
+- rispetto alla consegna: la consegna lo scrive fra parentesi, come comando facoltativo; e' stato
+  realizzato lo stesso.
+- stato di implementazione: parziale. L'effetto e' quello richiesto, ma la precondizione non viene
+  verificata da nessuna parte: il comando sopprime anche un convoglio in mezzo a una tratta, e la
+  sopprimibilita' resta affidata al buon senso di chi preme il bottone.
+
+**** RF01.5 - Consultazione dello storico
+
+- enunciato: sono consultabili i transiti passati, ciascuno con il convoglio, la stazione, la tratta,
+  il verso (entrata o uscita) e l'istante.
+- rispetto alla consegna: e' un'aggiunta. La consegna chiede alla centrale di *memorizzare* lo
+  storico dei transiti, e quello e' RF02.7; mostrarlo in una schermata non lo chiede nessuno.
+- dipende da: RF02.7.
+- stato di implementazione: completo.
+
+**** RF01.6 - Accesso al sistema
+
+- enunciato: l'uso dell'applicazione richiede di identificarsi; l'identita' accompagna tutte le
+  operazioni successive e termina con l'uscita esplicita.
+- l'identificazione avviene *fuori dall'applicazione*, sulla schermata del servizio di identita':
+  l'applicazione non raccoglie e non vede mai le credenziali, riceve solo l'attestato di accesso.
+- rimando: il dettaglio dei permessi e' in RF04.
+- stato di implementazione: completo. L'identificazione avviene sulla schermata del servizio di
+  identita', l'applicazione riceve solo l'attestato e l'uscita esplicita chiude la sessione.
+
+*** RF02 - Correttezza dello stato rappresentato
+*Enunciato*: lo stato che il sistema mostra e conserva corrisponde a quello che sta realmente
+accadendo sulla rete, anche in presenza di guasti, di interruzioni del collegamento e di modifiche
+fatte mentre il sistema e' in funzione.
+
+*Stato di implementazione*: parziale. Sono completi il ramo dei convogli (RF02.2), quello delle
+stazioni (RF02.3), l'identita' dei nodi di campo (RF02.4) e le anomalie che la centrale deduce da
+sola (RF02.6). Non sono realizzate le conseguenze del guasto del convoglio sull'infrastruttura
+(RF02.1.2.2) e la ripresa dal punto giusto dopo una modifica dell'itinerario (RF02.5.2); sono
+parziali il ciclo di vita del guasto, che non registra la presa in carico (RF02.1.3), e la memoria
+storica, che di cinque cose ne scrive tre (RF02.7).
+
+**** RF02.1 - Gestione dei guasti
+
+*Stato di implementazione*: parziale — il guasto della stazione e la chiusura automatica ci sono;
+restano fuori le conseguenze del guasto del convoglio (RF02.1.2.2) e la presa in carico nel ciclo di
+vita del guasto (RF02.1.3).
+
+***** RF02.1.1 - Guasto della stazione
+
+*Stato di implementazione*: parziale, per il solo RF02.1.1.2.3.
+
+****** RF02.1.1.1 - Interruzione del collegamento con la centrale
+
+*Stato di implementazione*: completo.
+
+******* RF02.1.1.1.1 - Nessun dato perduto durante l'interruzione
+- enunciato: mentre il collegamento con la centrale non e' disponibile, la stazione conserva
+  localmente tutto cio' che produce e lo consegna quando il collegamento torna.
+- precondizione: la stazione continua a funzionare e i suoi sensori continuano a rilevare.
+- esito atteso: al ritorno del collegamento la centrale riceve tutti gli eventi prodotti durante
+  l'interruzione, nessuno escluso.
+- stato di implementazione: completo, nei limiti della precondizione. Il nodo continua a rilevare e
+  accoda cio' che non riesce a consegnare, e svuota la coda quando il collegamento torna. La coda
+  pero' vive in memoria: vale finche' il nodo resta acceso, un suo riavvio si porterebbe via quello
+  che non era ancora partito.
+
+******* RF02.1.1.1.2 - Ordine di consegna preservato
+- enunciato: la consegna differita rispetta l'ordine in cui gli eventi sono stati generati; se una
+  singola consegna fallisce, l'evento non consegnato precede comunque quelli successivi.
+- *perche' e' un requisito a se'*: senza questo vincolo l'entrata e l'uscita di uno stesso convoglio
+  possono arrivare invertite, e lo storico racconterebbe un convoglio che esce da una stazione prima
+  di entrarci.
+- dipende da: RF02.7.
+- stato di implementazione: completo. L'evento che non riesce a partire rientra in *testa* alla
+  coda, ed e' esattamente questo che impedisce a un'uscita di precedere la propria entrata.
+
+****** RF02.1.1.2 - Stazione non percorribile
+
+*Stato di implementazione*: parziale, per il solo RF02.1.1.2.3.
+
+******* RF02.1.1.2.1 - Il convoglio diretto alla stazione guasta si ferma
+- enunciato: se la prossima stazione dell'itinerario e' guasta, il convoglio non vi entra e resta
+  fermo dove si trova.
+- esito atteso: il convoglio risulta FERMO, la sua posizione non avanza e il ritardo cresce.
+- dipende da: RF02.2.2.1.
+- stato di implementazione: completo.
+
+******* RF02.1.1.2.2 - Riparte solo al ripristino
+- enunciato: il convoglio trattenuto riprende la corsa quando arriva il ripristino di quella
+  stazione, non prima e non per scadenza di un tempo.
+- stato di implementazione: completo. Lo sblocco arriva solo con il ripristino e riprende la fase
+  che era in corso: nel codice non c'e' nessun tempo massimo che faccia ripartire il convoglio da
+  solo.
+
+******* RF02.1.1.2.3 - Il blocco vale anche per chi e' gia' fermo li'
+- enunciato: un convoglio gia' in sosta nella stazione che si guasta non riparte finche' il guasto e'
+  aperto.
+- *perche' e' un requisito a se'*: senza di esso il guasto bloccherebbe solo chi arriva dopo, e la
+  stazione non risulterebbe davvero non percorribile.
+- stato di implementazione: parziale. Il convoglio gia' in sosta viene trattenuto, ma per un'altra
+  strada: si tiene l'elenco delle stazioni che ha visto dichiararsi guaste e lo ricontrolla quando
+  sta per ripartire. E' il controllo alla ripartenza a tenerlo fermo, non la stazione che smette di
+  essere percorribile, e la differenza si vede quando l'avviso non gli arriva.
+
+***** RF02.1.2 - Guasto del convoglio
+
+*Stato di implementazione*: parziale — il guasto viene registrato, le conseguenze sull'infrastruttura
+no.
+
+****** RF02.1.2.1 - Il guasto viene registrato in centrale
+- enunciato: quando un convoglio si guasta, la centrale apre e conserva il guasto corrispondente.
+- stato di implementazione: completo.
+
+****** RF02.1.2.2 - Conseguenze del guasto
+
+*Stato di implementazione*: non realizzato, in nessuno dei due casi.
+
+******* RF02.1.2.2.1 - Convoglio guasto *in stazione*: la stazione diventa non percorribile
+- enunciato: se il convoglio si guasta mentre e' fermo in una stazione, quella stazione risulta
+  guasta.
+- dipende da: RF02.2.2.1, perche' la conseguenza si sceglie in base a dove si trova il convoglio.
+- stato di implementazione: non realizzato. Il convoglio che si guasta congela se' stesso ma non
+  contagia l'infrastruttura: in centrale solo un guasto dichiarato con sorgente STAZIONE e severita'
+  critica porta la stazione a GUASTA, quindi dopo un guasto di bordo la stazione resta percorribile e
+  gli altri convogli ci entrano tranquillamente.
+
+******* RF02.1.2.2.2 - Convoglio guasto *in tratta*: la tratta diventa non percorribile
+- enunciato: se il convoglio si guasta fra due stazioni, e' la tratta elementare che sta percorrendo
+  a risultare non percorribile; nessuna stazione cambia stato.
+- dipende da: RF02.2.2.1.
+- stato di implementazione: non realizzato, per lo stesso motivo di RF02.1.2.2.1. L'allarme si apre
+  sul convoglio, ma la tratta non ha nessuno stato di percorribilita' che qualcuno cambi: continua a
+  risultare libera e nessun altro convoglio viene fermato. Vale anche per l'allarme che la centrale
+  deduce da sola (RF02.6.2).
+
+***** RF02.1.3 - Ciclo di vita del guasto
+- enunciato: un guasto ha uno stato di lavorazione (aperto, preso in carico, chiuso), un
+  assegnatario e una traccia di come e' evoluto; sulla stessa sorgente e per lo stesso motivo non
+  esiste piu' di un guasto aperto per volta.
+- *perche' l'unicita' e' un requisito*: le anomalie dedotte vengono ricontrollate a ritmo periodico,
+  e senza unicita' la stessa condizione genererebbe un allarme nuovo a ogni controllo, rendendo
+  l'elenco inutilizzabile proprio quando serve.
+- stato di implementazione: parziale. L'unicita' del guasto aperto per sorgente c'e', da qualunque
+  parte arrivi il guasto, ed e' quella che tiene leggibile l'elenco; apertura e chiusura lasciano
+  traccia nello storico. Gli stati pero' sono due e non tre, perche' il guasto porta solo un
+  "risolto" vero o falso, e l'assegnatario non viene mai valorizzato: la colonna e la tabella delle
+  assegnazioni esistono nello schema ma restano vuote.
+
+***** RF02.1.4 - Chiusura automatica quando la causa rientra
+- enunciato: un guasto aperto perche' un nodo taceva si chiude da solo quando il nodo torna a dare
+  notizie, senza bisogno dell'intervento di un operatore.
+- *perche'*: un guasto dedotto deve essere disfatto dalla stessa deduzione che lo ha creato,
+  altrimenti l'elenco degli allarmi si riempie di condizioni gia' rientrate che nessuno chiude.
+- precondizione: il guasto e' stato aperto per deduzione e non per segnalazione.
+- dipende da: RF02.3.2.
+- stato di implementazione: completo. Il battito che torna richiude il guasto dedotto sulla stazione
+  e il convoglio che riprende a muoversi richiude il proprio, in tutti e due i casi senza che nessuno
+  debba premere niente; la chiusura automatica riguarda solo i guasti che la centrale ha dedotto,
+  come dice la precondizione.
+
+**** RF02.2 - Gestione dei convogli
+
+*Stato di implementazione*: completo.
+
+***** RF02.2.1 - Ritardi
+
+*Stato di implementazione*: completo.
+
+****** RF02.2.1.1 - Il ritardo si accumula quando il convoglio e' fermo e dovrebbe circolare
+- enunciato: finche' il convoglio e' trattenuto pur avendo una tappa da percorrere, il suo ritardo
+  cresce; quando circola regolarmente non cresce.
+- dipende da: RF02.1, perche' il fermo nasce dai guasti.
+- stato di implementazione: completo.
+
+***** RF02.2.2 - Informazioni di stato del convoglio
+
+*Stato di implementazione*: completo, tutte e quattro le informazioni.
+
+****** RF02.2.2.1 - Posizione
+- enunciato: il convoglio dichiara in modo non ambiguo dove si trova: in quale stazione e' fermo,
+  oppure fra quali due stazioni sta viaggiando e in quale direzione.
+- esito atteso: la risposta alla domanda "il convoglio e' in stazione o in tratta?" e' sempre
+  definita, in ogni istante della corsa.
+- *nota*: questo e' il *predicato centrale della specifica*. Da "dove si trova il convoglio"
+  dipendono la scelta della conseguenza di un guasto (stazione o tratta non percorribile), la
+  gestione della modifica dell'itinerario a sistema acceso e il riconoscimento dell'anomalia del
+  convoglio fermo troppo a lungo. Se questa informazione non e' affidabile, cadono sei requisiti
+  insieme.
+- stato di implementazione: completo. Il convoglio dichiara o la stazione in cui e' fermo o la
+  tratta che sta percorrendo con la direzione, e la centrale la corregge con i passaggi rilevati a
+  terra.
+
+****** RF02.2.2.2 - Ritardo accumulato
+- enunciato: il convoglio dichiara il ritardo accumulato dall'inizio della corsa.
+- dipende da: RF02.2.1.
+- stato di implementazione: completo.
+
+****** RF02.2.2.3 - Stato del convoglio
+- enunciato: il convoglio dichiara come sta, con uno dei valori del vocabolario degli stati, e questa
+  informazione e' distinta dalla posizione.
+- stato di implementazione: completo, e la distinzione dalla posizione e' rispettata anche a
+  database, dove la colonna dello stato accetta solo i quattro valori del vocabolario.
+
+****** RF02.2.2.4 - Velocita' e passeggeri a bordo
+- enunciato: il convoglio dichiara la velocita' corrente e il numero di passeggeri a bordo.
+- *nota di ambito*: sono valori simulati che rendono leggibile la corsa sulla mappa; non provengono
+  da nessuna rilevazione reale e non alimentano nessuna decisione del sistema.
+- stato di implementazione: completo, con l'ambito dichiarato qui sopra: sono numeri generati dal
+  convoglio a ogni fermata.
+
+***** RF02.2.3 - Andata e ritorno sullo stesso itinerario
+- enunciato: raggiunto il capolinea, il convoglio inverte la marcia e ripercorre l'itinerario in
+  senso contrario; il tempo di percorrenza di ogni tappa e' quello previsto per il verso che sta
+  percorrendo.
+- esito atteso: la corsa e' continua, senza che il convoglio scompaia e riappaia all'altro capolinea.
+- stato di implementazione: completo. Al capolinea la direzione si inverte, l'itinerario viene
+  ripercorso al contrario e ogni tappa usa il tempo di percorrenza del verso che sta percorrendo.
+
+***** RF02.2.4 - Passaggi asimmetrici in stazione
+- enunciato: un convoglio puo' uscire da una stazione senza esservi entrato, e puo' entrare in una
+  stazione senza uscirne.
+- precondizione: il primo caso si presenta alla stazione da cui la corsa comincia, il secondo al
+  capolinea in cui la corsa si conclude prima dell'inversione.
+- *perche' va scritto*: e' il caso che rompe l'abbinamento ingenuo fra entrate e uscite nello
+  storico. Chi conta le coppie deve sapere che la prima e l'ultima sono spaiate per costruzione, e
+  che questo non e' un errore di rilevazione.
+- stato di implementazione: completo. I due casi sono gestiti e non scartati: l'uscita senza entrata
+  diventa un transito puntuale, in cui entrata e uscita coincidono, e l'entrata senza uscita resta un
+  transito aperto. Nello storico pero' non sono marcati come caso a se': chi conta le coppie deve
+  saperlo da qui.
+
+**** RF02.3 - Gestione delle stazioni
+
+*Stato di implementazione*: completo.
+
+***** RF02.3.1 - Informazioni rese dalla stazione
+- enunciato: la stazione sa dire quali convogli ha sui binari in questo momento, chi e' entrato e
+  quando, chi e' uscito e quando.
+- dipende da: RF02.1.1.1.1 — l'informazione locale che serve alla visualizzazione *e' la stessa* che
+  permette alla stazione di sopravvivere a un'interruzione del collegamento. Non sono due memorie
+  distinte, ed e' un vincolo di specifica: se fossero due potrebbero divergere.
+- stato di implementazione: completo, vincolo compreso: la fotografia che la stazione tiene in
+  memoria e' la stessa che risponde alle interrogazioni locali e che alimenta la coda di RF02.1.1.1.1.
+
+***** RF02.3.2 - Segnale di vita verso la centrale
+- enunciato: la stazione emette un battito periodico verso la centrale, con periodo =P_bat=, anche
+  quando non ha nulla da dichiarare.
+- *perche' anche quando non c'e' niente da dire*: senza un segnale emesso a prescindere dagli eventi,
+  il silenzio di una stazione non e' distinguibile dall'assenza di traffico su quella stazione.
+- stato di implementazione: completo.
+
+***** RF02.3.3 - Segnale di vita dei sensori verso la stazione
+- enunciato: i sensori dichiarano periodicamente alla stazione di essere vivi, con periodo =P_kal=;
+  se uno smette, la stazione lo considera guasto e lo segnala alla centrale.
+- esito atteso: la stazione con un sensore muto dichiara il proprio stato come GUASTA.
+- stato di implementazione: completo, esito compreso. Il limite del meccanismo e' che la stazione
+  non sa quanti sensori dovrebbero esserci: li conosce solo quando la chiamano, quindi un sensore che
+  non ha mai battuto non puo' risultare guasto.
+
+***** RF02.3.4 - Stato che la stazione dichiara di se'
+- enunciato: la stazione dichiara di se' soltanto ONLINE o GUASTA.
+- rimando: la motivazione e' nella sezione sul vocabolario degli stati osservabili.
+- stato di implementazione: completo. Il nodo dichiara due stati, la centrale ne tiene quattro:
+  l'asimmetria voluta dal requisito c'e' tutta.
+
+**** RF02.4 - Identita' del nodo di campo
+
+*Stato di implementazione*: completo.
+
+***** RF02.4.1 - L'identita' dichiarata viene verificata
+- enunciato: un nodo che entra in servizio dichiara la propria identita' alla centrale, che la
+  verifica sull'anagrafica della rete prima di accettarne qualsiasi dato.
+- *perche'*: senza questa verifica chiunque avvii un nodo con un'identita' inventata inquina lo stato
+  della centrale con la telemetria di un convoglio che non esiste, e la correttezza promessa da RF02
+  non e' piu' difendibile.
+- stato di implementazione: completo. Il nodo chiede alla centrale se esiste e non manda niente
+  finche' non ha avuto la risposta: la verifica non puo' auto-validarsi con il primo dato che arriva.
+
+***** RF02.4.2 - Esito negativo: il nodo non entra in servizio
+- enunciato: se l'identita' non e' riconosciuta, il nodo non entra in servizio e termina, invece di
+  restare attivo senza poter comunicare.
+- *perche' terminare e non restare in attesa*: un nodo acceso ma non riconosciuto e' indistinguibile
+  da un nodo sano dal punto di vista di chi guarda i processi, ed e' una sorgente di confusione
+  durante la diagnosi.
+- stato di implementazione: completo. Il nodo non riconosciuto termina con codice di uscita 1, non
+  resta acceso in attesa.
+
+***** RF02.4.3 - Portata della dipendenza
+Non e' un requisito a se': e' la regola di lettura del grafo. Senza RF02.4 nessun nodo entra in
+servizio, quindi non arriva nessun dato e cadono per intero RF02.1, RF02.2 e RF02.3. Per questo nel
+grafo la dipendenza e' disegnata una volta sola sui tre rami invece che su ogni foglia.
+
+*Stato di implementazione*: non ne ha uno proprio, non essendo un requisito; vale quello di RF02.4.1
+e RF02.4.2.
+
+**** RF02.5 - Modifica dell'itinerario a sistema acceso
+*Enunciato del ramo*: l'amministratore puo' cambiare le stazioni attraversate da un itinerario e i
+convogli assegnati mentre i convogli sono gia' in marcia, e il sistema resta coerente.
+
+*Stato di implementazione*: parziale — il convoglio escluso e' gestito, quello che resta assegnato
+riparte dal capolinea invece che da dove si trovava.
+
+***** RF02.5.1 - Convoglio escluso dall'itinerario
+- enunciato: se dopo la modifica un convoglio non e' piu' assegnato ad alcun itinerario, smette di
+  viaggiare e resta fermo in attesa di essere soppresso.
+- esito atteso: il convoglio non produce piu' transiti e non avanza; resta visibile nelle schermate,
+  perche' un convoglio fermo su un binario e' un fatto che l'operatore deve vedere.
+- *punto delicato della specifica*: la notifica della modifica deve raggiungere *anche* i convogli
+  che la modifica esclude. Un convoglio escluso a cui nessuno dice niente continuerebbe a percorrere
+  l'itinerario vecchio senza saperlo, ed e' il caso peggiore possibile, perche' il sistema mostrerebbe
+  uno stato plausibile ma falso.
+- stato di implementazione: completo, punto delicato compreso: l'avviso parte anche verso i convogli
+  che la modifica esclude, e chi resta senza itinerario si dichiara fermo invece di continuare a
+  raccontare di essere in marcia.
+
+***** RF02.5.2 - Convoglio ancora assegnato
+- enunciato: se dopo la modifica il convoglio e' ancora assegnato all'itinerario, prosegue sul nuovo
+  itinerario a partire dal punto in cui la modifica lo ha colto, conservando direzione e ritardo
+  accumulato.
+- precondizione: la stazione da cui il convoglio e' appena passato appartiene ancora al nuovo
+  itinerario.
+- esito atteso: la posizione mostrata non compie salti; il convoglio non ricomincia la corsa da capo.
+- caso limite: se la stazione da cui e' appena passato non fa piu' parte dell'itinerario, il convoglio
+  riprende dal capolinea del nuovo itinerario, perche' non esiste un punto di ripresa sensato.
+- dipende da: RF02.2.2.1.
+- stato di implementazione: non realizzato. L'avviso arriva e l'itinerario nuovo viene ricaricato,
+  ma il viaggio viene fatto ripartire dalla prima tappa in direzione andata: il convoglio conserva il
+  ritardo accumulato e non la posizione, e sulla mappa fa il salto che il requisito voleva evitare.
+  In pratica il sistema si comporta *sempre* come nel caso limite, anche quando un punto di ripresa
+  sensato ci sarebbe.
+
+**** RF02.6 - Anomalie dedotte dalla centrale
+
+*Enunciato del ramo*: la centrale riconosce da sola le anomalie che i nodi di campo non sono in grado
+di segnalare, a partire dalla propria caduta.
+
+*Perche' esiste questo ramo*: un nodo guasto puo' non essere in condizione di dire di esserlo. Se il
+sistema si fidasse solo delle segnalazioni, il caso peggiore (il nodo che smette del tutto) sarebbe
+anche l'unico invisibile.
+
+*Stato di implementazione*: completo, tutti e tre.
+
+***** RF02.6.1 - Stazione silenziosa oltre la soglia
+- enunciato: se una stazione non da' notizie di se' per piu' di =T_sil=, la centrale la considera
+  caduta, la mostra come OFFLINE e apre un guasto su di essa.
+- dipende da: RF02.3.2, perche' senza un segnale regolare non c'e' un silenzio da misurare.
+- si chiude da solo per RF02.1.4.
+- stato di implementazione: completo, e il guasto aperto non resta dentro la centrale: viene
+  pubblicato verso il campo, cosi' i convogli diretti alla stazione caduta si fermano come se il
+  guasto lo avesse dichiarato lei.
+
+***** RF02.6.2 - Convoglio fermo fuori stazione oltre la soglia
+- enunciato: se un convoglio resta fermo fra due stazioni per piu' di =T_fer=, la centrale apre un
+  allarme su di esso.
+- precondizione: il convoglio non e' in una stazione e non e' soppresso.
+- dipende da: RF02.2.2.1, perche' "fuori stazione" e' una domanda sulla posizione.
+- stato di implementazione: completo per quanto riguarda l'allarme; quello che l'allarme *non* fa
+  e' rendere non percorribile la tratta, ed e' il limite di RF02.1.2.2.2.
+
+***** RF02.6.3 - Fotografia periodica dello stato
+- enunciato: ogni =P_ria= la centrale rende disponibile alle schermate una fotografia completa dello
+  stato corrente della rete.
+- *a cosa serve*: a riallineare chi si e' collegato dopo che gli eventi erano gia' avvenuti, o chi ne
+  ha persi. Non e' il meccanismo con cui le schermate si aggiornano (RF01.1.4), e' la rete di
+  sicurezza sotto di esso.
+- stato di implementazione: completo. La fotografia porta i numeri di sintesi e anche l'elenco
+  completo di convogli e stazioni, quindi rimette a posto il browser e non solo i contatori.
+
+**** RF02.7 - Memoria storica
+
+- enunciato: oltre allo stato corrente, il sistema conserva la traccia di cio' che e' accaduto:
+  transiti, cambi di stato dei convogli e delle stazioni, guasti, assegnazioni degli operatori e
+  itinerari percorsi.
+- esito atteso: la storia e' consultabile anche dopo che i nodi che l'hanno prodotta sono stati
+  spenti e riavviati.
+- *regola di registrazione*: la storia registra i *cambiamenti*, non i campionamenti. Un convoglio
+  che dichiara la propria telemetria a ritmo regolare per un'ora, senza mai cambiare stato, deve
+  lasciare una sola riga di storia e non una per ogni dichiarazione. Senza questa regola lo storico
+  cresce in proporzione al tempo invece che agli avvenimenti, e diventa illeggibile proprio dove
+  serve.
+- stato di implementazione: parziale. Delle cinque cose elencate nell'enunciato ne vengono scritte
+  tre — transiti, cambi di stato dei convogli e delle stazioni, guasti — e vengono scritte ai
+  cambiamenti e non a ogni campionamento, quindi la regola di registrazione e' rispettata. Gli
+  itinerari percorsi e le assegnazioni degli operatori no: le due tabelle esistono nello schema ma
+  non le scrive nessuno, compaiono solo nelle cancellazioni di pulizia.
+
+*** RF03 - Contratti di interazione fra le parti
+*Enunciato*: le parti del sistema interagiscono secondo obblighi dichiarati, in modo che ciascuna
+possa funzionare, fallire e ripartire senza trascinare con se' le altre.
+
+*Nota di lettura*: questo ramo non prescrive tecnologie. Prescrive proprieta' dell'interazione che si
+osservano dall'esterno: chi deve poter sopravvivere a chi, quale informazione e' fonte di verita' per
+cosa, che cosa una parte puo' e non puo' toccare dell'altra.
+
+*Stato di implementazione*: completo.
+
+**** RF03.1 - Autonomia dei nodi
+- enunciato: ogni convoglio e ogni stazione sono parti autonome, avviabili, arrestabili e riavviabili
+  una indipendentemente dall'altra.
+- esito atteso: l'arresto di un nodo non ferma gli altri; la rete continua a funzionare in modo
+  ridotto, con l'assenza segnalata come anomalia (RF02.6.1) e non come blocco generale.
+- stato di implementazione: completo. Ogni convoglio e ogni stazione sono processi a se', si
+  avviano con il proprio identificativo passato da riga di comando e se ne possono tenere accesi
+  quanti se ne vuole sulla stessa macchina.
+
+**** RF03.2 - Disaccoppiamento fra campo e centrale
+- enunciato: quando un nodo di campo comunica con la centrale non resta in attesa che la centrale sia
+  presente per poter continuare a lavorare.
+- esito atteso: con la centrale non raggiungibile, i nodi di campo continuano a rilevare, a
+  registrare e ad accumulare cio' che dovranno consegnare; nessuna funzione locale si arresta.
+- dipende da: RF02.1.1.1.1.
+- stato di implementazione: completo. Fra campo e centrale c'e' sempre il broker, quindi nessuno dei
+  due aspetta l'altro: il nodo pubblica e va avanti.
+
+**** RF03.3 - Due fonti di verita' distinte per lo stesso passaggio
+- enunciato: lo stesso passaggio fisico e' conosciuto per due vie indipendenti: la rilevazione a
+  terra fatta dai sensori di stazione e la dichiarazione fatta dal convoglio. Le due vie non si
+  sostituiscono a vicenda.
+- ripartizione degli obblighi:
+  - la rilevazione a terra e' la *fonte di verita' per la storia dei transiti*: esiste anche se il
+    convoglio tace, ed e' quella che deve finire nello storico;
+  - la dichiarazione del convoglio e' la *fonte di verita' per la posizione corrente*: e' disponibile
+    prima e con piu' dettaglio, ed e' quella che alimenta il tempo reale.
+- *perche' due e non una*: eliminando la prima si perde la storia quando il convoglio non parla;
+  eliminando la seconda si perde il tempo reale fra una stazione e l'altra, dove nessun sensore vede
+  niente. Sono due requisiti diversi serviti da due vie diverse, non una ridondanza da ottimizzare.
+- stato di implementazione: completo, ripartizione degli obblighi compresa: le due vie arrivano in
+  centrale su canali distinti e restano trattate separatamente, nessuna delle due sovrascrive
+  l'altra.
+
+**** RF03.4 - I sensori usano solo l'interfaccia pubblica del nodo
+- enunciato: i sensori dichiarano cio' che rilevano attraverso l'interfaccia che il nodo espone
+  verso l'esterno, senza nessun accesso privilegiato al suo stato interno.
+- *perche' e' un requisito e non una scelta interna*: e' cio' che rende il nodo verificabile. Se i
+  sensori potessero modificare direttamente lo stato del nodo, il comportamento osservato durante una
+  prova non sarebbe lo stesso di quello in esercizio, e la specifica non sarebbe piu' controllabile
+  dall'esterno.
+- esito atteso: una dichiarazione fatta a mano da uno strumento di prova e una fatta dal sensore reale
+  producono nel nodo esattamente lo stesso effetto.
+- stato di implementazione: completo, sia per i sensori di binario sia per quelli di bordo: passano
+  tutti dalle sole chiamate che il nodo espone verso l'esterno, e infatti tutte le prove dei guasti
+  si fanno da li'.
+
+**** RF03.5 - L'itinerario e' fornito dalla centrale
+- enunciato: il convoglio non conosce l'itinerario per conto proprio: lo riceve dalla centrale, che
+  ne e' l'unica depositaria.
+- due modalita' ammesse, entrambe valide:
+  - il convoglio riceve l'itinerario completo quando entra in servizio e lo tiene per la corsa;
+  - il convoglio chiede di volta in volta quale sia la prossima stazione, data la stazione in cui si
+    trova e la direzione.
+- *perche' l'unicita' della fonte conta*: se il convoglio conservasse un itinerario proprio, dopo una
+  modifica fatta a sistema acceso esisterebbero due versioni dell'itinerario e RF02.5 non sarebbe
+  garantibile.
+- stato di implementazione: completo. Delle due modalita' ammesse e' realizzata la prima: il
+  convoglio riceve l'itinerario intero quando entra in servizio e lo richiede di nuovo a ogni
+  modifica. Anche la seconda esiste ed e' funzionante — c'e' l'operazione che risponde "data questa
+  stazione e questa direzione, qual e' la prossima" — ma nessuno la usa: e' li' perche' il requisito
+  le dichiara entrambe valide.
+
+*** RF04 - Accesso e protezione
+
+*Stato di implementazione*: parziale — l'accesso e' completo; l'autorizzazione per ruolo vale per le
+letture e per l'anagrafica ma non distingue i ruoli sui tre comandi operativi (RF04.2); la protezione
+dei canali si ferma dove dice il limite dichiarato in RF04.3.
+
+**** RF04.1 - Autenticazione
+- enunciato: gli utenti sono registrati presso il servizio di identita' e accedono dichiarando li'
+  le proprie credenziali; l'accesso produce un attestato che accompagna le operazioni successive.
+- *requisito fondamentale*: le credenziali sono conosciute da una parte sola. Chi custodisce i dati
+  della rete non conserva password e non ne verifica nessuna: si limita a controllare che
+  l'attestato esibito sia autentico e non scaduto. Una realizzazione in cui la centrale confronta
+  una password con una propria copia *non* soddisfa questo requisito.
+- l'attestato e' verificabile da solo: chi lo riceve stabilisce se e' buono senza dover interrogare
+  il servizio di identita' a ogni richiesta. E' questo che rende il controllo indipendente dalla
+  disponibilita' momentanea di quel servizio.
+- l'attestato ha una durata limitata (=T_att=) e viene rinnovato senza disturbare l'utente finche'
+  la sessione presso il servizio di identita' resta aperta (=T_ina=, =T_ses=).
+- stato di implementazione: completo, requisito fondamentale compreso: chi custodisce i dati della
+  rete non conserva nessuna password e si limita a controllare la firma dell'attestato, senza
+  interpellare il servizio di identita' a ogni richiesta.
+
+**** RF04.2 - Autorizzazione per ruolo
+- enunciato: ogni operazione e' permessa o negata in base al ruolo di chi la chiede: le letture sono
+  permesse a entrambi i ruoli, la modifica dell'anagrafica della rete al solo amministratore, e
+  ciascun comando operativo al ruolo che la consegna gli assegna — l'invio della squadra al tecnico,
+  la soppressione della corsa all'amministratore (RF01.4).
+- *requisito fondamentale*: il controllo dei permessi e' fatto dalla parte che possiede i dati, non
+  dall'interfaccia. Un'interfaccia che si limita a nascondere i comandi non consentiti non soddisfa
+  questo requisito, perche' chiunque puo' formulare la stessa richiesta senza passare
+  dall'interfaccia.
+- il ruolo e' scritto *dentro l'attestato* dal servizio di identita': chi possiede i dati lo legge
+  da li' e non lo deduce da una propria tabella. Cambiare il ruolo di un utente e' un'operazione che
+  si fa in un posto solo, e ha effetto dal primo attestato successivo.
+- eccezioni dichiarate, ciascuna con la sua motivazione:
+  - l'identificazione avviene presso il servizio di identita' e non fra le operazioni protette:
+    non c'e' quindi nessuna operazione di accesso da lasciare aperta su chi possiede i dati;
+  - le richieste preliminari che i browser inviano prima di una chiamata vera non portano identita' e
+    devono poter passare, altrimenti la chiamata vera non parte nemmeno;
+  - le due sole letture di cui i nodi di campo hanno bisogno (RF03.5) restano accessibili senza
+    identita' di utente: i nodi non sono utenti e non si identificano con credenziali, la loro
+    verifica e' quella dell'identita' di nodo (RF02.4). Sono letture, non modifiche, ed e' un confine
+    che vale la pena tenere stretto a due sole operazioni.
+- stato di implementazione: parziale, e il pezzo che manca e' la ripartizione dei comandi operativi.
+  Il controllo sta dalla parte che possiede i dati e il ruolo viene letto dentro l'attestato:
+  nascondere i comandi nell'interfaccia non serve a passare il controllo, e su letture e anagrafica
+  la ripartizione e' rispettata per intero, con esattamente le tre eccezioni dichiarate qui sopra e
+  nessun'altra. I tre comandi operativi pero' sono concessi a entrambi i ruoli: il tecnico puo'
+  sopprimere una corsa e l'amministratore puo' mandare la squadra, mentre la consegna li assegna uno
+  per ruolo. Resta fuori anche la sola websocket, che non e' un'operazione sui dati ma una porta di
+  sola lettura, ed e' un limite dichiarato nel capitolo /Progettazione/.
+
+**** RF04.3 - Protezione dei canali
+- enunciato: il sistema puo' funzionare con tutti i canali di comunicazione protetti, in modo che il
+  contenuto scambiato fra le parti non sia leggibile ne' alterabile da un osservatore della rete.
+- esito atteso: la protezione e' una condizione dell'*intero* sistema e non della singola parte: o
+  tutti i canali sono protetti, o la garanzia non vale.
+- *conseguenza da tenere presente*: se un solo canale resta in chiaro mentre gli altri sono protetti,
+  cio' che si osserva non e' un errore di sicurezza ma un nodo che non riesce a entrare in servizio.
+  E' un sintomo che punta lontano dalla causa, e va messo per iscritto qui perche' e' proprio in
+  fase di verifica che si presenta.
+- *limite dichiarato*: il canale verso il servizio di identita' non e' compreso nella protezione. E'
+  l'unico tratto che resta in chiaro quando tutti gli altri sono protetti, ed e' proprio quello su
+  cui viaggiano le credenziali: va detto, perche' altrimenti la garanzia di questo requisito
+  sembrerebbe piu' ampia di quello che e'. La realizzazione e le sue conseguenze sono nel capitolo
+  /Progettazione/, sezione /Autenticazione e autorizzazione/.
+- stato di implementazione: parziale, ed e' parziale esattamente quanto dice il limite dichiarato.
+  Con il profilo apposta tutti i canali fra le parti sono protetti — MQTT sulla porta cifrata,
+  compresi i canali con cui i nodi si fanno riconoscere, e HTTPS verso la centrale, che la schermata
+  segue cambiando due indirizzi senza essere ricompilata — ma il canale verso il servizio di
+  identita' resta in chiaro, ed e' proprio quello su cui viaggiano le credenziali.
+
+** Requisiti non funzionali osservabili
+
+Sono proprieta' del sistema nel suo insieme. Le tengo separate dai requisiti funzionali perche' non
+descrivono una funzione, ma una qualita' che ogni funzione deve avere.
+
+#+attr_latex: :align |p{0.07\textwidth}|p{0.17\textwidth}|p{0.31\textwidth}|p{0.29\textwidth}|
+| #     | requisito                     | enunciato                                                                                       | come si verifica                                                                 |
+|-------+-------------------------------+-------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------|
+| RNF01 | prontezza                     | un evento accaduto sul campo e' visibile all'operatore entro pochi secondi                       | si cronometra la distanza fra l'evento provocato e la sua comparsa sulla schermata   |
+| RNF02 | nessuna perdita dei transiti  | nessun transito rilevato va perduto, nemmeno in presenza di interruzioni del collegamento        | si contano i transiti provocati e li si ritrova tutti nello storico                  |
+| RNF03 | degradazione per parti        | il guasto di una parte riduce le funzioni disponibili ma non ferma il sistema                    | si arrestano nodi uno alla volta e si controlla cosa resta funzionante               |
+| RNF04 | riservatezza                  | il contenuto scambiato fra le parti non e' leggibile da un osservatore della rete                | si osserva il traffico con la protezione attiva                                      |
+| RNF05 | numerosita' dei nodi          | il sistema regge piu' stazioni e piu' convogli contemporaneamente, senza modifiche               | si avviano piu' istanze e si controlla che ciascuna sia distinguibile e indipendente |
+| RNF06 | riavviabilita'                | un nodo riavviato torna in servizio da solo e si riallinea, senza interventi manuali             | si arresta e si riavvia un nodo mentre il sistema e' in funzione                     |
+
+** Scenari di verifica
+
+Gli scenari servono a controllare i requisiti *insieme*, come li vede un utente. Ogni scenario e'
+scritto con la situazione di partenza, l'evento che lo innesca e il comportamento atteso passo per
+passo.
+
+*** SV01 - Stazione non percorribile e successivo ripristino
+
+- situazione :: un convoglio sta percorrendo la tratta che porta alla stazione B; in B c'e' gia' un
+  altro convoglio in sosta.
+- evento :: B viene dichiarata guasta.
+- comportamento atteso ::
+  1. B risulta GUASTA nelle schermate e compare un allarme con B come sorgente;
+  2. il convoglio in arrivo si ferma prima di entrare in B e passa a FERMO;
+  3. il convoglio gia' in sosta in B non riparte a fine sosta;
+  4. il ritardo di entrambi cresce finche' restano fermi;
+  5. il tecnico manda la squadra: B passa a MANUTENZIONE;
+  6. il tecnico dichiara risolto il guasto: B torna ONLINE, l'allarme risulta chiuso e conservato
+     nella storia;
+  7. entrambi i convogli riprendono la corsa dal punto in cui erano, senza altri comandi.
+- requisiti coperti :: RF01.2.1, RF01.4.1, RF01.4.2, RF02.1.1.2, RF02.1.3, RF02.2.1.1.
+
+*** SV02 - Interruzione del collegamento fra stazione e centrale
+
+- situazione :: la stazione A e' operativa e i convogli transitano regolarmente.
+- evento :: il collegamento fra A e la centrale viene interrotto.
+- comportamento atteso ::
+  1. A continua a rilevare i transiti e a rispondere alle interrogazioni locali;
+  2. la centrale, passato =T_sil=, mostra A come OFFLINE e apre un allarme;
+  3. nel frattempo transitano dei convogli da A;
+  4. il collegamento viene ripristinato;
+  5. la centrale riceve tutti i transiti avvenuti durante l'interruzione, nell'ordine giusto;
+  6. l'allarme aperto per silenzio si chiude da solo e A torna ONLINE.
+- requisiti coperti :: RF02.1.1.1, RF02.1.4, RF02.6.1, RF03.2, RNF02.
+
+*** SV03 - Guasto del convoglio, in stazione e in tratta
+
+- situazione :: due convogli, uno fermo nella stazione C e uno a meta' della tratta D-E.
+- evento :: entrambi dichiarano un guasto di bordo.
+- comportamento atteso ::
+  1. per il primo, la stazione C risulta non percorribile;
+  2. per il secondo, e' la tratta D-E a risultare non percorribile, mentre D ed E restano operative;
+  3. entrambi i convogli passano a EMERGENZA e restano dove sono;
+  4. i due allarmi risultano segnalati dal campo e non dedotti.
+- requisiti coperti :: RF01.2.2, RF02.1.2, RF02.2.2.1.
+
+*** SV04 - Convoglio fermo fra due stazioni
+
+- situazione :: un convoglio e' fermo fra due stazioni per una causa qualsiasi.
+- evento :: passa il tempo =T_fer= senza che si muova.
+- comportamento atteso ::
+  1. la centrale apre da sola un allarme sul convoglio, senza che nessuno lo abbia segnalato;
+  2. l'allarme risulta dedotto e non segnalato;
+  3. finche' la condizione resta, non ne compaiono altri sulla stessa sorgente.
+- requisiti coperti :: RF02.1.3, RF02.6.2, RF01.2.2.
+
+*** SV05 - Modifica dell'itinerario a convogli in marcia
+
+- situazione :: un itinerario con due convogli assegnati, entrambi in marcia in punti diversi.
+- evento :: l'amministratore modifica la sequenza delle stazioni e toglie uno dei due convogli.
+- comportamento atteso ::
+  1. il convoglio rimasto assegnato prosegue sul nuovo itinerario dal punto in cui si trovava, senza
+     salti di posizione e conservando il ritardo;
+  2. il convoglio escluso si ferma e resta in attesa di soppressione, restando visibile;
+  3. nessuno dei due continua a percorrere l'itinerario vecchio.
+- requisiti coperti :: RF01.3.4, RF02.5, RF03.5.
+
+*** SV06 - Corsa completa con inversione al capolinea
+
+- situazione :: un convoglio all'inizio della corsa, nella stazione di partenza.
+- evento :: la corsa viene svolta per intero, andata e ritorno.
+- comportamento atteso ::
+  1. dalla stazione di partenza risulta una uscita senza una entrata che la preceda;
+  2. per ogni stazione intermedia risultano una entrata e una uscita, in quest'ordine;
+  3. al capolinea risulta una entrata; la direzione dichiarata passa da andata a ritorno;
+  4. la corsa di ritorno percorre le stesse stazioni in ordine inverso;
+  5. lo storico contiene tutti i transiti nell'ordine reale.
+- requisiti coperti :: RF01.5, RF02.2.3, RF02.2.4, RF02.7.
+
+*** Copertura dei requisiti da parte degli scenari
+
+| requisito | scenari che lo verificano |
+|-----------+---------------------------|
+| RF01.1    | SV01, SV05                |
+| RF01.2    | SV01, SV03, SV04          |
+| RF01.3    | SV05                      |
+| RF01.4    | SV01                      |
+| RF01.5    | SV06                      |
+| RF01.6    | tutti (accesso preliminare) |
+| RF02.1    | SV01, SV02, SV03          |
+| RF02.2    | SV01, SV03, SV06          |
+| RF02.3    | SV02                      |
+| RF02.4    | preliminare a tutti       |
+| RF02.5    | SV05                      |
+| RF02.6    | SV02, SV04                |
+| RF02.7    | SV02, SV06                |
+| RF03      | SV02, SV05                |
+| RF04      | verifica dedicata (RF04.2, RF04.3) |
+
