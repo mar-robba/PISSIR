@@ -6,8 +6,8 @@ import it.uni.reti2.entity.StatiCanonici;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.gateway.NotificatoreRealtime;
 import it.uni.reti2.ingestion.PubblicatoreAlert;
-import it.uni.reti2.ingestion.payload.PassaggioMsg;
 import it.uni.reti2.ingestion.payload.TelemetriaMsg;
+import it.uni.reti2.ingestion.payload.TransitoMsg;
 import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -132,17 +132,21 @@ public class MonitoraggioTreni {
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Registra il passaggio dichiarato dal convoglio: e' qui che la Centrale misura il
-     * ritardo, aggiorna la posizione sull'itinerario e ne informa il treno.
+     * Registra il passaggio rilevato dal sensore di terra: e' qui che la Centrale misura
+     * il ritardo, aggiorna la posizione sull'itinerario e ne informa il treno. Viene
+     * chiamato da {@link TransitiService#registra} prima di congelare il ritardo sulla
+     * riga di Transito, cosi' il numero storicizzato e' gia' quello aggiornato.
      *
-     * <p><b>Niente evento TRANSIT per il frontend.</b> Lo stesso passaggio fisico arriva
-     * alla Centrale per due strade, dal treno e dalla stazione, e la sorgente ufficiale
-     * per la dashboard e' il sensore di terra: altrimenti ogni ingresso comparirebbe due
-     * volte nella pagina Transiti.</p>
+     * <p>Il treno non dichiara piu' la propria direzione su un topic dedicato (era
+     * {@code PassaggioMsg}, pubblicato su railway/train/+/passaggio): adesso l'unica
+     * fonte e' la cache aggiornata dall'ultima telemetria, con "andata" come default.
+     * Nella finestra fra un'inversione a capolinea e il frame di telemetria successivo
+     * (fino a 5s) la direzione letta qui puo' quindi essere quella vecchia.</p>
      */
-    public void registraPassaggio(PassaggioMsg msg) {
+    public void registraPassaggio(TransitoMsg msg) {
         Treno cacheTreno = statoRete.getTreno(msg.trenoId());
-        String direzione = msg.direzione(cacheTreno != null ? cacheTreno.direzione : null);
+        String direzione = cacheTreno != null && cacheTreno.direzione != null
+                ? cacheTreno.direzione : "andata";
 
         // Letture sull'itinerario e aggiornamento della posizione: tutto in una
         // transazione, perche' senza non ci sarebbe nessuna sessione JPA attiva.
@@ -212,7 +216,7 @@ public class MonitoraggioTreni {
     }
 
     /** Scrive sul database la tratta su cui il convoglio si trova. Gira dentro una transazione. */
-    private NavigazioneItinerario.Posizione aggiornaPosizioneSuDb(PassaggioMsg msg, String direzione) {
+    private NavigazioneItinerario.Posizione aggiornaPosizioneSuDb(TransitoMsg msg, String direzione) {
         Treno dbTreno = repository.trovaTreno(msg.trenoId());
         if (dbTreno == null || dbTreno.itinerario == null) {
             return NavigazioneItinerario.Posizione.sconosciuta();

@@ -24,7 +24,16 @@ public final class StatiCanonici {
 
     /** Valori ammessi dal CHECK sulla colonna Treni.stato. */
     public static final List<String> TRENO =
-            List.of("attivo", "fermo", "rotto", "in manutenzione");
+            List.of("attivo", "fermo", "rotto", "in manutenzione", "capolinea");
+
+    /**
+     * Il convoglio ha finito la corsa al capolinea dell'itinerario e non riparte da solo.
+     *
+     * <p>E' uno stato terminale come "in manutenzione", ma per un motivo opposto: non c'e'
+     * niente di rotto, il servizio e' semplicemente finito. Se ne esce solo assegnando al
+     * treno un itinerario diverso.</p>
+     */
+    public static final String TRENO_CAPOLINEA = "capolinea";
 
     /** Valori con cui la Centrale descrive una stazione. */
     public static final String STAZIONE_ONLINE = "ONLINE";
@@ -37,7 +46,8 @@ public final class StatiCanonici {
 
     /**
      * Converte lo stato dichiarato da un convoglio sul topic della telemetria.
-     * IN_VIAGGIO&rarr;attivo, FERMO&rarr;fermo, EMERGENZA&rarr;rotto, SOPPRESSO&rarr;in manutenzione.
+     * IN_VIAGGIO&rarr;attivo, FERMO&rarr;fermo, EMERGENZA&rarr;rotto, SOPPRESSO&rarr;in manutenzione,
+     * CAPOLINEA&rarr;capolinea (corsa finita all'estremo marcato dell'itinerario).
      *
      * <p>Qualunque valore non riconosciuto (campo assente compreso) diventa "fermo":
      * un convoglio che dice qualcosa di incomprensibile e' un convoglio di cui non si
@@ -48,6 +58,7 @@ public final class StatiCanonici {
         if ("FERMO".equalsIgnoreCase(dichiarato)) return "fermo";
         if ("EMERGENZA".equalsIgnoreCase(dichiarato)) return "rotto";
         if ("SOPPRESSO".equalsIgnoreCase(dichiarato)) return "in manutenzione";
+        if ("CAPOLINEA".equalsIgnoreCase(dichiarato)) return TRENO_CAPOLINEA;
         String normalizzato = dichiarato == null ? "" : dichiarato.trim().toLowerCase();
         return TRENO.contains(normalizzato) ? normalizzato : "fermo";
     }

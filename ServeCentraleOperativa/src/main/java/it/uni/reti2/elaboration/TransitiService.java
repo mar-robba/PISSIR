@@ -44,20 +44,26 @@ public class TransitiService {
     @Inject
     NotificatoreRealtime notificatore;
 
+    @Inject
+    MonitoraggioTreni treni;
+
     /**
      * Registra il passaggio rilevato dalla stazione e lo annuncia alla dashboard.
      *
-     * <p>La stazione e' la SOLA sorgente degli eventi TRANSIT per l'interfaccia: e' il
-     * sensore di terra a rilevare il passaggio. Il treno dichiara lo stesso passaggio su
-     * un altro topic, ma quello serve alla Centrale per misurare il ritardo, non al
-     * browser per riempire una tabella.</p>
+     * <p>La stazione e' la SOLA sorgente di questo evento: non esiste piu' un topic
+     * separato su cui il treno dichiara lo stesso passaggio. Prima di congelare il
+     * ritardo sulla riga di Transito si chiama {@link MonitoraggioTreni#registraPassaggio},
+     * che e' il punto in cui la Centrale lo misura davvero, aggiorna la posizione
+     * sull'itinerario e ne informa il convoglio.</p>
      *
      * @param payloadDalCampo Il messaggio originale della stazione, che porta l'ora vera
      *                        del passaggio e va lasciato intatto.
      */
     public void registra(TransitoMsg msg, JsonNode payloadDalCampo) {
+        treni.registraPassaggio(msg);
+
         // Il ritardo va congelato adesso: e' quello che il convoglio ha nel momento del
-        // passaggio.
+        // passaggio, appena aggiornato dalla chiamata sopra.
         Treno cacheTreno = statoRete.getTreno(msg.trenoId());
         int ritardoAlPassaggio = cacheTreno != null ? cacheTreno.ritardo : 0;
 

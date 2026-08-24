@@ -30,6 +30,9 @@ export default function TrainsPage() {
       case 'in_ritardo': return 'warning';
       case 'guasto': 
       case 'soppresso': return 'danger';
+      // Corsa finita al capolinea: non è un allarme, è un convoglio che ha concluso il
+      // servizio. Grigio come gli stati di quiete, non rosso come i guasti.
+      case 'capolinea': return 'neutral';
       default: return 'info';
     }
   };
@@ -195,6 +198,17 @@ export default function TrainsPage() {
                   </div>
                 )}
                 
+                {selectedTrain.status === 'capolinea' && (
+                  <div className="p-3 bg-primary/10 border border-primary/30 rounded-md">
+                    <p className="font-bold uppercase tracking-wider">Corsa terminata</p>
+                    <p className="text-sm opacity-80 mt-1">
+                      Il convoglio è arrivato al capolinea della sua tratta e resta fermo qui.
+                      Riprende servizio quando gli viene assegnata un'altra tratta, oppure se
+                      dalla pagina Tratte si toglie la marcatura del capolinea.
+                    </p>
+                  </div>
+                )}
+
                 {selectedTrain.status === 'soppresso' && (
                   <div className="p-3 bg-danger/10 border border-danger/30 rounded-md text-danger">
                     <p className="font-bold uppercase tracking-wider">Treno Soppresso</p>
@@ -220,7 +234,7 @@ export default function TrainsPage() {
                         if (selectedTrain.status === 'in_viaggio') {
                           const currentIndex = selectedTrainRoute.stationIds.indexOf(selectedTrain.previousStationId || '');
                           if (index <= currentIndex) isPast = true;
-                        } else if (selectedTrain.status === 'in_stazione') {
+                        } else if (selectedTrain.status === 'in_stazione' || selectedTrain.status === 'capolinea') {
                           const currentIndex = selectedTrainRoute.stationIds.indexOf(selectedTrain.currentStationId || '');
                           if (index < currentIndex) isPast = true;
                           if (index === currentIndex) isCurrent = true;

@@ -10,7 +10,6 @@ import it.uni.reti2.elaboration.TransitiService;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.ingestion.payload.AlertMsg;
 import it.uni.reti2.ingestion.payload.HeartbeatMsg;
-import it.uni.reti2.ingestion.payload.PassaggioMsg;
 import it.uni.reti2.ingestion.payload.TelemetriaMsg;
 import it.uni.reti2.ingestion.payload.TransitoMsg;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -22,7 +21,7 @@ import org.jboss.logging.Logger;
 import java.util.concurrent.CompletionStage;
 
 /**
- * La porta d'ingresso MQTT della Centrale: cinque topic, cinque metodi.
+ * La porta d'ingresso MQTT della Centrale: quattro topic, quattro metodi.
  *
  * <p>Questa classe fa tre cose e nessun'altra: prende i byte che arrivano dal broker, li
  * trasforma in un messaggio con un nome ({@code TelemetriaMsg}, {@code HeartbeatMsg}...)
@@ -99,7 +98,12 @@ public class IngestionService {
         return message.ack();
     }
 
-    /** railway/transit — il passaggio rilevato dai sensori di terra di una stazione. */
+    /**
+     * railway/station/+/transit — il passaggio rilevato dai sensori di terra di una
+     * stazione, unica fonte del transito ora che il treno non lo dichiara più su un
+     * topic proprio: da qui la Centrale misura anche il ritardo e la direzione
+     * (vedi {@link TransitiService#registra}).
+     */
     @Incoming("transit-in")
     @Blocking
     public CompletionStage<Void> onTransit(Message<byte[]> message) {
@@ -145,26 +149,6 @@ public class IngestionService {
             }
         } catch (Exception e) {
             LOG.error("❌ Errore parsing alert: " + payload, e);
-        }
-        return message.ack();
-    }
-
-    /**
-     * railway/train/+/passaggio — lo stesso passaggio, ma dichiarato dal convoglio.
-     *
-     * <p>Non e' un doppione del transito: da qui arriva la direzione di marcia, e da qui
-     * la Centrale misura il ritardo. Nessun evento per il browser parte da questo topic,
-     * altrimenti ogni ingresso comparirebbe due volte nella pagina Transiti.</p>
-     */
-    @Incoming("passaggio-in")
-    @Blocking
-    public CompletionStage<Void> onPassaggio(Message<byte[]> message) {
-        String payload = new String(message.getPayload());
-        try {
-            JsonNode root = mapper.readTree(payload);
-            treni.registraPassaggio(PassaggioMsg.da(root));
-        } catch (Exception e) {
-            LOG.error("❌ Errore parsing passaggio: " + payload, e);
         }
         return message.ack();
     }

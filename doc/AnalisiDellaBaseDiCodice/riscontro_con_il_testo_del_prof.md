@@ -13,7 +13,12 @@ e con loro la 1.4 (il ritardo comunicato al convoglio), che era la conseguenza d
 avere spostato il calcolo in Centrale. Dopo di loro sono stati implementati anche i sensori
 di binario che mandano il keepalive da soli (era la vecchia 2.1) e il guasto circoscritto a
 una via della stazione (`binario_guasto`, era meta` della vecchia 2.2). La sezione 1 racconta
-come, e con quali limiti dichiarati; restano aperte solo le due voci della sezione 2.
+come, e con quali limiti dichiarati.
+
+**Aggiornamento del 24 agosto 2026**: chiusa anche la 2.2, il capolinea che non era mai un fine
+corsa (voce 1.7 qui sotto). Nella stessa giornata e` cambiata la strada del passaggio in stazione:
+il treno non lo dichiara piu` alla Centrale su un topic suo, lo annuncia ai sensori di binario ed
+e` la stazione a certificarlo. Resta aperta la sola voce 2.1, i guasti alle linee.
 
 A differenza di [`requisiti_da_implementare.md`](requisiti_da_implementare.md), che parte dai
 requisiti RFxx ricavati dall'analisi del codice, questo documento parte dal testo della consegna:
@@ -24,23 +29,24 @@ serve a rispondere alla domanda "che cosa chiede il prof che io non ho fatto".
 | # | richiesta del PDF | stato | dove |
 |---|---|---|---|
 | 1.1 | previsioni di arrivo (Processing dell'OCC) | **fatto**: le calcola la Centrale e viaggiano su REST, SNAPSHOT e WebSocket | `PrevisioneArrivi.java`, `Treno.arrivoPrevisto` |
-| 1.2 | calcolo dei ritardi (Processing dell'OCC) | **fatto**: spostato sulla Centrale, il convoglio non ne tiene piu` copia | `PrevisioneArrivi.registraArrivo`, `IngestionService.onPassaggio` |
+| 1.2 | calcolo dei ritardi (Processing dell'OCC) | **fatto**: spostato sulla Centrale, il convoglio non ne tiene piu` copia | `PrevisioneArrivi.registraArrivo`, `MonitoraggioTreni.registraPassaggio` |
 | 1.3 | treni attesi in ingresso/uscita in una stazione | **fatto**: endpoint della Centrale calcolato sull'itinerario | `GET /api/stazioni/{id}/treni-attesi` |
 | 1.4 | il treno riceve guasti *o ritardi* dalla centrale | **fatto**: alert `RITARDO` con target il convoglio, pubblicato quando la misura cambia | `IngestionService.pubblicaRitardoSuMqtt`, `TrainGateway.riceviAlert` |
 | 1.5 | keepalive dei sensori verso la stazione | **fatto**: i due sensori di binario sono simulati come dispositivi a se`, battono da soli e si spengono dalla CLI | `SimulatoreSensori.java`, `MonitorSensori.java`, `ConsoleSensori.java` |
 | 1.6 | guasto a una particolare via della stazione | **fatto**: tipo `binario_guasto`, dichiarato da chi lo segnala | `StationIngestion./sensore/guasto`, `ConsoleSensori.java:150` |
+| 1.7 | il treno puo` entrare in stazione senza uscirvi (capolinea) | **fatto** il 24 agosto 2026: l'itinerario puo` marcare un estremo come capolinea, e chi ci arriva chiude la corsa | `Itinerario.capolineaId`, `TrainJourneyEngine.java:752` |
 | 2.1 | guasti alle linee (alle tratte fra due stazioni) | non esistono: la sorgente di un guasto e` solo una stazione o un treno | `Guasto.sorgenteTipo` |
-| 2.2 | il treno puo` entrare in stazione senza uscirvi (capolinea) | non succede mai: al capolinea il treno inverte e riparte | `TrainJourneyEngine.java:687` |
 | — | resto della consegna (ingestion, caching locale, heartbeat stazione, T_fer/T_sil, guasto permanente, prossima stazione in entrambe le varianti, storico, ruoli tecnico/amministratore, REST+webapp, OAuth2, TLS) | coperto | — |
 | — | varianti ammesse usate | solo la 1 (web app anziche` SPA), zero penalita` | — |
 
-Zero buchi reali: i sei punti della prima sezione sono stati implementati il 21 agosto 2026.
-Restano due scelte difendibili ma parziali (2.1-2.2); tutto il resto era gia` coperto.
+Zero buchi reali: i sei punti della prima sezione sono stati implementati il 21 agosto 2026, il
+settimo il 24. Resta una sola scelta difendibile ma parziale (2.1); tutto il resto era gia` coperto.
 
-## 1. Buchi chiusi il 21 agosto 2026
+## 1. Buchi chiusi (21 e 24 agosto 2026)
 
-Erano i soli punti della consegna senza implementazione. Restano scritti qui, con il
-testo del PDF a cui rispondono, perche` sono le domande piu` probabili in sede di prova.
+Erano i soli punti della consegna senza implementazione: i primi sei chiusi il 21 agosto, il
+settimo (il capolinea) il 24. Restano scritti qui, con il testo del PDF a cui rispondono, perche`
+sono le domande piu` probabili in sede di prova.
 
 ### 1.1 Previsioni di arrivo — fatto
 
@@ -116,11 +122,16 @@ Due dettagli che valgono una domanda:
   tick; con il fattore 100 un secondo reale vale gia` quasi due minuti di servizio. Senza
   tolleranza ogni convoglio accumulerebbe un paio di minuti a ogni fermata pur viaggiando
   in perfetto orario.
-- **`direzione` nel payload del passaggio**. Al capolinea il convoglio inverte la marcia
-  *prima* di annunciare l'ENTRATA: la Centrale se ne accorgerebbe solo col frame di
-  telemetria successivo, e nel frattempo cercherebbe la prossima fermata dalla parte
-  sbagliata. Adesso il verso lo dichiara il treno, che lo sa per certo. Il campo prende il
-  posto del vecchio `ritardoMinuti`, quindi il messaggio non e` nemmeno cresciuto.
+- **`direzione` nel payload del passaggio**. All'estremo dell'itinerario il convoglio inverte
+  la marcia *prima* di annunciare l'ENTRATA: la Centrale se ne accorge solo col frame di
+  telemetria successivo, e nel frattempo cerca la prossima fermata dalla parte sbagliata. Il
+  verso viaggiava per questo nel messaggio del passaggio, che il treno mandava alla Centrale.
+  **Dal 24 agosto 2026 quel topic non c'e` piu`** (il passaggio e` diretto ai sensori di
+  stazione, e la stazione certifica il transito senza il verso), quindi la Centrale legge la
+  direzione dalla cache aggiornata dall'ultima telemetria, con "andata" come ripiego: nella
+  finestra fra l'inversione e il frame successivo, fino a `P_tel`, il verso e` ancora quello
+  vecchio. E` il prezzo dichiarato di aver fatto certificare il passaggio al sensore invece che
+  al treno.
 
 *Limite dichiarato*: tabella di marcia e ritardo stanno in RAM (`Treno.ritardo` era gia`
 `@Transient`), quindi al riavvio della Centrale il conteggio riparte da zero e il primo
@@ -221,6 +232,37 @@ invece di lasciarlo indovinare alla Centrale, che comunque lo valida
 quello di stazione — trattiene i convogli — perche` non c'e` una seconda via su cui
 dirottarli.
 
+### 1.7 Il capolinea come fine corsa — fatto il 24 agosto 2026
+
+Il PDF ammette che un treno possa *"entrare senza uscirvi (capolinea)"*. Prima non succedeva mai:
+all'estremo dell'itinerario il convoglio invertiva la direzione e ripartiva, quindi da ogni stazione
+prima o poi usciva.
+
+Adesso l'itinerario ha una colonna `capolinea` (`Itinerario.capolineaId`, estensione dello schema):
+l'amministratore marca con la bandierina uno dei due **estremi** dell'elenco delle stazioni — una
+fermata intermedia il gateway la rifiuta con un 400, perche' spezzerebbe il percorso in due — e quale
+dei due cambia la corsa: l'ultima stazione chiude dopo la sola andata, la prima dopo andata e
+ritorno. Il capolinea viaggia verso il treno nella stessa risposta dell'itinerario
+(`GET /api/treni/{id}/itinerario`, campo `capolineaId`).
+
+Arrivandoci il convoglio pubblica l'ENTRATA — in quella stazione ci e` entrato davvero — e poi si
+ferma: stato `CAPOLINEA`, fase `FERMO_CAPOLINEA`, velocita` e passeggeri a zero, nessuna prossima
+fermata (`TrainJourneyEngine.java:752`). Quel transito resta aperto per sempre, ed e` esattamente il
+caso "entra senza uscire" che il PDF nomina. Lo stato nuovo e` stato aggiunto anche al CHECK di
+`Treni.stato` in Centrale (serve la migrazione `migrazione_capolinea.sql` su un database gia` in
+uso), le previsioni di arrivo saltano i convogli a fine corsa e la dashboard li mostra come servizio
+concluso, non come guasto.
+
+Se ne esce solo assegnando al treno un itinerario diverso, oppure togliendo il capolinea da quello
+che ha: la modifica arriva via `ITINERARIO_AGGIORNATO` e il twin si riaggancia
+(`TrainJourneyEngine.java:365`). Un convoglio a fine corsa viene riagganciato **sempre**, anche se le
+fermate non sono cambiate, perche' quella e` l'unica strada che ha per ripartire; se pero` il
+capolinea e` ancora la stazione in cui sta, resta fermo (`TrainJourneyEngine.java:491`), se no
+bastava agganciare un altro treno alla tratta per farlo ripartire.
+
+Il caso opposto era gia` coperto: alla prima partenza viene pubblicata solo l'USCITA, senza ENTRATA
+inventata.
+
 ### Come si verifica
 
 - `ServeCentraleOperativa/src/test/java/it/uni/reti2/elaboration/PrevisioneArriviTest.java`
@@ -233,6 +275,10 @@ dirottarli.
   che il convoglio li copia a bordo, che lo zero azzeri davvero il ritardo e che l'alert di
   un altro treno venga ignorato (il topic e` condiviso). Nessuno dei due e` un
   `@QuarkusTest`: sono oggetti costruiti a mano, cosi` non toccano il broker vero.
+- `Treni/src/test/java/it/uni/reti2/RiaggancioItinerarioTest.java` copre il capolinea con due
+  casi in coda ai cinque del riaggancio: togliere il capolinea rimette in marcia il convoglio che
+  aveva chiuso la corsa, confermarlo dov'era lo tiene fermo. A mano si prova dalla pagina Tratte,
+  con la bandierina su una delle due stazioni estreme.
 - I due parametri dell'orario di servizio (`viaggio.fattore.accelerazione`,
   `viaggio.sosta.secondi`) stanno adesso anche in
   `ServeCentraleOperativa/src/main/resources/application.properties` e **devono restare
@@ -251,13 +297,6 @@ interrotta si rappresenta guastando la stazione a un capo, che e` piu` grossolan
 
 Le vie multiple il PDF le dichiara opzionali (*"se volete gestire anche le vie multiple"*), quindi
 non e` una penalita`.
-
-### 2.2 Il capolinea non e` mai un fine corsa
-
-Il PDF ammette che un treno possa *"entrare senza uscirvi (capolinea)"*. Nel simulatore al capolinea
-il convoglio inverte la direzione e riparte (`TrainJourneyEngine.java:687`), quindi quel caso non si
-verifica mai. Il caso opposto invece si` : alla prima partenza viene pubblicata solo l'USCITA, senza
-ENTRATA inventata (`TrainJourneyEngine.java:533`).
 
 ## 3. Quello che invece e` coperto
 
@@ -285,5 +324,5 @@ Due righe di quel documento sono superate dai fatti:
   `TrainJourneyEngine.java:329-455`.
 - **RF02.1.1.2.3** (il convoglio avviato dopo l'allarme non sa che la stazione e` guasta) di fatto
   si chiude da solo: quando quel convoglio entra, la stazione si accorge di essere GUASTA e
-  ripubblica l'alert, e il treno si blocca li` (`StationGateway.riceviPassaggio`, ramo
+  ripubblica l'alert, e il treno si blocca li` (`StationGateway.registraTransitoRilevato`, ramo
   "stazione guasta", e `TrainGateway.java:95-108`).

@@ -35,7 +35,9 @@ import java.util.Random;
  * - i tempi di percorrenza reali sono scalati dal fattore di accelerazione
  *   (es. fattore 10: 1 minuto simulato = 6 secondi reali);
  * - la posizione GPS è interpolata linearmente tra le coordinate delle due stazioni;
- * - al capolinea il treno inverte la direzione (con sosta doppia);
+ * - all'estremo dell'itinerario il treno inverte la direzione (con sosta doppia),
+ *   a meno che quell'estremo sia il capolinea marcato dall'amministratore: in quel caso
+ *   la corsa finisce li' (fase FERMO_CAPOLINEA) e riparte solo con un itinerario nuovo;
  * - se una stazione della tratta (corrente o prossima) risulta guasta il treno
  *   si blocca finché non arriva l'alert RESOLVED (il ritardo che ne segue lo
  *   misura la Centrale, confrontando l'arrivo con l'orario previsto);
@@ -63,7 +65,7 @@ public class TrainJourneyEngine {
 
     /**
      * Gateway MQTT del treno: usato per pubblicare i passaggi ENTRATA/USCITA
-     * sul topic railway/train/{id}/passaggio tramite i suoi Emitter.
+     * sul topic railway/treno-simulatoriSensori/{id} tramite i suoi Emitter.
      */
     @Inject
     TrainGateway trainGateway;
@@ -131,6 +133,14 @@ public class TrainJourneyEngine {
 
     /** Id dell'itinerario tenuto in attesa in {@link #itinerarioPendente}. */
     private String itinerarioPendenteId = null;
+
+    /**
+     * Capolinea dell'itinerario tenuto in attesa. Viaggia insieme alle tappe e non viene
+     * scritto subito nel TrainDB: fino all'arrivo il convoglio sta percorrendo il vecchio
+     * percorso, e mescolare le fermate di quello con il capolinea di questo lo farebbe
+     * fermare in un punto che sul suo itinerario non chiude niente.
+     */
+    private String capolineaPendente = null;
 
     /** Evita di sottoscrivere due volte il flusso di tick. */
     private boolean tickAvviato = false;
@@ -219,6 +229,14 @@ public class TrainJourneyEngine {
             return;
         }
 
+        // Corsa finita al capolinea: il convoglio resta fermo dov'è. Non c'è niente da
+        // congelare e niente da aspettare, l'unica cosa che può rimetterlo in moto è un
+        // itinerario nuovo, e quella richiesta è già stata gestita in cima a questo metodo.
+        if ("CAPOLINEA".equals(trainDB.stato)) {
+            trainDB.velocita = 0;
+            return;
+        }
+
         // In emergenza il viaggio è congelato: il tempo di tratta non avanza
         if ("EMERGENZA".equals(trainDB.stato)) {
             congelaAvanzamentoTratta();
@@ -229,7 +247,7 @@ public class TrainJourneyEngine {
             case "IN_STAZIONE" -> tickInStazione();
             case "IN_VIAGGIO" -> tickInViaggio();
             case "BLOCCATO_GUASTO_STAZIONE" -> tickBloccato();
-            default -> { /* TERMINATO o fase sconosciuta: nulla da fare */ }
+            default -> { /* TERMINATO, FERMO_CAPOLINEA o fase sconosciuta: nulla da fare */ }
         }
     }
 
@@ -270,8 +288,10 @@ public class TrainJourneyEngine {
                 trainDB.itinerario = new ArrayList<>();
                 trainDB.itinerarioId = null;
                 trainDB.stazioniTratta = new ArrayList<>();
+                trainDB.capolineaId = null; // il capolinea se ne va con l'itinerario a cui apparteneva
                 itinerarioPendente = null;
                 itinerarioPendenteId = null;
+                capolineaPendente = null;
                 viaggioAvviato = false;
                 fermaPerMancanzaItinerario();
                 return;
@@ -286,7 +306,7 @@ public class TrainJourneyEngine {
             // todo: controllla un po meglio come è sto modello che mi sembra un po strano questo inserimento dei dati
 
             //  --- si riempie il db locale delle informaizoni riguardo alla tratta
-            // Parsing della risposta: {"itinerarioId":"...","stazioni":[{...},...]}
+            // Parsing della risposta: {"itinerarioId":"...","capolineaId":"...","stazioni":[...]}
             JsonNode radice = objectMapper.readTree(risposta.body());
             List<TrainDB.TappaItinerario> tappe = new ArrayList<>();
             List<String> soloId = new ArrayList<>();// ?
@@ -307,8 +327,11 @@ public class TrainJourneyEngine {
                 LOG.warnf("⚠️ [TWIN] Itinerario con meno di 2 stazioni (%d): impossibile viaggiare, riprovo", tappe.size());
                 return;
             }
-            // aggiornamento del db (o attesa, se il treno è in mezzo a una tratta)
-            applicaItinerario(radice.path("itinerarioId").asText(null), tappe, soloId);
+            // aggiornamento del db (o attesa, se il treno è in mezzo a una tratta).
+            // capolineaId assente o null = itinerario da percorrere all'infinito, cioè il
+            // comportamento che il twin ha sempre avuto.
+            applicaItinerario(radice.path("itinerarioId").asText(null), tappe, soloId,
+                    radice.path("capolineaId").asText(null));
 
             LOG.infof("🗺️ [TWIN] Itinerario %s caricato: %d stazioni %s",
                     radice.path("itinerarioId").asText(null), tappe.size(), soloId);
@@ -334,18 +357,34 @@ public class TrainJourneyEngine {
      *   <li>treno fermo in stazione: si scrive subito e ci si riaggancia lì.</li>
      * </ul>
      *
-     * @param nuovoId Identificativo dell'itinerario scaricato.
-     * @param tappe   Tappe del nuovo itinerario, in ordine.
-     * @param soloId  Gli id delle stesse tappe (per TrainDB.stazioniTratta).
+     * @param nuovoId    Identificativo dell'itinerario scaricato.
+     * @param tappe      Tappe del nuovo itinerario, in ordine.
+     * @param soloId     Gli id delle stesse tappe (per TrainDB.stazioniTratta).
+     * @param capolineaId Stazione che chiude il servizio, null se il percorso non finisce.
      */
-    void applicaItinerario(String nuovoId, List<TrainDB.TappaItinerario> tappe, List<String> soloId) {
+    void applicaItinerario(String nuovoId, List<TrainDB.TappaItinerario> tappe, List<String> soloId,
+                           String capolineaId) {
+        // Il convoglio che aveva chiuso la corsa va SEMPRE riagganciato, anche quando le
+        // fermate sono identiche: se il capolinea è stato spostato o tolto, quella è
+        // esattamente la modifica che deve rimetterlo in servizio, ed è l'unico modo che ha
+        // per ripartire. Senza questo ramo cadrebbe nel caso "stesse fermate" qui sotto, che
+        // scrive l'itinerario e basta, e resterebbe fermo lì per sempre.
+        if ("CAPOLINEA".equals(trainDB.stato)) {
+            String dovEro = trainDB.stazioneCorrente;
+            scriviItinerario(nuovoId, tappe, soloId, capolineaId);
+            if (dovEro == null || !riancora(dovEro)) {
+                viaggioAvviato = false; // fuori dal percorso nuovo: si riparte dalla prima tappa
+            }
+            return;
+        }
+
         boolean inMarcia = viaggioAvviato
                 && !"SOPPRESSO".equals(trainDB.stato)
                 && !"SENZA_ITINERARIO".equals(trainDB.faseViaggio)
                 && !"TERMINATO".equals(trainDB.faseViaggio);
 
         if (!inMarcia) {
-            scriviItinerario(nuovoId, tappe, soloId);
+            scriviItinerario(nuovoId, tappe, soloId, capolineaId);
             return;
         }
 
@@ -354,7 +393,7 @@ public class TrainJourneyEngine {
         // motivo di rimettere in sosta un convoglio che sta viaggiando bene. I tempi di
         // percorrenza però possono essere cambiati, quindi la lista si scrive lo stesso.
         if (soloId.equals(trainDB.stazioniTratta)) {
-            scriviItinerario(nuovoId, tappe, soloId);
+            scriviItinerario(nuovoId, tappe, soloId, capolineaId);
             LOG.info("🗺️ [TWIN] Le mie fermate non sono cambiate: proseguo il viaggio");
             return;
         }
@@ -364,13 +403,14 @@ public class TrainJourneyEngine {
         if ("IN_VIAGGIO".equals(faseEffettiva())) {
             itinerarioPendente = tappe;
             itinerarioPendenteId = nuovoId;
+            capolineaPendente = capolineaId;
             LOG.infof("🗺️ [TWIN] Itinerario %s in attesa: lo applico appena arrivo a %s",
                     nuovoId, trainDB.prossimaStazione);
             return;
         }
 
         String stazioneAncora = tappaCorrente().id;
-        scriviItinerario(nuovoId, tappe, soloId);
+        scriviItinerario(nuovoId, tappe, soloId, capolineaId);
         if (!riancora(stazioneAncora)) {
             viaggioAvviato = false; // nessun punto di aggancio: si ricomincia dal capolinea
         }
@@ -379,14 +419,20 @@ public class TrainJourneyEngine {
     /**
      * Scrive nel TrainDB l'itinerario ricevuto dalla Centrale.
      *
-     * @param nuovoId Identificativo dell'itinerario.
-     * @param tappe   Tappe in ordine di percorrenza.
-     * @param soloId  Gli id delle stesse tappe.
+     * @param nuovoId    Identificativo dell'itinerario.
+     * @param tappe      Tappe in ordine di percorrenza.
+     * @param soloId     Gli id delle stesse tappe.
+     * @param capolineaId Stazione che chiude il servizio, null se il percorso non finisce.
      */
-    private void scriviItinerario(String nuovoId, List<TrainDB.TappaItinerario> tappe, List<String> soloId) {
+    private void scriviItinerario(String nuovoId, List<TrainDB.TappaItinerario> tappe, List<String> soloId,
+                                  String capolineaId) {
         trainDB.itinerarioId = nuovoId;
         trainDB.itinerario = tappe; // perchè è una lista di tappe
         trainDB.stazioniTratta = soloId; // ma come cazzo lo abbiamo fatto sto modello ??
+        // Il capolinea appartiene all'itinerario: si scrive insieme a lui e mai da solo, se
+        // no il treno finirebbe per fermarsi in un punto che sul percorso in uso non chiude
+        // niente.
+        trainDB.capolineaId = capolineaId;
     }
 
     /**
@@ -442,9 +488,20 @@ public class TrainJourneyEngine {
             if (!ancoraGuasta) {
                 sbloccaDaGuastoStazione();
             }
+        } else if (stazioneAncora.equals(trainDB.capolineaId)) {
+            // Il percorso nuovo conferma il capolinea proprio dove il treno si trova: la corsa
+            // resta chiusa. Senza questo controllo basterebbe risalvare l'itinerario senza
+            // cambiare niente (o agganciarci un altro convoglio: l'evento arriva a tutti) per
+            // far ripartire un treno che aveva finito il servizio.
+            trainDB.faseViaggio = "FERMO_CAPOLINEA";
+            if (!"EMERGENZA".equals(trainDB.stato) && !"SOPPRESSO".equals(trainDB.stato)) {
+                trainDB.stato = "CAPOLINEA";
+            }
         } else {
             trainDB.faseViaggio = "IN_STAZIONE";
-            // Gli stati decisi da fuori non si toccano, come in fermaPerMancanzaItinerario
+            // Gli stati decisi da fuori non si toccano, come in fermaPerMancanzaItinerario.
+            // CAPOLINEA invece sì: se il treno era fermo a fine corsa e adesso quella stazione
+            // non chiude più niente, questo è il momento in cui torna in servizio.
             if (!"EMERGENZA".equals(trainDB.stato) && !"SOPPRESSO".equals(trainDB.stato)) {
                 trainDB.stato = "FERMO";
             }
@@ -642,7 +699,12 @@ public class TrainJourneyEngine {
     /**
      * Gestisce l'arrivo nella stazione di destinazione della tratta corrente:
      * avanza l'indice, pubblica ENTRATA, rinnova i passeggeri e, se la stazione
-     * è un capolinea, inverte la direzione con sosta doppia.
+     * è un estremo dell'itinerario, inverte la direzione con sosta doppia.
+     *
+     * <p>Se l'estremo raggiunto è il <b>capolinea marcato dall'amministratore</b> non c'è
+     * nessuna inversione: la corsa finisce lì. L'ENTRATA si pubblica lo stesso, perché il
+     * convoglio in quella stazione ci è entrato davvero — è il caso "un treno può entrarvi
+     * e non uscirvi" — e sarà l'unico passaggio che quella stazione registrerà per lui.</p>
      *
      * @param arrivo Tappa in cui il treno è appena entrato.
      */
@@ -670,15 +732,32 @@ public class TrainJourneyEngine {
         if (itinerarioPendente != null) {
             List<TrainDB.TappaItinerario> nuovo = itinerarioPendente;
             String nuovoId = itinerarioPendenteId;
+            String nuovoCapolinea = capolineaPendente;
             itinerarioPendente = null;
             itinerarioPendenteId = null;
-            scriviItinerario(nuovoId, nuovo, soloId(nuovo));
+            capolineaPendente = null;
+            scriviItinerario(nuovoId, nuovo, soloId(nuovo), nuovoCapolinea);
             trainGateway.notificaPassaggioStazione(arrivo.id, "ENTRATA");
             if (!riancora(arrivo.id)) {
                 viaggioAvviato = false; // la stazione non è nel percorso nuovo: riparto dal capolinea
             }
             LOG.infof("🚉 [TWIN] Arrivo in %s con itinerario nuovo (passeggeri %d)",
                     arrivo.id, trainDB.passeggeri);
+            return;
+        }
+
+        // Fine del servizio: quello raggiunto è l'estremo che l'amministratore ha marcato
+        // come capolinea. Il controllo viene prima dell'inversione perché un estremo marcato
+        // non è un punto in cui girarsi, è il punto in cui la corsa finisce.
+        if (arrivo.id.equals(trainDB.capolineaId)) {
+            trainDB.stato = "CAPOLINEA";
+            trainDB.faseViaggio = "FERMO_CAPOLINEA";
+            trainDB.velocita = 0;
+            trainDB.passeggeri = 0; // al capolinea scendono tutti
+            trainGateway.notificaPassaggioStazione(arrivo.id, "ENTRATA");
+            trainDB.prossimaStazione = null;
+            LOG.infof("🏁 [TWIN] Capolinea %s: corsa terminata, resto fermo qui finché non "
+                    + "mi assegnano un itinerario nuovo", arrivo.id);
             return;
         }
 

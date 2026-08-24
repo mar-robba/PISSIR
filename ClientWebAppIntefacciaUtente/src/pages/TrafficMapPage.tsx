@@ -526,6 +526,9 @@ function inLinea(train: TrainType): boolean {
 /** Colore del simbolo del treno in base allo stato del convoglio. */
 function coloreTreno(train: TrainType): { simbolo: string; classe: string } {
   if (train.status === 'guasto') return { simbolo: '#ef4444', classe: 'map-label--guasto' };
+  // Il capolinea viene prima del ritardo: un convoglio che ha chiuso la corsa con qualche
+  // minuto di ritardo residuo non è "in ritardo", non deve più arrivare da nessuna parte.
+  if (train.status === 'capolinea') return { simbolo: '#8b5cf6', classe: 'map-label--fermo' };
   if (train.status === 'in_ritardo' || train.delayMinutes > 0) {
     return { simbolo: '#f59e0b', classe: 'map-label--ritardo' };
   }

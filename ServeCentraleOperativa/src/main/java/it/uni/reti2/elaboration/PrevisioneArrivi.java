@@ -2,6 +2,7 @@ package it.uni.reti2.elaboration;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import it.uni.reti2.entity.ItinerarioTratta;
+import it.uni.reti2.entity.StatiCanonici;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -143,9 +144,13 @@ public class PrevisioneArrivi {
         if (treno == null) {
             return;
         }
-        Previsione previsione = "in manutenzione".equalsIgnoreCase(treno.stato)
-                ? null
-                : previsioneVerso(treno, treno.prossimaStazione);
+        // Corsa soppressa o finita al capolinea: non c'e' nessun arrivo da prevedere. Per il
+        // capolinea basterebbe la prossima stazione vuota, ma dirlo qui rende la regola
+        // esplicita e regge anche l'ultimo frame di telemetria che arrivasse ancora con la
+        // fermata successiva valorizzata.
+        boolean corsaFinita = "in manutenzione".equalsIgnoreCase(treno.stato)
+                || StatiCanonici.TRENO_CAPOLINEA.equalsIgnoreCase(treno.stato);
+        Previsione previsione = corsaFinita ? null : previsioneVerso(treno, treno.prossimaStazione);
         if (previsione == null) {
             treno.minutiAllArrivo = null;
             treno.arrivoPrevisto = null;
@@ -232,6 +237,12 @@ public class PrevisioneArrivi {
             }
             if ("in manutenzione".equalsIgnoreCase(treno.stato)) {
                 continue; // corsa soppressa: la stazione non lo aspetta piu'
+            }
+            if (StatiCanonici.TRENO_CAPOLINEA.equalsIgnoreCase(treno.stato)) {
+                // Corsa finita: il convoglio e' fermo al capolinea e non ne uscira'. Senza
+                // questo salto resterebbe in eterno fra i treni "in partenza" dal tabellone
+                // di quella stazione, con zero minuti all'arrivo, aspettato da tutti.
+                continue;
             }
             boolean inSosta = stazioneId.equals(treno.stazioneCorrente);
             Previsione previsione = inSosta ? new Previsione(0, 0) : previsioneVerso(treno, stazioneId);

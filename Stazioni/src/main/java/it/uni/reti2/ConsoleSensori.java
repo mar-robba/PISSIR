@@ -10,6 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Path;
 import java.util.Scanner;
 
 /**
@@ -49,6 +50,7 @@ public class ConsoleSensori {
                 case "3" -> cambiaHeartbeat(scanner, "start");
                 case "4" -> simulaPassaggio(scanner);
                 case "5" -> simulaGuasto(scanner);
+                case "6" -> cambiaDestinazioneLog();
                 case "0", "q", "Q" -> attivo = false;
                 default -> System.out.println("Scelta non valida.");
             }
@@ -63,6 +65,9 @@ public class ConsoleSensori {
         System.out.println("3) RIPRENDI l'heartbeat di un sensore");
         System.out.println("4) Simula il passaggio di un treno");
         System.out.println("5) Segnala un guasto (stazione intera o un binario)");
+        System.out.println("6) " + (LogSuFile.attivo()
+                ? "Riporta i log a schermo (ora vanno su " + LogSuFile.fileCorrente() + ")"
+                : "Manda i log su file (cartella logs/) e lascia solo il menu qui"));
         System.out.println("0) Esci");
         System.out.print("Scegli l'operazione: ");
     }
@@ -157,6 +162,26 @@ public class ConsoleSensori {
 
         inviaPost("/stazione/sensore/guasto",
                 "{\"descrizione\":\"" + escapeJson(descrizione) + "\",\"tipoGuasto\":\"" + tipoGuasto + "\"}");
+    }
+
+    /**
+     * Sposta i log dal terminale a un file dentro logs/ (o li riporta a schermo).
+     * Il menu resta comunque qui: le sue stampe non passano dal logger.
+     */
+    private void cambiaDestinazioneLog() {
+        try {
+            if (LogSuFile.attivo()) {
+                Path file = LogSuFile.fileCorrente();
+                LogSuFile.disattiva();
+                System.out.println("Log di nuovo a schermo (il file " + file + " resta dov'e').");
+            } else {
+                Path file = LogSuFile.attiva(stazioneId);
+                System.out.println("Log dirottati su " + file.toAbsolutePath()
+                        + " (seguili con: tail -f " + file + ")");
+            }
+        } catch (IOException e) {
+            System.out.println("Non riesco a scrivere nella cartella logs: " + e.getMessage());
+        }
     }
 
     private String inviaGet(String path) {

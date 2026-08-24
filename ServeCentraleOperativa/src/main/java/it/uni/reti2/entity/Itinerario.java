@@ -28,6 +28,24 @@ public class Itinerario extends PanacheEntityBase {
     @Column(name = "id_itinerario", length = 50)
     public String id;
 
+    /**
+     * La stazione che <strong>chiude il servizio</strong> su questo itinerario, oppure
+     * null (il caso normale) se il percorso si ripete all'infinito, andata e ritorno.
+     *
+     * <p>Deve essere uno dei due estremi dell'elenco delle stazioni, e quale dei due
+     * cambia la corsa: l'ultima chiude dopo la sola andata, la prima dopo andata e
+     * ritorno. La verifica sta in {@code RestApiGateway}, che e' l'unico punto da cui il
+     * campo viene scritto.</p>
+     *
+     * <p>E' un id "nudo" e non un {@code @ManyToOne} verso {@link Stazione} apposta: gli
+     * itinerari finiscono nella cache in RAM appesi ai treni e da li' vengono serializzati
+     * in JSON per il frontend. Un'associazione lazy su un'entita' ormai staccata dalla
+     * sessione esploderebbe proprio durante quella serializzazione; il nome della stazione,
+     * quando serve, lo rilegge il gateway.</p>
+     */
+    @Column(name = "capolinea", length = 50)
+    public String capolineaId;
+
     // ──────────────────────────────────────────────────────────────
     // Campi di compatibilità con il frontend (NON persistiti).
     // Vengono popolati dinamicamente da RestApiGateway.getTratte().

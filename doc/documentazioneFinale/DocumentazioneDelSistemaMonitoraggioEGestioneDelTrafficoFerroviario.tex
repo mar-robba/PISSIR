@@ -1,4 +1,4 @@
-% Created 2026-08-22 sab 17:01
+% Created 2026-08-24 lun 18:43
 % Intended LaTeX compiler: pdflatex
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
@@ -39,22 +39,22 @@
 \tableofcontents
 
 \section{Specifica}
-\label{sec:orgee1b4cc}
+\label{sec:org33e6ec6}
 \subsection{Introduzione Descrizione Generale}
-\label{sec:org84a81b7}
+\label{sec:org2bfc2bd}
 Il sistema è al fine della gestione e del monitoraggio di una rete ferroviaria, in particolare
 delle stazioni e dei treni che la compongono.
 Tale servizio è Fornito attraverso una app web che fornisce il neccessarrio
 \subsection{Modellazione per casi d'uso}
-\label{sec:org9b7473c}
+\label{sec:orgcbed464}
 
 
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-ZO2bKU.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-zrf5q5.png}
 \label{}
 \end{center}
 \subsection{Glossario dei termini di dominio}
-\label{sec:org1958da1}
+\label{sec:org7220f01}
 
 \begin{description}
 \item[{Stazione}] nodo della rete in cui i convogli entrano, sostano ed escono. Ha un nome, una
@@ -63,9 +63,14 @@ posizione geografica e uno stato operativo.
 E' l'unita' con cui si compone un percorso.
 \item[{Itinerario}] sequenza ordinata di stazioni che un convoglio deve percorrere, con il tempo di
 percorrenza previsto fra una tappa e la successiva. Nelle schermate e' chiamato anche \textbf{tratta}.
-\item[{Capolinea}] prima e ultima stazione di un itinerario.
+\item[{Estremo dell'itinerario}] la prima e l'ultima stazione della sequenza. E' il punto in cui il
+convoglio inverte la marcia, a meno che quell'estremo sia anche il capolinea.
+\item[{Capolinea}] l'estremo su cui il servizio si chiude, deciso dall'amministratore quando compone
+l'itinerario. Il convoglio che ci arriva termina la corsa e resta fermo li'. E' una proprieta'
+dell'itinerario e non della stazione: la stessa stazione puo' chiudere un itinerario ed essere
+una fermata qualunque di un altro. Un itinerario senza capolinea si percorre senza fine.
 \item[{Direzione}] verso di percorrenza dell'itinerario, \textbf{andata} o \textbf{ritorno}.
-\item[{Corsa}] percorrenza dell'itinerario da un capolinea all'altro in una direzione.
+\item[{Corsa}] percorrenza dell'itinerario da un estremo all'altro in una direzione.
 \item[{Convoglio}] il treno in servizio, identificato da un numero. Ha una posizione, uno stato, un
 ritardo accumulato e un numero di passeggeri a bordo.
 \item[{Transito}] passaggio di un convoglio per una stazione. E' di due tipi, \textbf{entrata} e \textbf{uscita}, ed e'
@@ -92,10 +97,10 @@ nuovo le credenziali all'utente. Serve perche' una sessione di lavoro dura piu' 
 attestato.
 \end{description}
 \subsection{Requisiti funzionali}
-\label{sec:org1d7c7a1}
+\label{sec:orga526a59}
 La numerazione è gerarchica per raggruppamenti e presenta anche le dipendenze
 \subsubsection{RF01 - Servizi offerti agli utenti}
-\label{sec:org697bbbf}
+\label{sec:org03e7bc6}
 
 \textbf{Enunciato}: il sistema espone a tecnico e amministratore, attraverso un'unica applicazione web, la
 situazione corrente della rete, la sua storia e i comandi previsti per il loro ruolo.
@@ -109,11 +114,11 @@ l'accesso ci sono per intero; dei tre comandi operativi di RF01.4 i due che rigu
 sono completi, resta parziale la soppressione della corsa, che non verifica la propria
 precondizione.
 \paragraph{RF01.1 - Visualizzazione della situazione corrente}
-\label{sec:org337a087}
+\label{sec:org4fedc63}
 
 \textbf{Stato di implementazione}: completo, tutte e cinque le voci.
 \subparagraph{RF01.1.1 - Mappa del traffico}
-\label{sec:orgf914e35}
+\label{sec:org042e1c0}
 \begin{itemize}
 \item enunciato: la posizione dei convogli e' rappresentata su una mappa geografica, insieme al percorso
 che stanno seguendo e al loro stato.
@@ -122,7 +127,7 @@ che stanno seguendo e al loro stato.
 le due stazioni della tratta che sta percorrendo, con sopra il percorso e il colore dello stato.
 \end{itemize}
 \subparagraph{RF01.1.2 - Elenco dei convogli}
-\label{sec:org1e7df66}
+\label{sec:org4c3c3d4}
 \begin{itemize}
 \item enunciato: per ogni convoglio sono visibili il numero, la stazione o la tratta su cui si trova, lo
 stato, il ritardo accumulato e i passeggeri a bordo.
@@ -130,7 +135,7 @@ stato, il ritardo accumulato e i passeggeri a bordo.
 \item stato di implementazione: completo.
 \end{itemize}
 \subparagraph{RF01.1.3 - Elenco delle stazioni}
-\label{sec:org51c8612}
+\label{sec:org7974655}
 \begin{itemize}
 \item enunciato: per ogni stazione sono visibili lo stato operativo, i convogli fermi sui binari in quel
 momento, quelli attesi in ingresso e quelli attesi in uscita.
@@ -139,7 +144,7 @@ momento, quelli attesi in ingresso e quelli attesi in uscita.
 li dichiara il nodo di stazione: la schermata mette insieme le due cose.
 \end{itemize}
 \subparagraph{RF01.1.4 - Aggiornamento continuo}
-\label{sec:org71fe95d}
+\label{sec:org35255f5}
 \begin{itemize}
 \item enunciato: le schermate si aggiornano da sole mentre l'operatore le guarda, senza che lui debba
 ricaricare la pagina o chiedere l'aggiornamento.
@@ -154,7 +159,7 @@ spinto sulla websocket nel momento in cui accade, e la fotografia periodica viag
 canale senza che il browser chieda niente.
 \end{itemize}
 \subparagraph{RF01.1.5 - Indicatori di sintesi}
-\label{sec:org2157ef5}
+\label{sec:orgcbfc403}
 \begin{itemize}
 \item enunciato: una schermata di riepilogo riassume in pochi numeri i convogli in circolazione, le
 stazioni operative, i guasti aperti e il ritardo medio.
@@ -163,11 +168,11 @@ stazioni operative, i guasti aperti e il ritardo medio.
 fotografia periodica di RF01.1.4, quindi si aggiornano da soli come il resto.
 \end{itemize}
 \paragraph{RF01.2 - Visualizzazione dei guasti}
-\label{sec:org7b22b1b}
+\label{sec:org4be0dbe}
 
 \textbf{Stato di implementazione}: completo, entrambe le voci.
 \subparagraph{RF01.2.1 - Elenco degli allarmi aperti}
-\label{sec:orgb507d84}
+\label{sec:orge69214b}
 \begin{itemize}
 \item enunciato: sono visibili i guasti attivi con la sorgente (quale stazione, quale convoglio, quale
 tratta), il tipo, la severita' e l'istante di apertura.
@@ -175,7 +180,7 @@ tratta), il tipo, la severita' e l'istante di apertura.
 \item stato di implementazione: completo.
 \end{itemize}
 \subparagraph{RF01.2.2 - Distinzione fra guasto segnalato e guasto dedotto}
-\label{sec:org669fddf}
+\label{sec:org59fcfce}
 \begin{itemize}
 \item enunciato: l'elenco distingue il guasto \textbf{segnalato dal campo} (qualcuno lo ha dichiarato) da quello
 \textbf{dedotto dalla centrale} (un nodo ha smesso di dare notizie).
@@ -189,7 +194,7 @@ dell'allarme, e la schermata la mostra esplicitamente come ``segnalato dal campo
 ``dedotto dalla centrale''.
 \end{itemize}
 \paragraph{RF01.3 - Amministrazione dei dati della rete}
-\label{sec:org8273f96}
+\label{sec:org4d50290}
 
 \textbf{Enunciato del ramo}: la creazione, la modifica e l'eliminazione dell'anagrafica della rete sono
 riservate all'amministratore; il tecnico vede tutto ma non modifica nulla.
@@ -202,35 +207,42 @@ aggiungere ne' i treni a cui cambiare le stazioni attraversate.
 
 \textbf{Stato di implementazione}: completo, tutte e cinque le voci.
 \subparagraph{RF01.3.1 - Stazioni}
-\label{sec:org2afca79}
+\label{sec:org2aec385}
 \begin{itemize}
 \item enunciato: l'amministratore crea, modifica ed elimina le stazioni della rete.
 \item stato di implementazione: completo.
 \end{itemize}
 \subparagraph{RF01.3.2 - Convogli}
-\label{sec:org3ae6bbc}
+\label{sec:orgd9f90f0}
 \begin{itemize}
 \item enunciato: l'amministratore crea, modifica ed elimina i convogli.
 \item stato di implementazione: completo.
 \end{itemize}
 \subparagraph{RF01.3.3 - Tratte elementari}
-\label{sec:org48829b8}
+\label{sec:org24f2a53}
 \begin{itemize}
 \item enunciato: l'amministratore crea, modifica ed elimina i collegamenti diretti fra due stazioni
 adiacenti.
 \item stato di implementazione: completo.
 \end{itemize}
 \subparagraph{RF01.3.4 - Itinerari e assegnazione dei convogli}
-\label{sec:org51809c6}
+\label{sec:orgd3eaa60}
 \begin{itemize}
 \item enunciato: l'amministratore compone un itinerario come sequenza ordinata di stazioni con i tempi di
 percorrenza previsti, e vi assegna sopra i convogli che devono percorrerlo.
+\item \textbf{scelta di quanto dura il servizio}: sull'itinerario si puo' marcare un estremo come capolinea, e
+allora la corsa si chiude li' invece di ripartire all'incontrario. Quale dei due estremi non e'
+indifferente: l'ultima stazione chiude dopo la sola andata, la prima dopo andata e ritorno. Una
+fermata intermedia non e' ammessa, perche' spezzerebbe l'itinerario in due senza dire che ne e'
+del pezzo restante.
 \item dipende da: RF02.5, perche' la modifica deve restare corretta anche con convogli gia' in marcia.
 \item stato di implementazione: completo per la parte di composizione e assegnazione; quello che succede
-ai convogli gia' in marcia e' invece il ramo RF02.5, che completo non e'.
+ai convogli gia' in marcia e' invece il ramo RF02.5, che completo non e'. Il capolinea si marca e
+si toglie con la bandierina accanto alle due stazioni estreme, e toglierlo e' anche l'unico modo
+per rimettere in servizio un convoglio che la corsa l'ha gia' chiusa.
 \end{itemize}
 \subparagraph{RF01.3.5 - Integrita' dei dati alle eliminazioni}
-\label{sec:org7ae6051}
+\label{sec:org4c1d12c}
 \begin{itemize}
 \item enunciato: l'eliminazione di un'entita' non lascia riferimenti pendenti, e non e' permessa finche'
 qualcosa la sta ancora usando.
@@ -246,7 +258,7 @@ dire niente. Una parte della garanzia pero' la tengono i vincoli del database e 
 scritti a mano.
 \end{itemize}
 \paragraph{RF01.4 - Comandi operativi}
-\label{sec:org115974a}
+\label{sec:orgdb081b8}
 
 \textbf{Chi puo' dare quale comando}: lo dice la consegna, e non e' lo stesso ruolo per tutti e tre. La
 squadra sulla stazione guasta la manda il \textbf{tecnico}; la corsa la sopprime l'\textbf{amministratore}, e la
@@ -262,7 +274,7 @@ RF04.2 non e' completo.
 \textbf{Stato di implementazione}: parziale — tutti e tre i comandi fanno la cosa principale, nessuno dei
 tre la fa per intero.
 \subparagraph{RF01.4.1 - Invio della squadra di manutenzione}
-\label{sec:org108b216}
+\label{sec:org4e37fa2}
 \begin{itemize}
 \item enunciato: il tecnico manda la squadra su una stazione guasta; la stazione resta inutilizzabile
 per tutta la durata dell'intervento.
@@ -285,7 +297,7 @@ di storico del passaggio e avvisa il campo; il ritorno in servizio non e' piu' d
 chiamata ma e' legato alla fine vera dell'intervento, cioe' a RF01.4.2.
 \end{itemize}
 \subparagraph{RF01.4.2 - Chiusura dell'allarme e ripresa della circolazione}
-\label{sec:org2a41c2a}
+\label{sec:org3a880bd}
 \begin{itemize}
 \item enunciato: il tecnico dichiara concluso l'intervento; il guasto passa a chiuso e cio' che era
 trattenuto per causa sua riprende.
@@ -303,7 +315,7 @@ vengano inviati e che il guasto sia ripristinato, non che il sistema tenga il re
 operatore se ne sia occupato.
 \end{itemize}
 \subparagraph{RF01.4.3 - Soppressione di un convoglio fermo in stazione}
-\label{sec:orgdd083bb}
+\label{sec:orgc77b1de}
 \begin{itemize}
 \item enunciato: l'amministratore annulla una corsa; il convoglio passa in SOPPRESSO e non viaggia piu'.
 \item soggetto: l'amministratore, che nella consegna e' il ruolo a cui questo comando e' assegnato.
@@ -315,7 +327,7 @@ verificata da nessuna parte: il comando sopprime anche un convoglio in mezzo a u
 sopprimibilita' resta affidata al buon senso di chi preme il bottone.
 \end{itemize}
 \paragraph{RF01.5 - Consultazione dello storico}
-\label{sec:org39b0858}
+\label{sec:orgcf287b9}
 
 \begin{itemize}
 \item enunciato: sono consultabili i transiti passati, ciascuno con il convoglio, la stazione, la tratta,
@@ -326,7 +338,7 @@ storico dei transiti, e quello e' RF02.7; mostrarlo in una schermata non lo chie
 \item stato di implementazione: completo.
 \end{itemize}
 \paragraph{RF01.6 - Accesso al sistema}
-\label{sec:org0e4bb46}
+\label{sec:org80806d7}
 
 \begin{itemize}
 \item enunciato: l'uso dell'applicazione richiede di identificarsi; l'identita' accompagna tutte le
@@ -338,7 +350,7 @@ l'applicazione non raccoglie e non vede mai le credenziali, riceve solo l'attest
 identita', l'applicazione riceve solo l'attestato e l'uscita esplicita chiude la sessione.
 \end{itemize}
 \subsubsection{RF02 - Correttezza dello stato rappresentato}
-\label{sec:org13e1300}
+\label{sec:org0784722}
 \textbf{Enunciato}: lo stato che il sistema mostra e conserva corrisponde a quello che sta realmente
 accadendo sulla rete, anche in presenza di guasti, di interruzioni del collegamento e di modifiche
 fatte mentre il sistema e' in funzione.
@@ -350,23 +362,23 @@ conseguenze del guasto del convoglio sull'infrastruttura (RF02.1.2.2); sono parz
 vita del guasto, che non registra la presa in carico (RF02.1.3), e la memoria storica, che di
 cinque cose ne scrive tre (RF02.7).
 \paragraph{RF02.1 - Gestione dei guasti}
-\label{sec:org236d80c}
+\label{sec:orgd109f11}
 
 \textbf{Stato di implementazione}: parziale — il guasto della stazione e la chiusura automatica ci sono;
 restano fuori le conseguenze del guasto del convoglio (RF02.1.2.2) e la presa in carico nel ciclo di
 vita del guasto (RF02.1.3).
 \subparagraph{RF02.1.1 - Guasto della stazione}
-\label{sec:org89a8c80}
+\label{sec:org245cc49}
 
 \textbf{Stato di implementazione}: parziale, per il solo RF02.1.1.2.3.
 \begin{enumerate}
 \item RF02.1.1.1 - Interruzione del collegamento con la centrale
-\label{sec:orgba230c8}
+\label{sec:org3f55269}
 
 \textbf{Stato di implementazione}: completo.
 \begin{enumerate}
 \item RF02.1.1.1.1 - Nessun dato perduto durante l'interruzione
-\label{sec:org811493c}
+\label{sec:org9709ea5}
 \begin{itemize}
 \item enunciato: mentre il collegamento con la centrale non e' disponibile, la stazione conserva
 localmente tutto cio' che produce e lo consegna quando il collegamento torna.
@@ -379,7 +391,7 @@ su un SQLite locale (tabella \texttt{bufferChache}), quindi regge anche alla cad
 riavvio la stazione rilegge da disco cio' che non era partito e lo consegna comunque.
 \end{itemize}
 \item RF02.1.1.1.2 - Ordine di consegna preservato
-\label{sec:orgf4b0a73}
+\label{sec:orgde04913}
 \begin{itemize}
 \item enunciato: la consegna differita rispetta l'ordine in cui gli eventi sono stati generati; se una
 singola consegna fallisce, l'evento non consegnato precede comunque quelli successivi.
@@ -392,12 +404,12 @@ coda, ed e' esattamente questo che impedisce a un'uscita di precedere la propria
 \end{itemize}
 \end{enumerate}
 \item RF02.1.1.2 - Stazione non percorribile
-\label{sec:org387420f}
+\label{sec:org1098e29}
 
 \textbf{Stato di implementazione}: parziale, per il solo RF02.1.1.2.3.
 \begin{enumerate}
 \item RF02.1.1.2.1 - Il convoglio diretto alla stazione guasta si ferma
-\label{sec:org0ed9064}
+\label{sec:org66b8007}
 \begin{itemize}
 \item enunciato: se la prossima stazione dell'itinerario e' guasta, il convoglio non vi entra e resta
 fermo dove si trova.
@@ -406,7 +418,7 @@ fermo dove si trova.
 \item stato di implementazione: completo.
 \end{itemize}
 \item RF02.1.1.2.2 - Riparte solo al ripristino
-\label{sec:org811b202}
+\label{sec:org1846ced}
 \begin{itemize}
 \item enunciato: il convoglio trattenuto riprende la corsa quando arriva il ripristino di quella
 stazione, non prima e non per scadenza di un tempo.
@@ -415,7 +427,7 @@ che era in corso: nel codice non c'e' nessun tempo massimo che faccia ripartire 
 solo.
 \end{itemize}
 \item RF02.1.1.2.3 - Il blocco vale anche per chi e' gia' fermo li'
-\label{sec:orga612cb8}
+\label{sec:org528c455}
 \begin{itemize}
 \item enunciato: un convoglio gia' in sosta nella stazione che si guasta non riparte finche' il guasto e'
 aperto.
@@ -429,24 +441,24 @@ essere percorribile, e la differenza si vede quando l'avviso non gli arriva.
 \end{enumerate}
 \end{enumerate}
 \subparagraph{RF02.1.2 - Guasto del convoglio}
-\label{sec:org8d7d306}
+\label{sec:org36aad97}
 
 \textbf{Stato di implementazione}: parziale — il guasto viene registrato, le conseguenze sull'infrastruttura
 no.
 \begin{enumerate}
 \item RF02.1.2.1 - Il guasto viene registrato in centrale
-\label{sec:org9e861ae}
+\label{sec:org2cb27a6}
 \begin{itemize}
 \item enunciato: quando un convoglio si guasta, la centrale apre e conserva il guasto corrispondente.
 \item stato di implementazione: completo.
 \end{itemize}
 \item RF02.1.2.2 - Conseguenze del guasto
-\label{sec:org5e4cb4d}
+\label{sec:org3e32275}
 
 \textbf{Stato di implementazione}: non realizzato, in nessuno dei due casi.
 \begin{enumerate}
 \item RF02.1.2.2.1 - Convoglio guasto \textbf{in stazione}: la stazione diventa non percorribile
-\label{sec:org47cb12d}
+\label{sec:org8db7799}
 \begin{itemize}
 \item enunciato: se il convoglio si guasta mentre e' fermo in una stazione, quella stazione risulta
 guasta.
@@ -457,7 +469,7 @@ critica porta la stazione a GUASTA, quindi dopo un guasto di bordo la stazione r
 gli altri convogli ci entrano tranquillamente.
 \end{itemize}
 \item RF02.1.2.2.2 - Convoglio guasto \textbf{in tratta}: la tratta diventa non percorribile
-\label{sec:orgaf956d5}
+\label{sec:org0c4fad9}
 \begin{itemize}
 \item enunciato: se il convoglio si guasta fra due stazioni, e' la tratta elementare che sta percorrendo
 a risultare non percorribile; nessuna stazione cambia stato.
@@ -470,7 +482,7 @@ deduce da sola (RF02.6.2).
 \end{enumerate}
 \end{enumerate}
 \subparagraph{RF02.1.3 - Ciclo di vita del guasto}
-\label{sec:orgfc55b75}
+\label{sec:orgd961564}
 \begin{itemize}
 \item enunciato: un guasto ha uno stato di lavorazione (aperto, preso in carico, chiuso), un
 assegnatario e una traccia di come e' evoluto; sulla stessa sorgente e per lo stesso motivo non
@@ -485,7 +497,7 @@ traccia nello storico. Gli stati pero' sono due e non tre, perche' il guasto por
 assegnazioni esistono nello schema ma restano vuote.
 \end{itemize}
 \subparagraph{RF02.1.4 - Chiusura automatica quando la causa rientra}
-\label{sec:org1457694}
+\label{sec:org2e8ef61}
 \begin{itemize}
 \item enunciato: un guasto aperto perche' un nodo taceva si chiude da solo quando il nodo torna a dare
 notizie, senza bisogno dell'intervento di un operatore.
@@ -499,16 +511,16 @@ debba premere niente; la chiusura automatica riguarda solo i guasti che la centr
 come dice la precondizione.
 \end{itemize}
 \paragraph{RF02.2 - Gestione dei convogli}
-\label{sec:org1dbc2f2}
+\label{sec:orgd1b7ddd}
 
 \textbf{Stato di implementazione}: completo.
 \subparagraph{RF02.2.1 - Ritardi}
-\label{sec:orge91c5fc}
+\label{sec:org871e36b}
 
 \textbf{Stato di implementazione}: completo.
 \begin{enumerate}
 \item RF02.2.1.1 - Il ritardo si accumula quando il convoglio e' fermo e dovrebbe circolare
-\label{sec:org686c494}
+\label{sec:org9346989}
 \begin{itemize}
 \item enunciato: finche' il convoglio e' trattenuto pur avendo una tappa da percorrere, il suo ritardo
 cresce; quando circola regolarmente non cresce.
@@ -517,12 +529,12 @@ cresce; quando circola regolarmente non cresce.
 \end{itemize}
 \end{enumerate}
 \subparagraph{RF02.2.2 - Informazioni di stato del convoglio}
-\label{sec:org23b1c58}
+\label{sec:orgd170f6c}
 
 \textbf{Stato di implementazione}: completo, tutte e quattro le informazioni.
 \begin{enumerate}
 \item RF02.2.2.1 - Posizione
-\label{sec:orgeff668a}
+\label{sec:orgc347efa}
 \begin{itemize}
 \item enunciato: il convoglio dichiara in modo non ambiguo dove si trova: in quale stazione e' fermo,
 oppure fra quali due stazioni sta viaggiando e in quale direzione.
@@ -538,22 +550,22 @@ tratta che sta percorrendo con la direzione, e la centrale la corregge con i pas
 terra.
 \end{itemize}
 \item RF02.2.2.2 - Ritardo accumulato
-\label{sec:org3e0c4b8}
+\label{sec:org3ff35d8}
 \begin{itemize}
 \item enunciato: il convoglio dichiara il ritardo accumulato dall'inizio della corsa.
 \item dipende da: RF02.2.1.
 \item stato di implementazione: completo.
 \end{itemize}
 \item RF02.2.2.3 - Stato del convoglio
-\label{sec:org6a38664}
+\label{sec:orgfb51886}
 \begin{itemize}
 \item enunciato: il convoglio dichiara come sta, con uno dei valori del vocabolario degli stati, e questa
 informazione e' distinta dalla posizione.
 \item stato di implementazione: completo, e la distinzione dalla posizione e' rispettata anche a
-database, dove la colonna dello stato accetta solo i quattro valori del vocabolario.
+database, dove la colonna dello stato accetta solo i cinque valori del vocabolario.
 \end{itemize}
 \item RF02.2.2.4 - Velocita' e passeggeri a bordo
-\label{sec:org948df46}
+\label{sec:orga3ef075}
 \begin{itemize}
 \item enunciato: il convoglio dichiara la velocita' corrente e il numero di passeggeri a bordo.
 \item \textbf{nota di ambito}: sono valori simulati che rendono leggibile la corsa sulla mappa; non provengono
@@ -563,22 +575,24 @@ convoglio a ogni fermata.
 \end{itemize}
 \end{enumerate}
 \subparagraph{RF02.2.3 - Andata e ritorno sullo stesso itinerario}
-\label{sec:org989501c}
+\label{sec:orgc756646}
 \begin{itemize}
-\item enunciato: raggiunto il capolinea, il convoglio inverte la marcia e ripercorre l'itinerario in
+\item enunciato: raggiunto un estremo dell'itinerario, il convoglio inverte la marcia e lo ripercorre in
 senso contrario; il tempo di percorrenza di ogni tappa e' quello previsto per il verso che sta
 percorrendo.
-\item esito atteso: la corsa e' continua, senza che il convoglio scompaia e riappaia all'altro capolinea.
-\item stato di implementazione: completo. Al capolinea la direzione si inverte, l'itinerario viene
+\item esito atteso: la corsa e' continua, senza che il convoglio scompaia e riappaia all'altro estremo.
+\item eccezione: l'estremo marcato come capolinea (RF01.3.4) non e' un punto in cui girarsi ma quello in
+cui il servizio finisce, e li' l'inversione non avviene.
+\item stato di implementazione: completo. All'estremo la direzione si inverte, l'itinerario viene
 ripercorso al contrario e ogni tappa usa il tempo di percorrenza del verso che sta percorrendo.
 \end{itemize}
 \subparagraph{RF02.2.4 - Passaggi asimmetrici in stazione}
-\label{sec:org9750dc9}
+\label{sec:orgafc7182}
 \begin{itemize}
 \item enunciato: un convoglio puo' uscire da una stazione senza esservi entrato, e puo' entrare in una
 stazione senza uscirne.
 \item precondizione: il primo caso si presenta alla stazione da cui la corsa comincia, il secondo al
-capolinea in cui la corsa si conclude prima dell'inversione.
+capolinea in cui la corsa si conclude.
 \item \textbf{perche' va scritto}: e' il caso che rompe l'abbinamento ingenuo fra entrate e uscite nello
 storico. Chi conta le coppie deve sapere che la prima e l'ultima sono spaiate per costruzione, e
 che questo non e' un errore di rilevazione.
@@ -586,13 +600,17 @@ che questo non e' un errore di rilevazione.
 diventa un transito puntuale, in cui entrata e uscita coincidono, e l'entrata senza uscita resta un
 transito aperto. Nello storico pero' non sono marcati come caso a se': chi conta le coppie deve
 saperlo da qui.
+\item \textbf{dove nasce il secondo caso}: finche' ogni estremo era un punto di inversione, il convoglio da
+ogni stazione prima o poi usciva, e l'entrata senza uscita durava il tempo di una sosta doppia.
+Con il capolinea di RF01.3.4 il caso diventa quello vero e definitivo: il treno entra li' e non
+ne esce piu', e quel transito resta aperto finche' non gli viene assegnato un altro itinerario.
 \end{itemize}
 \paragraph{RF02.3 - Gestione delle stazioni}
-\label{sec:org2cbcbed}
+\label{sec:org702fd19}
 
 \textbf{Stato di implementazione}: completo.
 \subparagraph{RF02.3.1 - Informazioni rese dalla stazione}
-\label{sec:orge43b7c8}
+\label{sec:org1bb3d82}
 \begin{itemize}
 \item enunciato: la stazione sa dire quali convogli ha sui binari in questo momento, chi e' entrato e
 quando, chi e' uscito e quando.
@@ -603,7 +621,7 @@ distinte, ed e' un vincolo di specifica: se fossero due potrebbero divergere.
 memoria e' la stessa che risponde alle interrogazioni locali e che alimenta la coda di RF02.1.1.1.1.
 \end{itemize}
 \subparagraph{RF02.3.2 - Segnale di vita verso la centrale}
-\label{sec:org5fe36b9}
+\label{sec:orge3f02f6}
 \begin{itemize}
 \item enunciato: la stazione emette un battito periodico verso la centrale, con periodo \texttt{P\_bat}, anche
 quando non ha nulla da dichiarare.
@@ -612,7 +630,7 @@ il silenzio di una stazione non e' distinguibile dall'assenza di traffico su que
 \item stato di implementazione: completo.
 \end{itemize}
 \subparagraph{RF02.3.3 - Segnale di vita dei sensori verso la stazione}
-\label{sec:org46ac33e}
+\label{sec:org4071e13}
 \begin{itemize}
 \item enunciato: i sensori dichiarano periodicamente alla stazione di essere vivi, con periodo \texttt{P\_kal};
 se uno smette, la stazione lo considera guasto e lo segnala alla centrale.
@@ -622,7 +640,7 @@ non sa quanti sensori dovrebbero esserci: li conosce solo quando la chiamano, qu
 non ha mai battuto non puo' risultare guasto.
 \end{itemize}
 \subparagraph{RF02.3.4 - Stato che la stazione dichiara di se'}
-\label{sec:org0cb3a88}
+\label{sec:org906d864}
 \begin{itemize}
 \item enunciato: la stazione dichiara di se' soltanto ONLINE o GUASTA.
 \item rimando: la motivazione e' nella sezione sul vocabolario degli stati osservabili.
@@ -630,11 +648,11 @@ non ha mai battuto non puo' risultare guasto.
 l'asimmetria voluta dal requisito c'e' tutta.
 \end{itemize}
 \paragraph{RF02.4 - Identita' del nodo di campo}
-\label{sec:org9ff243f}
+\label{sec:org123bca6}
 
 \textbf{Stato di implementazione}: completo.
 \subparagraph{RF02.4.1 - L'identita' dichiarata viene verificata}
-\label{sec:org3b15352}
+\label{sec:org3ab5917}
 \begin{itemize}
 \item enunciato: un nodo che entra in servizio dichiara la propria identita' alla centrale, che la
 verifica sull'anagrafica della rete prima di accettarne qualsiasi dato.
@@ -645,7 +663,7 @@ non e' piu' difendibile.
 finche' non ha avuto la risposta: la verifica non puo' auto-validarsi con il primo dato che arriva.
 \end{itemize}
 \subparagraph{RF02.4.2 - Esito negativo: il nodo non entra in servizio}
-\label{sec:orgbedb5d1}
+\label{sec:orgb4c955a}
 \begin{itemize}
 \item enunciato: se l'identita' non e' riconosciuta, il nodo non entra in servizio e termina, invece di
 restare attivo senza poter comunicare.
@@ -656,7 +674,7 @@ durante la diagnosi.
 resta acceso in attesa.
 \end{itemize}
 \subparagraph{RF02.4.3 - Portata della dipendenza}
-\label{sec:org6e526e4}
+\label{sec:orgff34a37}
 Non e' un requisito a se': e' la regola di lettura del grafo. Senza RF02.4 nessun nodo entra in
 servizio, quindi non arriva nessun dato e cadono per intero RF02.1, RF02.2 e RF02.3. Per questo nel
 grafo la dipendenza e' disegnata una volta sola sui tre rami invece che su ogni foglia.
@@ -664,14 +682,14 @@ grafo la dipendenza e' disegnata una volta sola sui tre rami invece che su ogni 
 \textbf{Stato di implementazione}: non ne ha uno proprio, non essendo un requisito; vale quello di RF02.4.1
 e RF02.4.2.
 \paragraph{RF02.5 - Modifica dell'itinerario a sistema acceso}
-\label{sec:orgef12f58}
+\label{sec:orgf1168f7}
 \textbf{Enunciato del ramo}: l'amministratore puo' cambiare le stazioni attraversate da un itinerario e i
 convogli assegnati mentre i convogli sono gia' in marcia, e il sistema resta coerente.
 
 \textbf{Stato di implementazione}: completo — sono gestiti sia il convoglio escluso, che si dichiara fermo
 in attesa, sia quello che resta assegnato, che prosegue dal punto in cui la modifica lo ha colto.
 \subparagraph{RF02.5.1 - Convoglio escluso dall'itinerario}
-\label{sec:orgb7ac9bd}
+\label{sec:org512e5a7}
 \begin{itemize}
 \item enunciato: se dopo la modifica un convoglio non e' piu' assegnato ad alcun itinerario, smette di
 viaggiare e resta fermo in attesa di essere soppresso.
@@ -686,7 +704,7 @@ che la modifica esclude, e chi resta senza itinerario si dichiara fermo invece d
 raccontare di essere in marcia.
 \end{itemize}
 \subparagraph{RF02.5.2 - Convoglio ancora assegnato}
-\label{sec:orga45979d}
+\label{sec:org1d823bf}
 \begin{itemize}
 \item enunciato: se dopo la modifica il convoglio e' ancora assegnato all'itinerario, prosegue sul nuovo
 itinerario a partire dal punto in cui la modifica lo ha colto, conservando direzione e ritardo
@@ -714,7 +732,7 @@ piu' parte dell'itinerario non c'e' nessun punto a cui agganciarsi e il viaggio 
 capolinea, con una segnalazione nei log del convoglio.
 \end{itemize}
 \paragraph{RF02.6 - Anomalie dedotte dalla centrale}
-\label{sec:org1e102e5}
+\label{sec:orga88fefd}
 
 \textbf{Enunciato del ramo}: la centrale riconosce da sola le anomalie che i nodi di campo non sono in grado
 di segnalare, a partire dalla propria caduta.
@@ -725,7 +743,7 @@ anche l'unico invisibile.
 
 \textbf{Stato di implementazione}: completo, tutti e tre.
 \subparagraph{RF02.6.1 - Stazione silenziosa oltre la soglia}
-\label{sec:org5c45869}
+\label{sec:orgdfcc117}
 \begin{itemize}
 \item enunciato: se una stazione non da' notizie di se' per piu' di \texttt{T\_sil}, la centrale la considera
 caduta, la mostra come OFFLINE e apre un guasto su di essa.
@@ -736,7 +754,7 @@ pubblicato verso il campo, cosi' i convogli diretti alla stazione caduta si ferm
 guasto lo avesse dichiarato lei.
 \end{itemize}
 \subparagraph{RF02.6.2 - Convoglio fermo fuori stazione oltre la soglia}
-\label{sec:org1009e9c}
+\label{sec:org59f552a}
 \begin{itemize}
 \item enunciato: se un convoglio resta fermo fra due stazioni per piu' di \texttt{T\_fer}, la centrale apre un
 allarme su di esso.
@@ -746,7 +764,7 @@ allarme su di esso.
 e' rendere non percorribile la tratta, ed e' il limite di RF02.1.2.2.2.
 \end{itemize}
 \subparagraph{RF02.6.3 - Fotografia periodica dello stato}
-\label{sec:org56ffe94}
+\label{sec:org2a01e6a}
 \begin{itemize}
 \item enunciato: ogni \texttt{P\_ria} la centrale rende disponibile alle schermate una fotografia completa dello
 stato corrente della rete.
@@ -757,7 +775,7 @@ sicurezza sotto di esso.
 completo di convogli e stazioni, quindi rimette a posto il browser e non solo i contatori.
 \end{itemize}
 \paragraph{RF02.7 - Memoria storica}
-\label{sec:org0cdc804}
+\label{sec:org4138259}
 
 \begin{itemize}
 \item enunciato: oltre allo stato corrente, il sistema conserva la traccia di cio' che e' accaduto:
@@ -777,7 +795,7 @@ itinerari percorsi e le assegnazioni degli operatori no: le due tabelle esistono
 non le scrive nessuno, compaiono solo nelle cancellazioni di pulizia.
 \end{itemize}
 \subsubsection{RF03 - Contratti di interazione fra le parti}
-\label{sec:orgfb0f80c}
+\label{sec:org989e826}
 \textbf{Enunciato}: le parti del sistema interagiscono secondo obblighi dichiarati, in modo che ciascuna
 possa funzionare, fallire e ripartire senza trascinare con se' le altre.
 
@@ -787,7 +805,7 @@ cosa, che cosa una parte puo' e non puo' toccare dell'altra.
 
 \textbf{Stato di implementazione}: completo.
 \paragraph{RF03.1 - Autonomia dei nodi}
-\label{sec:org50064e7}
+\label{sec:org00dbb4c}
 \begin{itemize}
 \item enunciato: ogni convoglio e ogni stazione sono parti autonome, avviabili, arrestabili e riavviabili
 una indipendentemente dall'altra.
@@ -798,7 +816,7 @@ avviano con il proprio identificativo passato da riga di comando e se ne possono
 quanti se ne vuole sulla stessa macchina.
 \end{itemize}
 \paragraph{RF03.2 - Disaccoppiamento fra campo e centrale}
-\label{sec:org841a174}
+\label{sec:org6c6ad2c}
 \begin{itemize}
 \item enunciato: quando un nodo di campo comunica con la centrale non resta in attesa che la centrale sia
 presente per poter continuare a lavorare.
@@ -809,7 +827,7 @@ registrare e ad accumulare cio' che dovranno consegnare; nessuna funzione locale
 due aspetta l'altro: il nodo pubblica e va avanti.
 \end{itemize}
 \paragraph{RF03.3 - Due fonti di verita' distinte per lo stesso passaggio}
-\label{sec:org69ed22a}
+\label{sec:org3256dfd}
 \begin{itemize}
 \item enunciato: lo stesso passaggio fisico e' conosciuto per due vie indipendenti: la rilevazione a
 terra fatta dai sensori di stazione e la dichiarazione fatta dal convoglio. Le due vie non si
@@ -824,12 +842,24 @@ prima e con piu' dettaglio, ed e' quella che alimenta il tempo reale.
 \item \textbf{perche' due e non una}: eliminando la prima si perde la storia quando il convoglio non parla;
 eliminando la seconda si perde il tempo reale fra una stazione e l'altra, dove nessun sensore vede
 niente. Sono due requisiti diversi serviti da due vie diverse, non una ridondanza da ottimizzare.
-\item stato di implementazione: completo, ripartizione degli obblighi compresa: le due vie arrivano in
-centrale su canali distinti e restano trattate separatamente, nessuna delle due sovrascrive
-l'altra.
+\item stato di implementazione: completo, ripartizione degli obblighi compresa, ma non piu' come nella
+prima versione. La dichiarazione del convoglio arriva in centrale \textbf{soltanto} con la telemetria:
+il messaggio con cui il treno annuncia di essere passato non e' piu' indirizzato alla centrale ma
+ai sensori di binario della stazione, che sono i soli a poter vedere un transito. Le due vie
+restano due e restano indipendenti — la rilevazione a terra fa la storia, la telemetria fa il
+tempo reale — ma lo stesso passaggio non entra piu' in centrale da due porte diverse.
+\item \textbf{perche' e' stato cambiato}: un convoglio vero non telefona alla sala controllo per dire che e'
+passato, passa e basta; e con il sensore in mezzo il suo fail-stop ha la conseguenza giusta, cioe'
+che il transito non lo registra nessuno. Con il vecchio topic la centrale sapeva del passaggio
+anche a sensori morti, il che rendeva innocuo proprio il guasto che RF02.3.3 vuole far pesare.
+\item \textbf{conseguenza da dichiarare}: il verso di marcia la centrale lo conosce solo dalla telemetria, che
+arriva ogni \texttt{P\_tel}. Fra un'inversione all'estremo dell'itinerario e il frame successivo il verso
+in centrale e' ancora quello vecchio, e in quella finestra la fermata successiva viene cercata
+dalla parte sbagliata dell'itinerario. La direzione dichiarata insieme al passaggio era l'unico
+motivo per cui quel topic esisteva.
 \end{itemize}
 \paragraph{RF03.4 - I sensori usano solo l'interfaccia pubblica del nodo}
-\label{sec:orga3937fa}
+\label{sec:org51baf76}
 \begin{itemize}
 \item enunciato: i sensori dichiarano cio' che rilevano attraverso l'interfaccia che il nodo espone
 verso l'esterno, senza nessun accesso privilegiato al suo stato interno.
@@ -844,7 +874,7 @@ tutti dalle sole chiamate che il nodo espone verso l'esterno, e infatti tutte le
 si fanno da li'.
 \end{itemize}
 \paragraph{RF03.5 - L'itinerario e' fornito dalla centrale}
-\label{sec:org83082dd}
+\label{sec:orgb0dcc20}
 \begin{itemize}
 \item enunciato: il convoglio non conosce l'itinerario per conto proprio: lo riceve dalla centrale, che
 ne e' l'unica depositaria.
@@ -864,13 +894,13 @@ stazione e questa direzione, qual e' la prossima'' — ma nessuno la usa: e' li'
 le dichiara entrambe valide.
 \end{itemize}
 \subsubsection{RF04 - Accesso e protezione}
-\label{sec:org542ef0f}
+\label{sec:org0eb7b25}
 
 \textbf{Stato di implementazione}: parziale — l'accesso e la protezione dei canali sono completi;
 l'autorizzazione per ruolo vale per le letture e per l'anagrafica ma non distingue i ruoli sui tre
 comandi operativi (RF04.2).
 \paragraph{RF04.1 - Autenticazione}
-\label{sec:orgd52fefa}
+\label{sec:org8e273e8}
 \begin{itemize}
 \item enunciato: gli utenti sono registrati presso il servizio di identita' e accedono dichiarando li'
 le proprie credenziali; l'accesso produce un attestato che accompagna le operazioni successive.
@@ -888,7 +918,7 @@ rete non conserva nessuna password e si limita a controllare la firma dell'attes
 interpellare il servizio di identita' a ogni richiesta.
 \end{itemize}
 \paragraph{RF04.2 - Autorizzazione per ruolo}
-\label{sec:org51a4726}
+\label{sec:org7a4b529}
 \begin{itemize}
 \item enunciato: ogni operazione e' permessa o negata in base al ruolo di chi la chiede: le letture sono
 permesse a entrambi i ruoli, la modifica dell'anagrafica della rete al solo amministratore, e
@@ -922,7 +952,7 @@ per ruolo. Resta fuori anche la sola websocket, che non e' un'operazione sui dat
 sola lettura, ed e' un limite dichiarato nel capitolo \emph{Progettazione}.
 \end{itemize}
 \paragraph{RF04.3 - Protezione dei canali}
-\label{sec:orgd440c00}
+\label{sec:orgae6b3cf}
 \begin{itemize}
 \item enunciato: il sistema puo' funzionare con tutti i canali di comunicazione protetti, in modo che il
 contenuto scambiato fra le parti non sia leggibile ne' alterabile da un osservatore della rete.
@@ -951,7 +981,7 @@ parti si riconoscono fra loro tramite un'autorita' di certificazione privata del
 stessa che firma i certificati di tutti i servizi.
 \end{itemize}
 \subsection{Requisiti non funzionali osservabili}
-\label{sec:orgd7ac90b}
+\label{sec:orgdf72bdb}
 
 Sono proprieta' del sistema nel suo insieme. Le tengo separate dai requisiti funzionali perche' non
 descrivono una funzione, ma una qualita' che ogni funzione deve avere.
@@ -969,13 +999,13 @@ RNF06 & riavviabilita' & un nodo riavviato torna in servizio da solo e si rialli
 \end{tabular}
 \end{center}
 \subsection{Scenari di verifica}
-\label{sec:org5b5ae87}
+\label{sec:orga7c6030}
 
 Gli scenari servono a controllare i requisiti \textbf{insieme}, come li vede un utente. Ogni scenario e'
 scritto con la situazione di partenza, l'evento che lo innesca e il comportamento atteso passo per
 passo.
 \subsubsection{SV01 - Stazione non percorribile e successivo ripristino}
-\label{sec:org98f1fc4}
+\label{sec:org2040f9c}
 
 \begin{description}
 \item[{situazione}] un convoglio sta percorrendo la tratta che porta alla stazione B; in B c'e' gia' un
@@ -994,7 +1024,7 @@ nella storia;
 \item[{requisiti coperti}] RF01.2.1, RF01.4.1, RF01.4.2, RF02.1.1.2, RF02.1.3, RF02.2.1.1.
 \end{description}
 \subsubsection{SV02 - Interruzione del collegamento fra stazione e centrale}
-\label{sec:org8624d10}
+\label{sec:org8271667}
 
 \begin{description}
 \item[{situazione}] la stazione A e' operativa e i convogli transitano regolarmente.
@@ -1010,7 +1040,7 @@ nella storia;
 \item[{requisiti coperti}] RF02.1.1.1, RF02.1.4, RF02.6.1, RF03.2, RNF02.
 \end{description}
 \subsubsection{SV03 - Guasto del convoglio, in stazione e in tratta}
-\label{sec:org03fb3b6}
+\label{sec:org43328da}
 
 \begin{description}
 \item[{situazione}] due convogli, uno fermo nella stazione C e uno a meta' della tratta D-E.
@@ -1024,7 +1054,7 @@ nella storia;
 \item[{requisiti coperti}] RF01.2.2, RF02.1.2, RF02.2.2.1.
 \end{description}
 \subsubsection{SV04 - Convoglio fermo fra due stazioni}
-\label{sec:orgc7e43eb}
+\label{sec:orga26093f}
 
 \begin{description}
 \item[{situazione}] un convoglio e' fermo fra due stazioni per una causa qualsiasi.
@@ -1037,7 +1067,7 @@ nella storia;
 \item[{requisiti coperti}] RF02.1.3, RF02.6.2, RF01.2.2.
 \end{description}
 \subsubsection{SV05 - Modifica dell'itinerario a convogli in marcia}
-\label{sec:orgae8c6fa}
+\label{sec:org779e404}
 
 \begin{description}
 \item[{situazione}] un itinerario con due convogli assegnati, entrambi in marcia in punti diversi.
@@ -1051,7 +1081,7 @@ salti di posizione e conservando il ritardo;
 \item[{requisiti coperti}] RF01.3.4, RF02.5, RF03.5.
 \end{description}
 \subsubsection{SV06 - Corsa completa con inversione al capolinea}
-\label{sec:orgc741134}
+\label{sec:org1fd5b5a}
 
 \begin{description}
 \item[{situazione}] un convoglio all'inizio della corsa, nella stazione di partenza.
@@ -1059,14 +1089,17 @@ salti di posizione e conservando il ritardo;
 \item[{comportamento atteso}] \begin{enumerate}
 \item dalla stazione di partenza risulta una uscita senza una entrata che la preceda;
 \item per ogni stazione intermedia risultano una entrata e una uscita, in quest'ordine;
-\item al capolinea risulta una entrata; la direzione dichiarata passa da andata a ritorno;
+\item all'estremo dell'itinerario risulta una entrata; la direzione dichiarata passa da andata a
+ritorno;
 \item la corsa di ritorno percorre le stesse stazioni in ordine inverso;
-\item lo storico contiene tutti i transiti nell'ordine reale.
+\item lo storico contiene tutti i transiti nell'ordine reale;
+\item se su quell'estremo e' marcato il capolinea non c'e' nessuna inversione: il convoglio si ferma,
+passa in stato capolinea e la sua entrata resta senza l'uscita corrispondente.
 \end{enumerate}
 \item[{requisiti coperti}] RF01.5, RF02.2.3, RF02.2.4, RF02.7.
 \end{description}
 \subsubsection{Copertura dei requisiti da parte degli scenari}
-\label{sec:org9385327}
+\label{sec:orge3c3ab5}
 
 \begin{center}
 \begin{tabular}{ll}
@@ -1090,15 +1123,22 @@ RF04 & verifica dedicata (RF04.2, RF04.3)\\
 \end{tabular}
 \end{center}
 \section{Progettazione}
-\label{sec:org704bbe2}
+\label{sec:org9b3692d}
 \subsection{Diagramma delle componenti}
-\label{sec:org69bd6da}
+\label{sec:org3212b93}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-UamZWV.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-WLzoM8.png}
+\label{}
+\end{center}
+\subsection{Diagramma dei microservizzi}
+\label{sec:orgab63f5d}
+
+\begin{center}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-a7OsVU.png}
 \label{}
 \end{center}
 \subsection{Stack tecnologico}
-\label{sec:org686a709}
+\label{sec:orgf825d2e}
 
 {\small
 \begin{longtable}{L{0.24\textwidth}L{0.36\textwidth}L{0.32\textwidth}}
@@ -1130,11 +1170,13 @@ test & JUnit 5 e RestAssured, Vitest con Testing Library & moduli Java, web app\
 database dei test & H2 in memoria, schema rigenerato a ogni esecuzione & \texttt{src/test/resources/application.properties} della Centrale\\
 \end{longtable}}
 
-
-
-La tabella dice quali tecnologie ci sono; qui c'è il perché, cioè cosa è stato scartato e per quale
-motivo.
-
+Anche questa documentazione ha il suo piccolo stack: è scritta in org-mode ed esportata in
+\LaTeX{}, e i diagrammi (stati, sequenza, classi) sono sorgenti PlantUML tenuti dentro il
+documento stesso e compilati in png.
+\subsection{Scelte progettuali e giustifiacazioni}
+\label{sec:orgba5234b}
+\subsubsection{Metodi di interfacciamento tra microservizzi}
+\label{sec:org9b92c3e}
 \textbf{Il broker al posto delle chiamate REST periodiche.} I nodi di campo stanno in reti private: una
 stazione dietro il NAT dell'ente ferroviario non è raggiungibile da fuori e un convoglio in
 movimento cambia rete di continuo. Con REST sarebbe la Centrale a dover contattare ogni nodo,
@@ -1144,31 +1186,17 @@ Il broker disaccoppia anche nel tempo — se la Centrale è giù la stazione con
 messaggi con QoS 1 restano in coda e il \texttt{LocalBuffer} li ritenta, mentre un POST fallito sarebbe
 perso — e nei destinatari: pubblicare su \texttt{railway/alerts} raggiunge tutti i treni interessati
 senza che chi pubblica sappia quanti sono (RNF05), cosa che con REST costringerebbe la Centrale a
-tenere l'elenco aggiornato dei nodi e a chiamarli uno per uno.
+tenere l'elenco aggiornato dei nodi e a chiamarli uno per uno. Questo è il grande vantaggio del metodo uno a molti del pub/sub
 
-\textbf{Perché MQTT e non AMQP o Kafka.} Il traffico è fatto di messaggi piccoli e frequenti: telemetria
-ogni \texttt{P\_tel} per convoglio, cioè circa 2.000 messaggi al secondo con diecimila treni, payload JSON
-di qualche centinaio di byte. MQTT ha un header fisso di 2 byte, mentre ogni richiesta HTTP ne
-porterebbe centinaia fra intestazioni e handshake. AMQP aggiunge exchange e instradamenti che qui
-non servono, Kafka è pensato per conservare e rileggere flussi enormi ed è sovradimensionato per
-una rete di sensori. I vincoli di tempo sono soft real-time, dell'ordine dei secondi (\texttt{P\_tel},
-\texttt{T\_sil}): non serve una garanzia dura sulla latenza, bastano la consegna almeno-una-volta e il
-keepalive che si accorge della caduta.
-
-\textbf{Il resto.} REST resta dove la risposta serve subito e su richiesta (l'itinerario che il treno
+\textbf{Il resto.} REST resta per rapidità implementativa dove la risposta serve subito e su richiesta (l'itinerario che il treno
 scarica all'avvio, le API dell'operatore); verso il browser si usa WebSocket, perché la dashboard
 deve ricevere aggiornamenti spontanei e il polling sprecherebbe banda su dati che spesso non
 cambiano. PostgreSQL sta solo sulla Centrale, dove lo storico cresce senza limite; alla stazione
 basta SQLite, che è un file e non un servizio. Keycloak evita di scriversi in casa utenti,
 password e ruoli, e parla OIDC standard: lo stesso token vale per la web app e per la Centrale.
-
-Anche questa documentazione ha il suo piccolo stack: è scritta in org-mode ed esportata in
-\LaTeX{}, e i diagrammi (stati, sequenza, classi) sono sorgenti PlantUML tenuti dentro il
-documento stesso e compilati in png.
-\subsection{Scelte progettuali}
-\label{sec:org84ab170}
-\subsubsection{Lo stato corrente della rete sta in RAM e non sul database}
-\label{sec:orgbc12925}
+\subsubsection{Sul metodo di repository}
+\label{sec:org9253ed1}
+Lo stato corrente della rete sta in RAM e non sul database
 
 Il \texttt{TrafficLogicEngine} tiene tre mappe in memoria (treni, stazioni, guasti aperti) e le API di
 lettura rispondono da lì. La domanda naturale è perché non interrogare direttamente PostgreSQL.
@@ -1196,19 +1224,16 @@ e tuple morte da far digerire all'autovacuum, per dati che diventano obsoleti do
 e che non ha senso rendere durabili. È il caso d'uso per cui in esercizio si affianca al database
 un archivio in memoria: qui la stessa funzione la assolve una \texttt{ConcurrentHashMap}, che per un
 sistema a nodo singolo è la semplificazione ragionevole.
-\subsubsection{I test hanno un database loro, non quello di lavoro}
-\label{sec:orga5ed7ba}
-
+\subsubsection{Sul sistema di validazione}
+\label{sec:org04d3e45}
+I test hanno un database loro, non quello di lavoro
+Questo perchè i test che si creano i dati da soli e li cancellano appena hanno finito, se il test si interrompesse prima di cancellare i dati, tali avrebbero sporcato lo stato persistente.
 \texttt{src/test/resources/application.properties} della Centrale sovrascrive il datasource: i test girano
 su \textbf{H2 in memoria}, con lo schema generato da Hibernate a ogni esecuzione (\texttt{drop-and-create}) e
-buttato via alla fine; in \texttt{pom.xml} la dipendenza \texttt{quarkus-jdbc-h2} sta in scope \texttt{test}.
-
-Prima quel file conteneva solo host e porta HTTP, quindi non essendoci nessun override i test
-usavano lo stesso \texttt{jdbc:postgresql://localhost:5432/railway} dell'esecuzione normale. \texttt{AdminApiTest}
-e \texttt{ItinerariTratteTest} creano davvero stazioni, tratte e convogli (\texttt{STAZ\_TEST\_xxxx}, \texttt{IT\_A\_xxxx}):
-la pulizia finale c'e', ma vale solo se la sequenza arriva in fondo, quindi bastava un test rotto a
-lasciare righe di prova dentro i dati di lavoro. In piu' senza Postgres acceso \texttt{./mvnw test} non
-partiva affatto, il che rendeva vano il motivo per cui i test erano stati scritti senza Keycloak.
+buttato via alla fine; in \texttt{pom.xml} la dipendenza \texttt{quarkus-jdbc-h2} sta in scope \texttt{test}. Senza
+questo override i test usavano il database di lavoro, e per giunta senza Postgres acceso
+\texttt{./mvnw test} non partiva affatto: proprio il contrario del motivo per cui erano stati scritti
+senza Keycloak, cioè poterli lanciare senza avere il sistema in piedi.
 
 Due impostazioni servono per far reggere lo schema su H2: \texttt{globally-quoted-identifiers=true}, perche'
 \texttt{eventi\_stazioni} ha una colonna che si chiama \texttt{timestamp} e in H2 2.x e' una parola riservata, e
@@ -1216,7 +1241,7 @@ Due impostazioni servono per far reggere lo schema su H2: \texttt{globally-quote
 gli serve. Nel log di avvio dei test si legge ``Caricate 0 stazioni'': e' la prova che il database e'
 quello nuovo e vuoto.
 \subsection{Parametri temporali}
-\label{sec:org5c72ec5}
+\label{sec:org80ae85d}
 
 I requisiti che parlano di tempo si riferiscono a questi parametri e non a numeri fissi. Il valore
 predefinito e' quello con cui il sistema e' consegnato; cambiarlo non cambia la specifica.
@@ -1252,7 +1277,7 @@ telemetria consegnata con un attimo di ritardo verrebbe scambiata per un convogl
 servirebbe a niente, e la sessione deve avere comunque una fine, se no una postazione lasciata
 aperta resterebbe valida per sempre.
 \subsection{Modello}
-\label{sec:orgd1884f3}
+\label{sec:org0b874d7}
 Il sistema non ha un database unico ma tre livelli di persistenza, uno per tipo di nodo.
 Il database centrale è quello della Centrale (PostgreSQL, schema in
 \texttt{ServeCentraleOperativa/src/main/resources/schema.sql}): è lì che stanno l'anagrafica della
@@ -1272,7 +1297,7 @@ esattamente il contrario del vero, e i treni in arrivo verrebbero fatti entrare 
 stazione inagibile. Per questo la persistenza locale è stata implementata sulla stazione e
 non sul treno.
 \subsubsection{Il database della Centrale}
-\label{sec:orgb1ef660}
+\label{sec:org0446295}
 Le tabelle si dividono in tre gruppi.
 
 Anagrafica (i dati che l'amministratore crea dalla dashboard):
@@ -1281,11 +1306,16 @@ Anagrafica (i dati che l'amministratore crea dalla dashboard):
 latitudine, longitudine e numero di binari per poterle disegnare sulla mappa
 \item \texttt{Tratte}: un arco fra due stazioni (\texttt{StazionePartenzaFK} -> \texttt{StazioneArrivoFK}) più il
 tempo nominale di percorrenza in minuti, che serve poi al calcolo del ritardo
-\item \texttt{Itinerari} e \texttt{Itinerario\_Tratta}: l'itinerario di per sè è solo un id, il percorso vero
-è nella tabella associativa, che lega itinerario e tratta e in più tiene la colonna
+\item \texttt{Itinerari} e \texttt{Itinerario\_Tratta}: l'itinerario di per sè è un id e poco altro, il percorso
+vero è nella tabella associativa, che lega itinerario e tratta e in più tiene la colonna
 \texttt{ordine}. È l'unico modo per dire che la stessa tratta può stare in più itinerari e che
-dentro un itinerario le tratte hanno una sequenza
-\item \texttt{Treni}: stato del convoglio (attivo / fermo / rotto / in manutenzione), itinerario
+dentro un itinerario le tratte hanno una sequenza. L'unica colonna propria è \texttt{capolinea}
+(estensione), la stazione su cui il servizio si chiude: se è nulla il percorso si ripete
+all'infinito, se è valorizzata il convoglio che ci arriva termina la corsa. Sta qui e non su
+\texttt{Stazione} perché è una proprietà del percorso: la stessa stazione può chiudere un itinerario ed
+essere una fermata qualunque di un altro, e infatti non va confusa con
+\texttt{Stazione.tipoCapolineaPartenzaoNormale}, che descrive invece la stazione in sé
+\item \texttt{Treni}: stato del convoglio (attivo / fermo / rotto / in manutenzione / capolinea), itinerario
 assegnato e posizione corrente. Da notare che \texttt{id\_convoglio} è insieme chiave primaria e
 nome del treno (es. ``IC 351''): non c'è una colonna nome separata, così il nome è univoco
 per costruzione, però diventa immutabile (per rinominare un convoglio va cancellato e
@@ -1316,6 +1346,18 @@ l'operatore che se ne sta occupando
 Non era prevista nello schema iniziale, la crea Hibernate a runtime
 \end{itemize}
 
+Una nota sulle estensioni, perché non si aggiungono tutte allo stesso modo. Le colonne nuove le
+crea da sola Hibernate, che gira con \texttt{database.generation=update}: è così che sono comparse
+\texttt{ritardoMinuti}, le coordinate delle stazioni e la colonna \texttt{capolinea} degli itinerari. I \textbf{vincoli}
+no: in quella modalità Hibernate non tocca mai un CHECK che esiste già, quindi un database nato da
+\texttt{schema.sql} continuerebbe a rifiutare il valore \texttt{capolinea} sulla colonna \texttt{Treni.stato}. È il caso
+peggiore, perché l'eccezione non arriva quando lo stato viene scritto in memoria ma al commit, e da
+lì risale fino al connettore reattivo e spegne il canale MQTT. Per questo c'è
+\texttt{ServeCentraleOperativa/src/main/resources/migrazione\_capolinea.sql}, da lanciare una volta sola sul
+database già in uso: aggiunge la colonna, la chiave esterna verso \texttt{Stazione} e rifà il CHECK con il
+valore nuovo. È scritto per essere innocuo su un database creato da zero e per potersi rilanciare
+quante volte si vuole.
+
 Storici (\texttt{Storico\_Transiti}, \texttt{Storico\_Guasti}, \texttt{Storico\_Stato\_Treni},
 \texttt{Storico\_Stato\_Stazioni}, \texttt{Storico\_Itinerari}, \texttt{Storico\_Assegnazioni\_Guasti}): sono tabelle
 separate in sola aggiunta, ognuna con la sua chiave \texttt{SERIAL} e un campo
@@ -1326,7 +1368,7 @@ dashboard sul dato corrente restano semplici e lo storico non le appesantisce.
 della storicizzazione: è quella che la pagina Transiti legge, e per le righe già presenti prima
 dell'aggiunta resta nulla e viene esposta come ritardo zero.
 \subsubsection{I db locali dei nodi di campo}
-\label{sec:org0880063}
+\label{sec:org86cc5dc}
 Il treno ha una sola tabella, \texttt{Stato\_convoglio}: direzione, stato, stazione corrente,
 prossima stazione e tratta corrente. È di fatto la fotografia di dove si trova il convoglio,
 la stessa che poi viene spedita in telemetria. Resta un modello sulla carta: nel codice
@@ -1370,7 +1412,7 @@ stringhe (``MI'', ``Jaz''), non interi come nel modello. La seconda: il file è 
 proprio la corrente che va via, e con \texttt{synchronous=NORMAL} le ultime transazioni si
 possono perdere.
 \subsection{Topic}
-\label{sec:orgba7bd02}
+\label{sec:org2d61dd8}
 La comunicazione fra i nodi passa da un broker Mosquitto (localhost:1883, oppure 8883 con
 TLS sotto il profilo \texttt{\%tls}). Tutti i topic stanno sotto il prefisso \texttt{railway/} e sono
 organizzati per nodo: \texttt{railway/train/\{id\}/...} e \texttt{railway/station/\{id\}/...}, con l'id del
@@ -1401,8 +1443,15 @@ suffisso & flusso & contenuto \\
 validation & treno -> centrale & richiesta di validazione dell'id all'avvio\\
 validation-response & centrale -> treno & esito: se l'id non è a db il nodo non entra\\
 telemetry & treno -> centrale & posizione, fase del viaggio, stato e ritardo\\
-passaggio & treno -> centrale e stazioni & entrata/uscita del convoglio da una stazione\\
 \end{longtable}}
+
+C'è poi un topic che il treno pubblica ma che alla Centrale non arriva mai,
+\texttt{railway/treno-simulatoriSensori/\{id\}}: è l'annuncio del passaggio rivolto ai \textbf{sensori di binario}
+della stazione. Sta fuori dal prefisso \texttt{railway/train/} proprio perché non è una comunicazione verso
+la Centrale, ma il modo con cui la simulazione mette il convoglio davanti al sensore, che è l'unico
+a poterlo vedere passare. Le stazioni si iscrivono con la wildcard
+\texttt{railway/treno-simulatoriSensori/+} e tengono solo i messaggi con il proprio \texttt{stazioneId}, così il
+treno non deve conoscere né l'indirizzo né la porta di nessuna stazione.
 
 Topic della stazione, sotto il prefisso \texttt{railway/station/\{id\}/}:
 
@@ -1469,14 +1518,20 @@ governa il traffico, il treno lo mostra e basta. L'alert parte solo quando il ri
 cambia, non a ogni passaggio, se no il canale condiviso si riempirebbe di messaggi che
 dicono tutti la stessa cosa.
 
-Il passaggio dei treni viaggia volutamente su due topic distinti: \texttt{railway/train/\{id\}/passaggio}
-è quello che dichiara il treno, \texttt{railway/station/\{id\}/transit} è quello che rilevano i sensori
-della stazione. Sono due punti di vista sullo stesso evento e la Centrale li tratta separatamente.
+Lo stesso passaggio fisico attraversa quindi tre canali in fila, ed è una catena e non tre copie
+della stessa notizia: sul primo (\texttt{railway/treno-simulatoriSensori/\{id\}}, MQTT) il convoglio si
+limita a \textbf{passare}, sul secondo (\texttt{POST /stazione/sensore/treno}, REST) il sensore di binario
+\textbf{rileva}, sul terzo (\texttt{railway/station/\{id\}/transit}, MQTT) la stazione \textbf{certifica} alla Centrale.
+Prima il treno pubblicava anche un passaggio indirizzato alla Centrale, che quindi riceveva lo stesso
+fatto per due strade; è stato tolto perché un convoglio vero non telefona alla sala controllo per
+dire che è passato, e perché con il sensore in mezzo il suo fail-stop ha la conseguenza giusta — se
+il dispositivo è morto quel transito non lo registra nessuno, che è poi il motivo per cui una
+stazione senza sensori è una stazione guasta.
 \subsection{Vocabolario degli stati osservabili}
-\label{sec:orgb21824b}
+\label{sec:orgcee3c50}
 
 \subsubsection{Stato del convoglio}
-\label{sec:org53706f4}
+\label{sec:org9a0d01a}
 
 \begin{center}
 \begin{tabular}{|p{0.22\textwidth}|p{0.68\textwidth}|}
@@ -1486,10 +1541,11 @@ FERMO & e' in sosta in una stazione, oppure e' trattenuto e non puo' ripartire\\
 IN\textsubscript{VIAGGIO} & sta percorrendo una tratta elementare fra due stazioni\\
 EMERGENZA & e' aperto un guasto che lo riguarda; la corsa e' sospesa dove si trovava\\
 SOPPRESSO & la corsa e' stata annullata: il convoglio non viaggia piu' e non riprendera'\\
+CAPOLINEA & e' arrivato all'estremo che chiude il servizio: la corsa e' finita, il convoglio sta bene\\
 \end{tabular}
 \end{center}
 \subsubsection{Stato operativo della stazione}
-\label{sec:orgc9da750}
+\label{sec:orga591016}
 
 La stazione e' vista da due punti di osservazione, che dispongono di informazione diversa. Non e' una
 contraddizione: e' la conseguenza di che cosa ciascuno dei due puo' sapere.
@@ -1505,7 +1561,7 @@ MANUTENZIONE & solo la centrale & la squadra e' stata mandata sul posto e sta la
 \end{tabular}
 \end{center}
 \subsection{Diagrammi degli stati}
-\label{sec:orgf0c84af}
+\label{sec:orgae9fd04}
 
 \textbf{Come si leggono.} Nessun componente è una macchina sola: il treno ne ha 11, la stazione 11, la
 centrale 13, e ogni diagramma ritaglia una variabile o un flusso. I richiami alle altre macchine
@@ -1530,7 +1586,7 @@ devono poter divergere.
 macchine e non stati, e la freccia vuol dire ``avvia'' o ``alimenta'', mai ``transita in''. Il processo non
 lascia mai T1, e infatti in T1 le altre macchine stanno \textbf{dentro} lo stato ``Servizio operativo''.
 \subsubsection{Del Treno}
-\label{sec:org0fe46ff}
+\label{sec:orgf815b8c}
 \begin{itemize}
 \item nota : gli stati del treno sono simulati, al posto delle simulazioni degli eventi nella realta tali dovrebbero essere implementati attraverso l'ascolto dei sensori di bordo
 \item il componente e' stato astratto in 11 macchine, ognuna con la sua sezione; la mappa qui sotto dice chi avvia chi
@@ -1538,254 +1594,256 @@ lascia mai T1, e infatti in T1 le altre macchine stanno \textbf{dentro} lo stato
 \item le due variabili di stato non vanno confuse: T5 dice DOVE sta il convoglio lungo l'itinerario (faseViaggio), T6 dice COME sta (stato). Sono due campi distinti del TrainDB e cambiano per cause diverse, ed e' esattamente l'ortogonalita' che la specifica chiede in RF02.2.2.1 e RF02.2.2.3
 \end{itemize}
 \paragraph{mappa delle macchine}
-\label{sec:orgb7af2a6}
+\label{sec:orgb83f80d}
 \begin{itemize}
 \item requisiti coperti: nessuno in proprio, e' l'indice delle altre undici: i requisiti veri stanno scritti sopra le singole macchine
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-kNWJ4F.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-vHOYQr.png}
 \label{}
 \end{center}
 \paragraph{T1 ciclo di vita del processo treno}
-\label{sec:org2a742bf}
+\label{sec:org1eef5ca}
 \begin{itemize}
 \item e' la macchina radice: legge l'ID dagli args o dalla property, aspetta il via libera della centrale e poi lascia girare tutto il resto in parallelo (main + TrainJourneyEngine.avvia)
 \item requisiti coperti: RF02.4.1 e RF02.4.2 parzialmente, qui c'e' solo la guardia all'avvio e la scelta di terminare invece di restare acceso senza poter comunicare; RF03.1 parzialmente, il convoglio e' un processo a se', avviabile e arrestabile da solo. La conversazione vera e' in T2
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-MOstoB.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-x7kiEy.png}
 \label{}
 \end{center}
 \paragraph{T2 validazione dell'id sul database centrale}
-\label{sec:org70fbd31}
+\label{sec:orgec54a32}
 \begin{itemize}
 \item richiesta e risposta su MQTT: il processo prosegue solo se la centrale conferma che l'ID esiste a database, altrimenti termina con codice 1 (TrainDatabaseValidator)
 \item requisiti coperti: RF02.4.1 e RF02.4.2 completi per la parte del treno, l'altra meta' della conversazione e' M2 lato centrale
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-yj8nrW.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-WNnqU8.png}
 \label{}
 \end{center}
 \paragraph{T3 caricamento dell'itinerario}
-\label{sec:orgeeb8c78}
+\label{sec:org21ebcfa}
 \begin{itemize}
 \item unica conversazione REST del treno verso la centrale: GET /api/treni/\{id\}/itinerario, con retry ogni 15s e ricarica completa quando l'operatore cambia la tratta
 \item finche' l'itinerario manca il convoglio non si limita a non muoversi: si dichiara fermo (fase SENZA\textsubscript{ITINERARIO}), se no continuerebbe a mandare telemetria da treno in marcia stando immobile
 \item requisiti coperti: RF03.5 completo lato treno, il convoglio non conosce l'itinerario per conto proprio ma lo riceve dalla centrale, che ne resta l'unica depositaria; RF02.5.2 completo, applicaItinerario() decide che cosa fare del percorso appena scaricato e riancora() rimette il convoglio nella stazione in cui si trova invece di far ripartire il viaggio dalla prima tappa; il 404 (convoglio sganciato) e' l'unico caso in cui l'itinerario in memoria viene buttato via
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-mjm7Si.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-bKNvxk.png}
 \label{}
 \end{center}
 \paragraph{T4 tick del motore di viaggio}
-\label{sec:org0f02ba5}
+\label{sec:org9800371}
 \begin{itemize}
 \item il battito da 1 secondo del digital twin: sette controlli in ordine di priorita', il primo che scatta chiude il giro (TrainJourneyEngine.tick); l'unica eccezione e' la ricarica dell'itinerario, che e' un passo del giro e non un'uscita
 \item requisiti coperti: nessuno per intero, e' l'orchestratore: RF02.5.1 parzialmente (lo stato SOPPRESSO porta la fase a TERMINATO), RF02.5.2 parzialmente (da qui parte la ricarica, e all'arrivo in stazione viene installato l'itinerario rimasto in attesa perche' il treno era a meta' tratta) e RF02.1.2.2 parzialmente (l'EMERGENZA congela l'avanzamento, pero' congela il convoglio e non l'infrastruttura, quindi RF02.1.2.2.1 e RF02.1.2.2.2 restano scoperti)
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-5KwM38.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-tK4L5V.png}
 \label{}
 \end{center}
 \paragraph{T5 fase del viaggio}
-\label{sec:org75e3f41}
+\label{sec:orgfebe894}
 \begin{itemize}
 \item il cuore della simulazione, cioe' dove si trova il convoglio lungo l'itinerario: comprende il trattenimento per stazione guasta, il ritardo che cresce mentre e' fermo e l'attesa di un percorso quando l'itinerario non c'e'
-\item le fasi ammesse sono cinque, e sono i valori che \texttt{TrainDB.faseViaggio} puo' assumere: IN\textsubscript{STAZIONE}, IN\textsubscript{VIAGGIO}, BLOCCATO\textsubscript{GUASTO}\textsubscript{STAZIONE}, SENZA\textsubscript{ITINERARIO} e TERMINATO
+\item le fasi ammesse sono sei, e sono i valori che \texttt{TrainDB.faseViaggio} puo' assumere: IN\textsubscript{STAZIONE}, IN\textsubscript{VIAGGIO}, BLOCCATO\textsubscript{GUASTO}\textsubscript{STAZIONE}, SENZA\textsubscript{ITINERARIO}, FERMO\textsubscript{CAPOLINEA} e TERMINATO
 \item requisiti coperti: RF02.2.2.1 e RF02.2.1.1 completi (dove si trova il convoglio e il ritardo che cresce mentre e' trattenuto pur avendo una tappa da percorrere), RF02.1.1.2.1 e RF02.1.1.2.2 completi insieme a T9 e T11: non entra nella stazione non percorribile e riparte solo al ripristino, non per scadenza di un tempo; RF02.5.1 completo per la parte del convoglio, che con la fase SENZA\textsubscript{ITINERARIO} smette davvero di viaggiare invece di dichiararsi in marcia stando fermo
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-83dOwx.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-owQ9ib.png}
 \label{}
 \end{center}
 \paragraph{T6 stato del convoglio}
-\label{sec:orgcf8de90}
+\label{sec:orgb8bf063}
 \begin{itemize}
-\item macchina di dominio: come sta il convoglio (FERMO, IN\textsubscript{VIAGGIO}, EMERGENZA, SOPPRESSO). Sulla centrale questi valori vengono normalizzati nei quattro ammessi dalla colonna Treni.stato (M13)
+\item macchina di dominio: come sta il convoglio (FERMO, IN\textsubscript{VIAGGIO}, EMERGENZA, SOPPRESSO, CAPOLINEA). Sulla centrale questi valori vengono normalizzati nei cinque ammessi dalla colonna Treni.stato (M13)
 \item requisiti coperti: RF02.2.2.3 completo, e' lo stato del convoglio tenuto distinto dalla posizione che sta in T5, come la specifica richiede; RF02.1.2 parzialmente, qui nasce l'EMERGENZA ma la registrazione in centrale (RF02.1.2.1) sta in M6 e M13; RF02.5.1 parzialmente, SOPPRESSO e' lo stato definitivo del convoglio fermato in attesa di soppressione
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-qB26qS.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-KVyyCh.png}
 \label{}
 \end{center}
 \paragraph{T7 direzione di marcia e capolinea}
-\label{sec:org71f44d8}
+\label{sec:orga3e7a65}
 \begin{itemize}
-\item andata e ritorno sullo stesso itinerario: al capolinea la direzione si inverte e la sosta raddoppia, e il tempo di percorrenza si legge sulla tappa opposta
+\item andata e ritorno sullo stesso itinerario: all'estremo la direzione si inverte e la sosta raddoppia, e il tempo di percorrenza si legge sulla tappa opposta; se pero' quell'estremo e' il capolinea dell'itinerario non ci si gira, la corsa finisce li'
 \item requisiti coperti: RF02.2.3 completo (raggiunto il capolinea la marcia si inverte e ogni tappa usa il tempo di percorrenza del verso che sta percorrendo) e RF02.2.4 parzialmente, perche' e' qui che nascono i passaggi spaiati dei due capolinea; e' inoltre di supporto a RF02.2.2.1, perche' tiene coerenti indice, direzione e tempo di percorrenza, senza i quali la posizione riportata sarebbe sbagliata
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-27O8m8.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-IobcYo.png}
 \label{}
 \end{center}
 \paragraph{T8 telemetria verso la centrale}
-\label{sec:org1787266}
+\label{sec:orga0cb8dc}
 \begin{itemize}
 \item il frame ogni 5 secondi con posizione, velocita', progresso, ritardo e passeggeri: e' cio' che alimenta la mappa dell'operatore (TrainElab)
 \item requisiti coperti: RF02.2.2.1, RF02.2.2.2 e RF02.2.2.4 parzialmente (posizione, ritardo, velocita' e passeggeri: qui c'e' la sorgente del dato, mentre la correttezza e la visualizzazione si chiudono in M3 e M11), RF03.3 parzialmente perche' la dichiarazione del convoglio e' la fonte di verita' per la posizione corrente, quella che alimenta il tempo reale
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-FMbdC5.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-Ggvxtz.png}
 \label{}
 \end{center}
 \paragraph{T9 alert in ingresso dalla centrale}
-\label{sec:orgea518ca}
+\label{sec:org7fec943}
 \begin{itemize}
 \item il treno in ascolto su railway/alerts: soppressioni, guasti delle stazioni, ripristini, itinerari aggiornati e il ritardo che la Centrale gli comunica (TrainGateway.riceviAlert)
 \item requisiti coperti: RF02.5.1 completo lato treno (lo STOP con il mio target), RF02.1.1.2.1, RF02.1.1.2.2 e RF02.2.1.1 parzialmente (decide il blocco e lo sblocco, che poi esegue T5), RF02.1.2 parzialmente (dal RESOLVED si esce dall'emergenza), RF02.5.2 parzialmente (qui arriva solo l'avviso, la ricarica e' T3); e' anche il punto in cui si chiude la richiesta della consegna di un convoglio capace di ricevere ``guasti o ritardi'', perche' il ramo RITARDO e' la seconda meta'
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-7sm9mN.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-CF0CxP.png}
 \label{}
 \end{center}
 \paragraph{T10 sensori di bordo e api rest}
-\label{sec:org1b0fe3e}
+\label{sec:org0adf4ed}
 \begin{itemize}
 \item i sensori di bordo non toccano il modello: passano sempre dalle API REST della 8082, sia dalla console interattiva sia da un chiamante esterno
 \item requisiti coperti: RF03.4 completo lato treno, i sensori di bordo non toccano il modello ma passano sempre dall'interfaccia pubblica del nodo, ed e' cio' che rende il nodo verificabile dall'esterno; RF02.1.2.1 parzialmente, e' il punto in cui il guasto del convoglio nasce, mentre la registrazione e le conseguenze sono lato centrale
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-149Nu8.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-h70FYh.png}
 \label{}
 \end{center}
 \paragraph{T11 stazioni guaste note al treno}
-\label{sec:org0124344}
+\label{sec:orgdac0f30}
 \begin{itemize}
 \item macchina di entita': la storia di una stazione nella memoria del convoglio, cioe' il motivo per cui il treno non riparte verso un binario ancora inagibile
 \item requisiti coperti: RF02.1.1.2.1 e RF02.1.1.2.2 completi insieme a T5 e T9, RF02.1.1.2.3 parzialmente: e' la memoria che fa fermare il convoglio anche quando l'allarme era arrivato mentre stava altrove
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-zrkLsj.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-FOZvVk.png}
 \label{}
 \end{center}
 \subsubsection{Della Stazione}
-\label{sec:org839a84e}
+\label{sec:org7497dca}
 \begin{itemize}
 \item il componente e' stato astratto in 11 macchine, ognuna con la sua sezione; la mappa qui sotto dice chi avvia chi
 \item si leggono in quattro gruppi: l'avvio e l'aggancio alla centrale (S1 e S2), i canali verso la centrale con il caching locale (S3, S4, S5), cio' che arriva dal campo e dall'operatore (S6, S7, S8, S9) e lo stato del nodo (S10, S11)
 \item la stazione e' il nodo che deve sopravvivere alla caduta della rete: S4 e S5 sono esattamente la parte che il testo chiede, cioe' il caching locale con reinvio (RF02.1.1.1.1 per il non perdere niente, RF02.1.1.1.2 per il consegnarlo nell'ordine giusto)
 \end{itemize}
 \paragraph{mappa delle macchine}
-\label{sec:org600a5df}
+\label{sec:orge44c986}
 \begin{itemize}
 \item requisiti coperti: nessuno in proprio, e' l'indice delle altre undici: i requisiti veri stanno scritti sopra le singole macchine
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-wcVGSe.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-eJ9yYt.png}
 \label{}
 \end{center}
 \paragraph{S1 ciclo di vita del processo stazione}
-\label{sec:orgb9c6c80}
+\label{sec:org06f4f36}
 \begin{itemize}
 \item e' la macchina radice: legge l'ID dagli args o dalla property, aspetta il via libera della centrale e poi lascia girare tutto il resto in parallelo (main)
 \item requisiti coperti: RF02.4.1 e RF02.4.2 parzialmente, come in T1 qui c'e' solo la guardia all'avvio e la terminazione del nodo non riconosciuto; RF03.1 parzialmente, ogni stazione e' un processo a se'. La conversazione vera e' in S2
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-O8T6Ih.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-xsMrDc.png}
 \label{}
 \end{center}
 \paragraph{S2 validazione dell'id sul database centrale}
-\label{sec:org2775b8a}
+\label{sec:org061e0ea}
 \begin{itemize}
 \item stesso pattern del treno, richiesta e risposta su MQTT: il nodo parte solo se la centrale conferma che l'ID esiste a database (StationDatabaseValidator)
 \item requisiti coperti: RF02.4.1 e RF02.4.2 completi per la parte della stazione, l'altra meta' della conversazione e' M2 lato centrale
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-7bAfQx.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-JreZ9J.png}
 \label{}
 \end{center}
 \paragraph{S3 heartbeat verso la centrale}
-\label{sec:org71e0fc2}
+\label{sec:orge28acd1}
 \begin{itemize}
 \item il battito ogni 10 secondi tiene la stazione ONLINE lato centrale, e il suo silenzio e' proprio cio' che il watchdog legge come caduta del nodo (HeartbeatGenerator)
 \item requisiti coperti: RF02.3.2 completo lato nodo, il battito parte ogni P\textsubscript{bat} anche quando non c'e' niente da dichiarare, ed e' proprio questo che rende il silenzio di una stazione distinguibile dall'assenza di traffico; da solo non gestisce niente, e' il segnale il cui silenzio M8 legge come caduta (RF02.6.1)
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-UnlV0u.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-UFfkG1.png}
 \label{}
 \end{center}
 \paragraph{S4 connettivita' verso la centrale e store and forward}
-\label{sec:orgd363c10}
+\label{sec:orgd795e0d}
 \begin{itemize}
 \item lo stato del collegamento e lo svuotamento del buffer: e' il caching locale con reinvio richiesto dal testo, con le due POST /rete per simulare la caduta durante la demo
 \item requisiti coperti: RF02.1.1.1.1 e RF02.1.1.1.2 completi (nessun dato perduto durante l'interruzione e ordine di consegna preservato) e RF03.2 completo lato stazione, il nodo continua a rilevare e a registrare mentre la centrale non c'e': e' esattamente il caching locale dei dati con reinvio in massa alla ripresa della connessione chiesto dal testo
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-qTgqX0.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-Xwqy5t.png}
 \label{}
 \end{center}
 \paragraph{S5 ciclo di vita di un evento della stazione}
-\label{sec:org1da0d72}
+\label{sec:orgde87eaf}
 \begin{itemize}
 \item macchina di entita': la storia di un singolo transito o allarme dalla generazione alla consegna, compreso il rientro in TESTA alla coda quando il reinvio fallisce
 \item requisiti coperti: RF02.1.1.1.1 e RF02.1.1.1.2 completi, e' il dettaglio sul singolo evento di quello che S4 fa sull'intera coda: nessun dato prodotto durante la caduta va perso e il rientro in TESTA alla coda e' cio' che impedisce a una uscita di precedere la propria entrata
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-5ioADG.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-Axe3Kt.png}
 \label{}
 \end{center}
 \paragraph{S6 api rest dei sensori di stazione}
-\label{sec:orgd8541e4}
+\label{sec:org8384d4a}
 \begin{itemize}
 \item i sensori di binario parlano REST, come deciso nel contratto di integrazione: qui entrano transiti, guasti, keepalive e le leve di simulazione della rete
 \item requisiti coperti: RF03.4 completo lato stazione (i sensori di binario dichiarano cio' che rilevano solo attraverso l'interfaccia pubblica del nodo), RF02.3.1 parzialmente (e' la porta da cui entrano i transiti, la storicizzazione e' in M5), RF02.3.3 parzialmente (qui arrivano i segnali di vita dei sensori) e RF02.1.1.2 parzialmente, perche' da qui si dichiara il guasto che rende la stazione non percorribile
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-Wy8nC4.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-DAbgQ6.png}
 \label{}
 \end{center}
-\paragraph{S7 manutenzione periodica del nodo}
-\label{sec:org46214a5}
+\paragraph{S7 sorveglianza dei sensori e manutenzione periodica}
+\label{sec:org076962f}
 \begin{itemize}
-\item il job schedulato da 10 secondi: sorveglia i keepalive dei sensori e svuota il buffer, due controlli volutamente tenuti fuori dal flusso reattivo dell'heartbeat
-\item requisiti coperti: RF02.3.3 completo (il sensore che smette di dichiararsi vivo oltre la soglia porta la stazione a GUASTA, che e' esattamente l'esito atteso dal requisito) e RF02.1.1.1.1 parzialmente, perche' svuota il buffer anche quando il flusso reattivo dell'heartbeat e' fermo
+\item due job schedulati e non uno: \texttt{MonitorSensori} sorveglia i keepalive dei sensori di binario (ogni 5s, timeout 30s), \texttt{HeartbeatGenerator.manutenzionePeriodica} svuota il buffer (ogni 10s). Sono tenuti fuori dal flusso reattivo dell'heartbeat perche' un \texttt{Multi} che fallisce termina, e al primo errore MQTT si fermava anche lo store and forward
+\item il sensore muto non viene dimenticato: resta sotto osservazione anche da guasto, ed e' il ritorno del suo battito a rimettere la stazione operativa
+\item requisiti coperti: RF02.3.3 completo (il sensore che smette di dichiararsi vivo oltre la soglia porta la stazione a GUASTA, che e' esattamente l'esito atteso dal requisito, e il rientro automatico e' il seguito) e RF02.1.1.1.1 parzialmente, perche' svuota il buffer anche quando il flusso reattivo dell'heartbeat e' fermo
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-0mgkr9.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-mOSzc7.png}
 \label{}
 \end{center}
 \paragraph{S8 ingestione dei passaggi dei treni}
-\label{sec:orgdb06b26}
+\label{sec:org5e5e74b}
 \begin{itemize}
-\item consumo di railway/train/+/passaggio con filtro sul proprio ID e pubblicazione del transito ufficiale verso la centrale (StationGateway.riceviPassaggio)
-\item requisiti coperti: RF02.3.1 parzialmente (produce il transito ufficiale che poi M5 storicizza), RF03.3 parzialmente perche' e' la rilevazione a terra, cioe' la fonte di verita' per la storia dei transiti, e RF02.1.1.2.3 parzialmente: se la stazione e' GUASTA e il convoglio entra lo stesso, pubblica l'alert che lo trattiene
+\item consumo di railway/treno-simulatoriSensori/+ con filtro sul proprio ID, consegna al sensore di binario competente e pubblicazione del transito ufficiale verso la centrale (StationGateway.riceviPassaggio, SimulatoreSensori.rilevaPassaggio, StationGateway.registraTransitoRilevato)
+\item il convoglio annuncia il proprio passaggio ma non lo registra nessuno finche' un sensore non lo vede: fra il messaggio e il transito ci sono un dispositivo e una chiamata REST, ed e' li' che il fail-stop del sensore ha effetto
+\item requisiti coperti: RF02.3.1 parzialmente (produce il transito ufficiale che poi M5 storicizza), RF03.3 parzialmente perche' e' la rilevazione a terra, cioe' la fonte di verita' per la storia dei transiti, RF03.4 perche' il passaggio entra nel nodo solo dalla sua interfaccia pubblica, e RF02.1.1.2.3 parzialmente: se la stazione e' GUASTA e il convoglio entra lo stesso, pubblica l'alert che lo trattiene
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-ZFuoTJ.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-aDXbHG.png}
 \label{}
 \end{center}
 \paragraph{S9 alert in ingresso dalla centrale}
-\label{sec:org91e04b2}
+\label{sec:org66539ef}
 \begin{itemize}
 \item la stazione in ascolto su railway/alerts: la riguardano solo il ripristino e l'invio della squadra, tutto il resto del topic condiviso viene scartato
 \item requisiti coperti: RF02.1.1.2.2 parzialmente, la stazione da sola non si ripara: torna percorribile solo con il RESOLVED deciso dalla centrale in M10; RF01.4.1 lato campo, perche' e' qui che arriva l'invio della squadra di manutenzione: il nodo lo registra e basta, il suo stato locale resta GUASTA ed e' quello che continua a trattenere i treni per tutta la durata dell'intervento
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-IRirko.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-TEtAgE.png}
 \label{}
 \end{center}
 \paragraph{S10 stato operativo della stazione}
-\label{sec:org3518a81}
+\label{sec:org505dee5}
 \begin{itemize}
 \item gli stati ONLINE e GUASTA come li vede il nodo: sono due e non quattro come nella cache della centrale (M12), perche' OFFLINE e MANUTENZIONE la stazione non puo' conoscerli di se stessa
 \item requisiti coperti: RF02.3.4 completo, il nodo dichiara di se' soltanto ONLINE e GUASTA, mentre OFFLINE e MANUTENZIONE sono giudizi che si possono dare solo da fuori e li tiene la centrale (M12)
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-S7Oxqz.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-yefwye.png}
 \label{}
 \end{center}
 \paragraph{S11 presenza di un treno sui binari}
-\label{sec:org28554f4}
+\label{sec:org00d7091}
 \begin{itemize}
 \item macchina di entita': la fotografia dei treni fermi sui binari, quella che risponde alla GET /stazione/treni
 \item requisiti coperti: RF02.3.1 completo lato nodo (quali convogli ci sono sui binari in questo momento, con l'ora di entrata e di uscita) e RF01.1.3 parzialmente, e' la fotografia che risponde alla GET /stazione/treni, tenuta in RAM e rispecchiata sulla tabella Treno del db locale
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-4aX1wU.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-gZw8yk.png}
 \label{}
 \end{center}
 \subsubsection{Del Server Centrale}
-\label{sec:orge57fdc4}
+\label{sec:org7a8299a}
 \begin{itemize}
 \item nota: ci sono anche due macchine relative a stazione e treno sarebbero la proiezione lato della centrale operativa
 \item il componente e' stato astratto in 13 macchine, ognuna con la sua sezione; la mappa qui sotto dice chi avvia chi
@@ -1793,90 +1851,90 @@ lascia mai T1, e infatti in T1 le altre macchine stanno \textbf{dentro} lo stato
 \item M8 e' l'unica macchina che non reagisce a un messaggio ma a un silenzio: e' quella che realizza RF02.6, le anomalie che i nodi di campo non sono in grado di segnalare da soli
 \end{itemize}
 \paragraph{mappa delle macchine}
-\label{sec:orgb6535cc}
+\label{sec:orgfb05554}
 \begin{itemize}
 \item requisiti coperti: nessuno in proprio, e' l'indice delle altre tredici: i requisiti veri stanno scritti sopra le singole macchine
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-q62xyu.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-6OjFFM.png}
 \label{}
 \end{center}
 \paragraph{M1 ciclo di vita del processo della centrale}
-\label{sec:org80715d6}
+\label{sec:org6947f47}
 \begin{itemize}
 \item e' la macchina radice: da qui partono in parallelo tutte le altre (main + TrafficLogicEngine.onStart)
 \item requisiti coperti: nessuno in modo diretto, e' l'infrastruttura che fa partire tutte le altre: se non parte lei cadono tutti i requisiti, ma da sola non ne implementa nessuno
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-XL5yNt.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-3vxL7S.png}
 \label{}
 \end{center}
 \paragraph{M2 validazione dell'id dei nodi di campo}
-\label{sec:orgcc775e7}
+\label{sec:org260f112}
 \begin{itemize}
 \item lato centrale della verifica dell'id gia' vista nei diagrammi del treno e della stazione (ExistIdForEdge / ExistIdForEdgeStazione)
 \item requisiti coperti: RF02.4.1 e RF02.4.2 completi lato centrale, e' il pezzo che va davvero a leggere l'anagrafica e chiude la conversazione aperta da T2 e S2
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-qL03IN.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-MQDctI.png}
 \label{}
 \end{center}
 \paragraph{M3 ingestione della telemetria dei treni}
-\label{sec:orgc5548bd}
+\label{sec:org5a6a8f6}
 \begin{itemize}
 \item consumo del topic railway/train/+/telemetry, aggiornamento della cache e storicizzazione solo al cambio di stato (IngestionService.onTelemetry)
 \item e' anche il punto in cui la centrale si accorge che un convoglio dato per fermo ha ripreso a muoversi, e chiude da sola il guasto che si era aperta
 \item requisiti coperti: RF02.2.2.1, RF02.2.2.2 e RF02.2.2.3 completi lato centrale (posizione, ritardo e stato in cache), RF02.1.4 completo per i convogli (il guasto dedotto si richiude quando la causa rientra, gemello di quello che M4 fa per le stazioni), RF02.7 parzialmente perche' storicizza solo al cambio di stato e non a ogni frame, che e' la regola di registrazione chiesta dal requisito, RF01.1.1 e RF01.1.2 parzialmente (il dato sta qui, la spinta al browser e' M11), RF02.1.2.1 parzialmente (normalizza lo stato nei valori ammessi da M13)
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-OeAyWn.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-wTAAho.png}
 \label{}
 \end{center}
 \paragraph{M4 ingestione degli heartbeat delle stazioni}
-\label{sec:org1e3cff5}
+\label{sec:org6e7ce77}
 \begin{itemize}
 \item consumo del topic railway/station/+/heartbeat e chiusura automatica dei guasti aperti dal watchdog quando il battito torna (IngestionService.onHeartbeat)
 \item requisiti coperti: RF02.3.2 completo lato centrale e RF02.1.4 completo: il battito che torna riporta la stazione ONLINE e chiude da solo, senza intervento di un operatore, il guasto che il watchdog aveva dedotto dal silenzio
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-oF5d0B.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-xQMGSL.png}
 \label{}
 \end{center}
-\paragraph{M5 ingestione dei transiti e dei passaggi}
-\label{sec:orge8a5f07}
+\paragraph{M5 ingestione dei transiti}
+\label{sec:org87f2164}
 \begin{itemize}
-\item ciclo di vita del transito di un treno in una stazione: lo stesso passaggio fisico arriva alla centrale da due strade, il sensore di terra (onTransit, che scrive il transito e avvisa la dashboard) e il treno (onPassaggio, che aggiorna posizione sulla tratta e prossima stazione)
+\item ciclo di vita del transito di un treno in una stazione: la notizia arriva da una strada sola, quella del sensore di terra (onTransit), e viene usata per due cose diverse, scrivere il transito con il suo storico e aggiornare la posizione del convoglio sull'itinerario
 \item l'ora e il ritardo scritti nel transito sono quelli del passaggio e non quelli dell'elaborazione: sono due dati che invecchiano, e lo storico deve conservarli come erano
-\item requisiti coperti: RF02.3.1 e RF01.5 completi lato centrale (convoglio, stazione, tratta e orario di entrata e di uscita, a db e in cache), RF03.3 completo perche' e' il punto in cui le due fonti dello stesso passaggio restano trattate separatamente invece di sostituirsi a vicenda, RF02.7 e RF02.2.2.1 parzialmente (onPassaggio aggiorna posizione sulla tratta e prossima stazione)
+\item requisiti coperti: RF02.3.1 e RF01.5 completi lato centrale (convoglio, stazione, tratta e orario di entrata e di uscita, a db e in cache), RF03.3 parzialmente perche' e' la via della rilevazione a terra, quella che fa la storia dei transiti, mentre l'altra via e' la telemetria (M3), RF02.7 e RF02.2.2.1 parzialmente (la posizione sulla tratta e la prossima stazione si aggiornano al passaggio)
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-xbmuZR.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-oBNeFV.png}
 \label{}
 \end{center}
 \paragraph{M6 ingestione degli allarmi dal campo}
-\label{sec:org7ecbd16}
+\label{sec:org40e4d46}
 \begin{itemize}
 \item railway/alerts e' un topic condiviso, quindi la centrale deve filtrare i messaggi che ha pubblicato lei stessa (IngestionService.onAlert)
 \item il tipo del guasto lo dichiara la sorgente nel campo \texttt{tipoGuasto}: prima veniva indovinato cercando la parola ``sensore'' nel messaggio, ed era una classificazione fatta su una frase invece che su un dato
 \item requisiti coperti: RF02.1.2.1 completo (il guasto dichiarato dal campo finisce a db), RF02.1.1.2 completo per la parte di stazione (l'alert CRITICAL con sorgenteTipo STAZIONE la porta a GUASTA), RF01.2.2 parzialmente perche' e' qui che un guasto viene marcato come segnalato dal campo e non dedotto; la storia del guasto e' M7
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-LWvkQK.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-yBaHuu.png}
 \label{}
 \end{center}
 \paragraph{M7 ciclo di vita del guasto}
-\label{sec:org0086d29}
+\label{sec:org43678c8}
 \begin{itemize}
 \item macchina di entita': la storia di un singolo guasto, su cui agiscono M3, M4, M6, M8 e M10
 \item le due chiusure automatiche (stazione che torna a battere, convoglio che riparte) riguardano solo i guasti dedotti dalla centrale, riconosciuti dal prefisso del messaggio: quelli dichiarati dal campo li chiude un operatore
 \item requisiti coperti: RF02.1.3 parzialmente (l'unicita' del guasto aperto per sorgente e la traccia su Storico\textsubscript{Guasti} ci sono, da qualunque parte arrivi il guasto; mancano lo stato intermedio ``preso in carico'' e l'assegnatario, vedi la nota nel diagramma) e RF01.2.1 parzialmente, perche' e' il dato che poi la visualizzazione legge
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-pGTjpv.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-bLw8Cb.png}
 \label{}
 \end{center}
 \paragraph{M8 watchdog faultmonitor}
-\label{sec:org1cb756f}
+\label{sec:org4e11f9c}
 \begin{itemize}
 \item i tre job schedulati ogni 10 secondi che rilevano cio' che i nodi di campo non possono segnalare da soli, cioe' la propria caduta (FaultMonitor)
 \item il secondo job tiene un cronometro per convoglio: l'anomalia non e' ``adesso e' fermo'' ma ``e' fermo da almeno T\textsubscript{fer}'', e senza memoria il watchdog poteva solo guardare l'istante presente
@@ -1885,11 +1943,11 @@ lascia mai T1, e infatti in T1 le altre macchine stanno \textbf{dentro} lo stato
 \item requisiti coperti: RF02.6.1, RF02.6.2 e RF02.6.3 completi: la stazione silenziosa oltre T\textsubscript{sil}, il convoglio fermo fuori stazione oltre T\textsubscript{fer} e la fotografia dello stato ogni P\textsubscript{ria}, cioe' tutto cio' che i nodi di campo non sono in grado di segnalare da soli; RF01.1.5 e RF01.2.2 parzialmente. RF02.1.2.2.2 resta solo sfiorato: il convoglio fermo fra due stazioni fa aprire un allarme, ma la tratta non viene resa non percorribile
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-GHKCvY.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-ibPQPN.png}
 \label{}
 \end{center}
 \paragraph{M9 ciclo di vita del token e autorizzazione delle api rest}
-\label{sec:org721eeb9}
+\label{sec:orgc532727}
 \begin{itemize}
 \item autenticazione OAuth2/OpenID Connect delegata a Keycloak e filtro dei permessi tecnico/amministratore su ogni chiamata: e' l'architettura base del PDF, non la variante 2
 \item gli stati non sono piu' ``sessione aperta / chiusa'' lato Centrale, perche' la Centrale non tiene piu' nessuna sessione: quello che ha un ciclo di vita e' il token, e vive nel browser
@@ -1898,51 +1956,51 @@ lascia mai T1, e infatti in T1 le altre macchine stanno \textbf{dentro} lo stato
 \item requisiti coperti: RF04.1 completo e RF04.2 parziale (le eccezioni dichiarate nella specifica ci sono tutte — le richieste preliminari del browser e le due sole letture di cui hanno bisogno i nodi di campo — ma i tre comandi operativi restano aperti a entrambi i ruoli), e RF01.6 completo lato centrale: il controllo dei permessi e' fatto qui, dalla parte che possiede i dati, non nascondendo i comandi nell'interfaccia
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-l8Y0U4.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-s1qTij.png}
 \label{}
 \end{center}
 \paragraph{M10 gateway rest, crud e comandi operativi}
-\label{sec:org220d0e6}
+\label{sec:org9346da1}
 \begin{itemize}
 \item ciclo di vita di una richiesta gia' autorizzata: letture, crud, comandi e notifiche verso il campo (RestApiGateway)
 \item requisiti coperti: RF01.3 completo insieme a M9, RF01.5 completo per le letture dello storico, RF03.5 completo lato centrale perche' e' da qui che l'itinerario viene servito ai convogli, RF02.5.1 completo e RF02.5.2 parzialmente (da qui partono STOP e ITINERARIO\textsubscript{AGGIORNATO}, ma il punto da cui si riprende lo decide il treno in T3), RF01.3.5 parzialmente perche' l'integrita' alle eliminazioni e' affidata ai vincoli del db. Dei tre comandi operativi i due che riguardano il guasto sono completi: RF01.4.1 apre l'intervento e lo stato MANUTENZIONE dura fino alla chiusura (vedi la nota sotto e M12), RF01.4.2 lo chiude e sblocca chi era trattenuto (M7). Resta parziale RF01.4.3, perche' la precondizione ``convoglio fermo in stazione'' non viene verificata
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-VwEno5.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-CKToFi.png}
 \label{}
 \end{center}
 \paragraph{M11 canale websocket realtime}
-\label{sec:org7b27018}
+\label{sec:orga5fdd1e}
 \begin{itemize}
 \item punto di uscita comune di quasi tutte le altre macchine verso la dashboard (RealtimeWebSocket)
 \item requisiti coperti: RF01.1 e RF01.2 completi, e in particolare RF01.1.4: l'aggiornamento e' spinto nel momento in cui l'evento accade e non ottenuto da interrogazioni a orologio del browser; RF02.6.3 parzialmente, perche' e' anche il canale su cui viaggia la fotografia periodica
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-XxhGqh.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-LR41Kq.png}
 \label{}
 \end{center}
 \paragraph{M12 stato runtime della stazione}
-\label{sec:org30b59ad}
+\label{sec:org29de154}
 \begin{itemize}
 \item gli stati ONLINE / OFFLINE / GUASTA / MANUTENZIONE come li vede la centrale: stanno solo in cache, sul db ne resta la traccia nello storico
 \item requisiti coperti: RF02.3.4 completo lato centrale per ONLINE, GUASTA e OFFLINE, cioe' i tre stati che l'operatore vede davvero, compreso l'OFFLINE che il nodo non puo' conoscere di se'; MANUTENZIONE esiste nel vocabolario ma in pratica non e' osservabile, perche' dura quanto la chiamata REST che lo imposta (vedi la nota). RF02.6.1 e RF01.1.3 parzialmente
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-w4ozbR.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-dPWMyJ.png}
 \label{}
 \end{center}
 \paragraph{M13 stato del treno}
-\label{sec:org5079b2a}
+\label{sec:org4310ca3}
 \begin{itemize}
-\item proiezione sul database centrale della macchina a stati del convoglio: i quattro valori ammessi dal CHECK sulla colonna Treni.stato
-\item requisiti coperti: RF02.2.2.3 completo, e' la proiezione a db dello stato del convoglio, con il CHECK sulla colonna Treni.stato che tiene solo i quattro valori del vocabolario; RF02.7 parzialmente
+\item proiezione sul database centrale della macchina a stati del convoglio: i cinque valori ammessi dal CHECK sulla colonna Treni.stato
+\item requisiti coperti: RF02.2.2.3 completo, e' la proiezione a db dello stato del convoglio, con il CHECK sulla colonna Treni.stato che tiene solo i cinque valori del vocabolario; RF02.7 parzialmente
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-nJZacJ.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-9JwbfO.png}
 \label{}
 \end{center}
 \subsubsection{Riepilogo requisiti - macchine a stati}
-\label{sec:org983b1f9}
+\label{sec:org64f3a1c}
 
 È la lettura al contrario delle righe ``requisiti coperti'' che stanno sopra ogni diagramma del
 capitolo \emph{Progettazione}: qui si parte dal requisito e si trovano le macchine, lì si parte dalla
@@ -2006,7 +2064,7 @@ RF02.2.2.2 & T5, M3 & T8 & \\
 RF02.2.2.3 & T6, M13 & M3 & lo stato è tenuto distinto dalla posizione, come chiede il requisito\\
 RF02.2.2.4 & T8 &  & valori simulati, non alimentano nessuna decisione\\
 RF02.2.3 & T7 &  & \\
-RF02.2.4 &  & T7 & i passaggi spaiati nascono ai capolinea, nessuna macchina li tratta a parte\\
+RF02.2.4 &  & T5, T7 & i passaggi spaiati nascono agli estremi; l'entrata definitiva senza uscita e' la fase FERMO\textsubscript{CAPOLINEA}\\
 RF02.3.1 & S11, M5 & S6, S8 & \\
 RF02.3.2 & S3, M4 & M8 & S3 emette il battito, M8 ne misura il silenzio\\
 RF02.3.3 & S7 & S6 & \\
@@ -2021,7 +2079,7 @@ RF02.6.3 & M8 & M11 & M8 scatta la fotografia, M11 la porta al browser\\
 RF02.7 &  & M5, M3, M13 & si registrano i cambiamenti e non i campionamenti, ma solo per transiti, stati e guasti: assegnazioni degli operatori e itinerari percorsi non vengono mai scritti\\
 RF03.1 & T1, S1, M1 &  & tre processi distinti, avviabili e arrestabili uno per volta\\
 RF03.2 & S4 & S5, S7 & \\
-RF03.3 & M5 & T8, S8 & M5 è il punto in cui le due fonti restano trattate separatamente\\
+RF03.3 & M5 & T8, S8 & le due vie sono la telemetria (T8) e la rilevazione a terra (S8, M5), e restano distinte\\
 RF03.4 & T10, S6 &  & i sensori entrano solo dalle API REST del nodo\\
 RF03.5 & M10 & T3 & \\
 RF04.1 & M9 &  & \\
@@ -2029,14 +2087,14 @@ RF04.2 &  & M9, M10 & il controllo è sul lato che possiede i dati, non sull'int
 RF04.3 &  &  & non è una macchina: è il profilo \texttt{\%tls} sui canali, vedi la sezione \emph{Topic}\\
 \end{longtable}}
 \subsection{Diagrammi di sequenza}
-\label{sec:org8d77563}
+\label{sec:orgaae0fd6}
 
 Le macchine a stati del paragrafo precedente dicono come cambia lo stato di \emph{un} nodo. Qui si
 guarda l'altra meta': chi parla con chi, in che ordine e su quale canale. Sono due letture dello
 stesso codice, e servono tutte e due perche' i punti in cui questo sistema si rompe non stanno
-dentro un nodo ma fra un nodo e l'altro: lo stesso passaggio raccontato da due testimoni, un
-allarme che la centrale rischia di riascoltare da se', una coda che deve restare in ordine anche
-quando il reinvio fallisce a meta'.
+dentro un nodo ma fra un nodo e l'altro: un passaggio che deve attraversare tre processi prima di
+diventare una riga di storico, un allarme che la centrale rischia di riascoltare da se', una coda
+che deve restare in ordine anche quando il reinvio fallisce a meta'.
 
 I diagrammi sono diciotto piu' la mappa, e ognuno porta sopra la riga dei requisiti che copre,
 esattamente come le macchine a stati. Il commento in testa a ogni sorgente elenca i metodi veri
@@ -2060,18 +2118,18 @@ partecipante a se' perche' avrebbe aggiunto una corsia a quindici figure senza d
 nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \end{itemize}
 \subsubsection{mappa dei diagrammi}
-\label{sec:orgc5ad501}
+\label{sec:org6089fa3}
 \begin{itemize}
 \item non e' una conversazione: e' l'indice delle altre diciotto, raggruppate per il momento in cui si presentano nella vita del sistema
 \item i cinque gruppi rispondono a una domanda sola: chi apre la conversazione. Un tempo che scade, un sensore, il watchdog della centrale oppure il browser dell'utente
 \item requisiti coperti: nessuno in proprio, i requisiti veri stanno sopra i singoli diagrammi
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-e6XJs0.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-9DERcj.png}
 \label{}
 \end{center}
 \subsubsection{SQ01 avvio del nodo treno e validazione dell'id}
-\label{sec:org89d384f}
+\label{sec:org08d4917}
 \begin{itemize}
 \item richiesta e risposta su due topic dedicati: il processo prosegue solo se la centrale conferma che l'id esiste a database, altrimenti termina con codice 1
 \item i tre esiti sono VALIDATO, ID\textsubscript{NON}\textsubscript{PRESENTE} (uscita) e RIPROVA (nuovo tentativo dopo 5 secondi, con una richiesta MQTT nuova al massimo ogni 15)
@@ -2079,22 +2137,22 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF02.4.1 e RF02.4.2 completi per la parte del treno, RF02.4.3 per la portata della dipendenza; e' la conversazione che le macchine T1, T2 e M2 raccontano da un lato solo
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-t2dfNQ.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-6eFs0i.png}
 \label{}
 \end{center}
 \subsubsection{SQ02 avvio del nodo stazione e validazione dell'id}
-\label{sec:orgc1ad962}
+\label{sec:orgd427e7a}
 \begin{itemize}
 \item stessa conversazione di SQ01 fatta dall'altro tipo di nodo: due coppie di topic separate e due bean diversi lato centrale, perche' le tabelle interrogate sono due
 \item il dettaglio che vale la pena guardare e' l'aggancio con l'heartbeat: il tick da 10 secondi gira gia' da prima, ma resta filtrato finche' non arriva la conferma
 \item requisiti coperti: RF02.4.1 e RF02.4.2 completi per la parte della stazione, l'altra meta' e' M2 lato centrale
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-bGz8IG.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-zbV9g9.png}
 \label{}
 \end{center}
 \subsubsection{SQ03 caricamento dell'itinerario del convoglio}
-\label{sec:orge39f530}
+\label{sec:org913ce7e}
 \begin{itemize}
 \item e' l'unica chiamata REST che un nodo di campo fa verso la centrale: il digital twin scarica la propria mappa di viaggio e senza quella non si muove
 \item la rotta e' lasciata aperta dal filtro di autorizzazione perche' i processi di campo non fanno login: la loro autenticazione e' la validazione dell'id di SQ01
@@ -2102,11 +2160,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF03.5 completo, RF03.1 parzialmente perche' e' il punto in cui l'autonomia del nodo si appoggia comunque alla centrale
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-yBz1O0.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-3VEvin.png}
 \label{}
 \end{center}
 \subsubsection{SQ04 telemetria del convoglio fino alla mappa}
-\label{sec:orga78b7dc}
+\label{sec:org4a91f18}
 \begin{itemize}
 \item il percorso completo di un frame: tick da 5 secondi, topic della telemetria, cache in RAM, storico solo al cambio di stato, websocket, store del frontend
 \item sono quattro salti e tre rappresentazioni diverse dello stesso convoglio (TrainDB, cache della centrale, riga di tabella, oggetto Train del frontend): e' la ragione di tutte le normalizzazioni che si vedono nel codice
@@ -2114,11 +2172,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF01.1.1 e RF01.1.2 completi, RF02.2.2.1 e RF02.2.2.3 per posizione e stato dichiarato; il canale che spinge il dato a schermo e' M11
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-1Hnhwd.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-WGY3Ev.png}
 \label{}
 \end{center}
 \subsubsection{SQ05 heartbeat della stazione}
-\label{sec:orge0cc5cc}
+\label{sec:org0c12225}
 \begin{itemize}
 \item il battito parte solo se la stazione e' stata riconosciuta e se il collegamento risulta attivo: due filtri in cascata sullo stesso flusso reattivo
 \item i due tempi non coincidono apposta, la stazione batte ogni 10 secondi e la centrale la considera caduta dopo 30: tre battiti persi di fila prima del fail-stop
@@ -2126,23 +2184,24 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF02.3.2 completo, RF02.3.1 parzialmente per le informazioni che il nodo rende di se'
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-q4fr7T.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-j2i0ZN.png}
 \label{}
 \end{center}
-\subsubsection{SQ06 passaggio in stazione dalle due sorgenti}
-\label{sec:orgc3d78f5}
+\subsubsection{SQ06 passaggio in stazione, dal binario alla centrale}
+\label{sec:org6d12701}
 \begin{itemize}
-\item e' il diagramma piu' importante del capitolo: lo stesso fatto fisico arriva alla centrale per due strade indipendenti, quella dichiarata dal convoglio e quella rilevata dai sensori di terra
-\item le due strade fanno cose diverse: il passaggio dichiarato aggiorna la posizione sull'itinerario, il transito rilevato scrive i transiti e lo storico
-\item una sola delle due genera l'evento per la dashboard, se no ogni ingresso comparirebbe due volte nella pagina dei transiti
-\item requisiti coperti: RF03.3 completo, RF01.5 parzialmente perche' e' qui che nasce lo storico consultabile, RF02.2.4 per i passaggi spaiati dei capolinea
+\item e' il diagramma piu' importante del capitolo: fa vedere la catena con cui un fatto fisico diventa un dato, e i tre salti di responsabilita' che la compongono
+\item il convoglio \textbf{passa} (MQTT verso i sensori), il sensore di binario \textbf{rileva} (REST verso il proprio nodo), la stazione \textbf{certifica} alla centrale (MQTT); nessuno dei tre fa il lavoro dell'altro
+\item in centrale la notizia serve a due cose e in quest'ordine: prima MonitoraggioTreni misura il ritardo e sposta il convoglio sull'itinerario, poi TransitiService scrive la riga del transito con quel ritardo gia' aggiornato
+\item il topic su cui il treno dichiarava lo stesso passaggio alla centrale non c'e' piu': era il secondo testimone dello stesso fatto, ed e' stato tolto perche' rendeva innocuo il fail-stop del sensore
+\item requisiti coperti: RF03.3 parzialmente (qui c'e' la via della rilevazione a terra, l'altra e' la telemetria di SQ04), RF03.4 perche' il passaggio entra nel nodo solo dalle sue API pubbliche, RF01.5 parzialmente perche' e' qui che nasce lo storico consultabile, RF02.2.4 per i passaggi spaiati degli estremi
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-8igjog.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-jvQ7M5.png}
 \label{}
 \end{center}
 \subsubsection{SQ07 keepalive dei sensori di binario}
-\label{sec:org6ceea66}
+\label{sec:orgc0ef3c5}
 \begin{itemize}
 \item i sensori parlano con il nodo solo attraverso le sue API REST: non toccano mai il modello interno, ed e' una scelta esplicita
 \item la stazione non sa quanti sensori esistano, li conosce solo quando la chiamano: un sensore che non ha mai battuto non puo' risultare guasto, ed e' il limite dichiarato del meccanismo
@@ -2150,11 +2209,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF02.3.3 completo, RF03.4 completo per il contratto dei sensori
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-jmpvei.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-WXQoST.png}
 \label{}
 \end{center}
 \subsubsection{SQ08 convoglio trattenuto da una stazione guasta}
-\label{sec:org95917b4}
+\label{sec:orgb7a7b30}
 \begin{itemize}
 \item due controlli in due momenti diversi: l'alert blocca subito il convoglio se la stazione guasta e' la corrente o la prossima, altrimenti l'id resta memorizzato e sara' il controllo alla ripartenza a trattenerlo
 \item quel secondo controllo e' anche quello che copre chi era gia' fermo in quella stazione quando il guasto e' arrivato
@@ -2163,11 +2222,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF02.1.1.2.1 e RF02.1.1.2.2 completi, RF02.1.1.2.3 parzialmente (vale solo per chi ripassa dal controllo alla ripartenza), RF02.2.1.1 per il ritardo che si accumula
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-nKZaTX.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-7Gpcpt.png}
 \label{}
 \end{center}
 \subsubsection{SQ09 guasto rilevato dai sensori di bordo}
-\label{sec:orgf94b243}
+\label{sec:org7760c08}
 \begin{itemize}
 \item il convoglio si ferma in locale prima ancora che il messaggio parta: non aspetta il permesso della centrale, ed e' il senso dell'autonomia del nodo
 \item lato centrale la parte interessante e' la deduplica, perche' una sorgente che ripete l'allarme riempirebbe la tabella di righe identiche e il comando risolvi ne chiuderebbe una sola
@@ -2175,11 +2234,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF02.1.2.1 completo, RF02.1.3 parzialmente per l'unicita' per sorgente, RF01.2.1 per l'elenco degli allarmi aperti; RF02.1.2.2 non e' coperto ed e' segnato nella nota
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-R8WCJw.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-3abVO7.png}
 \label{}
 \end{center}
 \subsubsection{SQ10 fail-stop della stazione e chiusura automatica}
-\label{sec:org2094156}
+\label{sec:org99e0567}
 \begin{itemize}
 \item e' il giro completo del cardine per assenza: la centrale non riceve piu' niente, deduce il guasto, lo scrive, lo rimanda sul campo e i convogli si fermano
 \item due dettagli reggono tutto il meccanismo: il marcatore sull'origine, che impedisce alla centrale di riascoltarsi e creare un secondo guasto per un allarme scritto da lei, e il prefisso nel messaggio, che le permette di riconoscere i guasti suoi e chiuderli da sola senza toccare quelli dichiarati dalla stazione
@@ -2187,11 +2246,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF02.6.1 completo, RF02.1.4 completo per la chiusura automatica quando la causa rientra; RF01.2.2 solo parzialmente, perche' la distinzione fra segnalato e dedotto esiste dentro la centrale ma non arriva all'operatore (vedi l'ultima nota)
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-OqRguP.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-syNxco.png}
 \label{}
 \end{center}
 \subsubsection{SQ11 convoglio fermo fuori stazione}
-\label{sec:org946f22d}
+\label{sec:org0bf6211}
 \begin{itemize}
 \item stesso watchdog di SQ10 ma con severita' warning: e' un'anomalia da guardare, non un fail-stop, e infatti non blocca nessuno
 \item l'alert finisce comunque sul campo, ma nessun convoglio reagisce perche' il blocco scatta solo sui guasti di stazione con severita' critica
@@ -2199,11 +2258,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF02.6.2 completo; il fatto che la tratta resti percorribile e' il limite gia' segnalato per RF02.1.2.2.2
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-h6ce68.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-vjZoN9.png}
 \label{}
 \end{center}
 \subsubsection{SQ12 store and forward durante l'interruzione del collegamento}
-\label{sec:org625b2a7}
+\label{sec:orgc457231}
 \begin{itemize}
 \item mentre il collegamento e' giu' non si tenta nemmeno l'invio: l'evento va dritto in coda, insieme al nome del canale su cui andra' rimandato
 \item il punto vero e' il rientro in testa: se il reinvio fallisce a meta' svuotamento l'evento torna davanti a tutti, perche' rimetterlo in fondo lo renderebbe il piu' recente e la centrale riceverebbe una uscita prima della relativa entrata
@@ -2211,11 +2270,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF02.1.1.1.1 e RF02.1.1.1.2 completi, RF03.1 parzialmente per l'autonomia del nodo
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-5UvNp0.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-AG7A7W.png}
 \label{}
 \end{center}
 \subsubsection{SQ13 accesso OAuth2, token e permessi per ruolo}
-\label{sec:org0198fdc}
+\label{sec:org1ed7aeb}
 \begin{itemize}
 \item la password si digita sulla pagina di Keycloak e non sulla nostra: la web app e la Centrale non la vedono mai
 \item il codice che torna nella URL da solo non basta, serve anche il code\textsubscript{verifier} che non e' mai uscito dalla memoria della pagina: e' PKCE, ed e' quello che permette a una SPA di usare l'Authorization Code senza client\textsubscript{secret}
@@ -2225,11 +2284,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF01.6 e RF04.1 completi, RF04.2 parziale perche' il ruolo non viene distinto sui tre comandi operativi; RF04.3 non e' una macchina ne' una sequenza, e' il profilo tls sui canali
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-CMNqB4.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-KUQTX6.png}
 \label{}
 \end{center}
 \subsubsection{SQ14 comandi di ripristino dell'operatore}
-\label{sec:orgb8c33f0}
+\label{sec:orgb1f6a50}
 \begin{itemize}
 \item due comandi diversi con lo stesso effetto sul campo: un evento di risoluzione che libera i convogli trattenuti, per questo stanno nello stesso diagramma
 \item l'invio della squadra chiude tutti i guasti aperti di quella stazione, la chiusura di un allarme ne chiude uno solo
@@ -2239,11 +2298,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF01.4.1 completo (il comando porta la stazione in MANUTENZIONE, lo storicizza e avvisa il campo, e lo stato dura fino alla chiusura del guasto, vedi M12), RF01.4.2 completo (la chiusura sblocca chi era trattenuto e chiude in storico l'intervallo aperto dal comando precedente), RF02.1.3 parzialmente: il ciclo di vita del guasto si apre e si chiude, e l'intervallo di lavorazione e' leggibile come MANUTENZIONE sulla stazione, ma l'assegnatario non viene mai registrato
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-x0pbgr.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-Ayvj52.png}
 \label{}
 \end{center}
 \subsubsection{SQ15 soppressione di un convoglio}
-\label{sec:orgf7aa07b}
+\label{sec:orgbc348b7}
 \begin{itemize}
 \item il comando scrive due valori diversi apposta: la parola che il frontend si aspetta di leggere nella cache e il valore ammesso dal vincolo della colonna sul database
 \item i due tornano allineati al primo frame di telemetria successivo, perche' la normalizzazione riporta l'uno sull'altro
@@ -2252,24 +2311,25 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF01.4.3 parzialmente. L'effetto e' quello richiesto (il convoglio passa a SOPPRESSO e non viaggia piu'), ma la precondizione ``il convoglio e' fermo in una stazione'' non e' verificata da nessuna parte: la sopprimibilita' e' lasciata al buon senso di chi preme il bottone
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-C28stm.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-BnfdEJ.png}
 \label{}
 \end{center}
 \subsubsection{SQ16 modifica dell'itinerario a sistema acceso}
-\label{sec:org2c7a0b6}
+\label{sec:org7c37796}
 \begin{itemize}
 \item gli identificativi dei convogli assegnati vanno letti prima di riassegnare: chi viene sganciato non risulterebbe piu' da nessuna query e non riceverebbe mai la notifica, continuando a girare sul percorso vecchio
 \item vengono avvisati sia i convogli esclusi sia quelli appena agganciati
 \item chi resta assegnato si riaggancia al percorso nuovo nella stazione in cui si trova, e se era fra due stazioni lo fa appena arriva alla successiva; chi e' stato escluso resta senza itinerario e riprova ogni 15 secondi
+\item e' anche la strada con cui si rimette in servizio un convoglio che ha chiuso la corsa: togliere o spostare il capolinea e' una modifica dell'itinerario come le altre, e l'avviso arriva a tutti i convogli assegnati
 \item il tempo di percorrenza di una tratta condivisa con altri itinerari non viene toccato, se no si cambierebbero di nascosto anche gli altri percorsi
 \item requisiti coperti: RF02.5.1 completo e RF01.3.4 per la composizione dell'itinerario. RF02.5.2 e' coperto per la parte di centrale, che avvisa tutti i convogli coinvolti; il punto da cui si riprende lo decide il treno (T3, T4 e la nota finale)
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-wT2VZT.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-fXBH5R.png}
 \label{}
 \end{center}
 \subsubsection{SQ17 amministrazione dell'anagrafica della rete}
-\label{sec:org1bc22ba}
+\label{sec:org087f36c}
 \begin{itemize}
 \item il diagramma mostra i rifiuti, non i casi che vanno bene: sono quelli la parte osservabile del requisito sull'integrita' dei dati
 \item una stazione ancora estremo di qualche tratta non si cancella, e nemmeno una tratta usata da un itinerario o presente nei transiti storici
@@ -2278,11 +2338,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF01.3.1, RF01.3.2 e RF01.3.3 completi; RF01.3.5 parzialmente, perche' l'integrita' la tengono anche i vincoli del database e non solo questi controlli
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-hLaXih.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-m46SE4.png}
 \label{}
 \end{center}
 \subsubsection{SQ18 dashboard in tempo reale e snapshot periodico}
-\label{sec:orgb1a1e51}
+\label{sec:org656f4cf}
 \begin{itemize}
 \item tre meccanismi diversi tenuti insieme: la fotografia iniziale via HTTP, il flusso continuo via websocket e lo snapshot dei numeri di sintesi ogni 10 secondi
 \item i numeri della dashboard li calcola una funzione sola, usata sia dalla chiamata REST sia dallo snapshot: cosi' la pagina appena aperta e quella aggiornata dal vivo non possono discordare
@@ -2290,11 +2350,11 @@ nuovo; chi lo chiama e per che cosa si vede in \texttt{C5}
 \item requisiti coperti: RF01.1.4 e RF01.1.5 completi, RF02.6.3 completo per la fotografia periodica dello stato
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-N667ID.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-pYsNYV.png}
 \label{}
 \end{center}
 \subsubsection{riepilogo requisiti - diagrammi di sequenza}
-\label{sec:org1e39f15}
+\label{sec:org53d648b}
 
 E' la lettura al contrario delle righe ``requisiti coperti'' scritte sopra ogni diagramma: qui si
 parte dal requisito e si trovano le conversazioni che lo realizzano.
@@ -2353,8 +2413,8 @@ RF02.2.2.1 & SQ04 & SQ06 & la posizione e' interpolata dal motore e corretta dai
 RF02.2.2.2 & SQ04 & SQ08 & \\
 RF02.2.2.3 & SQ04 &  & \\
 RF02.2.2.4 & SQ04 &  & velocita' e passeggeri sono gli unici dati ancora simulati\\
-RF02.2.3 &  & SQ06 & l'inversione al capolinea e' nel motore, nessuna conversazione la mostra sola\\
-RF02.2.4 &  & SQ06 & i passaggi spaiati nascono ai capolinea e finiscono nel transito puntuale\\
+RF02.2.3 &  & SQ06 & l'inversione all'estremo e' nel motore, nessuna conversazione la mostra sola\\
+RF02.2.4 &  & SQ06 & i passaggi spaiati nascono agli estremi e finiscono nel transito puntuale\\
 RF02.3.1 & SQ05 & SQ07 & \\
 RF02.3.2 & SQ05 &  & \\
 RF02.3.3 & SQ07 &  & \\
@@ -2370,7 +2430,7 @@ RF02.6.3 & SQ18 &  & \\
 RF02.7 &  & SQ04, SQ06 & lo storico si scrive qui, ma nessuna conversazione lo conserva da sola; itinerari percorsi e assegnazioni degli operatori non li scrive nessuno\\
 RF03.1 &  & SQ01, SQ12 & l'autonomia si vede nel nodo che vive anche senza centrale\\
 RF03.2 &  & SQ04, SQ08 & il disaccoppiamento e' il broker disegnato come partecipante a se'\\
-RF03.3 & SQ06 &  & e' il diagramma nato apposta per questo requisito\\
+RF03.3 & SQ06 & SQ04 & SQ06 e' la via della rilevazione a terra, SQ04 quella della dichiarazione del treno\\
 RF03.4 & SQ07 & SQ09 & i sensori di terra e quelli di bordo usano solo le API pubbliche del nodo\\
 RF03.5 & SQ03 &  & \\
 RF04.1 & SQ13 &  & \\
@@ -2378,7 +2438,7 @@ RF04.2 &  & SQ13, SQ16, SQ17 & il 403 sull'anagrafica e' la parte visibile del r
 RF04.3 &  &  & non e' una conversazione: e' il profilo \texttt{\%tls} sui canali, vedi la sezione \emph{Topic}\\
 \end{longtable}}
 \subsection{Diagrammi delle classi}
-\label{sec:orgf85daff}
+\label{sec:orgfa93bca}
 
 Sette diagrammi e una mappa: \texttt{C1} il nodo Treno, \texttt{C2} il nodo Stazione, la mappa della Centrale che
 tiene insieme \texttt{C3}, \texttt{C4a}, \texttt{C4b} e \texttt{C5}, e \texttt{C6} la Web App. Le entita' JPA non hanno un diagramma a
@@ -2406,88 +2466,88 @@ sistema sono le entita' che estendono \texttt{PanacheEntityBase}, e stanno nel M
 senza punta lega le note al loro riquadro, gli archi \texttt{-[hidden]-} della mappa servono solo a
 impaginare, e i colori sono stereotipi locali a ogni figura.
 \subsubsection{Il componente Treno (C1)}
-\label{sec:org8955837}
+\label{sec:orgf3f516d}
 
 \begin{itemize}
 \item requisiti coperti: RF03.1 parzialmente, il convoglio e' un processo a se' con il proprio stato; RF02.2.2 per i campi che descrivono il convoglio
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-TVYI43.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-wwOytH.png}
 \label{}
 \end{center}
 \subsubsection{Il componente Stazione (C2)}
-\label{sec:orgc61d278}
+\label{sec:orgeda7935}
 
 \begin{itemize}
 \item requisiti coperti: RF02.1.1.1.1 e RF02.1.1.1.2 per la struttura che regge il caching, RF03.1 per l'autonomia del nodo (con PersistenzaLocale il nodo si ricostruisce da solo anche dopo un riavvio, senza chiedere niente alla Centrale)
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-hrT6tb.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-Uyc6la.png}
 \label{}
 \end{center}
 \subsubsection{Il componente Centrale: mappa delle tre viste}
-\label{sec:org79861d7}
+\label{sec:orgb5536f4}
 
 \begin{itemize}
 \item requisiti coperti: nessuno in proprio, e' l'indice dei tre diagrammi che seguono
 \item le viste erano due: lo scorporo dell'ingestione ha creato un confine che prima non c'era, quello fra chi sa di MQTT (C4a) e chi sa di ferrovia (C4b), e questa mappa serve soprattutto a farlo vedere
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-PHp283.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-SDBd9O.png}
 \label{}
 \end{center}
 \subsubsection{Il componente Centrale: verso l'operatore (C3)}
-\label{sec:org707a4ef}
+\label{sec:orgeea287d}
 \begin{itemize}
 \item e' la faccia HTTP e websocket della centrale: ogni richiesta attraversa prima il filtro di autorizzazione, che e' un provider JAX-RS e non un controllo sparso negli endpoint
 \item requisiti coperti: RF01.3 e RF01.4 per la superficie dei comandi, RF01.6, RF04.1 e RF04.2 per la parte di accesso
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-4URz8z.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-Br667g.png}
 \label{}
 \end{center}
 \subsubsection{Il componente Centrale: verso il campo, la porta MQTT (C4a)}
-\label{sec:orgc647709}
+\label{sec:org1af04e6}
 \begin{itemize}
 \item e' tutto cio' che la Centrale sa di MQTT, e finisce qui: l'adapter legge i byte, li trasforma in un messaggio con un nome e chiama chi di dovere, poi da C4b in giu' nessuno vede piu' un topic
-\item requisiti coperti: RF03.3 per i due consumatori distinti dello stesso fatto fisico, RF02.4 per la validazione degli id dei nodi che si accendono
+\item requisiti coperti: RF03.3 per le due vie con cui il passaggio si conosce (il transito certificato e la telemetria, che entrano da due consumatori diversi), RF02.4 per la validazione degli id dei nodi che si accendono
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-m6Ajxo.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-4TTEWg.png}
 \label{}
 \end{center}
 \subsubsection{Il componente Centrale: verso il campo, i servizi di dominio (C4b)}
-\label{sec:org2be73f1}
+\label{sec:orgf7637c8}
 \begin{itemize}
 \item e' la vista che il riordino dell'ingestione ha fatto nascere: qui la Centrale sa di ferrovia e non sa piu' da dove la notizia sia arrivata, e infatti le stesse regole servono al messaggio MQTT di C4a e alla richiesta REST di C3
 \item requisiti coperti: RF02.6.1, RF02.6.2 e RF02.6.3 per le anomalie dedotte, RF02.1.3 per il ciclo di vita del guasto, RF02.7 parzialmente per la scrittura della memoria storica
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-dvWr85.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-dOTdYx.png}
 \label{}
 \end{center}
 \subsubsection{Il componente Centrale: la persistenza (C5)}
-\label{sec:orgc098b20}
+\label{sec:org71d1bd2}
 \begin{itemize}
 \item non e' una quarta vista ma il piano sotto le altre tre: e' l'unica classe della Centrale che chiama Panache, e la usano sia il lato operatore (C3) sia il lato campo (C4a e C4b)
 \item requisiti coperti: nessuno in proprio; da qui passano le scritture della memoria storica (RF02.7) e le letture dell'anagrafica che servono a RF01.3
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-0mpn8e.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-XSdwLW.png}
 \label{}
 \end{center}
 \subsubsection{Il componente Web App (C6)}
-\label{sec:org1d3620a}
+\label{sec:org0de300f}
 
 \begin{itemize}
 \item requisiti coperti: RF01.1, RF01.2 e RF01.3 per le schermate, RF01.6 per l'accesso; RF04.2 solo in apparenza, perche' il ruolo lo decide il server e non queste classi
 \end{itemize}
 \begin{center}
-\includegraphics[width=.9\linewidth]{/tmp/babel-H10Rt9/plantuml-8gQ5hj.png}
+\includegraphics[width=.9\linewidth]{/tmp/babel-FdBd44/plantuml-3DJFR6.png}
 \label{}
 \end{center}
 \subsubsection{riepilogo requisiti - diagrammi delle classi}
-\label{sec:org0efa350}
+\label{sec:org4ace149}
 
 
 {\small
@@ -2526,14 +2586,14 @@ RF02.6 &  & C4b & il watchdog con i suoi tre lavori periodici\\
 RF02.7 &  & modello, C5 & le sei tabelle di storico stanno nel Modello e non in un diagramma; a scriverle e' tutte il repository, che e' l'unica classe che parla col database; due di esse restano sempre vuote\\
 RF03.1 &  & C1, C2 & ogni nodo ha il proprio stato e il proprio punto di ingresso\\
 RF03.2 &  & C1, C2, C4a & nessuna classe condivisa fra i processi: e' la mappa C0 a dirlo\\
-RF03.3 &  & C4a & due consumatori distinti per lo stesso fatto fisico\\
+RF03.3 &  & C4a, C2 & due consumatori distinti in centrale (telemetria e transito) e, sul nodo, i sensori che certificano il passaggio\\
 RF03.4 &  & C1, C2 & gli endpoint REST dei nodi sono l'unica porta dei sensori\\
 RF03.5 &  & C3, C1 & l'endpoint dell'itinerario e il client che lo chiama\\
 RF04.1, RF04.2 & C3 & C6 & verifica del token (quarkus-oidc), filtro sui ruoli, flusso PKCE lato SPA\\
 RF04.3 &  &  & non e' una classe: e' la configurazione del profilo \texttt{\%tls}\\
 \end{longtable}}
 \subsubsection{riepilogo classi - macchine a stati}
-\label{sec:org71c0a55}
+\label{sec:orgfcdd4fb}
 
 E' la terza lettura dello stesso codice: nella sezione \emph{Diagrammi degli stati} si parte dalla macchina
 e si trovano i metodi, qui si parte dalla classe e si trova la macchina. Le sigle sono quelle di quel
@@ -2580,8 +2640,11 @@ SecureHttpClient & -- & fornisce a T3 il client HTTP, e sotto profilo \texttt{\%
 \textbf{C2 - il nodo Stazione} &  & \\
 main & S1 & la stessa di T1 sull'altro nodo: id, attesa dell'esito di S2, poi il servizio operativo\\
 StationDatabaseValidator & S2 & la stessa conversazione di T2 con un altro topic; l'interlocutore e' sempre M2\\
-HeartbeatGenerator & S3, S7 & i due compiti separati apposta: il \texttt{Multi} del battito (S3) e il \texttt{@Scheduled} che sorveglia i sensori (S7)\\
-StationGateway & S4, S5, S8, S9, S10, S11 & e' la classe piu' carica del nodo: \texttt{inviaOppureBufferizza} e \texttt{flush} sono S4 e fanno vivere gli eventi di S5, \texttt{riceviPassaggio} e' S8 e scrive \texttt{treniPresenti} (S11), \texttt{riceviAlert} e' S9 e insieme a \texttt{inviaGuasto} porta \texttt{stato} fra ONLINE e GUASTA (S10)\\
+HeartbeatGenerator & S3, meta' di S7 & i due compiti separati apposta: il \texttt{Multi} del battito (S3) e il \texttt{@Scheduled} da 10s che svuota il buffer (la meta' di S7 che non riguarda i sensori)\\
+MonitorSensori & meta' di S7 & l'altra meta': il \texttt{@Scheduled} da 5s che mette in timeout i keepalive, dichiara il guasto una volta sola e rimette la stazione ONLINE quando i battiti tornano\\
+SimulatoreSensori, SensoreBinario & -- & sono i dispositivi, non la macchina: rilevano il passaggio di S8 e battono verso S7, ma passano dalle API REST del nodo come farebbe l'elettronica vera\\
+ConsoleSensori & -- & e' un client di S6, la gemella di \texttt{Sensori} sul treno: spegne e riaccende i sensori per provare il fail-stop\\
+StationGateway & S4, S5, S8, S9, S10, S11 & e' la classe piu' carica del nodo: \texttt{inviaOppureBufferizza} e \texttt{flush} sono S4 e fanno vivere gli eventi di S5, \texttt{riceviPassaggio} e \texttt{registraTransitoRilevato} sono S8 e scrivono \texttt{treniPresenti} (S11), \texttt{riceviAlert} e' S9 e insieme a \texttt{inviaGuasto} porta \texttt{stato} fra ONLINE e GUASTA (S10)\\
 LocalBuffer & -- & e' la coda dove gli eventi di S5 aspettano: \texttt{addFirst} al reinvio fallito e' cio' che conserva l'ordine (RF02.1.1.1.2), ma a metterceli e a toglierli e' il gateway\\
 StationIngestion & S6 & gli endpoint \texttt{/stazione}; \texttt{reteOffline} e \texttt{reteOnline} toccano anche S4, ma sono comandi di prova e non la macchina\\
 DBLocale & -- & tiene le variabili di S4, S10 e S11: la stessa parte di \texttt{TrainDB} sull'altro nodo\\
@@ -2596,13 +2659,13 @@ AuthController & -- & sta dentro M9 ma non ne e' il cuore: ricostruisce il profi
 \hline
 \textbf{C4a - la porta MQTT} &  & \\
 IngestionService & -- & e' il contorno di M3-M6: riceve i messaggi e li smista, ma non scrive nessuna variabile di stato. Prima era il cuore di tutte e quattro\\
-i cinque messaggi e Payload & -- & sono dati, non comportamento: dicono che cosa il campo ha detto, e nessuno di loro decide niente\\
+i quattro messaggi e Payload & -- & sono dati, non comportamento: dicono che cosa il campo ha detto, e nessuno di loro decide niente\\
 ExistIdForEdge, ExistIdForEdgeStazione & M2 & una macchina sola in due classi gemelle: cambiano il topic e la tabella interrogata, non il comportamento\\
 \hline
 \textbf{C4b - i servizi di dominio} &  & \\
-MonitoraggioTreni & M3, meta' di M5 & scrive \texttt{Treno.stato}, la posizione e il ritardo: la telemetria e' M3, il passaggio dichiarato dal convoglio e' la meta' di M5 che misura il tempo\\
+MonitoraggioTreni & M3, meta' di M5 & scrive \texttt{Treno.stato}, la posizione e il ritardo: la telemetria e' M3, mentre di M5 e' la meta' che misura il tempo, chiamata dal \texttt{TransitiService} prima che la riga del transito venga scritta\\
 MonitoraggioStazioni & M4 & l'unica che scrive \texttt{Stazione.stato} partendo da un battito, ed e' lei a decidere che in MANUTENZIONE il battito non conta (RF01.4.1)\\
-TransitiService & meta' di M5 & l'altra meta': il passaggio rilevato dal sensore di terra, che apre e chiude la riga del transito\\
+TransitiService & meta' di M5 & l'altra meta': riceve il transito certificato dalla stazione, fa misurare il ritardo e poi apre o chiude la riga del transito\\
 GuastiService & M6, M7 & M6 e' l'allarme che arriva dal campo; M7 e' il ciclo di vita del guasto, che da qui in poi ha un solo posto in cui transita\\
 FaultMonitor & M8 & l'unica macchina che reagisce a un silenzio invece che a un messaggio: i tre job da 10 secondi. La transizione la chiede al \texttt{GuastiService}\\
 PubblicatoreAlert, NavigazioneItinerario, PrevisioneArrivi & -- & nessuna transizione: il primo scrive messaggi, gli altri due rispondono a domande (dove sono, quando arrivo)\\
@@ -2640,9 +2703,9 @@ strada da cui la notizia e' arrivata. E' il risultato piu' concreto del riordino
 motivo per cui la tabella e' passata da trentuno righe a trentadue.
 \end{description}
 \section{Validazione}
-\label{sec:org28f9548}
+\label{sec:orgd7d539e}
 \subsection{Come è stato verificato}
-\label{sec:orgb82e44c}
+\label{sec:orgd031aac}
 
 La verifica procede su tre livelli, perché i requisiti non sono tutti della stessa natura. I
 \textbf{test automatici} controllano le singole funzioni e gli endpoint, e sono l'unica parte che si
@@ -2651,7 +2714,7 @@ d'insieme, quello che nessun test unitario vede perché nasce dall'interazione f
 separati, e si eseguono a mano sul sistema acceso. I \textbf{requisiti non funzionali} non si
 asseriscono ma si misurano, e per ciascuno serve uno strumento diverso.
 \subsection{Ambiente di prova}
-\label{sec:orgcefa0b7}
+\label{sec:orged1e228}
 
 I test automatici non hanno bisogno di nessun servizio esterno: la Centrale gira su H2 in
 memoria (vedi \emph{I test hanno un database loro}), i nodi di campo partono con
@@ -2662,9 +2725,9 @@ mentre il sistema vero è acceso senza contendergli né le porte né il database
 Le prove manuali richiedono invece il sistema completo: \texttt{docker compose up} per broker,
 PostgreSQL e Keycloak, i tre moduli Quarkus e la web app.
 \subsection{Test automatici}
-\label{sec:orgf43aba9}
+\label{sec:orgeec90e2}
 
-Esito dell'esecuzione del 21 agosto 2026: \textbf{57 test, tutti superati, nessun fallimento}.
+Esito dell'esecuzione del 24 agosto 2026: \textbf{86 test, tutti superati, nessun fallimento}.
 
 {\small
 \begin{longtable}{L{0.13\textwidth}L{0.24\textwidth}L{0.07\textwidth}L{0.42\textwidth}}
@@ -2683,18 +2746,23 @@ modulo & classe & test & che cosa verifica \\
 \endlastfoot
 \hline
 Centrale & \texttt{AdminApiTest} & 13 & gli endpoint dell'anagrafica e il filtro sui ruoli: senza token si viene respinti, il tecnico legge ma non crea, i nomi duplicati sono rifiutati (RF01.3, RF04.2)\\
+Centrale & \texttt{PrevisioneArriviTest} & 11 & l'orario di servizio: la previsione somma tratte e soste, il ritardo nasce dal confronto con l'orario previsto e cresce anche per una sosta troppo lunga (RF02.2.1, RF02.2.2.2)\\
 Centrale & \texttt{ItinerariTratteTest} & 8 & un itinerario si appoggia solo su tratte esistenti; il rifiuto lascia l'itinerario com'era e non a metà (RF01.3.3, RF01.3.4)\\
 Centrale & \texttt{RegressioniBugTest} & 7 & i bug trovati e chiusi, con un test a guardia di ciascuno\\
+Centrale & \texttt{ChiusuraGuastiTest} & 5 & i due comandi del tecnico: la squadra non si manda su una stazione sana, l'invio la mette in manutenzione, la chiusura dell'allarme la rimette in servizio (RF01.4.1, RF01.4.2)\\
 Centrale & \texttt{MemoriaStoricaTest} & 4 & eliminare una stazione o un convoglio non cancella la loro storia (RF01.5, RF02.7)\\
+Centrale & \texttt{AlertRitardoTest} & 4 & il ritardo misurato viaggia verso il convoglio con la causa giusta, e il rientro in orario non è un allarme (RF02.2.2.2)\\
 Centrale & \texttt{GuastoTest} & 2 & i campi del guasto e la distinzione fra allarme segnalato e dedotto (RF01.2.2)\\
 Centrale & \texttt{QuarkusSmokeTest} & 1 & il contesto si avvia e l'applicazione risponde\\
-Treni & \texttt{RiaggancioItinerarioTest} & 5 & il riaggancio dopo un cambio di itinerario: il treno resta dov'è, si inverte al capolinea nuovo, aspetta se è in mezzo a una tratta (RF02.5, SV05)\\
+Treni & \texttt{RiaggancioItinerarioTest} & 7 & il riaggancio dopo un cambio di itinerario: il treno resta dov'è, si inverte all'estremo nuovo, aspetta se è in mezzo a una tratta, e chi ha chiuso la corsa riparte solo se il capolinea è stato tolto (RF02.5, RF01.3.4, SV05)\\
+Treni & \texttt{RitardoComunicatoTest} & 3 & il ritardo che la Centrale comunica finisce a bordo, il rientro lo azzera, quello di un altro convoglio viene ignorato\\
 Treni & \texttt{ExampleTest} & 1 & l'arrivo di un allarme al convoglio\\
+Stazioni & \texttt{SensoriFailStopTest} & 4 & i sensori di binario: si chiamano con l'id della stazione, battono via REST, il sensore muto la guasta e il suo ritorno la rimette operativa, il sensore fermo non rileva il passaggio (RF02.3.3, RF03.4)\\
 Stazioni & \texttt{ExampleTest} & 1 & segnaposto, vedi i limiti in fondo al capitolo\\
 Web app & \texttt{TrafficMapPage}, \texttt{apiClient}, \texttt{Card} & 15 & il rendering della mappa, le chiamate con il token e i componenti di base\\
 \end{longtable}}
 \subsubsection{Le prove di regressione}
-\label{sec:org32132ee}
+\label{sec:org1c506e9}
 
 \texttt{RegressioniBugTest} merita una riga a parte perché non nasce da un requisito ma da un errore.
 Ogni suo test corrisponde a un bug che il sistema aveva davvero e che è stato chiuso: i nomi dei
@@ -2702,7 +2770,7 @@ metodi sono l'enunciato del bug — \texttt{modificareLeStazioniNonSganciaITreni
 \texttt{itinerarioCheRipassaSullaStessaTrattaVieneRifiutato},
 \texttt{trattaUsataComePosizioneDiUnTrenoNonSiElimina}. Servono a impedire che tornino.
 \subsection{Esecuzione degli scenari}
-\label{sec:org2212298}
+\label{sec:org3af5ad3}
 
 Gli scenari sono enunciati nel capitolo \emph{Scenari di verifica} con il comportamento atteso passo
 per passo; qui sta il modo in cui vengono provocati sul sistema acceso. Le leve sono gli endpoint
@@ -2730,10 +2798,10 @@ SV02 & \texttt{POST /stazione/rete/offline} su A, si fanno transitare dei convog
 SV03 & \texttt{POST /treno/sensore/guasto} su due convogli, uno in sosta e uno in tratta & l'elenco degli allarmi: la sorgente è la stazione nel primo caso, la tratta nel secondo\\
 SV04 & si ferma un convoglio fuori stazione e si aspetta \texttt{T\_fer} & l'allarme compare da solo ed è marcato come dedotto\\
 SV05 & si modifica l'itinerario dalla dashboard a convogli in marcia & posizione e ritardo dei due convogli prima e dopo\\
-SV06 & si lascia percorrere una corsa intera, andata e ritorno & lo storico dei transiti: entrate e uscite nell'ordine reale\\
+SV06 & si lascia percorrere una corsa intera, andata e ritorno; poi si marca il capolinea su un estremo e si lascia arrivare il convoglio & lo storico dei transiti (entrate e uscite nell'ordine reale) e, dopo il capolinea, il treno fermo con l'entrata rimasta senza uscita\\
 \end{longtable}}
 \subsection{Verifica dei requisiti non funzionali}
-\label{sec:orgf4f7cd8}
+\label{sec:org2009853}
 
 {\small
 \begin{longtable}{L{0.10\textwidth}L{0.22\textwidth}L{0.58\textwidth}}
@@ -2759,7 +2827,7 @@ RNF05 & numerosità & si avviano più istanze di stazione e di treno con id dive
 RNF06 & riavviabilità & si arresta e si riavvia un nodo a sistema acceso, senza toccare nient'altro\\
 \end{longtable}}
 \subsection{Limiti della verifica}
-\label{sec:org2b4517c}
+\label{sec:orgc4114ee}
 
 Tre cose vanno dette, perché non sono coperte.
 
@@ -2767,10 +2835,10 @@ Tre cose vanno dette, perché non sono coperte.
 \item[{I test automatici si fermano al confine del nodo}] verificano gli endpoint e la logica interna,
 ma non la conversazione via broker fra processi separati. Che la telemetria pubblicata dal treno
 arrivi davvero in Centrale è verificato dagli scenari a mano, non da un test.
-\item[{Il nodo Stazione non ha test propri}] il suo \texttt{ExampleTest} è un segnaposto. È il modulo con
-meno copertura automatica, e non per caso: la sua logica interessante (la coda locale e il suo
-svuotamento) vive proprio nell'interazione con la rete, che è quello che i test unitari non
-vedono.
+\item[{Il nodo Stazione è il meno coperto}] \texttt{SensoriFailStopTest} prova il meccanismo dei sensori, ma
+il suo \texttt{ExampleTest} resta un segnaposto e la parte più interessante del nodo — la coda locale e
+il suo svuotamento — non ha test propri, perché vive proprio nell'interazione con la rete, che è
+quello che i test unitari non vedono.
 \item[{Scenari e requisiti non funzionali sono verificati a mano}] si rieseguono a ogni modifica solo
 se qualcuno si ricorda di farlo.
 \end{description}

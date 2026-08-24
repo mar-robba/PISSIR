@@ -180,6 +180,7 @@ const mapApiRoute = (r: ApiRoutePayload): Route => ({
   stationIds: r.stazioni || [],
   trainIds: r.treniIds || [],
   travelTimes: r.travelTimes || [],
+  terminusStationId: r.capolinea ?? null,
   active: r.attivo || false,
   createdAt: Date.now()
 });
@@ -210,6 +211,7 @@ export const mapBackendStatus = (s: string): TrainStatus => {
   if (lower === 'fermo') return 'in_stazione';
   if (lower === 'rotto') return 'guasto';
   if (lower === 'in manutenzione') return 'soppresso';
+  if (lower === 'capolinea') return 'capolinea';
   return (lower || 'in_attesa') as TrainStatus;
 };
 
@@ -223,6 +225,11 @@ export const mapFrontendStatus = (s: TrainStatus): string => {
     case 'in_stazione': return 'fermo';
     case 'guasto': return 'rotto';
     case 'soppresso': return 'in manutenzione';
+    // Non c'e' nessun campo dell'amministrazione che imposti questo stato a mano: lo
+    // decide il convoglio arrivando al capolinea. La riga serve perche' le PUT parziali
+    // rimandano indietro lo stato che hanno letto, e senza di essa una modifica
+    // qualsiasi su un treno a fine corsa lo rimetterebbe "fermo".
+    case 'capolinea': return 'capolinea';
     default: return 'fermo';
   }
 };
@@ -359,6 +366,7 @@ export const apiClient = {
         stazioni: route.stationIds,
         travelTimes: route.travelTimes,
         attivo: route.active,
+        capolinea: route.terminusStationId ?? null,
         treniIds: route.trainIds
       })
     });
@@ -387,6 +395,11 @@ export const apiClient = {
         stazioni: route.stationIds,
         travelTimes: route.travelTimes,
         attivo: route.active,
+        // Il capolinea viaggia insieme all'elenco delle stazioni: la Centrale lo legge
+        // solo quando "stazioni" c'e', cosi' un null vuol dire "nessun capolinea" e non
+        // "non lo sto cambiando". Ed e' proprio mandando null che si rimette in servizio
+        // un convoglio fermo a fine corsa.
+        capolinea: route.terminusStationId ?? null,
         ...(route.trainIds !== undefined ? { treniIds: route.trainIds } : {})
       })
     });

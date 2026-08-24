@@ -51,7 +51,7 @@ public class RiaggancioItinerarioTest {
     @Test
     public void ilTrenoRestaNellaStazioneInCuiSiTrova() {
         List<TrainDB.TappaItinerario> nuovo = itinerario("S2", "S3", "S4", "S5");
-        motore.applicaItinerario("IT_NUOVO", nuovo, idDi(nuovo));
+        motore.applicaItinerario("IT_NUOVO", nuovo, idDi(nuovo), null);
 
         Assertions.assertTrue(motore.viaggioAvviato, "il viaggio non doveva essere azzerato");
         Assertions.assertEquals("IT_NUOVO", db.itinerarioId);
@@ -72,7 +72,7 @@ public class RiaggancioItinerarioTest {
     @Test
     public void senzaLaStazioneCorrenteSiRicominciaDalCapolinea() {
         List<TrainDB.TappaItinerario> nuovo = itinerario("S7", "S8", "S9");
-        motore.applicaItinerario("IT_ALTROVE", nuovo, idDi(nuovo));
+        motore.applicaItinerario("IT_ALTROVE", nuovo, idDi(nuovo), null);
 
         Assertions.assertFalse(motore.viaggioAvviato, "il tick successivo deve rifare avviaViaggio()");
         Assertions.assertEquals("IT_ALTROVE", db.itinerarioId);
@@ -86,7 +86,7 @@ public class RiaggancioItinerarioTest {
     @Test
     public void alCapolineaNuovoLaDirezioneSiInverte() {
         List<TrainDB.TappaItinerario> nuovo = itinerario("S1", "S2", "S3");
-        motore.applicaItinerario("IT_ACCORCIATO", nuovo, idDi(nuovo));
+        motore.applicaItinerario("IT_ACCORCIATO", nuovo, idDi(nuovo), null);
 
         Assertions.assertEquals(2, db.indiceStazione);
         Assertions.assertEquals("ritorno", db.direzione);
@@ -103,7 +103,7 @@ public class RiaggancioItinerarioTest {
         db.stato = "IN_VIAGGIO";
 
         List<TrainDB.TappaItinerario> nuovo = itinerario("S3", "S4", "S5");
-        motore.applicaItinerario("IT_NUOVO", nuovo, idDi(nuovo));
+        motore.applicaItinerario("IT_NUOVO", nuovo, idDi(nuovo), null);
 
         Assertions.assertEquals("IT_VECCHIO", db.itinerarioId, "l'itinerario in uso non cambia a metà tratta");
         Assertions.assertEquals(4, db.itinerario.size());
@@ -119,10 +119,52 @@ public class RiaggancioItinerarioTest {
     @Test
     public void conLeStesseFermateIlViaggioProsegue() {
         List<TrainDB.TappaItinerario> stesse = itinerario("S1", "S2", "S3", "S4");
-        motore.applicaItinerario("IT_VECCHIO", stesse, idDi(stesse));
+        motore.applicaItinerario("IT_VECCHIO", stesse, idDi(stesse), null);
 
         Assertions.assertEquals(2, db.indiceStazione, "nessun riaggancio: il treno era già a posto");
         Assertions.assertNull(db.tArrivoInStazione, "la sosta non doveva ripartire");
+    }
+
+    /**
+     * Il treno ha chiuso la corsa al capolinea S3. L'amministratore toglie la marcatura e
+     * risalva lo stesso identico itinerario: è l'unico modo che il convoglio ha per
+     * ripartire, quindi qui il riaggancio deve avvenire anche se le fermate non sono
+     * cambiate (il ramo "stesse fermate" da solo lo lascerebbe fermo per sempre).
+     */
+    @Test
+    public void toglierIlCapolineaRimetteInServizioIlTreno() {
+        db.capolineaId = "S3";
+        db.stato = "CAPOLINEA";
+        db.faseViaggio = "FERMO_CAPOLINEA";
+
+        List<TrainDB.TappaItinerario> stesse = itinerario("S1", "S2", "S3", "S4");
+        motore.applicaItinerario("IT_VECCHIO", stesse, idDi(stesse), null);
+
+        Assertions.assertEquals("IN_STAZIONE", db.faseViaggio, "la corsa è ricominciata");
+        Assertions.assertEquals("FERMO", db.stato);
+        Assertions.assertEquals("S3", db.stazioneCorrente, "riparte da dove si era fermato");
+        Assertions.assertEquals("S4", db.prossimaStazione);
+        Assertions.assertNull(db.capolineaId);
+    }
+
+    /**
+     * Stessa situazione, ma il capolinea resta dov'era: succede tutte le volte che
+     * l'itinerario viene risalvato per altri motivi (o che ci si aggancia un altro
+     * convoglio, visto che ITINERARIO_AGGIORNATO arriva a tutti). Un treno che aveva
+     * finito il servizio non deve ripartire per una modifica che non lo riguarda.
+     */
+    @Test
+    public void ilCapolineaConfermatoTieneFermoIlTreno() {
+        db.capolineaId = "S3";
+        db.stato = "CAPOLINEA";
+        db.faseViaggio = "FERMO_CAPOLINEA";
+
+        List<TrainDB.TappaItinerario> stesse = itinerario("S1", "S2", "S3", "S4");
+        motore.applicaItinerario("IT_VECCHIO", stesse, idDi(stesse), "S3");
+
+        Assertions.assertEquals("FERMO_CAPOLINEA", db.faseViaggio, "la corsa era ed è finita");
+        Assertions.assertEquals("CAPOLINEA", db.stato);
+        Assertions.assertEquals("S3", db.stazioneCorrente);
     }
 
     // ---------------------------------------------------------------- utilità

@@ -149,6 +149,15 @@ public class RestApiGateway {
         public List<Integer> travelTimes;
         public Boolean attivo;
         public List<String> treniIds;
+        /**
+         * Id della stazione che chiude il servizio, o null se l'itinerario si percorre
+         * all'infinito. Si legge <b>insieme a {@code stazioni}</b>: sono la stessa
+         * decisione (quale percorso e dove finisce) e un capolinea si puo' giudicare solo
+         * guardando l'elenco a cui si riferisce. Se "stazioni" non c'e' nel JSON, la PUT
+         * non tocca nemmeno questo campo, e un null vuol dire "nessun capolinea" invece
+         * di "non lo sto cambiando".
+         */
+        public String capolinea;
     }
 
     /** DTO della singola tratta fisica tra due stazioni, distinto da un itinerario. */
@@ -619,9 +628,12 @@ public class RestApiGateway {
         // Prima di scrivere qualsiasi cosa: se manca anche un solo arco non si crea niente.
         Response tratteMancanti = verificaTratteEsistenti(dto.stazioni);
         if (tratteMancanti != null) return tratteMancanti;
+        Response capolineaNonValido = verificaCapolinea(dto.stazioni, dto.capolinea);
+        if (capolineaNonValido != null) return capolineaNonValido;
 
         Itinerario itinerario = new Itinerario();
         itinerario.id = id;
+        itinerario.capolineaId = normalizzaCapolinea(dto.capolinea);
         repository.salvaItinerario(itinerario);
 
         Response errore = componiItinerario(itinerario, dto.stazioni, dto.travelTimes);
@@ -662,10 +674,17 @@ public class RestApiGateway {
             // perché la transazione va in commit lo stesso quando si torna un errore.
             Response tratteMancanti = verificaTratteEsistenti(dto.stazioni);
             if (tratteMancanti != null) return tratteMancanti;
+            Response capolineaNonValido = verificaCapolinea(dto.stazioni, dto.capolinea);
+            if (capolineaNonValido != null) return capolineaNonValido;
 
             repository.eliminaTratteDellItinerario(id);
             Response errore = componiItinerario(itinerario, dto.stazioni, dto.travelTimes);
             if (errore != null) return errore;
+            // Il capolinea segue l'elenco delle stazioni: toglierlo qui (capolinea null) e'
+            // il modo con cui l'amministratore rimette in servizio un treno che aveva
+            // chiuso la corsa, perche' subito sotto tutti i convogli assegnati ricevono
+            // ITINERARIO_AGGIORNATO e il twin si riaggancia al percorso nuovo.
+            itinerario.capolineaId = normalizzaCapolinea(dto.capolinea);
         }
 
         // Gli id dei treni assegnati vanno letti PRIMA di toccare le assegnazioni:
@@ -911,6 +930,10 @@ public class RestApiGateway {
         Map<String, Object> result = new HashMap<>();
         result.put("itinerarioId", treno.itinerario.id);
         result.put("stazioni", stazioni);
+        // L'unico canale con cui il convoglio impara il percorso e' questo, quindi e' anche
+        // l'unico da cui puo' sapere dove finisce il servizio. Null = si va avanti e
+        // indietro senza fine, che e' il comportamento di sempre.
+        result.put("capolineaId", treno.itinerario.capolineaId);
         return Response.ok(result).build();
     }
 
@@ -1086,6 +1109,40 @@ public class RestApiGateway {
     }
 
     /**
+     * Controlla che il capolinea dichiarato sia uno dei due <b>estremi</b> dell'elenco.
+     *
+     * <p>Una fermata intermedia marcata come capolinea spezzerebbe l'itinerario in due
+     * senza dire che ne e' del pezzo restante, e il convoglio si fermerebbe in mezzo al
+     * percorso lasciando delle stazioni che lo aspettano per sempre. Quale dei due estremi
+     * invece e' una scelta legittima e cambia la corsa: l'ultima stazione chiude dopo la
+     * sola andata, la prima dopo l'andata e il ritorno.</p>
+     *
+     * @return null se va bene (capolinea assente compreso), altrimenti la Response 400.
+     */
+    private Response verificaCapolinea(List<String> stazioni, String capolinea) {
+        String scelto = normalizzaCapolinea(capolinea);
+        if (scelto == null || stazioni == null || stazioni.isEmpty()) {
+            return null;
+        }
+        String primo = stazioni.get(0);
+        String ultimo = stazioni.get(stazioni.size() - 1);
+        if (scelto.equals(primo) || scelto.equals(ultimo)) {
+            return null;
+        }
+        return Response.status(Response.Status.BAD_REQUEST)
+                .entity(Map.of("errore", "Il capolinea deve essere il primo o l'ultimo nodo "
+                        + "dell'itinerario (" + primo + " o " + ultimo + "), non " + scelto))
+                .build();
+    }
+
+    /** Campo vuoto e campo assente sono la stessa cosa: nessun capolinea. */
+    private String normalizzaCapolinea(String capolinea) {
+        if (capolinea == null) return null;
+        String pulito = capolinea.trim();
+        return pulito.isEmpty() ? null : pulito;
+    }
+
+    /**
      * Assegna i treni indicati all'itinerario. Se {@code sganciaAssenti} è true
      * (caso PUT), i treni prima assegnati e non più presenti vengono scollegati.
      *
@@ -1145,6 +1202,7 @@ public class RestApiGateway {
         dto.put("stazioni", stazioni);
         dto.put("travelTimes", travelTimes);
         dto.put("attivo", true);
+        dto.put("capolinea", it.capolineaId);
 
         List<String> treniIds = new ArrayList<>();
         for (Treno t : Treno.<Treno>list("itinerario.id", it.id)) {

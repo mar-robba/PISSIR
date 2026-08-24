@@ -62,6 +62,8 @@ export interface ApiRoutePayload {
   travelTimes?: number[];
   attivo?: boolean;
   treniIds?: string[];
+  /** Id della stazione che chiude il servizio, null se la tratta non finisce mai. */
+  capolinea?: string | null;
 }
 
 export interface ApiTrackSegmentPayload {

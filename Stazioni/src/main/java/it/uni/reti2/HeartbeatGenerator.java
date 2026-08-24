@@ -38,6 +38,16 @@ public class HeartbeatGenerator implements HeartbeatKA {
     StationGateway stationGateway;
 
     /**
+     * Il battito è periodico: stamparlo tutte le volte riempirebbe il log di righe uguali.
+     * Se ne stampa una quando parte (e una ogni volta che riprende dopo una pausa), il
+     * payload completo resta in DEBUG. Questi due campi ricordano cosa è già stato detto,
+     * così anche il motivo per cui il battito è sospeso si scrive una volta sola e non a
+     * ogni tick.
+     */
+    private boolean battitoAnnunciato;
+    private String motivoSospensione;
+
+    /**
      * Costruisce il messaggio JSON di heartbeat implementando l'interfaccia.
      * Include la dimensione del buffer locale come informazione diagnostica.
      */
@@ -70,6 +80,23 @@ public class HeartbeatGenerator implements HeartbeatKA {
     }
 
     /**
+     * Scrive il motivo per cui il battito non parte, ma una volta sola: finché il motivo
+     * resta quello il tick continua a scattare ogni 10 secondi in silenzio invece di
+     * ripetere la stessa riga. Alla ripresa {@link #generaHeartbeat()} azzera il campo,
+     * così la volta dopo la sospensione si rivede.
+     *
+     * @param motivo Il messaggio da scrivere nel log.
+     */
+    private void sospendi(String motivo) {
+        if (!motivo.equals(motivoSospensione)) {
+            LOG.warn(motivo);
+            motivoSospensione = motivo;
+            // Quando il battito riprende va detto: è la notizia opposta a questa.
+            battitoAnnunciato = false;
+        }
+    }
+
+    /**
      * Producer reattivo che emette l'heartbeat sul canale MQTT dedicato ("heartbeat-out").
      * Viene eseguito ogni 10 secondi in background.
      * Se la connessione verso la Centrale è simulata come assente, il battito
@@ -94,7 +121,7 @@ public class HeartbeatGenerator implements HeartbeatKA {
                     // ID non ancora validato dalla Centrale: nessun battito finché non arriva
                     // la conferma via MQTT (StationDatabaseValidator.gestisciRispostaValidazione).
                     if (!dbLocale.stazioneRiconosciuta) {
-                        LOG.warn("⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.");
+                        sospendi("⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.");
                         return false;
                     }
                     return true;
@@ -102,7 +129,7 @@ public class HeartbeatGenerator implements HeartbeatKA {
                 .filter(tick -> {
                     // Rete simulata giù: si salta il battito, la Centrale ci vedrà OFFLINE
                     if (!dbLocale.connessioneCentrale) {
-                        LOG.warn("🔌 Offline: heartbeat non inviato alla Centrale.");
+                        sospendi("🔌 Offline: heartbeat non inviato alla Centrale.");
                         return false;
                     }
                     return true;
@@ -110,7 +137,13 @@ public class HeartbeatGenerator implements HeartbeatKA {
                 .map(tick -> {
                     // Prepara il messaggio
                     String json = generatePayload(dbLocale.stazioneId, dbLocale.getStato(), localBuffer.size());
-                    LOG.infof("💓 [HEARTBEAT] Invio heartbeat: %s", json);
+                    if (!battitoAnnunciato) {
+                        // Una riga sola per dire che il battito c'è: il dettaglio è in DEBUG.
+                        LOG.info("💓 [HEARTBEAT] Battito verso la Centrale ogni 10 secondi.");
+                        battitoAnnunciato = true;
+                    }
+                    motivoSospensione = null;
+                    LOG.debugf("💓 [HEARTBEAT] Invio heartbeat: %s", json);
                     return json;
                 })
                 // Gestione reattiva degli errori di connessione sul canale di invio

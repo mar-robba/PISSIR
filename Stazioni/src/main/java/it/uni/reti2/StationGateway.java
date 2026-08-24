@@ -86,7 +86,12 @@ public class StationGateway {
     @Incoming("alerts-in")
     public CompletionStage<Void> riceviAlert(org.eclipse.microprofile.reactive.messaging.Message<byte[]> message) {
         String payload = new String(message.getPayload());
-        LOG.warnf("🚨 [ALERT RICEVUTO] La Centrale dice: %s", payload);
+        // railway/alerts è un canale condiviso: qui dentro passano anche i ritardi dei treni
+        // e i guasti delle altre stazioni, che a questo nodo non dicono niente. Stamparli
+        // tutti per intero riempiva il log, quindi il payload grezzo resta in DEBUG e le
+        // righe visibili sono solo quelle degli alert che riguardano davvero la stazione
+        // (le stampa lo switch qui sotto).
+        LOG.debugf("🚨 [ALERT RICEVUTO] La Centrale dice: %s", payload);
 
         try {
             JsonNode json = mapper.readTree(payload);
@@ -131,15 +136,17 @@ public class StationGateway {
 
     /**
      * Intercetta i passaggi fisici dei treni pubblicati sul topic wildcard
-     * railway/train/+/passaggio. Ogni stazione riceve i passaggi di TUTTI i treni,
-     * quindi filtra i soli messaggi indirizzati al proprio stazioneId.
+     * railway/treno-simulatoriSensori/+. Ogni stazione riceve i passaggi di TUTTI i
+     * treni, quindi filtra i soli messaggi indirizzati al proprio stazioneId.
      * Il passaggio viene girato ai sensori di binario, che sono i soli a poterlo rilevare:
-     * la registrazione vera e propria avviene poi in {@link #registraTransitoRilevato}.
+     * la registrazione vera e propria avviene poi in {@link #registraTransitoRilevato},
+     * che è anche il punto da cui parte verso la Centrale il transito ufficiale su
+     * railway/station/{stazioneId}/transit.
      *
      * @param message Il messaggio di passaggio in arrivo dal broker.
      * @return CompletionStage che indica il processamento completato.
      */
-    @Incoming("passaggio-in")
+    @Incoming("sensori-in")
     public CompletionStage<Void> riceviPassaggio(org.eclipse.microprofile.reactive.messaging.Message<byte[]> message) {
         String payload = new String(message.getPayload());
 

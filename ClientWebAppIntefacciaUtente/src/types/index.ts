@@ -47,7 +47,13 @@ export type TrainStatus =
   | 'in_ritardo'
   | 'guasto'
   | 'soppresso'
-  | 'in_attesa';
+  | 'in_attesa'
+  /**
+   * Corsa finita: il convoglio è arrivato al capolinea marcato sulla tratta e non
+   * riparte da solo. Non è un guasto e non è una soppressione — il treno sta bene, è
+   * il servizio a essere finito — e se ne esce solo assegnandogli un'altra tratta.
+   */
+  | 'capolinea';
 
 export interface Train {
   /**
@@ -90,6 +96,13 @@ export interface Route {
   stationIds: string[]; // sequenza ordinata di nodi stazioni attraversate (andata)
   trainIds: string[]; // pool di treni assegnati alla linea
   travelTimes: number[]; // storico o delta previsti: minuti necessari tra stazione[i] e stazione[i+1]
+  /**
+   * Il nodo su cui la corsa si chiude, o null se la tratta si percorre all'infinito
+   * (comportamento normale). È sempre uno dei due estremi di stationIds: marcando
+   * l'ultimo il convoglio chiude dopo la sola andata, marcando il primo dopo l'andata
+   * e il ritorno. Arrivato lì il treno passa in stato 'capolinea' e resta fermo.
+   */
+  terminusStationId: string | null;
   active: boolean; // se la linea ferroviaria è attualmente aperta al traffico
   createdAt: number;
 }

@@ -37,6 +37,9 @@ public class TrainDB {
      * - FERMO: il treno è temporaneamente fermo (es. in stazione).
      * - EMERGENZA: è stato rilevato un guasto o un'emergenza.
      * - SOPPRESSO: la corsa del treno è stata cancellata.
+     * - CAPOLINEA: il convoglio è arrivato all'estremo che chiude l'itinerario e la corsa
+     *   è finita. Non è né un guasto né una soppressione: il treno è a posto, il servizio
+     *   no. Ci si esce solo se l'amministratore assegna un itinerario diverso.
      */
     public String stato = "FERMO";
 
@@ -83,6 +86,7 @@ public class TrainDB {
      * Fase corrente della macchina a stati del viaggio.
      * Valori possibili: IN_STAZIONE, IN_VIAGGIO, BLOCCATO_GUASTO_STAZIONE,
      * SENZA_ITINERARIO (nessun percorso assegnato: il convoglio è fermo e aspetta),
+     * FERMO_CAPOLINEA (corsa finita all'estremo marcato dell'itinerario),
      * TERMINATO.
      */
     public String faseViaggio = "IN_STAZIONE";
@@ -104,6 +108,17 @@ public class TrainDB {
      * ricevuto dalla Centrale Operativa insieme alla lista delle tappe.
      */
     public String itinerarioId = null;
+
+    /**
+     * La stazione in cui questo itinerario chiude il servizio, oppure null (il caso
+     * normale) se il percorso va percorso avanti e indietro senza fine.
+     *
+     * <p>Arriva dalla Centrale nella stessa risposta dell'itinerario: è lei a sapere che
+     * cosa ha marcato l'amministratore, il convoglio si limita a fermarsi quando ci
+     * arriva. È sempre uno dei due estremi dell'elenco: se è l'ultimo la corsa finisce
+     * dopo la sola andata, se è il primo dopo l'andata e il ritorno.</p>
+     */
+    public String capolineaId = null;
 
     /**
      * Itinerario completo del treno: lista ordinata di tappe con coordinate

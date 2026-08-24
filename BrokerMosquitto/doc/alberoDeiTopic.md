@@ -10,16 +10,19 @@ vedi `doc/TLS.md`). Tutti i payload sono JSON con decimali col punto e timestamp
 | `railway/station/{id}/heartbeat` | Stazione | Centrale (`railway/station/+/heartbeat`) | ogni 10 s |
 | `railway/station/{id}/transit` | Stazione | Centrale (`railway/station/+/transit`) | sensore rileva ENTRATA/USCITA treno |
 | `railway/train/{id}/telemetry` | Treno | Centrale (`railway/train/+/telemetry`) | ogni 5 s |
-| `railway/train/{id}/passaggio` | Treno | Centrale **e Stazioni** (`railway/train/+/passaggio`) | il treno transita al sensore di una stazione |
+| `railway/treno-simulatoriSensori/{id}` | Treno | Stazioni (`railway/treno-simulatoriSensori/+`) | il treno annuncia il passaggio ai sensori di binario |
 | `railway/alerts` | Centrale, Stazioni, Treni | tutti | eventi: guasti, risoluzioni, comandi |
 
 Note di progetto:
 
 - I **sensori NON usano MQTT**: parlano REST col proprio nodo (scelta documentata in
-  `doc/scheletroDoc/scheletrodoc.md`). I topic `transit`/`passaggio` sono la traduzione MQTT
-  dell'evento del sensore verso il resto del sistema.
-- Le stazioni sono sottoscritte a `railway/train/+/passaggio` e **filtrano** i messaggi con il
-  proprio `stazioneId`: così il treno non deve conoscere host/porta delle stazioni.
+  `doc/scheletroDoc/scheletrodoc.md`). I topic `transit`/`treno-simulatoriSensori` sono la
+  traduzione MQTT dell'evento del sensore verso il resto del sistema.
+- Le stazioni sono sottoscritte a `railway/treno-simulatoriSensori/+` e **filtrano** i messaggi
+  con il proprio `stazioneId`: così il treno non deve conoscere host/porta delle stazioni.
+  Non è la Centrale a riceverlo: il treno non le parla più direttamente su questo evento,
+  è la stazione a inoltrarle il transito ufficiale su `railway/station/{id}/transit` una
+  volta che il sensore l'ha rilevato.
 - Il transito ENTRATA/USCITA distingue il tipo con il campo `tipo` nel payload (non con
   sotto-topic `/in` `/out`): meno canali da configurare in SmallRye e stesso potere espressivo.
 
@@ -42,9 +45,9 @@ Note di progetto:
  "stazioneCorrente":"","prossimaStazione":"S2","direzione":"andata","timestamp":"..."}
 ```
 
-### `railway/train/{id}/passaggio`
+### `railway/treno-simulatoriSensori/{id}`
 ```json
-{"trenoId":"TRN001","stazioneId":"S2","tipo":"ENTRATA","timestamp":"...","ritardoMinuti":0}
+{"trenoId":"TRN001","stazioneId":"S2","tipo":"ENTRATA","timestamp":"...","direzione":"andata"}
 ```
 
 ### `railway/alerts` — discriminante `tipoEvento`

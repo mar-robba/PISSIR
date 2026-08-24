@@ -53,12 +53,12 @@ public class TrainGateway {
     Emitter<String> alertsEmitter;
 
     /**
-     * Emitter reattivo per l'invio di notifiche sul passaggio del treno nelle stazioni.
-     * I messaggi vengono inviati sul canale "passaggio-out".
+     * Emitter reattivo per l'invio di notifiche sul passaggio del treno ai sensori
+     * di binario. I messaggi vengono inviati sul canale "sensori-out".
      */
     @Inject
-    @Channel("passaggio-out")
-    Emitter<String> passaggioEmitter;
+    @Channel("sensori-out")
+    Emitter<String> sensoriEmitter;
 // ============================== inizio listeners
     /**
      * Listener per la ricezione di avvisi (alert) provenienti dal canale condiviso
@@ -195,15 +195,20 @@ public class TrainGateway {
 
     /**
      * notifica di transito dentro una stazione
-     * Notifica alla Centrale Operativa e agli altri sistemi il passaggio in una determinata stazione,
-     * con l'ora dell'evento e il verso di marcia.
+     * Annuncia ai sensori di binario della stazione il passaggio del treno, con l'ora
+     * dell'evento e il verso di marcia.
      *
-     * <p>Questi due dati sono quelli che servono alla Centrale per il calcolo dei ritardi:
-     * con l'ora sa se il convoglio è arrivato quando doveva, con la direzione sa qual è la
-     * fermata successiva e quindi a che ora deve aspettarselo. La direzione la dichiara il
-     * treno perché al capolinea l'ha appena invertita: la Centrale la vedrebbe solo con il
-     * frame di telemetria successivo, cioè dopo aver già fissato l'orario sbagliato. Il
-     * campo "ritardoMinuti" che stava qui è sparito insieme al contatore di bordo.</p>
+     * <p>Il treno non parla più direttamente con la Centrale su questo evento: pubblica
+     * sul topic "railway/treno-simulatoriSensori/{trenoId}", che i sensori di binario
+     * della stazione interessata ascoltano per rilevare fisicamente il passaggio (vedi
+     * {@code SimulatoreSensori.rilevaPassaggio} lato Stazione). E' la stazione, non il
+     * treno, a informare poi la Centrale con il transito ufficiale su
+     * "railway/station/{stazioneId}/transit".</p>
+     *
+     * <p>La direzione viaggia comunque in questo messaggio perché al capolinea il treno
+     * l'ha appena invertita, e nessun altro nodo lo saprebbe prima del prossimo frame di
+     * telemetria. Il campo "ritardoMinuti" che stava qui è sparito insieme al contatore
+     * di bordo: il ritardo lo calcola solo la Centrale.</p>
      *
      * @param stazioneId L'identificativo univoco della stazione interessata.
      * @param tipo Il tipo di passaggio (es. "ENTRATA" nella stazione, o "USCITA" dalla stazione).
@@ -220,7 +225,7 @@ public class TrainGateway {
 
         try {
             // Invio del payload sul canale apposito
-            passaggioEmitter.send(json);
+            sensoriEmitter.send(json);
         } catch (Exception e) {
             LOG.error("Errore notifica passaggio: " + e.getMessage());
         }

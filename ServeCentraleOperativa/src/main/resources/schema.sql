@@ -38,8 +38,20 @@ CREATE TABLE Utenti (
 );
 
 -- --- Itinerari ---
+-- La colonna "capolinea" e' un'ESTENSIONE: e' la stazione che CHIUDE il servizio su
+-- questo itinerario. Vuota (NULL) il percorso si ripete all'infinito, andata e ritorno,
+-- che e' il comportamento di sempre; valorizzata, il convoglio che arriva li' termina la
+-- corsa e resta fermo nello stato 'capolinea' finche' un amministratore non gli assegna
+-- un percorso nuovo.
+-- Deve essere uno dei due ESTREMI dell'itinerario (lo verifica il gateway REST prima di
+-- scrivere): l'ultima stazione chiude dopo la sola andata, la prima dopo andata e ritorno.
+-- NON e' la stessa cosa di Stazione.tipoCapolineaPartenzaoNormale, che descrive la
+-- stazione in se': la stessa stazione puo' chiudere un itinerario ed essere una fermata
+-- intermedia di un altro, quindi il dato appartiene all'itinerario e non alla stazione.
 CREATE TABLE Itinerari (
-    id_itinerario VARCHAR(50) PRIMARY KEY
+    id_itinerario VARCHAR(50) PRIMARY KEY,
+    capolinea     VARCHAR(50),                -- ESTENSIONE: estremo che termina la corsa
+    FOREIGN KEY (capolinea) REFERENCES Stazione(id_stazione)
 );
 
 -- --- Treni ---
@@ -50,7 +62,7 @@ CREATE TABLE Itinerari (
 CREATE TABLE Treni (
     id_convoglio                    VARCHAR(50) PRIMARY KEY,
     stato                           VARCHAR(30) NOT NULL
-        CHECK (stato IN ('attivo','fermo','rotto','in manutenzione')),
+        CHECK (stato IN ('attivo','fermo','rotto','in manutenzione','capolinea')),
     itinerario                      VARCHAR(50),
     PosizioneAttualeTrattaOStazione VARCHAR(50),
     FOREIGN KEY (itinerario)

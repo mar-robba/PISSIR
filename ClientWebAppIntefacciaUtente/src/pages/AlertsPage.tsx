@@ -1,7 +1,7 @@
 import { useRailwayStore } from '../store/railwayStore';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { ShieldAlert, CheckCircle2, Wrench, Clock, Info, X } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Wrench, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 
@@ -32,9 +32,17 @@ export default function AlertsPage() {
     }
   };
 
-  const handleDispatch = (stationId: string, alertId: string) => {
+  /**
+   * UC5: manda la squadra alla stazione guasta (RF01.4.1) e si ferma lì.
+   *
+   * L'allarme NON va chiuso qui: insieme all'invio partiva anche acknowledgeAlert, cioè
+   * la POST /allarmi/{id}/risolvi, quindi il solo fatto di far uscire gli operatori
+   * rimetteva la stazione ONLINE e liberava i treni prima che qualcuno avesse riparato
+   * niente. La chiusura è il comando separato "Dichiara come risolto", come vuole
+   * RF01.4.2.
+   */
+  const handleDispatch = (stationId: string) => {
     dispatchOperators(stationId);
-    acknowledgeAlert(alertId);
   };
 
   return (
@@ -115,6 +123,20 @@ export default function AlertsPage() {
             const station = alert.stationId ? stations.find(s => s.id === alert.stationId) : null;
             const train = alert.trainId ? trains.find(t => t.id === alert.trainId) : null;
 
+            /*
+             * Chi può chiudere questo allarme, e quando.
+             *
+             * Un guasto di stazione non lo chiude una spunta in interfaccia: lo ripara la
+             * squadra di manutenzione. Quindi il comando compare al solo tecnico e solo dopo
+             * che gli operatori sono partiti (RF01.4.1 → RF01.4.2), altrimenti dai due
+             * bottoni affiancati si poteva rimettere ONLINE Firenze senza mandarci nessuno.
+             * Gli allarmi che non riguardano una stazione (avaria di un convoglio, ritardo)
+             * restano chiudibili da entrambi i ruoli: lì non c'è nessuna squadra da mandare.
+             */
+            const risolvibile = alert.stationId
+              ? user?.role === 'tecnico' && Boolean(station?.operatorsDispatched)
+              : true;
+
             return (
               <div 
                 key={alert.id} 
@@ -155,12 +177,17 @@ export default function AlertsPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2 mt-4 md:mt-0 w-full md:w-auto">
-                  {!alert.acknowledged && (
-                    <button 
+                  {/* Si chiama "Dichiara come risolto" perché è quello che fa davvero:
+                      dietro c'è POST /allarmi/{id}/risolvi, che chiude il guasto, riporta
+                      la sorgente in servizio e manda il RESOLVED al campo. Chiamarlo
+                      "Presa Visione" faceva credere che servisse solo a togliersi
+                      l'avviso dagli occhi, mentre riparava la stazione. */}
+                  {!alert.acknowledged && risolvibile && (
+                    <button
                       onClick={() => acknowledgeAlert(alert.id)}
                       className="btn btn-outline text-sm"
                     >
-                      <CheckCircle2 size={16} /> Presa Visione
+                      <CheckCircle2 size={16} /> Dichiara come risolto
                     </button>
                   )}
                   
@@ -172,7 +199,7 @@ export default function AlertsPage() {
                       punto dell'interfaccia da cui mandare gli operatori (RF01.4.1). */}
                   {alert.stationId && !station?.operatorsDispatched && !alert.acknowledged && user?.role === 'tecnico' && (
                     <button
-                      onClick={() => handleDispatch(alert.stationId!, alert.id)}
+                      onClick={() => handleDispatch(alert.stationId!)}
                       className="btn btn-primary text-sm shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse"
                     >
                       <Wrench size={16} /> Invia Operatori (UC5)

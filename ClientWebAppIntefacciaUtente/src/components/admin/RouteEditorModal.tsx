@@ -3,7 +3,7 @@ import { useRailwayStore } from '../../store/railwayStore';
 import { Route } from '../../types';
 import { ErroreApi } from '../../api/apiClient';
 import type { ApiCoppiaMancante } from '../../api/apiTypes';
-import { X, Save, Trash2, ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react';
+import { X, Save, Trash2, ArrowUp, ArrowDown, AlertTriangle, Flag } from 'lucide-react';
 import Card from '../ui/Card';
 
 interface RouteEditorModalProps {
@@ -30,6 +30,7 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
     code: '',
     stationIds: [],
     travelTimes: [],
+    terminusStationId: null,
     active: true,
   });
   const [rifiuto, setRifiuto] = useState<Rifiuto | null>(null);
@@ -50,6 +51,7 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
       stationIds: [],
       trainIds: [],
       travelTimes: [],
+      terminusStationId: null,
       active: true,
       createdAt: Date.now(),
     };
@@ -70,6 +72,7 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
 
   const stationIds = formData.stationIds ?? [];
   const travelTimes = formData.travelTimes ?? [];
+  const capolinea = formData.terminusStationId ?? null;
 
   /**
    * I tempi seguono le COPPIE di stazioni, non le posizioni nell'elenco: per ogni
@@ -91,9 +94,36 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
       return arco?.travelTimeMinutes ?? 15;
     });
 
-  /** Sostituisce l'elenco delle stazioni tenendo allineati i tempi di percorrenza. */
+  /**
+   * Il capolinea può stare solo su un estremo. Quando l'elenco cambia — una stazione
+   * tolta, spostata, un'altra aggiunta in fondo — quello marcato può ritrovarsi in mezzo
+   * al percorso: in quel caso la marcatura si perde, invece di restare su una fermata
+   * intermedia che la Centrale rifiuterebbe al salvataggio.
+   */
+  const capolineaValido = (elenco: string[], scelto: string | null): string | null => {
+    if (!scelto || elenco.length === 0) return null;
+    const estremo = scelto === elenco[0] || scelto === elenco[elenco.length - 1];
+    return estremo ? scelto : null;
+  };
+
+  /** Sostituisce l'elenco delle stazioni tenendo allineati tempi di percorrenza e capolinea. */
   const aggiornaElenco = (elenco: string[]) =>
-    setFormData({ ...formData, stationIds: elenco, travelTimes: tempiPerElenco(elenco) });
+    setFormData({
+      ...formData,
+      stationIds: elenco,
+      travelTimes: tempiPerElenco(elenco),
+      terminusStationId: capolineaValido(elenco, capolinea),
+    });
+
+  /**
+   * Marca (o smarca) l'estremo su cui la corsa si chiude. Il capolinea è uno solo:
+   * sceglierne un altro sposta la marcatura invece di aggiungerne una seconda.
+   *
+   * <p>Toglierlo non è un dettaglio cosmetico: è il modo con cui si rimette in servizio
+   * un convoglio che ha già chiuso la corsa e sta fermo lì.</p>
+   */
+  const toggleCapolinea = (stationId: string) =>
+    setFormData({ ...formData, terminusStationId: capolinea === stationId ? null : stationId });
 
   /**
    * Si manda alla Centrale l'itinerario così come è stato composto, senza controllare
@@ -271,6 +301,20 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
                 condivise da più itinerari (es. Milano-Bologna sta sia sull'itinerario
                 per Napoli sia su quello per Roma): il tempo di percorrenza di un arco
                 già usato altrove si modifica dalla pagina "Tratte", non da qui. */}
+            {/* Senza capolinea il convoglio percorre la tratta all'infinito, andata e
+                ritorno: è il comportamento di sempre. Marcando un estremo la corsa si
+                chiude lì e il treno resta fermo in stazione finché non gli si assegna
+                un'altra tratta. */}
+            {stationIds.length > 1 && (
+              <p className="text-sm text-muted" style={{ marginBottom: '0.75rem' }}>
+                {capolinea
+                  ? `La corsa si chiude a ${stations.find(s => s.id === capolinea)?.name ?? capolinea}: `
+                    + 'il treno che ci arriva termina il servizio e resta fermo lì.'
+                  : 'Nessun capolinea: i treni percorrono la tratta avanti e indietro senza fine. '
+                    + 'Con la bandierina si può chiudere la corsa su una delle due stazioni estreme.'}
+              </p>
+            )}
+
             {stationIds.length === 0 ? (
               <div className="text-center p-6 bg-black/20 rounded-md border border-dashed border-border-color text-muted">
                 Nessuna stazione presente in questa tratta. Aggiungine almeno due.
@@ -312,6 +356,28 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
                             {station.code}
                           </span>
                         </div>
+
+                        {/* Solo gli estremi: una fermata di mezzo non può chiudere niente,
+                            e infatti la Centrale la rifiuterebbe con un 400. */}
+                        {(primaPosizione || ultimaPosizione) && (
+                          <button
+                            title={
+                              capolinea === stationId
+                                ? 'Togli il capolinea: i treni tornano a percorrere la tratta senza fine'
+                                : ultimaPosizione
+                                  ? 'Chiudi qui la corsa: il treno termina il servizio alla fine dell\'andata'
+                                  : 'Chiudi qui la corsa: il treno termina il servizio alla fine del ritorno'
+                            }
+                            onClick={() => toggleCapolinea(stationId)}
+                            className="p-2 rounded transition-colors"
+                            style={{
+                              color: capolinea === stationId ? 'var(--primary)' : 'var(--text-muted)',
+                              background: capolinea === stationId ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
+                            }}
+                          >
+                            <Flag size={16} />
+                          </button>
+                        )}
 
                         <button
                           title="Togli la stazione dall'itinerario"
