@@ -64,7 +64,9 @@ public class TrainIngestion {
     /**
      * Endpoint per interrogare lo stato completo del digital twin del viaggio:
      * fase della macchina a stati, direzione, indice della stazione, progresso
-     * sulla tratta, ritardo accumulato, passeggeri e itinerario caricato.
+     * sulla tratta, passeggeri e itinerario caricato. Il ritardo compare, ma non e'
+     * un conto fatto qui: e' l'ultimo valore che la Centrale ha comunicato al
+     * convoglio con l'alert RITARDO, con la stazione e l'ora della misura.
      * @return Response con la fotografia completa del viaggio simulato.
      */
     @GET
@@ -78,8 +80,11 @@ public class TrainIngestion {
         viaggio.put("direzione", trainDB.direzione);
         viaggio.put("indiceStazione", trainDB.indiceStazione);
         viaggio.put("progressPercent", trainDB.progressPercent);
-        viaggio.put("ritardoMinuti", trainDB.ritardoMinuti);
         viaggio.put("passeggeri", trainDB.passeggeri);
+        viaggio.put("ritardoMinuti", trainDB.ritardoMinuti);
+        viaggio.put("ritardoRilevatoA", trainDB.ritardoRilevatoA != null ? trainDB.ritardoRilevatoA : "");
+        viaggio.put("ritardoAggiornatoIl",
+                trainDB.ritardoAggiornatoIl != null ? trainDB.ritardoAggiornatoIl.toString() : "");
         viaggio.put("stazioneCorrente", trainDB.stazioneCorrente != null ? trainDB.stazioneCorrente : "");
         viaggio.put("prossimaStazione", trainDB.prossimaStazione != null ? trainDB.prossimaStazione : "");
         viaggio.put("stazioneBloccante", trainDB.stazioneBloccante != null ? trainDB.stazioneBloccante : "");
@@ -103,7 +108,10 @@ public class TrainIngestion {
         return Response.ok(Map.of(
             "stazioniTratta", trainDB.stazioniTratta,
             "stazioneCorrente", trainDB.stazioneCorrente != null ? trainDB.stazioneCorrente : "",
-            "prossimaStazione", trainDB.prossimaStazione != null ? trainDB.prossimaStazione : ""
+            "prossimaStazione", trainDB.prossimaStazione != null ? trainDB.prossimaStazione : "",
+            // Il ritardo comunicato dalla Centrale: su un display di bordo e' l'unica
+            // informazione che i passeggeri guardano davvero.
+            "ritardoMinuti", trainDB.ritardoMinuti
         )).build();
     }
 

@@ -124,11 +124,41 @@ public class TrainDB {
      */
     public Instant tArrivoInStazione = null;
 
+    // Il ritardo non lo CALCOLA piu' il convoglio. Il testo del progetto mette il
+    // calcolo dei ritardi fra i compiti della Centrale ("Processing: calcolo dei
+    // ritardi e previsioni di arrivo") e la Centrale ha tutto per farlo: conosce i
+    // tempi di percorrenza dell'itinerario, quindi sa a che ora il convoglio deve
+    // presentarsi in ogni stazione, e riceve i passaggi con l'ora in cui sono
+    // avvenuti davvero. Il contatore che stava qui era un secondo conteggio dello
+    // stesso fenomeno, fatto nel nodo sbagliato.
+    // I tre campi qui sotto non sono quel contatore: sono la copia di bordo del
+    // ritardo che la Centrale COMUNICA al treno con l'alert RITARDO, cioe' l'altra
+    // meta' del sistema di comunicazione in ingresso chiesto dal testo ("in grado di
+    // ricevere informazioni (guasti o ritardi) dalle stazioni o dalla centrale").
+
     /**
-     * Ritardo accumulato dal treno in minuti simulati (cresce quando il treno
-     * resta bloccato per un guasto di stazione).
+     * Ritardo del convoglio in minuti di servizio, come lo ha comunicato la Centrale
+     * con l'ultimo alert RITARDO ricevuto su railway/alerts. Vale 0 finche' nessun
+     * ritardo e' stato comunicato: e' anche il valore a cui torna il convoglio che
+     * recupera il tempo perso.
+     *
+     * <p>volatile perche' lo scrive il thread del broker (TrainGateway.riceviAlert) e
+     * lo leggono il tick del motore e le richieste REST, che sono altri thread.</p>
      */
-    public int ritardoMinuti = 0;
+    public volatile int ritardoMinuti = 0;
+
+    /**
+     * Stazione al cui passaggio la Centrale ha misurato il ritardo comunicato.
+     * null finche' non arriva il primo alert RITARDO.
+     */
+    public volatile String ritardoRilevatoA = null;
+
+    /**
+     * Istante (tempo reale) in cui e' arrivato l'ultimo alert RITARDO: serve a
+     * distinguere un ritardo appena comunicato da uno vecchio di mezza corsa.
+     * null finche' non arriva il primo alert RITARDO.
+     */
+    public volatile Instant ritardoAggiornatoIl = null;
 
     /**
      * Numero di passeggeri attualmente a bordo (rigenerato in modo casuale

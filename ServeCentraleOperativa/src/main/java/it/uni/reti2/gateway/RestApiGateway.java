@@ -2,16 +2,19 @@ package it.uni.reti2.gateway;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import it.uni.reti2.entity.*;
+import it.uni.reti2.elaboration.GuastiService;
+import it.uni.reti2.elaboration.MonitoraggioStazioni;
+import it.uni.reti2.elaboration.MonitoraggioTreni;
+import it.uni.reti2.elaboration.NavigazioneItinerario;
+import it.uni.reti2.elaboration.PrevisioneArrivi;
 import it.uni.reti2.elaboration.TrafficLogicEngine;
-import it.uni.reti2.ingestion.IngestionService;
+import it.uni.reti2.ingestion.PubblicatoreAlert;
 import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
 
 import org.jboss.logging.Logger;
 
@@ -50,20 +53,48 @@ public class RestApiGateway {
     RailwayRepository repository;
 
     /**
+     * Il calcolo dei ritardi e delle previsioni di arrivo. Qui serve per due cose: il
+     * tabellone dei treni attesi in una stazione e l'avviso, quando l'amministratore
+     * cambia la rete, che i percorsi memorizzati non valgono più.
+     */
+    @Inject
+    PrevisioneArrivi previsioni;
+
+    /**
      * Serve per rimandare al frontend i cambi di stato delle stazioni decisi da qui
-     * (presa in carico di un allarme, invio della squadra): sono modifiche che nessun
+     * (modifica dall'anagrafica, invio della squadra): sono modifiche che nessun
      * heartbeat annuncerà mai, quindi senza broadcast la schermata resterebbe indietro.
      */
     @Inject
-    IngestionService ingestion;
+    NotificatoreRealtime notificatore;
 
     /**
-     * Canale reattivo di uscita per inviare comandi asincroni ai field edge devices
-     * (es. bloccare i treni o notificare la risoluzione di guasti tramite MQTT/Kafka).
+     * L'uscita verso il campo: i comandi che l'operatore impartisce da questa API
+     * (soppressione di una corsa, itinerario rifatto) devono arrivare ai nodi.
      */
     @Inject
-    @Channel("alerts-out")
-    Emitter<String> alertsEmitter;
+    PubblicatoreAlert pubblicatore;
+
+    /**
+     * Il ciclo di vita dei guasti. Chiudere un allarme non è solo scrivere una riga:
+     * rimette in servizio la sorgente, chiude i guasti che quella sorgente aveva
+     * provocato altrove e avvisa il campo. Sono regole che valgono identiche quando a
+     * chiudere il guasto è il campo stesso, quindi non stanno in un endpoint REST.
+     */
+    @Inject
+    GuastiService guasti;
+
+    /** I comandi dell'operatore sui convogli (soppressione di una corsa). */
+    @Inject
+    MonitoraggioTreni treni;
+
+    /** I comandi dell'operatore sulle stazioni (invio della squadra di manutenzione). */
+    @Inject
+    MonitoraggioStazioni stazioni;
+
+    /** La lettura dell'itinerario per il digital twin di bordo. */
+    @Inject
+    NavigazioneItinerario navigazione;
 
     // ──────────────────────────────────────────────────────────────
     // DTO usati per il dialogo col frontend (evitano di esporre
@@ -173,7 +204,9 @@ public class RestApiGateway {
                 dto.latitudine != null ? dto.latitudine : 0.0,
                 dto.longitudine != null ? dto.longitudine : 0.0,
                 dto.binari != null ? dto.binari : 1);
-        stazione.stato = dto.stato != null ? normalizzaStatoStazione(dto.stato) : "OFFLINE";
+        stazione.stato = dto.stato != null
+                ? StatiCanonici.stazioneDallOperatore(dto.stato)
+                : StatiCanonici.STAZIONE_OFFLINE;
         repository.salvaStazione(stazione);
         statoRete.aggiornaStazione(stazione);
         return Response.status(Response.Status.CREATED).entity(stazione).build();
@@ -205,12 +238,12 @@ public class RestApiGateway {
         if (dto.latitudine != null) cache.latitudine = dto.latitudine;
         if (dto.longitudine != null) cache.longitudine = dto.longitudine;
         if (dto.binari != null) cache.binari = dto.binari;
-        if (dto.stato != null) cache.stato = normalizzaStatoStazione(dto.stato);
+        if (dto.stato != null) cache.stato = StatiCanonici.stazioneDallOperatore(dto.stato);
         statoRete.aggiornaStazione(cache);
         if (dto.stato != null) {
             // Anche lo stato cambiato a mano dall'amministratore deve arrivare subito
             // alle altre schermate aperte, non al prossimo ricaricamento.
-            ingestion.broadcastStatoStazione(cache);
+            notificatore.statoStazione(cache);
         }
 
         return Response.ok(cache).build();
@@ -251,6 +284,29 @@ public class RestApiGateway {
         repository.eliminaStazione(dbStazione);
         statoRete.rimuoviStazione(id);
         return Response.noContent().build();
+    }
+
+    /**
+     * I convogli che questa stazione deve aspettarsi, con l'orario previsto di ciascuno:
+     * è la schermata che il testo del progetto mette fra i compiti del tecnico
+     * ("quali treni ci si aspetta in ingresso e in uscita in una certa stazione").
+     *
+     * <p>La risposta la calcola la Centrale sull'itinerario dei treni, non il browser
+     * sulla loro posizione istantanea: prima la pagina Stazioni filtrava i convogli con
+     * {@code prossimaStazione == stazione}, quindi vedeva solo chi stava già arrivando
+     * dalla tratta adiacente e non chi sarebbe passato di lì qualche fermata più avanti.</p>
+     *
+     * @param id Identificativo della stazione.
+     * @return Elenco ordinato per tempo mancante, oppure 404 se la stazione non esiste.
+     */
+    @GET
+    @Path("/stazioni/{id}/treni-attesi")
+    public Response getTreniAttesi(@PathParam("id") String id) {
+        if (statoRete.getStazione(id) == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("errore", "Stazione inesistente: " + id)).build();
+        }
+        return Response.ok(previsioni.treniAttesi(id)).build();
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -311,7 +367,7 @@ public class RestApiGateway {
             return esito;
         }
         Treno treno = new Treno(nomeConvoglio);
-        treno.stato = dto.stato != null ? normalizzaStatoTreno(dto.stato) : "fermo";
+        treno.stato = dto.stato != null ? StatiCanonici.trenoDallOperatore(dto.stato) : "fermo";
 
         String itinerarioId = estraiItinerarioId(dto);
         if (itinerarioId != null) {
@@ -368,7 +424,7 @@ public class RestApiGateway {
         statoRete.aggiornaTreno(cache);
 
         if (esito.itinerarioCambiato) {
-            pubblicaItinerarioAggiornato(id);
+            pubblicatore.pubblicaItinerarioAggiornato(id);
         }
         return Response.ok(cache).build();
     }
@@ -381,7 +437,7 @@ public class RestApiGateway {
             esito.errore = Response.status(Response.Status.NOT_FOUND).build();
             return esito;
         }
-        if (dto.stato != null) dbTreno.stato = normalizzaStatoTreno(dto.stato);
+        if (dto.stato != null) dbTreno.stato = StatiCanonici.trenoDallOperatore(dto.stato);
 
         String itinerarioId = estraiItinerarioId(dto);
         if (itinerarioId != null) {
@@ -425,11 +481,9 @@ public class RestApiGateway {
         repository.eliminaTransitiDiTreno(id);
         repository.eliminaTreno(dbTreno);
         statoRete.rimuoviTreno(id);
+        previsioni.dimenticaTreno(id);
 
-        String alertJson = String.format(
-                "{\"tipoEvento\":\"STOP\",\"target\":\"%s\",\"motivo\":\"Treno eliminato da operatore\",\"timestamp\":\"%s\"}",
-                id, Instant.now().toString());
-        alertsEmitter.send(alertJson);
+        pubblicatore.pubblicaStop(id, "Treno eliminato da operatore");
         return Response.noContent().build();
     }
 
@@ -467,6 +521,7 @@ public class RestApiGateway {
         tratta.stazioneArrivo = arrivo;
         tratta.tempoPercorrenzaMinuti = dto.tempoPercorrenzaMinuti != null ? dto.tempoPercorrenzaMinuti : 15;
         repository.salvaTratta(tratta);
+        previsioni.itinerariCambiati();
         return Response.status(Response.Status.CREATED).entity(trattaElementoToDto(tratta)).build();
     }
 
@@ -487,6 +542,9 @@ public class RestApiGateway {
             tratta.stazioneArrivo = s;
         }
         if (dto.tempoPercorrenzaMinuti != null) tratta.tempoPercorrenzaMinuti = dto.tempoPercorrenzaMinuti;
+        // Il tempo di percorrenza è il dato con cui si calcolano gli orari previsti:
+        // cambiarlo senza avvisare lascerebbe la Centrale a prevedere sui minuti vecchi.
+        previsioni.itinerariCambiati();
         return Response.ok(trattaElementoToDto(tratta)).build();
     }
 
@@ -517,6 +575,7 @@ public class RestApiGateway {
                     .build();
         }
         repository.eliminaTratta(tratta);
+        previsioni.itinerariCambiati();
         return Response.noContent().build();
     }
 
@@ -569,6 +628,7 @@ public class RestApiGateway {
         if (errore != null) return errore;
 
         assegnaTreni(itinerario, dto.treniIds, false);
+        previsioni.itinerariCambiati();
         return Response.status(Response.Status.CREATED).entity(trattaToDto(itinerario)).build();
     }
 
@@ -628,8 +688,9 @@ public class RestApiGateway {
 
         // Ogni treno coinvolto (vecchio o nuovo) deve ricaricare l'itinerario dal server
         for (String trenoId : daNotificare) {
-            pubblicaItinerarioAggiornato(trenoId);
+            pubblicatore.pubblicaItinerarioAggiornato(trenoId);
         }
+        previsioni.itinerariCambiati();
         return Response.ok(trattaToDto(itinerario)).build();
     }
 
@@ -670,8 +731,9 @@ public class RestApiGateway {
         // Ricevuto ITINERARIO_AGGIORNATO il twin scarta l'itinerario in memoria e ne chiede
         // uno nuovo: non essendocene più resta fermo e visibile in attesa di essere soppresso.
         for (String trenoId : daNotificare) {
-            pubblicaItinerarioAggiornato(trenoId);
+            pubblicatore.pubblicaItinerarioAggiornato(trenoId);
         }
+        previsioni.itinerariCambiati();
         return Response.noContent().build();
     }
 
@@ -731,7 +793,7 @@ public class RestApiGateway {
             dto.put("messaggio", g.messaggio != null ? g.messaggio : "Allarme di sistema per " + g.id);
             dto.put("sorgenteId", g.sorgenteId != null ? g.sorgenteId : "");
             dto.put("sorgenteTipo", g.sorgenteTipo != null ? g.sorgenteTipo : "");
-            dto.put("origine", IngestionService.originePerOperatore(g));
+            dto.put("origine", Guasto.originePerOperatore(g));
             dto.put("timestamp", g.timestamp != null ? g.timestamp.toString() : null);
             dto.put("risolto", g.risolto);
             dto.put("timestampRisoluzione", g.timestampRisoluzione != null ? g.timestampRisoluzione.toString() : null);
@@ -741,166 +803,74 @@ public class RestApiGateway {
     }
 
     /**
-     * Operazione per segnare manualmente un guasto come risolto da parte di un operatore di centrale.
-     * Notifica l'avvenuta risoluzione verso il campo (con la sorgente reale del guasto)
-     * e aggiorna stato locale, DB e storico.
+     * Chiude un allarme perché un operatore di centrale dichiara il guasto risolto.
+     *
+     * <p>Non è una semplice scrittura: la sorgente torna in servizio (una stazione
+     * ridiventa operativa se non le resta nessun altro guasto aperto, un convoglio smette
+     * di essere "rotto"), si chiudono i guasti che quel convoglio aveva provocato altrove
+     * (RF02.1.2.2.1) e il campo viene avvisato con un RESOLVED, che è ciò che libera i
+     * treni trattenuti. Tutto questo è il ciclo di vita del guasto e vive in
+     * {@link GuastiService}: qui resta la traduzione fra HTTP e dominio.</p>
+     *
+     * <p>Niente {@code @Transactional} su questo metodo: la transazione la apre e la
+     * chiude il servizio, che annuncia la risoluzione solo a commit avvenuto. Con
+     * l'annotazione qui il RESOLVED partiva verso i treni <em>prima</em> del commit.</p>
      *
      * @param id Identificativo del guasto.
-     * @return Guasto aggiornato.
+     * @return Il guasto aggiornato, oppure 404.
      */
     @POST
     @Path("/allarmi/{id}/risolvi")
-    @Transactional
     public Response risolviAllarme(@PathParam("id") String id) {
-        Guasto guasto = repository.trovaGuasto(id);
-        if (guasto == null) {
+        Guasto risolto = guasti.risolviSuComandoOperatore(id);
+        if (risolto == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
-        chiudiGuasto(guasto);
-
-        // Se il guasto proveniva da una stazione, questa torna operativa in cache.
-        // Si fa ripartire anche il cronometro dell'heartbeat: senza, una stazione
-        // rimessa ONLINE dall'operatore ma in realtà ancora spenta resterebbe
-        // ONLINE per sempre, perché il FaultMonitor salta le stazioni che non hanno
-        // mai battuto. Così invece, se il battito non arriva davvero, dopo il
-        // timeout il watchdog la rimette OFFLINE.
-        if ("STAZIONE".equalsIgnoreCase(guasto.sorgenteTipo)) {
-            Stazione stazione = statoRete.getStazione(guasto.sorgenteId);
-            if (stazione != null) {
-                stazione.stato = "ONLINE";
-                stazione.ultimoHeartbeat = Instant.now();
-                statoRete.aggiornaStazione(stazione);
-                // Il ritorno in servizio va spinto sulla WebSocket: prima la stazione
-                // restava rossa sulla mappa finché l'operatore non ricaricava la pagina.
-                ingestion.broadcastStatoStazione(stazione);
-            }
-        }
-
-        // Stesso discorso per un treno: l'ingestione lo marca "rotto" in cache quando
-        // arriva il suo allarme, quindi alla chiusura del guasto va rimesso "fermo",
-        // altrimenti resterebbe guasto nell'interfaccia anche a riparazione avvenuta.
-        // "fermo" e non "attivo": riparte con la prima telemetria che manda davvero.
-        if ("TRENO".equalsIgnoreCase(guasto.sorgenteTipo)) {
-            Treno treno = statoRete.getTreno(guasto.sorgenteId);
-            if (treno != null && "rotto".equalsIgnoreCase(treno.stato)) {
-                treno.stato = "fermo";
-                statoRete.aggiornaTreno(treno);
-            }
-            Treno dbTreno = repository.trovaTreno(guasto.sorgenteId);
-            if (dbTreno != null && "rotto".equalsIgnoreCase(dbTreno.stato)) {
-                String statoPrecedente = dbTreno.stato;
-                dbTreno.stato = "fermo";
-
-                repository.salvaStoricoStatoTreno(dbTreno, statoPrecedente);
-            }
-
-            // RF02.1.2.2.1: se il convoglio guasto aveva reso inagibile una stazione,
-            // alla risoluzione del treno si chiude anche il guasto derivato.
-            risolviGuastoStazioneDerivatoDaConvoglio(guasto.sorgenteId);
-        }
-        pubblicaResolved(guasto);
-        return Response.ok(guasto).build();
+        return Response.ok(risolto).build();
     }
 
     /**
-     * Operazione manuale da parte dell'operatore per bloccare d'emergenza o sopprimere la corsa
-     * di un treno specifico.
+     * Sopprime la corsa di un treno su richiesta dell'operatore: il convoglio riceve il
+     * comando di frenata definitiva e la sua corsa esce dall'orario.
      *
      * @param id L'ID del treno da fermare.
-     * @return Stato del treno aggiornato.
+     * @return Stato del treno aggiornato, 404 se non esiste, 400 se non è fermo in stazione.
      */
     @POST
     @Path("/treni/{id}/sopprimi")
-    @Transactional
     public Response sopprimiTreno(@PathParam("id") String id) {
-        // Aggiorna lo stato in memoria per riflesso immediato sulle dashboard
-        Treno treno = statoRete.getTreno(id);
-        if (treno != null) {
-            if (!"fermo".equalsIgnoreCase(treno.stato) || treno.stazioneCorrente == null) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity(java.util.Map.of("errore", "Il treno può essere soppresso solo se fermo in una stazione"))
-                        .build();
-            }
-
-            treno.stato = "SOPPRESSO";
-            treno.velocita = 0;
-            statoRete.aggiornaTreno(treno);
-
-            // Aggiorna anche il salvataggio su DB persistente (stato canonico)
-            Treno dbTreno = repository.trovaTreno(id);
-            if (dbTreno != null) {
-                String statoPrecedente = dbTreno.stato;
-                dbTreno.stato = "in manutenzione";
-
-                repository.salvaStoricoStatoTreno(dbTreno, statoPrecedente);
-            }
-
-            // Invia asincronamente il comando di STOP sul canale di allarme
-            // affinché il gateway di bordo applichi la frenata definitiva.
-            String alertJson = String.format(
-                    "{\"tipoEvento\":\"STOP\",\"target\":\"%s\",\"motivo\":\"Soppresso da operatore\",\"timestamp\":\"%s\"}",
-                    id, Instant.now().toString());
-            alertsEmitter.send(alertJson);
-
-            return Response.ok(treno).build();
+        MonitoraggioTreni.EsitoComando esito = treni.sopprimi(id);
+        if (!esito.trovato()) {
+            return Response.status(Response.Status.NOT_FOUND).build();
         }
-        return Response.status(Response.Status.NOT_FOUND).build();
+        if (esito.errore() != null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("errore", esito.errore())).build();
+        }
+        return Response.ok(esito.treno()).build();
     }
-// sofisticazione assolutamente non richiesta fatta di propria zucca dell'ai
+
     /**
-     * Operazione manuale da parte dell'operatore per inviare una squadra di manutenzione a una stazione.
-     * Risolve tutti i guasti aperti della stazione e notifica campo e frontend.
+     * Manda una squadra di manutenzione a una stazione guasta (RF01.4.1).
+     *
+     * <p>L'intervento si apre e basta: la stazione passa a MANUTENZIONE e ci resta, i
+     * guasti aperti restano aperti e il nodo continua a trattenere i treni in ingresso.
+     * A chiudere l'intervento è {@code POST /allarmi/{id}/risolvi}, che è l'unico punto in
+     * cui la stazione torna ONLINE (RF01.4.2).</p>
+     *
      * @param id L'ID della stazione.
-     * @return Stato della stazione aggiornato.
+     * @return Stato della stazione aggiornato, 404 se non esiste, 409 se non ha guasti aperti.
      */
     @POST
     @Path("/stazioni/{id}/manutenzione")
-    @Transactional
     public Response dispacciaManutenzione(@PathParam("id") String id) {
-        Stazione stazione = statoRete.getStazione(id);
-        if (stazione == null) {
-            return Response.status(Response.Status.NOT_FOUND).build();
-        }
-        // Lo stato di partenza serve alla riga di storico scritta in fondo al metodo:
-        // è da lì che la stazione viene (di solito GUASTA o OFFLINE).
-        String statoPrima = stazione.stato;
-        stazione.stato = "MANUTENZIONE";
-        statoRete.aggiornaStazione(stazione);
-        ingestion.broadcastStatoStazione(stazione);
-
-        // Notifica informativa dell'invio degli operatori
-        String alertJson = String.format(
-                "{\"tipoEvento\":\"MAINTENANCE_DISPATCHED\",\"sorgenteId\":\"%s\",\"timestamp\":\"%s\"}",
-                id, Instant.now().toString());
-        alertsEmitter.send(alertJson);
-
-        // Risolve TUTTI i guasti ancora aperti generati da questa stazione.
-        // Il filtro su sorgenteTipo serve perché sorgenteId da solo non è univoco:
-        // un treno con lo stesso identificativo di una stazione si vedrebbe chiudere
-        // i propri guasti insieme a quelli della stazione.
-        List<Guasto> aperti = repository.guastiApertiDi(id, "STAZIONE");
-        for (Guasto guasto : aperti) {
-            chiudiGuasto(guasto);
-            if (guasto.sorgenteTipo == null) guasto.sorgenteTipo = "STAZIONE";
-            pubblicaResolved(guasto);
-        }
-
-        // A manutenzione completata la stazione torna operativa
-        stazione.stato = "ONLINE";
-        stazione.ultimoHeartbeat = Instant.now();
-        statoRete.aggiornaStazione(stazione);
-        ingestion.broadcastStatoStazione(stazione);
-
-        // Una riga sola, quella del rientro in servizio: il passaggio per MANUTENZIONE
-        // resta non storicizzato perché dura il tempo di questo metodo (è il limite già
-        // dichiarato di RF01.4.1, non una dimenticanza).
-        Stazione dbStazione = repository.trovaStazione(id);
-        if (dbStazione != null) {
-            repository.salvaStoricoStatoStazione(dbStazione, "ONLINE", statoPrima);
-        }
-        return Response.ok(stazione).build();
+        MonitoraggioStazioni.EsitoInvioSquadra esito = stazioni.inviaSquadra(id);
+        return switch (esito) {
+            case NON_TROVATA -> Response.status(Response.Status.NOT_FOUND).build();
+            case NESSUN_GUASTO_APERTO -> Response.status(Response.Status.CONFLICT).build();
+            case SQUADRA_INVIATA -> Response.ok(statoRete.getStazione(id)).build();
+        };
     }
-
 
     //------ da riordinare ma per comodità lascerò così
     // ──────────────────────────────────────────────────────────────
@@ -960,22 +930,18 @@ public class RestApiGateway {
             return Response.status(Response.Status.NOT_FOUND)
                     .entity(Map.of("errore", "Treno inesistente o senza itinerario")).build();
         }
-        List<String> stazioni = repository.stazioniOrdinateDi(treno.itinerario.id);
-        int idx = stazioni.indexOf(stazioneId);
+        // Il conto lo fa la stessa classe che lo fa per l'ingestione: leggere un
+        // itinerario nel verso giusto è una regola sola, non una per chi la chiede.
+        String prossimaId = navigazione.prossimaStazione(treno.itinerario.id, stazioneId, direzione);
 
         Map<String, Object> result = new HashMap<>();
         result.put("prossimaStazione", null);
-        if (idx >= 0) {
-            int next = "R".equalsIgnoreCase(direzione) ? idx - 1 : idx + 1;
-            if (next >= 0 && next < stazioni.size()) {
-                Stazione prossima = repository.trovaStazione(stazioni.get(next));
-                if (prossima != null) {
-                    Map<String, Object> dto = new HashMap<>();
-                    dto.put("id", prossima.id);
-                    dto.put("nome", prossima.nome);
-                    result.put("prossimaStazione", dto);
-                }
-            }
+        Stazione prossima = prossimaId != null ? repository.trovaStazione(prossimaId) : null;
+        if (prossima != null) {
+            Map<String, Object> dto = new HashMap<>();
+            dto.put("id", prossima.id);
+            dto.put("nome", prossima.nome);
+            result.put("prossimaStazione", dto);
         }
         return Response.ok(result).build();
     }
@@ -1197,102 +1163,14 @@ public class RestApiGateway {
         return dto;
     }
 
-    /** Mappa il tipo di un guasto nel vocabolario del frontend. */
-    private String tipoAllarmePerFrontend(Guasto g) {
-        if ("stazione_guasta".equals(g.tipo) || "treno_fermo".equals(g.tipo) || "sensore_offline".equals(g.tipo)) {
-            return g.tipo;
-        }
-        if ("STAZIONE".equalsIgnoreCase(g.sorgenteTipo)) return "stazione_guasta";
-        if ("TRENO".equalsIgnoreCase(g.sorgenteTipo)) return "treno_fermo";
-        return "sensore_offline";
-    }
-
-    /** Chiude un guasto su DB, storico e cache. */
-    private void chiudiGuasto(Guasto guasto) {
-        guasto.risolto = true;
-        guasto.timestampRisoluzione = Instant.now();
-
-        StoricoGuasto storico = repository.trovaStoricoGuasto(guasto.id);
-        if (storico != null) {
-            storico.risolto = true;
-            storico.tsChiusura = guasto.timestampRisoluzione;
-        } else {
-            // Guasto senza storico (per esempio aperto prima che la tabella esistesse):
-            // la riga si scrive adesso, già chiusa.
-            repository.salvaStoricoGuasto(guasto);
-        }
-        statoRete.risolviGuasto(guasto.id);
-    }
-
-    /** Pubblica su MQTT l'evento RESOLVED con la sorgente reale del guasto. */
-    private void pubblicaResolved(Guasto guasto) {
-        String sorgenteTipo = guasto.sorgenteTipo != null ? guasto.sorgenteTipo : "STAZIONE";
-        String sorgenteId = guasto.sorgenteId != null ? guasto.sorgenteId : "";
-        String alertJson = String.format(
-                "{\"tipoEvento\":\"RESOLVED\",\"sorgenteTipo\":\"%s\",\"sorgenteId\":\"%s\",\"guastoId\":\"%s\",\"timestamp\":\"%s\"}",
-                sorgenteTipo, sorgenteId, guasto.id, Instant.now().toString());
-        alertsEmitter.send(alertJson);
-    }
-
     /**
-     * RF02.1.2.2.1 — Alla risoluzione di un guasto TRENO, chiude automaticamente
-     * l'eventuale guasto di tipo {@code convoglio_guasto_in_stazione} generato per
-     * la stazione in cui il convoglio si era guastato. Se non rimangono altri guasti
-     * aperti per la stazione, questa torna ONLINE.
+     * Mappa il tipo di un guasto nel vocabolario del frontend.
      *
-     * @param trenoId Identificativo del convoglio il cui guasto è stato risolto.
+     * <p>Calcolo delegato a {@link GuastiService#tipoPerFrontend}: la stessa whitelist che
+     * usa l'ingestione quando il guasto arriva dal campo. Prima era scritta due volte, in
+     * due file diversi, e poteva andare fuori sincrono.</p>
      */
-    private void risolviGuastoStazioneDerivatoDaConvoglio(String trenoId) {
-        List<Guasto> guastiDerivativi = repository.guastiDerivatiDaConvoglio();
-        for (Guasto gs : guastiDerivativi) {
-            if (gs.messaggio == null || !gs.messaggio.contains(trenoId)) {
-                continue;
-            }
-            chiudiGuasto(gs);
-            pubblicaResolved(gs);
-
-            // Se la stazione non ha più guasti aperti, torna operativa
-            if (repository.guastiApertiDi(gs.sorgenteId, "STAZIONE").isEmpty()) {
-                Stazione stazione = statoRete.getStazione(gs.sorgenteId);
-                if (stazione != null && "GUASTA".equalsIgnoreCase(stazione.stato)) {
-                    String statoPrima = stazione.stato;
-                    stazione.stato = "ONLINE";
-                    stazione.ultimoHeartbeat = Instant.now();
-                    statoRete.aggiornaStazione(stazione);
-                    ingestion.broadcastStatoStazione(stazione);
-
-                    Stazione dbStazione = repository.trovaStazione(gs.sorgenteId);
-                    if (dbStazione != null) {
-                        repository.salvaStoricoStatoStazione(dbStazione, "ONLINE", statoPrima);
-                    }
-                }
-            }
-        }
-    }
-
-    /** Pubblica su MQTT l'evento ITINERARIO_AGGIORNATO destinato a un treno. */
-    private void pubblicaItinerarioAggiornato(String trenoId) {
-        String alertJson = String.format(
-                "{\"tipoEvento\":\"ITINERARIO_AGGIORNATO\",\"target\":\"%s\",\"timestamp\":\"%s\"}",
-                trenoId, Instant.now().toString());
-        alertsEmitter.send(alertJson);
-    }
-
-    /**
-     * Normalizza lo stato di un treno ricevuto dalla UI nei valori canonici del DB
-     * (attivo/fermo/rotto/in manutenzione): il CHECK sulla colonna rifiuta le maiuscole.
-     */
-    private static String normalizzaStatoTreno(String stato) {
-        return stato == null ? null : stato.trim().toLowerCase();
-    }
-
-    /**
-     * Normalizza lo stato runtime di una stazione nel vocabolario interno
-     * (ONLINE/GUASTA/MANUTENZIONE/OFFLINE), accettando il sinonimo usato dalla UI.
-     */
-    private static String normalizzaStatoStazione(String stato) {
-        if (stato == null) return null;
-        String s = stato.trim().toUpperCase();
-        return "OPERATIVA".equals(s) ? "ONLINE" : s;
+    private String tipoAllarmePerFrontend(Guasto g) {
+        return GuastiService.tipoPerFrontend(g.sorgenteTipo, g.tipo);
     }
 }

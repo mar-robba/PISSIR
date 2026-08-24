@@ -141,4 +141,4 @@ Quando il backend invierà nuovi dati e `useRailwayStore` sarà aggiornato, **tu
    ```bash
    npm run dev
    ```
-4. Aprire nel browser il link indicato dal terminale (solitamente `http://localhost:5173`).
+4. Aprire nel browser il link indicato dal terminale, solitamente `https://localhost:5173`: il dev server parte in https con il certificato del progetto (RF04.3), quindi la prima volta va importata la CA `BrokerMosquitto/tls/certs/ca.crt`.

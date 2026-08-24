@@ -37,7 +37,11 @@ import java.util.Random;
  * - la posizione GPS è interpolata linearmente tra le coordinate delle due stazioni;
  * - al capolinea il treno inverte la direzione (con sosta doppia);
  * - se una stazione della tratta (corrente o prossima) risulta guasta il treno
- *   si blocca e accumula ritardo finché non arriva l'alert RESOLVED.
+ *   si blocca finché non arriva l'alert RESOLVED (il ritardo che ne segue lo
+ *   misura la Centrale, confrontando l'arrivo con l'orario previsto);
+ * - se l'amministratore cambia l'itinerario a viaggio iniziato il convoglio non
+ *   ricomincia da capo: si riaggancia al percorso nuovo nella stazione in cui si
+ *   trova (o alla prima in cui arriva, se era in mezzo a una tratta).
  *
  * NOTA: l'emissione MQTT dei passaggi NON avviene qui direttamente (un Multi di tick
  * non può emettere su più canali) ma passa dagli Emitter del TrainGateway.
@@ -52,7 +56,7 @@ public class TrainJourneyEngine {
 
     /**
      * Database locale del treno: contiene tutto lo stato del twin (fase, indici,
-     * itinerario, ritardo, passeggeri...).
+     * itinerario, passeggeri...).
      */
     @Inject
     TrainDB trainDB;
@@ -102,8 +106,12 @@ public class TrainJourneyEngine {
     /** Istante dell'ultimo tentativo (fallito o no) di caricamento itinerario. */
     private Instant ultimoTentativoCaricamento = Instant.EPOCH;
 
-    /** True quando la posizione iniziale è stata impostata e il viaggio è partito. */
-    private boolean viaggioAvviato = false;
+    /**
+     * True quando la posizione iniziale è stata impostata e il viaggio è partito.
+     * Senza "private" così il test del riaggancio, che sta nello stesso package, può
+     * simulare un convoglio già in marcia senza passare da un avvio completo del nodo.
+     */
+    boolean viaggioAvviato = false;
 
     /** Sosta da rispettare nella stazione corrente (raddoppiata al capolinea). */
     private long sostaCorrenteSecondi;
@@ -111,11 +119,18 @@ public class TrainJourneyEngine {
     /** Fase in cui si trovava il treno quando è scattato il blocco per guasto stazione. */
     private String fasePrimaDelBlocco = null;
 
-    /** Contatore dei secondi reali di blocco, per accumulare il ritardo simulato. */
-    private double secondiDiBlocco = 0;
-
     /** Flag alzato dal gateway quando arriva ITINERARIO_AGGIORNATO: al tick successivo si ricarica. */
     private volatile boolean ricaricaItinerarioRichiesta = false;
+
+    /**
+     * Itinerario nuovo scaricato mentre il treno stava percorrendo una tratta: il convoglio
+     * è fisicamente su un binario fra due stazioni e non può teletrasportarsi, quindi il
+     * percorso resta qui in attesa e viene installato quando entra nella stazione di arrivo.
+     */
+    private List<TrainDB.TappaItinerario> itinerarioPendente = null;
+
+    /** Id dell'itinerario tenuto in attesa in {@link #itinerarioPendente}. */
+    private String itinerarioPendenteId = null;
 
     /** Evita di sottoscrivere due volte il flusso di tick. */
     private boolean tickAvviato = false;
@@ -155,22 +170,24 @@ public class TrainJourneyEngine {
      * fase corrente della macchina a stati.
      */
     private void tick() {
-        // Richiesta di ricarica arrivata dalla Centrale (ITINERARIO_AGGIORNATO) lo varia la centrale attraverso il gateway
-        // se si sta richiedendo un nuovo itinerario cancella il precedente
-        if (ricaricaItinerarioRichiesta) {
-            ricaricaItinerarioRichiesta = false;
-            LOG.info("🔄 [TWIN] Itinerario aggiornato dalla Centrale: ricarico e ricomincio il viaggio");
-            trainDB.itinerario = new ArrayList<>(); // ?
-            trainDB.itinerarioId = null; // ?
-            viaggioAvviato = false;// ?
-            ultimoTentativoCaricamento = Instant.EPOCH; // riprova subito// un modo più elegante per dire 0 // Istante dell'ultimo tentativo (fallito o no) di caricamento itinerario. */
-            fermaPerMancanzaItinerario();
-        }
-
         // Non facciamo nulla finché il treno non è stato validato dal server centrale
         // o se l'ID del treno non è valido (null o vuoto).
         if (!trainDB.trenoRiconosciuto || trainDB.trenoId == null || trainDB.trenoId.trim().isEmpty() || "null".equalsIgnoreCase(trainDB.trenoId.trim())) {
             return;
+        }
+
+        // Richiesta di ricarica arrivata dalla Centrale (ITINERARIO_AGGIORNATO) lo varia la centrale attraverso il gateway.
+        // L'itinerario vecchio NON si butta via qui: finché la Centrale non risponde il treno continua
+        // a viaggiare su quello che ha in memoria. Svuotandolo subito il convoglio passava per
+        // SENZA_ITINERARIO (fermo, velocità zero) anche quando un secondo dopo arrivava il percorso
+        // nuovo, e la telemetria raccontava alla Centrale un treno fermo che fermo non era.
+        // Chi decide che cosa farne è applicaItinerario(): il treno assegnato resta dov'è (RF02.5.2),
+        // quello sganciato riceve un 404 e solo allora si ferma (RF02.5.1).
+        if (ricaricaItinerarioRichiesta) {
+            ricaricaItinerarioRichiesta = false;
+            LOG.info("🔄 [TWIN] Itinerario aggiornato dalla Centrale: lo riscarico");
+            ultimoTentativoCaricamento = Instant.EPOCH; // riprova subito// un modo più elegante per dire 0 // Istante dell'ultimo tentativo (fallito o no) di caricamento itinerario. */
+            tentaCaricamentoItinerario();
         }
 
         // Senza itinerario non si viaggia: tenta il caricamento (con retry ogni 15s).
@@ -243,6 +260,23 @@ public class TrainJourneyEngine {
                     .build();
             HttpResponse<String> risposta = secureHttpClient.get().send(richiesta, HttpResponse.BodyHandlers.ofString());
 
+            // 404 = la Centrale non mi assegna (più) nessun itinerario: è il caso del convoglio
+            // sganciato dall'amministratore. Qui e solo qui il percorso in memoria va buttato via,
+            // così il treno si ferma e aspetta di essere soppresso (RF02.5.1).
+            if (risposta.statusCode() == 404) {
+                if (!trainDB.itinerario.isEmpty()) {
+                    LOG.warn("🚫 [TWIN] La Centrale non mi assegna più nessun itinerario: lo scarto");
+                }
+                trainDB.itinerario = new ArrayList<>();
+                trainDB.itinerarioId = null;
+                trainDB.stazioniTratta = new ArrayList<>();
+                itinerarioPendente = null;
+                itinerarioPendenteId = null;
+                viaggioAvviato = false;
+                fermaPerMancanzaItinerario();
+                return;
+            }
+
             if (risposta.statusCode() != 200) {
                 LOG.warnf("⚠️ [TWIN] Itinerario non disponibile (HTTP %d da %s), riprovo tra %ds",
                         risposta.statusCode(), url, RETRY_CARICAMENTO_SECONDI);
@@ -273,13 +307,11 @@ public class TrainJourneyEngine {
                 LOG.warnf("⚠️ [TWIN] Itinerario con meno di 2 stazioni (%d): impossibile viaggiare, riprovo", tappe.size());
                 return;
             }
-            // aggiornamento del db
-            trainDB.itinerarioId = radice.path("itinerarioId").asText(null);
-            trainDB.itinerario = tappe; // perchè è una lista di tappe
-            trainDB.stazioniTratta = soloId; // ma come cazzo lo abbiamo fatto sto modello ??
+            // aggiornamento del db (o attesa, se il treno è in mezzo a una tratta)
+            applicaItinerario(radice.path("itinerarioId").asText(null), tappe, soloId);
 
             LOG.infof("🗺️ [TWIN] Itinerario %s caricato: %d stazioni %s",
-                    trainDB.itinerarioId, tappe.size(), soloId);
+                    radice.path("itinerarioId").asText(null), tappe.size(), soloId);
             // immagino totalmente di best practise, niente manda realmente interrupt a questo thread
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -288,6 +320,186 @@ public class TrainJourneyEngine {
             LOG.warnf("⚠️ [TWIN] Centrale non raggiungibile (%s), riprovo tra %ds: %s",
                     url, RETRY_CARICAMENTO_SECONDI, e.getMessage());
         }
+    }
+
+    /**
+     * Decide che cosa fare dell'itinerario appena scaricato dalla Centrale (RF02.5.2).
+     * Il convoglio è già assegnato e in marcia: non deve ricominciare dal capolinea, ma
+     * restare dove si trova e proseguire sulle fermate nuove. I casi sono tre:
+     * <ul>
+     *   <li>viaggio non ancora partito (o treno fermo senza percorso): si scrive e basta,
+     *       ci pensa {@link #avviaViaggio()} al tick successivo;</li>
+     *   <li>treno in mezzo a una tratta: il percorso nuovo resta in attesa e si installa
+     *       all'arrivo in stazione, perché un treno fra due stazioni non si teletrasporta;</li>
+     *   <li>treno fermo in stazione: si scrive subito e ci si riaggancia lì.</li>
+     * </ul>
+     *
+     * @param nuovoId Identificativo dell'itinerario scaricato.
+     * @param tappe   Tappe del nuovo itinerario, in ordine.
+     * @param soloId  Gli id delle stesse tappe (per TrainDB.stazioniTratta).
+     */
+    void applicaItinerario(String nuovoId, List<TrainDB.TappaItinerario> tappe, List<String> soloId) {
+        boolean inMarcia = viaggioAvviato
+                && !"SOPPRESSO".equals(trainDB.stato)
+                && !"SENZA_ITINERARIO".equals(trainDB.faseViaggio)
+                && !"TERMINATO".equals(trainDB.faseViaggio);
+
+        if (!inMarcia) {
+            scriviItinerario(nuovoId, tappe, soloId);
+            return;
+        }
+
+        // Stesse identiche fermate: l'evento ITINERARIO_AGGIORNATO arriva a TUTTI i treni della
+        // tratta anche quando l'amministratore ne ha soltanto agganciato un altro, e non c'è
+        // motivo di rimettere in sosta un convoglio che sta viaggiando bene. I tempi di
+        // percorrenza però possono essere cambiati, quindi la lista si scrive lo stesso.
+        if (soloId.equals(trainDB.stazioniTratta)) {
+            scriviItinerario(nuovoId, tappe, soloId);
+            LOG.info("🗺️ [TWIN] Le mie fermate non sono cambiate: proseguo il viaggio");
+            return;
+        }
+
+        // In mezzo a una tratta il cambio si rimanda all'arrivo: fino a quel momento il treno
+        // continua sul vecchio itinerario, che è l'unico coerente con il binario che sta percorrendo.
+        if ("IN_VIAGGIO".equals(faseEffettiva())) {
+            itinerarioPendente = tappe;
+            itinerarioPendenteId = nuovoId;
+            LOG.infof("🗺️ [TWIN] Itinerario %s in attesa: lo applico appena arrivo a %s",
+                    nuovoId, trainDB.prossimaStazione);
+            return;
+        }
+
+        String stazioneAncora = tappaCorrente().id;
+        scriviItinerario(nuovoId, tappe, soloId);
+        if (!riancora(stazioneAncora)) {
+            viaggioAvviato = false; // nessun punto di aggancio: si ricomincia dal capolinea
+        }
+    }
+
+    /**
+     * Scrive nel TrainDB l'itinerario ricevuto dalla Centrale.
+     *
+     * @param nuovoId Identificativo dell'itinerario.
+     * @param tappe   Tappe in ordine di percorrenza.
+     * @param soloId  Gli id delle stesse tappe.
+     */
+    private void scriviItinerario(String nuovoId, List<TrainDB.TappaItinerario> tappe, List<String> soloId) {
+        trainDB.itinerarioId = nuovoId;
+        trainDB.itinerario = tappe; // perchè è una lista di tappe
+        trainDB.stazioniTratta = soloId; // ma come cazzo lo abbiamo fatto sto modello ??
+    }
+
+    /**
+     * Riporta il treno sull'itinerario appena installato, nella stazione in cui si trova:
+     * ricalcola indice, direzione e prossima fermata e fa ripartire la sosta da adesso.
+     * Ritardo, passeggeri e stato del convoglio non si toccano, perché il treno è lo stesso:
+     * è cambiato solo l'elenco delle fermate che ha davanti.
+     *
+     * <p>Non viene pubblicato nessun passaggio: il convoglio non si è mosso di un metro e
+     * un ENTRATA qui inventerebbe un transito che la Centrale storicizzerebbe come vero.</p>
+     *
+     * @param stazioneAncora Stazione in cui il treno si trova adesso.
+     * @return true se il riaggancio è riuscito, false se quella stazione non fa più parte
+     *         del percorso e quindi non c'è nessun punto a cui agganciarsi.
+     */
+    boolean riancora(String stazioneAncora) {
+        int indice = indiceDi(stazioneAncora);
+        if (indice < 0) {
+            LOG.warnf("⚠️ [TWIN] %s non fa più parte del mio percorso: riparto dal capolinea", stazioneAncora);
+            return false;
+        }
+
+        TrainDB.TappaItinerario tappa = trainDB.itinerario.get(indice);
+        trainDB.indiceStazione = indice;
+        trainDB.stazioneCorrente = tappa.id;
+        trainDB.latitudine = tappa.latitudine;
+        trainDB.longitudine = tappa.longitudine;
+        trainDB.velocita = 0;
+        trainDB.progressPercent = 0;
+
+        // Se il punto in cui mi trovo è diventato un capolinea del percorso nuovo la direzione
+        // va invertita: se no tappaProssima() torna null e il viaggio finirebbe in TERMINATO.
+        if (indice == trainDB.itinerario.size() - 1 && "andata".equals(trainDB.direzione)) {
+            trainDB.direzione = "ritorno";
+        } else if (indice == 0 && "ritorno".equals(trainDB.direzione)) {
+            trainDB.direzione = "andata";
+        }
+        TrainDB.TappaItinerario prossima = tappaProssima();
+        trainDB.prossimaStazione = prossima != null ? prossima.id : null;
+
+        // La sosta riparte da adesso, così il treno non schizza fuori dalla stazione un istante
+        // dopo il riaggancio solo perché era fermo lì da un po'.
+        trainDB.tArrivoInStazione = Instant.now();
+        sostaCorrenteSecondi = sostaSecondi;
+
+        if ("BLOCCATO_GUASTO_STAZIONE".equals(trainDB.faseViaggio)) {
+            // Il blocco era scattato sul percorso vecchio: resta solo se una stazione guasta è
+            // ancora fra quelle che mi riguardano. Adesso comunque sono fermo in stazione, non
+            // più a metà tratta, quindi è da lì che riprenderò.
+            fasePrimaDelBlocco = "IN_STAZIONE";
+            boolean ancoraGuasta = trainDB.stazioniGuaste.contains(trainDB.stazioneCorrente)
+                    || (trainDB.prossimaStazione != null && trainDB.stazioniGuaste.contains(trainDB.prossimaStazione));
+            if (!ancoraGuasta) {
+                sbloccaDaGuastoStazione();
+            }
+        } else {
+            trainDB.faseViaggio = "IN_STAZIONE";
+            // Gli stati decisi da fuori non si toccano, come in fermaPerMancanzaItinerario
+            if (!"EMERGENZA".equals(trainDB.stato) && !"SOPPRESSO".equals(trainDB.stato)) {
+                trainDB.stato = "FERMO";
+            }
+        }
+
+        LOG.infof("📍 [TWIN] Riagganciato all'itinerario %s in %s (indice %d), prossima fermata %s",
+                trainDB.itinerarioId, stazioneAncora, indice, trainDB.prossimaStazione);
+        return true;
+    }
+
+    /**
+     * Cerca una stazione nell'itinerario corrente. Se compare più volte (percorso che passa
+     * due volte dalla stessa stazione) vince l'occorrenza più vicina all'indice di prima,
+     * che è quella che meglio rappresenta il punto in cui il treno si trova.
+     *
+     * @param stazioneId Stazione da cercare.
+     * @return L'indice della tappa, oppure -1 se la stazione non c'è.
+     */
+    private int indiceDi(String stazioneId) {
+        int migliore = -1;
+        for (int i = 0; i < trainDB.itinerario.size(); i++) {
+            if (!trainDB.itinerario.get(i).id.equals(stazioneId)) {
+                continue;
+            }
+            if (migliore < 0
+                    || Math.abs(i - trainDB.indiceStazione) < Math.abs(migliore - trainDB.indiceStazione)) {
+                migliore = i;
+            }
+        }
+        return migliore;
+    }
+
+    /**
+     * @param tappe Itinerario di cui servono i soli identificativi.
+     * @return La lista degli id delle tappe, nel formato di TrainDB.stazioniTratta.
+     */
+    private List<String> soloId(List<TrainDB.TappaItinerario> tappe) {
+        List<String> ids = new ArrayList<>();
+        for (TrainDB.TappaItinerario tappa : tappe) {
+            ids.add(tappa.id);
+        }
+        return ids;
+    }
+
+    /**
+     * Fase in cui il treno si trova davvero: se è bloccato per un guasto vale quella in cui
+     * era prima del blocco, perché un treno bloccato a metà tratta è pur sempre fra due stazioni.
+     *
+     * @return IN_STAZIONE, IN_VIAGGIO o l'altra fase corrente.
+     */
+    private String faseEffettiva() {
+        if ("BLOCCATO_GUASTO_STAZIONE".equals(trainDB.faseViaggio) && fasePrimaDelBlocco != null) {
+            return fasePrimaDelBlocco;
+        }
+        return trainDB.faseViaggio;
     }
 
     /**
@@ -368,7 +580,7 @@ public class TrainJourneyEngine {
 
         // Trattenuto in stazione se la corrente o la prossima sono note come guaste.
         // Non basta un return "muto": si entra nella fase BLOCCATO_GUASTO_STAZIONE, così
-        // il treno accumula ritardo e /treno/viaggio dice anche QUALE stazione lo blocca.
+        // il convoglio resta fermo davvero e /treno/viaggio dice anche QUALE stazione lo blocca.
         // Serve quando l'alert di guasto è arrivato mentre il treno era altrove: in quel
         // caso il gateway non aveva chiamato bloccaPerGuastoStazione perché la stazione
         // non era né la corrente né la prossima.
@@ -450,6 +662,26 @@ public class TrainJourneyEngine {
         // Salita/discesa passeggeri simulata a ogni ENTRATA
         trainDB.passeggeri = 50 + random.nextInt(351);
 
+        // L'itinerario è cambiato mentre percorrevo questa tratta: adesso che sono fermo in
+        // stazione posso installarlo e riagganciarmi qui, senza tornare al capolinea (RF02.5.2).
+        // Il controllo sta PRIMA dell'inversione al capolinea: quella è calcolata sul percorso
+        // vecchio e un treno arrivato al vecchio capolinea, se il percorso nuovo prosegue oltre,
+        // deve andare avanti e non tornare indietro. La direzione la ricalcola riancora().
+        if (itinerarioPendente != null) {
+            List<TrainDB.TappaItinerario> nuovo = itinerarioPendente;
+            String nuovoId = itinerarioPendenteId;
+            itinerarioPendente = null;
+            itinerarioPendenteId = null;
+            scriviItinerario(nuovoId, nuovo, soloId(nuovo));
+            trainGateway.notificaPassaggioStazione(arrivo.id, "ENTRATA");
+            if (!riancora(arrivo.id)) {
+                viaggioAvviato = false; // la stazione non è nel percorso nuovo: riparto dal capolinea
+            }
+            LOG.infof("🚉 [TWIN] Arrivo in %s con itinerario nuovo (passeggeri %d)",
+                    arrivo.id, trainDB.passeggeri);
+            return;
+        }
+
         boolean capolinea = (andata && trainDB.indiceStazione == trainDB.itinerario.size() - 1)
                 || (!andata && trainDB.indiceStazione == 0);
         if (capolinea) {
@@ -466,26 +698,22 @@ public class TrainJourneyEngine {
         trainGateway.notificaPassaggioStazione(arrivo.id, "ENTRATA");
         TrainDB.TappaItinerario prossima = tappaProssima();
         trainDB.prossimaStazione = prossima != null ? prossima.id : null;
-        LOG.infof("🚉 [TWIN] Arrivo in %s (ritardo %d min, passeggeri %d)",
-                arrivo.id, trainDB.ritardoMinuti, trainDB.passeggeri);
+        LOG.infof("🚉 [TWIN] Arrivo in %s (passeggeri %d)", arrivo.id, trainDB.passeggeri);
     }
 
     /**
-     * Fase BLOCCATO_GUASTO_STAZIONE: il treno resta fermo e accumula un minuto
-     * di ritardo simulato ogni 60/fattore secondi reali. Se il blocco è scattato
+     * Fase BLOCCATO_GUASTO_STAZIONE: il treno resta fermo. Se il blocco è scattato
      * a metà tratta il cronometro della tratta viene congelato per non far
      * avanzare il progressPercent.
+     *
+     * <p>Il tempo perso qui non viene contato: il convoglio si limita a restare
+     * fermo, e che questo si traduca in un ritardo lo stabilisce la Centrale quando
+     * il treno si presenta alla fermata successiva più tardi dell'orario previsto.</p>
      */
     private void tickBloccato() {
         trainDB.velocita = 0;
         if ("IN_VIAGGIO".equals(fasePrimaDelBlocco)) {
             congelaAvanzamentoTratta();
-        }
-        secondiDiBlocco += 1.0;
-        double secondiPerMinutoSimulato = 60.0 / fattoreAccelerazione;
-        while (secondiDiBlocco >= secondiPerMinutoSimulato) {
-            trainDB.ritardoMinuti++;
-            secondiDiBlocco -= secondiPerMinutoSimulato;
         }
     }
 
@@ -516,7 +744,6 @@ public class TrainJourneyEngine {
             return;
         }
         fasePrimaDelBlocco = trainDB.faseViaggio;
-        secondiDiBlocco = 0;
         trainDB.stazioneBloccante = stazioneId;
         trainDB.faseViaggio = "BLOCCATO_GUASTO_STAZIONE";
         trainDB.stato = "FERMO";
@@ -539,14 +766,14 @@ public class TrainJourneyEngine {
         if ("IN_VIAGGIO".equals(faseDaRiprendere)) {
             trainDB.stato = "IN_VIAGGIO"; // riprende la marcia dal punto in cui era
         }
-        LOG.infof("✅ [TWIN] Guasto stazione risolto: riprendo la fase %s (ritardo accumulato %d min)",
-                faseDaRiprendere, trainDB.ritardoMinuti);
+        LOG.infof("✅ [TWIN] Guasto stazione risolto: riprendo la fase %s", faseDaRiprendere);
     }
 
     /**
      * Segnala che la Centrale ha modificato l'itinerario del treno
-     * (alert ITINERARIO_AGGIORNATO): al prossimo tick il motore lo riscarica
-     * e fa ripartire il viaggio dalla prima stazione.
+     * (alert ITINERARIO_AGGIORNATO): al prossimo tick il motore lo riscarica e,
+     * se il convoglio è ancora assegnato, si riaggancia al percorso nuovo nel punto
+     * in cui si trova invece di ricominciare dal capolinea (RF02.5.2).
      */
     public void richiediRicaricaItinerario() {
         ricaricaItinerarioRichiesta = true;

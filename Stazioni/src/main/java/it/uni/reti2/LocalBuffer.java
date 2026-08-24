@@ -1,19 +1,41 @@
 package it.uni.reti2;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.jboss.logging.Logger;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
 /**
- * LocalBuffer implementa un meccanismo di persistenza temporanea (coda FIFO in-memory)
- * per gli eventi generati dalla Stazione (es. transiti, guasti).
- * Questo buffer è fondamentale quando la connessione verso la Centrale cade (Edge computing in offline mode),
- * permettendo di accodare gli eventi e ritrasmetterli al ripristino della rete.
+ * LocalBuffer implementa il meccanismo di store and forward per gli eventi generati
+ * dalla Stazione (es. transiti, guasti). È fondamentale quando la connessione verso la
+ * Centrale cade (Edge computing in offline mode), perché permette di accodare gli eventi
+ * e ritrasmetterli al ripristino della rete.
+ *
+ * <p>La coda vive in RAM ma ha una copia sul db locale, nella tabella {@code bufferChache}:
+ * prima un blackout del nodo si portava via proprio gli eventi che la stazione non era
+ * ancora riuscita a spedire, cioè il caso peggiore, perché quei transiti e quei guasti non
+ * esistevano da nessun'altra parte. Adesso ogni add finisce anche su disco e al riavvio la
+ * coda si ricostruisce da sola, nello stesso ordine di prima.</p>
+ *
+ * <p>Sull'ordine: l'id degli eventi è progressivo e la lettura da disco è ordinata per id,
+ * quindi il FIFO regge anche attraverso un riavvio. Serve, se no la Centrale potrebbe
+ * ricevere l'USCITA di un treno prima della sua ENTRATA.</p>
  */
 @ApplicationScoped
 public class LocalBuffer {
+
+    private static final Logger LOG = Logger.getLogger(LocalBuffer.class);
+
+    /**
+     * Il db locale su file, dove la coda viene rispecchiata.
+     */
+    @Inject
+    PersistenzaLocale persistenza;
 
     /**
      * Evento accodato in attesa di ritrasmissione.
@@ -21,10 +43,16 @@ public class LocalBuffer {
      * ("transit" oppure "alert"), così al momento del flush ogni evento
      * può essere reinviato sull'emitter MQTT corretto.
      *
-     * @param canale  Canale logico di destinazione: "transit" o "alert".
-     * @param payload Il payload JSON dell'evento non recapitato.
+     * @param idEvento Numero progressivo che dà l'ordine FIFO, anche dopo un riavvio.
+     * @param canale   Canale logico di destinazione: "transit" o "alert" (colonna "tipo").
+     * @param payload  Il payload JSON dell'evento non recapitato, già pronto per il topic.
+     * @param idGuasto Riferimento al guasto locale che ha generato l'evento, null se non
+     *                 c'entra nessun guasto (colonna id_Guasto del modello).
+     * @param idTreno  Convoglio a cui l'evento si riferisce, null per gli eventi che non
+     *                 parlano di nessun treno (colonna id_Treno del modello).
      */
-    public record EventoBufferizzato(String canale, String payload) {}
+    public record EventoBufferizzato(long idEvento, String canale, String payload,
+                                     Long idGuasto, String idTreno) {}
 
     /**
      * La coda vera e propria dove vengono stoccati gli eventi.
@@ -36,35 +64,87 @@ public class LocalBuffer {
     private final Deque<EventoBufferizzato> bufferEventi = new ArrayDeque<>();
 
     /**
-     * Aggiunge un nuovo evento in coda al buffer.
+     * Prossimo id da assegnare. Al riavvio riparte da dopo l'ultimo trovato su disco,
+     * così i vecchi eventi restano davanti ai nuovi.
+     */
+    private long prossimoId = 1;
+
+    /**
+     * Ricarica dal db locale gli eventi che erano rimasti da spedire.
+     * Non li rimanda: ci pensa il job periodico di HeartbeatGenerator appena vede che
+     * la connessione verso la Centrale è tornata.
+     */
+    @PostConstruct
+    void ripristinaDaDisco() {
+        List<EventoBufferizzato> pendenti = persistenza.leggiBuffer();
+        for (EventoBufferizzato evento : pendenti) {
+            bufferEventi.addLast(evento);
+            prossimoId = Math.max(prossimoId, evento.idEvento() + 1);
+        }
+        if (!pendenti.isEmpty()) {
+            LOG.infof("💾 Ripristinati %d eventi ancora da spedire alla Centrale.", pendenti.size());
+        }
+    }
+
+    /**
+     * Aggiunge un nuovo evento in coda al buffer, senza riferimenti a guasti o treni.
      * Da invocare quando l'invio remoto fallisce o la stazione è offline.
      *
      * @param canale  Canale di destinazione dell'evento ("transit" o "alert").
      * @param payload Il payload JSON dell'evento non recapitato.
      */
     public synchronized void add(String canale, String payload) {
-        bufferEventi.addLast(new EventoBufferizzato(canale, payload));
+        add(canale, payload, null, null);
+    }
+
+    /**
+     * Aggiunge un nuovo evento in coda al buffer e lo scrive sul db locale.
+     *
+     * @param canale   Canale di destinazione dell'evento ("transit" o "alert").
+     * @param payload  Il payload JSON dell'evento non recapitato.
+     * @param idGuasto Guasto locale che ha generato l'evento, oppure null.
+     * @param idTreno  Convoglio a cui l'evento si riferisce, oppure null.
+     */
+    public synchronized void add(String canale, String payload, Long idGuasto, String idTreno) {
+        EventoBufferizzato evento = new EventoBufferizzato(prossimoId++, canale, payload, idGuasto, idTreno);
+        bufferEventi.addLast(evento);
+        persistenza.salvaEventoBuffer(evento);
     }
 
     /**
      * Rimette un evento IN TESTA al buffer, davanti a tutti gli altri.
      * Serve al flush: l'evento che non è riuscito a partire deve essere
      * ritentato per primo, così l'ordine cronologico (FIFO) è rispettato.
+     * Si passa l'evento intero e non canale e payload perché deve tornare indietro
+     * con lo stesso id, se no perderebbe il proprio posto nella fila.
      *
-     * @param canale  Canale di destinazione dell'evento ("transit" o "alert").
-     * @param payload Il payload JSON dell'evento non recapitato.
+     * @param evento L'evento uscito da {@link #poll()} e non recapitato.
      */
-    public synchronized void addFirst(String canale, String payload) {
-        bufferEventi.addFirst(new EventoBufferizzato(canale, payload));
+    public synchronized void addFirst(EventoBufferizzato evento) {
+        bufferEventi.addFirst(evento);
     }
 
     /**
      * Estrae e rimuove il primo evento inserito nella coda (modalità FIFO).
+     * Toglie l'evento SOLO dalla coda in RAM: la riga sul db resta finché non arriva
+     * la conferma dell'invio con {@link #confermaInvio(EventoBufferizzato)}. Cancellarla
+     * qui vorrebbe dire che un blackout fra l'estrazione e la spedizione si porterebbe via
+     * l'evento, che è proprio quello che questa classe deve impedire.
      *
      * @return L'evento più vecchio nel buffer, oppure null se il buffer è vuoto.
      */
     public synchronized EventoBufferizzato poll() {
         return bufferEventi.pollFirst();
+    }
+
+    /**
+     * Cancella dal db locale un evento che è stato consegnato davvero.
+     * Da chiamare dopo che l'emitter MQTT ha accettato il payload.
+     *
+     * @param evento L'evento andato a buon fine.
+     */
+    public synchronized void confermaInvio(EventoBufferizzato evento) {
+        persistenza.rimuoviEventoBuffer(evento.idEvento());
     }
 
     /**

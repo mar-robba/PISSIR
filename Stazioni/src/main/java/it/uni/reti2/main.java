@@ -14,6 +14,9 @@ public class main implements QuarkusApplication {
     @Inject
     StationDatabaseValidator stationDatabaseValidator;
 
+    @Inject
+    ConsoleSensori consoleSensori;
+
     private static final Logger LOG = Logger.getLogger(main.class);
     private static String STAZIONE_ID_PARAM;
 
@@ -66,6 +69,19 @@ public class main implements QuarkusApplication {
         LOG.info("✅ Processo Stazione AVVIATO CORRETTAMENTE");
         LOG.info("🔄 Ingresso nel ciclo infinito di mantenimento del nodo Stazione...");
         LOG.info("🌐 Server REST disponibile su http://localhost:8081/stazione/info");
+
+        // Console dei sensori di binario (heartbeat, fail-stop, transiti): gira su un thread
+        // separato per non bloccare il ciclo qui sotto. La si avvia solo se c'è davvero un
+        // terminale interattivo: con avvioStazioni.sh l'output finisce su file e lo Scanner
+        // leggerebbe a vuoto consumando CPU per niente. Stesso criterio del processo Treno.
+        if (System.console() != null) {
+            Thread consoleThread = new Thread(consoleSensori::avviaMenu, "console-sensori-stazione");
+            consoleThread.setDaemon(true); // non deve impedire la chiusura del processo
+            consoleThread.start();
+            LOG.info("🎛️ Console dei sensori di binario avviata su questo terminale");
+        } else {
+            LOG.info("🎛️ Nessun terminale interattivo: sensori pilotabili via POST /stazione/sensori/{id}/stop|start");
+        }
 
         while (true) {
             Thread.sleep(1000);

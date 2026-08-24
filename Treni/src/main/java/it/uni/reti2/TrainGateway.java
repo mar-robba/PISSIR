@@ -67,7 +67,9 @@ public class TrainGateway {
      * - GUASTO di una STAZIONE corrente/prossima: il treno si blocca (trattenuto);
      * - RESOLVED della stazione bloccante: il treno riprende il viaggio;
      * - RESOLVED di questo TRENO: rientro dall'emergenza (pronto a ripartire);
-     * - ITINERARIO_AGGIORNATO con target questo treno: ricarica dell'itinerario.
+     * - ITINERARIO_AGGIORNATO con target questo treno: ricarica dell'itinerario;
+     * - RITARDO con target questo treno: la Centrale comunica quanti minuti di
+     *   ritardo ha misurato al passaggio in stazione.
      *
      * @param message Il messaggio asincrono contenente il payload dell'alert.
      * @return Una CompletionStage che indica l'avvenuta elaborazione del messaggio (ack).
@@ -123,6 +125,30 @@ public class TrainGateway {
                         }
                     }
                 }
+                case "RITARDO" -> {
+                    // L'altra meta' del sistema di comunicazione in ingresso chiesto dal
+                    // testo del progetto: il convoglio riceve "guasti o ritardi". Il numero
+                    // non lo calcola lui, glielo dice la Centrale, che e' l'unico nodo a
+                    // conoscere l'orario di servizio; qui lo si prende e basta.
+                    if (trainDB.trenoId.equals(target)) {
+                        int ritardo = alert.path("ritardoMinuti").asInt(0);
+                        int variazione = alert.path("variazioneMinuti").asInt(0);
+                        String causa = alert.path("causa").asText("");
+                        trainDB.ritardoMinuti = Math.max(0, ritardo);
+                        trainDB.ritardoRilevatoA = sorgenteId;
+                        trainDB.ritardoAggiornatoIl = Instant.now();
+                        String dove = sorgenteId.isEmpty() ? "?" : sorgenteId;
+                        if (trainDB.ritardoMinuti > 0) {
+                            LOG.warnf("⏱️ [ALERT] La Centrale mi comunica %d minuti di ritardo (%+d a %s, causa %s)",
+                                    trainDB.ritardoMinuti, variazione, dove,
+                                    causa.isEmpty() ? "non dichiarata" : causa);
+                        } else {
+                            // Tornare in orario non e' un allarme: e' la notizia buona.
+                            LOG.infof("⏱️ [ALERT] La Centrale mi da' di nuovo in orario (%+d a %s)",
+                                    variazione, dove);
+                        }
+                    }
+                }
                 case "ITINERARIO_AGGIORNATO" -> {
                     if (trainDB.trenoId.equals(target)) {
                         LOG.info("🗺️ [ALERT] La Centrale ha aggiornato il mio itinerario: lo ricarico");
@@ -170,7 +196,14 @@ public class TrainGateway {
     /**
      * notifica di transito dentro una stazione
      * Notifica alla Centrale Operativa e agli altri sistemi il passaggio in una determinata stazione,
-     * includendo il timestamp dell'evento e il ritardo accumulato dal convoglio.
+     * con l'ora dell'evento e il verso di marcia.
+     *
+     * <p>Questi due dati sono quelli che servono alla Centrale per il calcolo dei ritardi:
+     * con l'ora sa se il convoglio è arrivato quando doveva, con la direzione sa qual è la
+     * fermata successiva e quindi a che ora deve aspettarselo. La direzione la dichiara il
+     * treno perché al capolinea l'ha appena invertita: la Centrale la vedrebbe solo con il
+     * frame di telemetria successivo, cioè dopo aver già fissato l'orario sbagliato. Il
+     * campo "ritardoMinuti" che stava qui è sparito insieme al contatore di bordo.</p>
      *
      * @param stazioneId L'identificativo univoco della stazione interessata.
      * @param tipo Il tipo di passaggio (es. "ENTRATA" nella stazione, o "USCITA" dalla stazione).
@@ -182,8 +215,8 @@ public class TrainGateway {
 
         // Costruzione del messaggio JSON per la telemetria/segnalamento passaggi
         String json = String.format(Locale.US,
-                "{\"trenoId\":\"%s\",\"stazioneId\":\"%s\",\"tipo\":\"%s\",\"timestamp\":\"%s\",\"ritardoMinuti\":%d}",
-                trainDB.trenoId, stazioneId, tipo, Instant.now().toString(), trainDB.ritardoMinuti);
+                "{\"trenoId\":\"%s\",\"stazioneId\":\"%s\",\"tipo\":\"%s\",\"timestamp\":\"%s\",\"direzione\":\"%s\"}",
+                trainDB.trenoId, stazioneId, tipo, Instant.now().toString(), trainDB.direzione);
 
         try {
             // Invio del payload sul canale apposito

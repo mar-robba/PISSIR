@@ -87,8 +87,8 @@ rectangle "Monitoraggio e gestione del traffico ferroviario" {
   }
 
   rectangle "Comandi operativi (RF01.4)" as G2 {
-    usecase "Invia la squadra\ndi manutenzione\n(RF01.4.1)" as UC08 <<parziale>>
-    usecase "Dichiara risolto\nun allarme\n(RF01.4.2)" as UC09 <<parziale>>
+    usecase "Invia la squadra\ndi manutenzione\n(RF01.4.1)" as UC08
+    usecase "Dichiara risolto\nun allarme\n(RF01.4.2)" as UC09
     usecase "Sopprimi una corsa\n(RF01.4.3)" as UC10 <<parziale>>
   }
 
@@ -154,7 +154,7 @@ endlegend
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-25gpgG/plantuml-5VTOFG.png]]
+[[file:/tmp/babel-ykrLGw/plantuml-tyJeKt.png]]
 
 ** Glossario dei termini di dominio
 
@@ -204,8 +204,9 @@ descritto da RF02 e' sbagliato, RF01 mostra correttamente un dato sbagliato: per
 RF01 dipende dal corrispondente ramo di RF02.
 
 *Stato di implementazione*: parziale — la visualizzazione, l'amministrazione dei dati, lo storico e
-l'accesso ci sono per intero; i tre comandi operativi di RF01.4 fanno la cosa principale ma nessuno
-dei tre e' completo.
+l'accesso ci sono per intero; dei tre comandi operativi di RF01.4 i due che riguardano il guasto
+sono completi, resta parziale la soppressione della corsa, che non verifica la propria
+precondizione.
 
 **** RF01.1 - Visualizzazione della situazione corrente
 
@@ -337,25 +338,41 @@ RF04.2 non e' completo.
 tre la fa per intero.
 
 ***** RF01.4.1 - Invio della squadra di manutenzione
-- enunciato: il tecnico manda la squadra su una stazione guasta.
+- enunciato: il tecnico manda la squadra su una stazione guasta; la stazione resta inutilizzabile
+  per tutta la durata dell'intervento.
 - soggetto: il tecnico, che nella consegna e' il ruolo a cui questo compito e' assegnato.
-- esito atteso: la stazione risulta in MANUTENZIONE e i nodi interessati ne sono informati.
-- stato di implementazione: parziale. Il comando parte, il campo viene avvisato, i guasti aperti
-  sulla stazione vengono chiusi e la stazione passa a MANUTENZIONE; solo che il ritorno a ONLINE sta
-  dentro la stessa chiamata, a pochi millisecondi di distanza. Lo stato attraversa il canale ma non
-  dura: la stazione non /risulta/ in manutenzione a nessuno che la guardi. Per soddisfare il
-  requisito il ritorno andrebbe staccato dal comando e legato alla fine vera dell'intervento.
+- precondizione: sulla stazione esiste almeno un guasto aperto. Non si mandano operatori su una
+  stazione sana: il comando viene rifiutato con 409.
+- esito atteso: la stazione risulta in MANUTENZIONE a chi la guarda, e ci resta finche' il tecnico
+  non chiude il guasto; il campo viene informato e i guasti aperti /restano aperti/, perche' l'invio
+  degli operatori apre l'intervento e non lo conclude.
+- nota di progetto: MANUTENZIONE e' uno stato della Centrale e vale "guasta piu' squadra inviata" -
+  e' il "preso in carico" del guasto, visto dal lato della stazione invece che da quello
+  dell'allarme, ed e' per questo che non serve duplicarlo con un terzo stato sul guasto. Sul nodo
+  lo stato locale resta GUASTA, ed e' quello che continua a trattenere i treni in ingresso: se il
+  nodo passasse anche lui in manutenzione smetterebbe di trattenerli proprio durante la
+  riparazione. Durante l'intervento il battito della stazione aggiorna il solo istante di ultimo
+  contatto e non ne riscrive lo stato, altrimenti il primo heartbeat cancellerebbe la manutenzione
+  appena aperta.
+- stato di implementazione: completo. Il comando porta la stazione in MANUTENZIONE, scrive la riga
+  di storico del passaggio e avvisa il campo; il ritorno in servizio non e' piu' dentro la stessa
+  chiamata ma e' legato alla fine vera dell'intervento, cioe' a RF01.4.2.
 
-***** RF01.4.2 - Presa in carico e chiusura di un allarme
-- enunciato: il tecnico dichiara risolto un guasto.
+***** RF01.4.2 - Chiusura dell'allarme e ripresa della circolazione
+- enunciato: il tecnico dichiara concluso l'intervento; il guasto passa a chiuso e cio' che era
+  trattenuto per causa sua riprende.
 - soggetto: il tecnico, per la ragione scritta sopra al ramo: chiudere l'allarme e' il seguito
   dell'invio degli operatori.
-- esito atteso: il guasto passa a chiuso, resta traccia di chi lo ha preso in carico e quando, e cio'
-  che era bloccato per causa sua riprende.
-- dipende da: RF02.1.3.
-- stato di implementazione: parziale. La chiusura c'e' e funziona, e cio' che era trattenuto
-  riprende davvero la corsa; la presa in carico no. Ne' l'operatore ne' il momento in cui se n'e'
-  occupato vengono scritti da nessuna parte, quindi a guasto chiuso non si sa piu' chi lo ha chiuso.
+- esito atteso: il guasto risulta risolto, la stazione torna ONLINE se non le restano altri guasti
+  aperti, la transizione viene storicizzata e i convogli fermi in stazione ripartono.
+- dipende da: RF01.4.1, di cui chiude l'intervallo.
+- stato di implementazione: completo. La chiusura fa partire il RESOLVED verso il campo, che
+  riporta il nodo a ONLINE e libera i treni trattenuti; la riga di storico chiude il passaggio per
+  MANUTENZIONE aperto dal comando precedente.
+- limite dichiarato: non viene registrato /chi/ ha chiuso il guasto, il campo =Guasto.operatore=
+  resta vuoto. E' la parte di RF02.1.3 che la consegna non chiede: il PDF vuole che gli operatori
+  vengano inviati e che il guasto sia ripristinato, non che il sistema tenga il registro di quale
+  operatore se ne sia occupato.
 
 ***** RF01.4.3 - Soppressione di un convoglio fermo in stazione
 - enunciato: l'amministratore annulla una corsa; il convoglio passa in SOPPRESSO e non viaggia piu'.
@@ -392,11 +409,11 @@ accadendo sulla rete, anche in presenza di guasti, di interruzioni del collegame
 fatte mentre il sistema e' in funzione.
 
 *Stato di implementazione*: parziale. Sono completi il ramo dei convogli (RF02.2), quello delle
-stazioni (RF02.3), l'identita' dei nodi di campo (RF02.4) e le anomalie che la centrale deduce da
-sola (RF02.6). Non sono realizzate le conseguenze del guasto del convoglio sull'infrastruttura
-(RF02.1.2.2) e la ripresa dal punto giusto dopo una modifica dell'itinerario (RF02.5.2); sono
-parziali il ciclo di vita del guasto, che non registra la presa in carico (RF02.1.3), e la memoria
-storica, che di cinque cose ne scrive tre (RF02.7).
+stazioni (RF02.3), l'identita' dei nodi di campo (RF02.4), la modifica dell'itinerario a sistema
+acceso (RF02.5) e le anomalie che la centrale deduce da sola (RF02.6). Non sono realizzate le
+conseguenze del guasto del convoglio sull'infrastruttura (RF02.1.2.2); sono parziali il ciclo di
+vita del guasto, che non registra la presa in carico (RF02.1.3), e la memoria storica, che di
+cinque cose ne scrive tre (RF02.7).
 
 **** RF02.1 - Gestione dei guasti
 
@@ -418,10 +435,10 @@ vita del guasto (RF02.1.3).
 - precondizione: la stazione continua a funzionare e i suoi sensori continuano a rilevare.
 - esito atteso: al ritorno del collegamento la centrale riceve tutti gli eventi prodotti durante
   l'interruzione, nessuno escluso.
-- stato di implementazione: completo, nei limiti della precondizione. Il nodo continua a rilevare e
-  accoda cio' che non riesce a consegnare, e svuota la coda quando il collegamento torna. La coda
-  pero' vive in memoria: vale finche' il nodo resta acceso, un suo riavvio si porterebbe via quello
-  che non era ancora partito.
+- stato di implementazione: completo. Il nodo continua a rilevare e accoda cio' che non riesce a
+  consegnare, e svuota la coda quando il collegamento torna. La coda sta in memoria ma ha una copia
+  su un SQLite locale (tabella =bufferChache=), quindi regge anche alla caduta del processo: al
+  riavvio la stazione rilegge da disco cio' che non era partito e lo consegna comunque.
 
 ******* RF02.1.1.1.2 - Ordine di consegna preservato
 - enunciato: la consegna differita rispetta l'ordine in cui gli eventi sono stati generati; se una
@@ -656,8 +673,8 @@ e RF02.4.2.
 *Enunciato del ramo*: l'amministratore puo' cambiare le stazioni attraversate da un itinerario e i
 convogli assegnati mentre i convogli sono gia' in marcia, e il sistema resta coerente.
 
-*Stato di implementazione*: parziale — il convoglio escluso e' gestito, quello che resta assegnato
-riparte dal capolinea invece che da dove si trovava.
+*Stato di implementazione*: completo — sono gestiti sia il convoglio escluso, che si dichiara fermo
+in attesa, sia quello che resta assegnato, che prosegue dal punto in cui la modifica lo ha colto.
 
 ***** RF02.5.1 - Convoglio escluso dall'itinerario
 - enunciato: se dopo la modifica un convoglio non e' piu' assegnato ad alcun itinerario, smette di
@@ -682,11 +699,21 @@ riparte dal capolinea invece che da dove si trovava.
 - caso limite: se la stazione da cui e' appena passato non fa piu' parte dell'itinerario, il convoglio
   riprende dal capolinea del nuovo itinerario, perche' non esiste un punto di ripresa sensato.
 - dipende da: RF02.2.2.1.
-- stato di implementazione: non realizzato. L'avviso arriva e l'itinerario nuovo viene ricaricato,
-  ma il viaggio viene fatto ripartire dalla prima tappa in direzione andata: il convoglio conserva il
-  ritardo accumulato e non la posizione, e sulla mappa fa il salto che il requisito voleva evitare.
-  In pratica il sistema si comporta *sempre* come nel caso limite, anche quando un punto di ripresa
-  sensato ci sarebbe.
+- stato di implementazione: completo. Ricevuto l'avviso il convoglio riscarica l'itinerario senza
+  buttare via quello che ha (se lo svuotasse subito si dichiarerebbe fermo anche quando un istante
+  dopo arriva il percorso nuovo), poi cerca nella lista nuova la stazione in cui si trova e ci si
+  riaggancia: ricalcola indice, direzione e prossima fermata e riapre la sosta, mentre ritardo,
+  passeggeri e stato restano quelli di prima, perche' il convoglio e' lo stesso ed e' cambiato solo
+  l'elenco delle fermate che ha davanti. Non viene pubblicato nessun passaggio, dato che il treno non
+  si e' mosso di un metro e un ENTRATA inventato verrebbe storicizzato come vero.
+- *scelta di progetto sul convoglio in mezzo a una tratta*: se la modifica arriva mentre il treno e'
+  fra due stazioni il percorso nuovo non viene installato subito ma resta in attesa e sostituisce il
+  vecchio quando il convoglio entra nella stazione di arrivo. Un treno lanciato su un binario non
+  puo' cambiare percorso a meta' strada: riagganciarlo subito vorrebbe dire farlo saltare indietro
+  alla stazione di partenza, cioe' proprio il salto di posizione che il requisito vieta.
+- il caso limite previsto dalla specifica resta quello che era: se la stazione di riferimento non fa
+  piu' parte dell'itinerario non c'e' nessun punto a cui agganciarsi e il viaggio riparte dal
+  capolinea, con una segnalazione nei log del convoglio.
 
 **** RF02.6 - Anomalie dedotte dalla centrale
 
@@ -818,9 +845,9 @@ cosa, che cosa una parte puo' e non puo' toccare dell'altra.
 
 *** RF04 - Accesso e protezione
 
-*Stato di implementazione*: parziale — l'accesso e' completo; l'autorizzazione per ruolo vale per le
-letture e per l'anagrafica ma non distingue i ruoli sui tre comandi operativi (RF04.2); la protezione
-dei canali si ferma dove dice il limite dichiarato in RF04.3.
+*Stato di implementazione*: parziale — l'accesso e la protezione dei canali sono completi;
+l'autorizzazione per ruolo vale per le letture e per l'anagrafica ma non distingue i ruoli sui tre
+comandi operativi (RF04.2).
 
 **** RF04.1 - Autenticazione
 - enunciato: gli utenti sono registrati presso il servizio di identita' e accedono dichiarando li'
@@ -877,16 +904,23 @@ dei canali si ferma dove dice il limite dichiarato in RF04.3.
   cio' che si osserva non e' un errore di sicurezza ma un nodo che non riesce a entrare in servizio.
   E' un sintomo che punta lontano dalla causa, e va messo per iscritto qui perche' e' proprio in
   fase di verifica che si presenta.
-- *limite dichiarato*: il canale verso il servizio di identita' non e' compreso nella protezione. E'
-  l'unico tratto che resta in chiaro quando tutti gli altri sono protetti, ed e' proprio quello su
-  cui viaggiano le credenziali: va detto, perche' altrimenti la garanzia di questo requisito
-  sembrerebbe piu' ampia di quello che e'. La realizzazione e le sue conseguenze sono nel capitolo
-  /Progettazione/, sezione /Autenticazione e autorizzazione/.
-- stato di implementazione: parziale, ed e' parziale esattamente quanto dice il limite dichiarato.
-  Con il profilo apposta tutti i canali fra le parti sono protetti — MQTT sulla porta cifrata,
-  compresi i canali con cui i nodi si fanno riconoscere, e HTTPS verso la centrale, che la schermata
-  segue cambiando due indirizzi senza essere ricompilata — ma il canale verso il servizio di
-  identita' resta in chiaro, ed e' proprio quello su cui viaggiano le credenziali.
+- *il canale delle credenziali non e' un canale come gli altri*: gli altri trasportano posizioni,
+  transiti e allarmi, cioe' dati che un osservatore leggerebbe ma non potrebbe riusare; li' passano
+  invece le parole d'ordine degli operatori, che chi le intercetta puo' adoperare per entrare. Per
+  questo la sua protezione non e' legata al profilo: il servizio di identita' accetta soltanto
+  connessioni protette e quella in chiaro non esiste, cosi' non c'e' modo di usarlo senza
+  protezione nemmeno per distrazione.
+- *conseguenza sulla schermata*: se la pagina da cui si avvia l'accesso restasse non protetta, il
+  guadagno si perderebbe lo stesso, perche' e' su di lei che torna l'attestato appena rilasciato.
+  Va quindi servita protetta anche lei, e questo si porta dietro il resto: una pagina protetta non
+  puo' rivolgersi a indirizzi non protetti, il programma di navigazione glielo impedisce, quindi
+  usare la schermata implica avere attivo il profilo di protezione su tutti gli altri canali.
+- stato di implementazione: completo. Con il profilo apposta tutti i canali fra le parti sono
+  protetti — MQTT sulla porta cifrata, compresi i canali con cui i nodi si fanno riconoscere, e
+  HTTPS verso la centrale, che la schermata segue cambiando due indirizzi senza essere ricompilata
+  — e il canale verso il servizio di identita' e' protetto sempre, in qualunque configurazione. Le
+  parti si riconoscono fra loro tramite un'autorita' di certificazione privata del progetto, la
+  stessa che firma i certificati di tutti i servizi.
 
 ** Requisiti non funzionali osservabili
 
@@ -1087,7 +1121,7 @@ component "Sensori di bordo\nguasto, passaggio\n(simulati)" <<esterno>> as Senso
 ' =====================================================
 '  INTERFACCE
 ' =====================================================
-interface "IAutenticazione\nOAuth2/OIDC :8180" as IAuth
+interface "IAutenticazione\nOAuth2/OIDC :8543 https" as IAuth
 interface "IChiaviPubbliche\nJWKS" as IJwks
 interface "IApiOperatore\nREST /api\n:8781 (:8444 tls)" as IApi
 interface "ITempoReale\nWebSocket /ws/realtime" as IRealtime
@@ -1155,14 +1189,45 @@ end note
 | chiamate sincrone             | JAX-RS (=quarkus-rest= + Jackson)                                  | =/api= della Centrale, =/stazione= e =/treno= per i sensori  |
 | aggiornamento della dashboard | WebSocket (=quarkus-websockets=)                                   | =/ws/realtime= della Centrale                               |
 | persistenza                   | PostgreSQL 15 in Docker, Hibernate ORM con Panache                 | solo Centrale                                               |
-| stato dei nodi di campo       | strutture in memoria (singleton CDI)                               | =TrainDB=, =DBLocale=, =LocalBuffer=                        |
+| stato dei nodi di campo       | singleton CDI in memoria; sulla stazione anche SQLite su file      | =TrainDB=, =DBLocale=, =LocalBuffer=, =PersistenzaLocale=   |
 | interfaccia utente            | React 18, TypeScript, Vite, zustand                                | web app                                                     |
 | identita' e autenticazione    | Keycloak 26 in Docker, OAuth2 / OIDC, Authorization Code + PKCE     | realm =railway=, =quarkus-oidc=, =src/api/keycloak.ts=       |
 | autorizzazione                | ruoli di realm nel token, filtro JAX-RS sui percorsi                | =FiltroAutorizzazione=                                      |
-| cifratura dei canali          | TLS con CA privata (=gen-certs.sh=)                                | profilo =%tls= (MQTT 8883, HTTPS 8444)                       |
+| cifratura dei canali          | TLS con CA privata (=gen-certs.sh=)                                | profilo =%tls= (MQTT 8883, HTTPS 8444), Keycloak e web app sempre in HTTPS (8543, 5173) |
 | test                          | JUnit 5 e RestAssured, Vitest con Testing Library                  | moduli Java, web app                                        |
 | database dei test             | H2 in memoria, schema rigenerato a ogni esecuzione                 | =src/test/resources/application.properties= della Centrale  |
 
+
+
+La tabella dice quali tecnologie ci sono; qui c'è il perché, cioè cosa è stato scartato e per quale
+motivo.
+
+*Il broker al posto delle chiamate REST periodiche.* I nodi di campo stanno in reti private: una
+stazione dietro il NAT dell'ente ferroviario non è raggiungibile da fuori e un convoglio in
+movimento cambia rete di continuo. Con REST sarebbe la Centrale a dover contattare ogni nodo,
+quindi servirebbero un indirizzo stabile e una porta aperta per ciascuno; con il broker è il nodo
+ad aprire la connessione verso l'esterno, e sul firewall basta permettere il traffico in uscita.
+Il broker disaccoppia anche nel tempo — se la Centrale è giù la stazione continua a pubblicare, i
+messaggi con QoS 1 restano in coda e il =LocalBuffer= li ritenta, mentre un POST fallito sarebbe
+perso — e nei destinatari: pubblicare su =railway/alerts= raggiunge tutti i treni interessati
+senza che chi pubblica sappia quanti sono (RNF05), cosa che con REST costringerebbe la Centrale a
+tenere l'elenco aggiornato dei nodi e a chiamarli uno per uno.
+
+*Perché MQTT e non AMQP o Kafka.* Il traffico è fatto di messaggi piccoli e frequenti: telemetria
+ogni =P_tel= per convoglio, cioè circa 2.000 messaggi al secondo con diecimila treni, payload JSON
+di qualche centinaio di byte. MQTT ha un header fisso di 2 byte, mentre ogni richiesta HTTP ne
+porterebbe centinaia fra intestazioni e handshake. AMQP aggiunge exchange e instradamenti che qui
+non servono, Kafka è pensato per conservare e rileggere flussi enormi ed è sovradimensionato per
+una rete di sensori. I vincoli di tempo sono soft real-time, dell'ordine dei secondi (=P_tel=,
+=T_sil=): non serve una garanzia dura sulla latenza, bastano la consegna almeno-una-volta e il
+keepalive che si accorge della caduta.
+
+*Il resto.* REST resta dove la risposta serve subito e su richiesta (l'itinerario che il treno
+scarica all'avvio, le API dell'operatore); verso il browser si usa WebSocket, perché la dashboard
+deve ricevere aggiornamenti spontanei e il polling sprecherebbe banda su dati che spesso non
+cambiano. PostgreSQL sta solo sulla Centrale, dove lo storico cresce senza limite; alla stazione
+basta SQLite, che è un file e non un servizio. Keycloak evita di scriversi in casa utenti,
+password e ruoli, e parla OIDC standard: lo stesso token vale per la web app e per la Centrale.
 
 Anche questa documentazione ha il suo piccolo stack: è scritta in org-mode ed esportata in
 LaTeX, e i diagrammi (stati, sequenza, classi) sono sorgenti PlantUML tenuti dentro il
@@ -1251,13 +1316,23 @@ aperta resterebbe valida per sempre.
 
 ** Modello
 Il sistema non ha un database unico ma tre livelli di persistenza, uno per tipo di nodo.
-L'unico database vero e proprio è quello della Centrale (PostgreSQL, schema in
+Il database centrale è quello della Centrale (PostgreSQL, schema in
 =ServeCentraleOperativa/src/main/resources/schema.sql=): è lì che stanno l'anagrafica della
-rete e tutto lo storico. I nodi di campo (treno e stazione) tengono invece il loro stato in
-memoria dentro le classi =TrainDB= e =DBLocale=, che sono singleton applicativi; i file
-=schema.sql= dei due moduli sono il modello di come quello stato andrebbe persistito su un
-db locale (a oggi il nodo che riparte riprende lo stato dalla Centrale, quindi la
-persistenza locale non è stata implementata).
+rete e tutto lo storico. La stazione ha un suo database locale, un file SQLite con lo schema
+di =Stazioni/src/main/resources/schema.sql=, gestito dalla classe =PersistenzaLocale=. Il
+treno invece tiene tutto in memoria dentro =TrainDB=, che resta un singleton applicativo, e
+il suo =schema.sql= rimane il modello di come quello stato andrebbe persistito.
+
+La differenza fra i due nodi di campo non è una dimenticanza ma la conseguenza di che cosa
+tengono in mano. Il treno non possiede niente di unico: l'itinerario lo riscarica dalla
+Centrale all'avvio e la posizione se la ricalcola percorrendolo, quindi un riavvio gli costa
+il viaggio in corso ma non un dato. La stazione invece produce dati che non esistono da
+nessun'altra parte finché non riesce a consegnarli — i transiti rilevati e i guasti segnalati
+mentre il collegamento con la Centrale è giù — e in più è l'unica a sapere di essere guasta.
+Se ripartisse dai valori di default direbbe di essere ONLINE con i binari liberi, cioè
+esattamente il contrario del vero, e i treni in arrivo verrebbero fatti entrare in una
+stazione inagibile. Per questo la persistenza locale è stata implementata sulla stazione e
+non sul treno.
 
 *** Il database della Centrale
 Le tabelle si dividono in tre gruppi.
@@ -1312,19 +1387,44 @@ dell'aggiunta resta nulla e viene esposta come ritardo zero.
 *** I db locali dei nodi di campo
 Il treno ha una sola tabella, =Stato_convoglio=: direzione, stato, stazione corrente,
 prossima stazione e tratta corrente. È di fatto la fotografia di dove si trova il convoglio,
-la stessa che poi viene spedita in telemetria.
+la stessa che poi viene spedita in telemetria. Resta un modello sulla carta: nel codice
+quella fotografia è il singleton =TrainDB=, per il motivo detto sopra.
 
-La stazione ne ha di più perchè deve sopravvivere alla disconnessione:
-- =Stato=: nome, regione, se è funzionante e i timestamp dell'ultimo guasto
-- =Tratte=: copia locale delle tratte che toccano la stazione (stessi id del db centrale)
+La stazione ne ha di più perchè deve sopravvivere alla disconnessione, e il suo schema è
+davvero eseguito: all'avvio =PersistenzaLocale= apre il file =Stazioni/data/stazione-{id}.db=
+e ci lancia dentro le =CREATE TABLE IF NOT EXISTS= di =schema.sql=.
+- =Stato=: nome, regione, se è funzionante e i timestamp dell'ultimo guasto. È la riga che
+  fa ripartire GUASTA una stazione che si era guastata prima di spegnersi
+- =Tratte=: copia locale delle tratte che toccano la stazione (stessi id del db centrale).
+  La tabella viene creata ma resta vuota: il nodo non ragiona per tratte, il grafo della rete
+  è roba della Centrale
 - =Guasto_Locale_Momentaneo= e la associativa =Tratta_Guasto=: quale guasto sta bloccando
-  quali tratte
-- =Treno=: i treni presenti al momento, con tempo di entrata e di partenza
+  quali tratte. Ogni guasto segnalato dalla stazione ci finisce aperto e viene chiuso quando
+  arriva il RESOLVED della Centrale; anche qui l'associativa resta vuota
+- =Treno=: i treni presenti al momento, con tempo di entrata e di partenza. Chi ha il tempo
+  di partenza a NULL è ancora fermo sui binari, ed è da questa query che al riavvio si
+  ricostruisce la mappa dei presenti
 - =bufferChache=: la coda degli eventi prodotti mentre la Centrale non era raggiungibile,
   da rispedire in blocco al ritorno della connessione. Nel codice corrisponde alla classe
   =LocalBuffer=, che è una coda FIFO in memoria in cui ogni elemento si porta dietro anche
   il canale di destinazione ("transit" o "alert"), così al flush ogni evento riparte
   sull'emitter giusto
+
+Il criterio con cui si è deciso che cosa persistere e che cosa no è che sul disco va solo
+quello che al riavvio non si sa più ricavare. Lo stato operativo, i treni sui binari e la
+coda degli eventi non consegnati vengono riletti; la connessione MQTT, la validazione
+dell'ID e i keepalive dei sensori no, perché si rifanno da capo comunque. I keepalive in
+particolare sarebbe sbagliato rileggerli: sono un segnale di vitalità, e ripartire con
+battiti vecchi di ore vorrebbe dire dichiarare guasti dei sensori che stanno benissimo.
+
+Due note sullo schema, che sono le domande che mi aspetto. La prima: SQLite non ha i tipi
+BOOLEAN e TIMESTAMP, quindi i booleani sono INTEGER 0/1 e i timestamp sono TEXT in ISO-8601,
+cioè la stringa che stampa =Instant.toString()=; e gli identificativi del sistema sono
+stringhe ("MI", "Jaz"), non interi come nel modello. La seconda: il file è aperto con
+=journal_mode=WAL= e =synchronous=FULL=. FULL è l'impostazione lenta, perché aspetta la
+=fsync= a ogni commit, ma è l'unica sensata qui: il caso da cui ci si vuole difendere è
+proprio la corrente che va via, e con =synchronous=NORMAL= le ultime transazioni si
+possono perdere.
 
 ** Topic
 La comunicazione fra i nodi passa da un broker Mosquitto (localhost:1883, oppure 8883 con
@@ -1372,12 +1472,30 @@ in un ciclo.
 
 Un messaggio =GUASTO= porta =sorgenteTipo= (STAZIONE o TRENO), =sorgenteId=, =severita=,
 =messaggio= e =timestamp=, più un campo facoltativo =tipoGuasto= con cui *chi segnala dichiara di
-che guasto si tratta* (a oggi lo valorizza la stazione, con =sensore_offline=, quando scade il
-keepalive di un sensore di binario). È il campo che permette alla Centrale di classificare
-l'allarme senza doverlo indovinare dal testo: prima bastava la parola "sensore" nella descrizione
-per far passare per guasto di terra l'avaria di bordo di un convoglio, e siccome i guasti di
-stazione parlano quasi sempre di sensori il tipo =stazione_guasta= non veniva quasi mai prodotto.
-Se il campo manca, il tipo lo decide il tipo di sorgente, che è comunque un dato strutturato.
+che guasto si tratta*. La stazione lo valorizza in due casi: =sensore_offline=, dedotto in
+automatico quando scade il keepalive di un sensore di binario, e =binario_guasto=, dichiarato
+dall'operatore tramite la CLI della stazione (endpoint =/stazione/sensore/guasto=) quando a
+guastarsi non è l'intera stazione ma un singolo binario o scambio — la stessa CLI, con
+l'altra scelta, dichiara =stazione_guasta=. È il campo che permette alla Centrale di
+classificare l'allarme senza doverlo indovinare dal testo: prima bastava la parola "sensore"
+nella descrizione per far passare per guasto di terra l'avaria di bordo di un convoglio, e
+siccome i guasti di terra parlano quasi sempre di sensori il tipo =stazione_guasta= non
+veniva quasi mai prodotto. Se il campo manca, il tipo lo decide il tipo di sorgente, che è
+comunque un dato strutturato.
+
+Un messaggio =RITARDO= è l'unico del canale che non parla di guasti: con quello la Centrale
+comunica al convoglio quanti minuti di ritardo gli ha misurato. Porta =target= (il treno a
+cui è destinato, come =STOP= e =ITINERARIO_AGGIORNATO=), =ritardoMinuti= con il totale,
+=variazioneMinuti= con quanto è cambiato in quel passaggio, =causa= (=ARRIVO_IN_RITARDO= se
+il tempo si è perso in linea, =SOSTA_PROLUNGATA= se si è perso fermi in banchina) e
+=sorgenteId=, che qui è la stazione al cui passaggio la misura è stata fatta. Serve perchè
+la consegna vuole il convoglio *"in grado di ricevere informazioni (guasti o ritardi)"*: il
+ritardo il treno non se lo può calcolare, dato che l'orario di servizio ce l'ha solo la
+Centrale, quindi l'unico modo perchè lo conosca è che glielo dica chi lo ha misurato. A
+bordo il numero non viene usato per decidere niente, si ferma al display: è la Centrale che
+governa il traffico, il treno lo mostra e basta. L'alert parte solo quando il ritardo
+cambia, non a ogni passaggio, se no il canale condiviso si riempirebbe di messaggi che
+dicono tutti la stessa cosa.
 
 Il passaggio dei treni viaggia volutamente su due topic distinti: =railway/train/{id}/passaggio=
 è quello che dichiara il treno, =railway/station/{id}/transit= è quello che rilevano i sensori
@@ -1407,211 +1525,6 @@ contraddizione: e' la conseguenza di che cosa ciascuno dei due puo' sapere.
 | GUASTA       | la stazione, la centrale | la stazione non e' percorribile: i convogli non ci entrano e non ne escono |
 | OFFLINE      | solo la centrale       | la stazione non da' piu' notizie di se'                                   |
 | MANUTENZIONE | solo la centrale       | la squadra e' stata mandata sul posto e sta lavorando                    |
-
-** COMMENT Autenticazione e autorizzazione
-
-*** Perchè OAuth2 e non un login fatto in casa
-
-Il PDF ammetteva una variante: al posto di OAuth2 si poteva fare un'autenticazione
-tradizionale, con la Centrale che confronta la password con una colonna della tabella
-=Utenti=. La prima versione del progetto era fatta così, poi l'ho rifatta con Keycloak, e la
-ragione non è "un punto in più": è che con il login tradizionale *la Centrale conosceva tutte
-le password del sistema*. Un =SELECT * FROM Utenti= tirava fuori le credenziali di ogni
-operatore, e le sessioni erano una mappa in RAM che un riavvio spazzava via. Adesso la
-Centrale non conserva nessuna password (la colonna non esiste proprio più) e non ne verifica
-nessuna: si limita a controllare che il token che le viene esibito sia firmato da chi dice lui.
-
-Il flusso scelto è l'*Authorization Code con PKCE*, che è quello che lo standard raccomanda
-per le Single Page Application. Non ho usato il grant "password" (mandare username e password
-a Keycloak da una form mia), che pure sarebbe stato più comodo, per due motivi: la password
-continuerebbe a passare dalla web app, esattamente come nella variante 2, ed è un grant
-deprecato in OAuth 2.1. Sul client =railway-webapp= l'ho lasciato *disattivato apposta*.
-
-*** Le parti in gioco
-
-#+ATTR_LATEX: :environment longtable :align L{0.22\textwidth}L{0.30\textwidth}L{0.40\textwidth} :font \small
-| chi                  | che ruolo ha nel flusso                       | dove sta                                              |
-|----------------------+-----------------------------------------------+-------------------------------------------------------|
-| Keycloak             | Identity Provider: utenti, password, ruoli    | container =railway-keycloak=, porta *8180*            |
-| realm =railway=      | la configurazione: 2 ruoli, 2 client, 4 utenti | =Keycloak/realm-railway.json=, importato all'avvio    |
-| =railway-webapp=     | client *pubblico* della SPA, PKCE obbligatorio | dichiarato nel realm                                  |
-| =railway-centrale=   | il servizio protetto, cioè l'audience del token | dichiarato nel realm, nessun flusso abilitato        |
-| web app              | chiede il token e lo esibisce a ogni chiamata  | =src/api/keycloak.ts=, =src/store/authStore.ts=       |
-| Centrale             | /resource server/: verifica il token e i ruoli | =quarkus-oidc= + =FiltroAutorizzazione=               |
-
-La porta è la *8180* e non la 8080 come in tutti i tutorial: la 8080 è la porta di default di
-Quarkus, quella che una Stazione o un Treno prenderebbero se li si lanciasse dimenticando
-=-Dquarkus.http.port=. Con Keycloak lì sopra si otterrebbe un "Address already in use"
-difficile da collegare alla causa.
-
-*** Il flusso, passo per passo
-
-1. l'utente clicca /Accedi con Keycloak/. La web app genera un segreto usa e getta
-   (=code_verifier=) e ne calcola l'impronta SHA-256 (=code_challenge=);
-2. il browser viene mandato sulla pagina di login di Keycloak, portandosi dietro solo
-   l'impronta. *La password si digita lì*: la web app non la vede mai;
-3. a credenziali giuste Keycloak rimanda il browser su =/login?code=...= con un codice monouso;
-4. la web app scambia quel codice per i token, esibendo il =code_verifier= originale;
-5. da quel momento ogni chiamata REST porta =Authorization: Bearer <token>=. La prima è
-   =GET /api/auth/me=, che serve a sapere chi è l'utente e cosa può fare.
-
-Il senso di *PKCE* è tutto nel passo 4. Il codice del passo 3 passa dalla barra degli
-indirizzi, dalla cronologia e dai log del browser: chi lo intercettasse non se ne farebbe
-niente, perchè per trasformarlo in token serve anche il =code_verifier=, che non è mai uscito
-dalla memoria della pagina. È il motivo per cui una SPA — il cui sorgente è pubblico e che
-quindi non può custodire nessun =client_secret= — riesce a usare l'Authorization Code in
-sicurezza. Che sia obbligatorio e non facoltativo lo impone il realm: una richiesta di
-autorizzazione senza =code_challenge_method= viene respinta da Keycloak, non dal client.
-
-La conversazione completa, con i partecipanti e i tre esiti del filtro, è il diagramma di
-sequenza SQ13; il ciclo di vita del token visto dalla Centrale è la macchina a stati M9.
-
-*** Come la Centrale verifica un token
-
-La configurazione sta in =application.properties= ed è corta, ma ogni riga serve:
-
-#+begin_example
-quarkus.oidc.auth-server-url=http://localhost:8180/realms/railway
-quarkus.oidc.client-id=railway-centrale
-quarkus.oidc.application-type=service
-quarkus.oidc.roles.role-claim-path=realm_access/roles
-quarkus.oidc.token.audience=railway-centrale
-quarkus.oidc.connection-delay=30S
-quarkus.oidc.connection-retry-count=5
-%test.quarkus.oidc.enabled=false
-#+end_example
-
-- =application-type=service= dice che la Centrale è un *resource server*: accetta token e
-  basta, non fa lei il redirect verso la pagina di login. Con =web-app= proverebbe a gestire
-  in proprio l'Authorization Code, che qui è compito della SPA;
-- =roles.role-claim-path= è la riga senza la quale non funziona niente: Quarkus di default
-  cerca i ruoli nel claim =groups=, Keycloak li scrive in =realm_access.roles=. Sbagliandola
-  si ottiene un utente autenticato ma senza nessun ruolo, cioè 403 su tutto;
-- =token.audience= impone che il token sia stato emesso *per queste API*: un token preso per
-  un altro servizio dello stesso realm qui non vale. A metterci dentro l'audience giusta è un
-  protocol mapper del client =railway-webapp=;
-- =connection-delay= e =connection-retry-count= servono all'avvio: la Centrale parte insieme
-  a Keycloak e deve scaricare la configurazione del realm, quindi invece di morire riprova.
-
-La verifica vera è locale. Alla prima richiesta la Centrale scarica una volta sola le chiavi
-pubbliche del realm (endpoint JWKS, che trova da sè con la discovery su
-=.well-known/openid-configuration=) e da lì in poi controlla la firma RS256 in memoria, senza
-richiamare Keycloak a ogni chiamata. Ne discendono due conseguenze da saper spiegare: il
-costo di un controllo è quello di una verifica di firma, e se Keycloak si spegne *chi ha già
-un token continua a lavorare* fino alla scadenza, mentre chi deve entrare non può.
-
-*** Chi decide cosa: la divisione delle responsabilità
-
-È il punto da tenere separato in testa, perchè con Keycloak il filtro fa metà del lavoro che
-faceva prima:
-
-- che il token sia *valido* — firma, scadenza, emittente, audience — lo stabilisce
-  =quarkus-oidc=, prima ancora che la richiesta arrivi al filtro;
-- *chi può fare cosa* lo decide =FiltroAutorizzazione=, leggendo i ruoli dal token.
-
-Le regole di autorizzazione sono rimaste *identiche* a prima: letture a entrambi i ruoli, i
-tre comandi operativi (=/sopprimi=, =/risolvi=, =/manutenzione=) a entrambi, tutte le altre
-scritture al solo amministratore, le due GET dei nodi di campo aperte. È cambiata solo la
-fonte della verità: non più =sessioni.trova(token)= ma =identita.hasRole(...)=. In più c'è un
-controllo che prima non aveva senso: un utente di Keycloak che non abbia nessuno dei due ruoli
-del realm si prende un 403, perchè esiste come utente ma non è abilitato a questa
-applicazione.
-
-Il ruolo applicativo non si deduce più dalla colonna =Utenti.tipo=, che ormai non decide più
-niente: è il ruolo di realm che Keycloak ha scritto nel token.
-
-*** Lato web app: PKCE a mano e rinnovo automatico
-
-Il dialogo OIDC sta tutto in =src/api/keycloak.ts= ed è scritto con le API native del browser
-(=crypto.getRandomValues=, =crypto.subtle.digest('SHA-256')=, =btoa=): *nessuna dipendenza npm
-aggiunta*. Espone quattro funzioni — =avviaLogin=, =completaLogin=, =rinnovaToken=,
-=logoutKeycloak= — e controlla il parametro =state= al ritorno, che è la protezione contro il
-CSRF sul redirect.
-
-Tre dettagli che valgono la pena:
-
-- *il rinnovo automatico*. L'access token dura mezz'ora: senza rinnovo l'utente si vedrebbe
-  comparire dei 401 mentre sta lavorando sulla dashboard. =authStore= programma un timer che
-  scatta poco prima della scadenza, usa il refresh token e si riprogramma da solo;
-- *il ritorno dopo un F5*. =App.tsx= ha uno stato =sessionePronta=: finchè non si è finito di
-  controllare se esiste ancora una sessione valida, =ProtectedRoute= non decide. Senza,
-  un banale ricaricamento sbatterebbe fuori un utente ancora autenticato;
-- *il logout non è cancellare il token*. Passa dall'=end_session_endpoint= di Keycloak, che
-  chiude anche la sessione di Single Sign-On. Saltando quel passaggio l'utente si ritroverebbe
-  dentro al login successivo *senza che gli venga chiesta la password*, perchè per Keycloak
-  sarebbe ancora collegato.
-
-C'è anche una guardia con =useRef= dentro =LoginPage=: in sviluppo lo StrictMode di React
-monta i componenti due volte e il codice di autorizzazione è monouso, quindi senza guardia il
-secondo tentativo fallirebbe.
-
-Gli indirizzi non sono fissi nel codice: =VITE_KEYCLOAK_URL=, =VITE_KEYCLOAK_REALM= e
-=VITE_KEYCLOAK_CLIENT_ID= stanno nel =.env=, come già facevano quelli della Centrale.
-
-*** Un bug che è saltato fuori per strada: il CORS era spento
-
-Non c'entra con l'autenticazione, ma senza la correzione la web app non parlava proprio con la
-Centrale. All'avvio compariva:
-
-#+begin_example
-WARN: Unrecognized configuration key "quarkus.http.cors" was provided; it will be ignored
-#+end_example
-
-Su Quarkus 3.x la chiave giusta è =quarkus.http.cors.enabled=: scritta senza suffisso veniva
-*ignorata* e il filtro CORS restava spento. Il problema c'era già da prima, solo che finchè le
-prove si facevano con =curl= non si vedeva.
-
-*** Limiti dichiarati
-
-Li scrivo qui tutti insieme perchè sono le domande che mi aspetto:
-
-- *i token stanno nel =sessionStorage=* (muoiono con la scheda). È il compromesso standard per
-  una SPA senza backend dedicato, ma qualunque script iniettato nella pagina potrebbe
-  leggerli. La soluzione seria è il pattern /backend-for-frontend/, con i token custoditi da
-  un servizio server-side e un cookie =HttpOnly= verso il browser: sarebbe un altro
-  microservizio. Le mitigazioni scelte sono la durata breve del token e il fatto che la
-  password non sia mai in ballo;
-- *due anagrafiche da tenere allineate a mano*. Gli utenti stanno in Keycloak (credenziali e
-  ruoli) e nella tabella =Utenti= (nome, cognome, matricola, per le chiavi esterne dei
-  guasti). Il collante è la matricola e nessuno lo verifica: creando un utente dalla console
-  di Keycloak senza aggiungere la riga in =Utenti=, =/api/auth/me= risponde lo stesso (ci sono
-  dei fallback sui claim del token) ma restituisce come =id= la matricola invece di un
-  =id_utente= vero, e l'assegnazione di un guasto a quell'operatore fallirebbe sulla chiave
-  esterna. Non l'ho risolto perchè entrambe le strade hanno un costo: creare la riga al primo
-  accesso significa lasciare che il database si popoli da solo, rifiutare l'accesso a chi non
-  è in anagrafica significa che Keycloak da solo non basta più a dare accesso;
-- *filtro sui percorsi invece delle annotazioni*. Ho tenuto =FiltroAutorizzazione=, che
-  ragiona sui percorsi, invece di annotare ogni endpoint con =@RolesAllowed=, che è il modo
-  idiomatico in Quarkus. Il vantaggio è che le regole sono rimaste identiche e in un posto
-  solo; lo svantaggio è che è più fragile, perchè un endpoint nuovo finisce automaticamente
-  nella regola "solo amministratore" per esclusione e non per una dichiarazione esplicita
-  (per fortuna è il default sicuro, ma resta un default);
-- *l'audience obbligatoria dipende da un mapper*. Se si modifica il client dalla console e si
-  perde l'audience mapper, tutte le API rispondono 401 e la causa non è per niente ovvia;
-- *Keycloak gira in =start-dev= e senza volume*: HTTP in chiaro, database H2 interno, e
-  =docker-compose rm keycloak= riporta il realm a com'è nel file JSON. È voluto — il realm
-  resta riproducibile da git — ma quello che si configura a mano dalla console va riesportato
-  nel file, se no si perde;
-- *sotto il profilo TLS Keycloak resta in HTTP*. Con =-Dquarkus.profile=tls= la Centrale
-  espone HTTPS sulla 8444 e MQTT cifrato sulla 8883, ma il servizio di identità resta in
-  chiaro sulla 8180. Il flusso funziona lo stesso (sono redirect di prima parte, il browser
-  non li blocca), però la variante 6 adesso ha un buco che prima non aveva, visto che prima il
-  login viaggiava sullo stesso canale della Centrale. È il limite già dichiarato in RF04.3;
-- *i nodi di campo restano fuori*. =GET /api/prossima-stazione= e
-  =GET /api/treni/{id}/itinerario= sono ancora aperte: Treno e Stazione non fanno login, la
-  loro "autenticazione" è la validazione dell'ID via MQTT all'avvio (M2). Era già un limite
-  dichiarato, ma in un sistema che adesso è OAuth2 ovunque stona di più: la strada pulita
-  sarebbe un client =railway-edge= con grant =client_credentials=, cioè un service account per
-  i nodi di campo;
-- *la WebSocket =/ws/realtime= non è autenticata*: chiunque può collegarcisi e ricevere la
-  telemetria in broadcast. Era così anche prima, ma adesso è l'unica porta senza controllo.
-  Autenticare una WebSocket è scomodo perchè il browser non lascia mettere header sulla
-  handshake, quindi il token andrebbe passato in query string o nel sottoprotocollo;
-- *i test non provano la verifica della firma*. Con =@TestSecurity= e
-  =%test.quarkus.oidc.enabled=false= i test verificano le regole di ruolo, non la validazione
-  del JWT: quella l'ho provata a mano con =curl= (token contraffatto → 401). Un test con
-  Keycloak vero (Dev Services / Testcontainers) sarebbe più completo, ma legherebbe
-  =./mvnw test= alla presenza di Docker: ho preferito test che girano sempre.
 
 ** Diagrammi degli stati
 
@@ -1916,7 +1829,7 @@ end note
 **** T3 caricamento dell'itinerario
 - unica conversazione REST del treno verso la centrale: GET /api/treni/{id}/itinerario, con retry ogni 15s e ricarica completa quando l'operatore cambia la tratta
 - finche' l'itinerario manca il convoglio non si limita a non muoversi: si dichiara fermo (fase SENZA_ITINERARIO), se no continuerebbe a mandare telemetria da treno in marcia stando immobile
-- requisiti coperti: RF03.5 completo lato treno, il convoglio non conosce l'itinerario per conto proprio ma lo riceve dalla centrale, che ne resta l'unica depositaria; RF02.5.2 parzialmente, l'itinerario nuovo viene ripreso ma il viaggio si riavvia dalla prima tappa (viaggioAvviato torna false e avviaViaggio riparte da indiceStazione = 0), quindi il "prosegue dal punto in cui la modifica lo ha colto" non c'e'
+- requisiti coperti: RF03.5 completo lato treno, il convoglio non conosce l'itinerario per conto proprio ma lo riceve dalla centrale, che ne resta l'unica depositaria; RF02.5.2 completo, applicaItinerario() decide che cosa fare del percorso appena scaricato e riancora() rimette il convoglio nella stazione in cui si trova invece di far ripartire il viaggio dalla prima tappa; il 404 (convoglio sganciato) e' l'unico caso in cui l'itinerario in memoria viene buttato via
 #+begin_src  plantuml file: treno_03_macchina_caricamento_itinerario.png
 @startuml T3 - Caricamento dell'itinerario dalla Centrale
 ' =========================================================================
@@ -1961,13 +1874,26 @@ state "M10 - gateway REST della Centrale" as M10 <<esterna>>
 
 Senza --> Senza : T4 - tick da 1s\n[meno di 15s dall'ultimo tentativo] /\nnessuna chiamata
 Senza --> Richiesta : T4 - tick da 1s\n[15s passati] / GET verso la Centrale
-Richiesta --> Senza : Centrale irraggiungibile\noppure HTTP diverso da 200 /\nlog e nuovo tentativo tra 15s
+Richiesta --> Senza : Centrale irraggiungibile\noppure HTTP diverso da 200 e da 404 /\nlog e nuovo tentativo tra 15s
 Richiesta --> Senza : [meno di 2 tappe nella risposta] /\nitinerario scartato, nuovo tentativo
-Richiesta --> Caricato : HTTP 200 e almeno 2 tappe /\nitinerarioId, tappe e stazioniTratta\nscritti nel TrainDB
+Richiesta --> Senza : HTTP 404: nessun itinerario assegnato /\npercorso buttato via, viaggioAvviato = false,\nfase SENZA_ITINERARIO (T5)
+Richiesta --> Caricato : HTTP 200 e almeno 2 tappe /\napplicaItinerario(): scrive il TrainDB e,\nse il viaggio era gia' in corso, riancora()
+Richiesta --> Caricato : errore durante una ricarica /\nresto sul percorso che ho gia',\nnuovo tentativo fra 15s
 Richiesta -[dashed]-> M10 : GET /api/treni/{id}/itinerario
 
-Caricato --> Senza : T9 - alert ITINERARIO_AGGIORNATO /\nsvuota l'itinerario, viaggioAvviato = false,\nfase SENZA_ITINERARIO (T5), ricarica subito
+Caricato --> Richiesta : T9 - alert ITINERARIO_AGGIORNATO /\nricarica immediata; il percorso vecchio resta\nin uso finche' non arriva la risposta
 Caricato --> [*] : T4 - autostart /\navviaViaggio() alla prima tappa
+
+note right of Caricato
+  Il percorso vecchio non si butta via alla notifica ma solo davanti a
+  un 404, cioe' quando la Centrale dice che il convoglio non e' piu'
+  assegnato (RF02.5.1). Se lo si svuotasse subito il treno passerebbe
+  per SENZA_ITINERARIO anche quando un istante dopo arriva il percorso
+  nuovo, e la telemetria racconterebbe un convoglio fermo che fermo non
+  e'. Chi resta assegnato non ricomincia dal capolinea: riancora() lo
+  rimette nella stazione in cui si trova (RF02.5.2), e se era in mezzo
+  a una tratta il percorso nuovo aspetta l'arrivo.
+end note
 
 note right of Senza
   Senza itinerario il convoglio non si muove, ma non basta che il
@@ -2003,8 +1929,8 @@ end note
 #+end_src
 
 **** T4 tick del motore di viaggio
-- il battito da 1 secondo del digital twin: sette controlli in ordine di priorita', il primo che scatta chiude il giro (TrainJourneyEngine.tick)
-- requisiti coperti: nessuno per intero, e' l'orchestratore: RF02.5.1 parzialmente (lo stato SOPPRESSO porta la fase a TERMINATO) e RF02.1.2.2 parzialmente (l'EMERGENZA congela l'avanzamento, pero' congela il convoglio e non l'infrastruttura, quindi RF02.1.2.2.1 e RF02.1.2.2.2 restano scoperti)
+- il battito da 1 secondo del digital twin: sette controlli in ordine di priorita', il primo che scatta chiude il giro (TrainJourneyEngine.tick); l'unica eccezione e' la ricarica dell'itinerario, che e' un passo del giro e non un'uscita
+- requisiti coperti: nessuno per intero, e' l'orchestratore: RF02.5.1 parzialmente (lo stato SOPPRESSO porta la fase a TERMINATO), RF02.5.2 parzialmente (da qui parte la ricarica, e all'arrivo in stazione viene installato l'itinerario rimasto in attesa perche' il treno era a meta' tratta) e RF02.1.2.2 parzialmente (l'EMERGENZA congela l'avanzamento, pero' congela il convoglio e non l'infrastruttura, quindi RF02.1.2.2.1 e RF02.1.2.2.2 restano scoperti)
 #+begin_src  plantuml file: treno_04_macchina_tick_motore_viaggio.png
 @startuml T4 - Tick del motore di viaggio
 ' =========================================================================
@@ -2049,15 +1975,15 @@ state "T5 - fase del viaggio" as T5 <<esterna>>
 
 Attesa --> Tick : ogni 1s
 
-Tick --> Attesa : 1. [ricarica richiesta da T9] /\nsvuota l'itinerario, azzera il viaggio\ne si dichiara fermo (T5, T6)
-Tick --> Attesa : 2. [treno non ancora riconosciuto\noppure ID vuoto] / nessuna azione
+Tick --> Attesa : 1. [treno non ancora riconosciuto\noppure ID vuoto] / nessuna azione
+Tick --> Tick : 2. [ricarica richiesta da T9] /\nriscarica subito l'itinerario (T3) senza buttare\nvia quello in uso, poi il giro prosegue
 Tick --> Attesa : 3. [itinerario vuoto] /\nsi dichiara fermo (T5, T6)\ne tenta il caricamento
 Tick --> Attesa : 4. [viaggio non ancora avviato] /\navviaViaggio() se autostart
 Tick --> Attesa : 5. [stato SOPPRESSO] /\nvelocita' 0 e fase TERMINATO
 Tick --> Attesa : 6. [stato EMERGENZA] /\ncongela l'avanzamento della tratta
 Tick --> Attesa : 7. altrimenti /\nesegue la fase corrente
 
-Tick -[dashed]-> T3 : casi 1 e 3
+Tick -[dashed]-> T3 : casi 2 e 3
 Tick -[dashed]-> T5 : caso 7
 
 note right of Tick
@@ -2067,7 +1993,11 @@ note right of Tick
   indietro, e un'emergenza congela il viaggio senza dover
   toccare la fase in cui il convoglio si trovava.
 
-  I casi 1 e 3 non escono in silenzio: chiamano
+  Il caso 2 e' l'unico che non esce: chiede il percorso nuovo e
+  lascia proseguire il giro, perche' finche' la Centrale non
+  risponde il treno continua a viaggiare su quello che ha.
+
+  Il caso 3 non esce in silenzio: chiama
   fermaPerMancanzaItinerario(), che mette il convoglio in uno
   stato coerente con il fatto che un percorso non ce l'ha.
   Uscire senza toccare niente lasciava il convoglio a
@@ -2142,8 +2072,10 @@ state "TERMINATO\nil tick non fa piu' nulla" as TERMINATO
 
 IN_STAZIONE --> IN_VIAGGIO : sosta scaduta, stato FERMO e\nnessuna stazione guasta in rotta /\npubblica USCITA, avvia il cronometro
 IN_VIAGGIO --> IN_STAZIONE : progressPercent >= 100 /\npubblica ENTRATA, avanza l'indice (T7),\nrinnova i passeggeri
+IN_VIAGGIO --> IN_STAZIONE : progressPercent >= 100\n[itinerario nuovo in attesa] /\npubblica ENTRATA e riancora() qui\nsul percorso modificato a caldo
 
-IN_STAZIONE --> SENZA : T4 - itinerario vuoto oppure\nricarica richiesta da T9 /\nvelocita' 0, stato FERMO (T6),\nprossima stazione azzerata
+IN_STAZIONE --> IN_STAZIONE : T3 - itinerario modificato a caldo /\nriancora(): stessa stazione, indice, direzione e\nprossima fermata ricalcolati, sosta riaperta
+IN_STAZIONE --> SENZA : T4 - itinerario vuoto oppure\nHTTP 404 alla ricarica (convoglio sganciato) /\nvelocita' 0, stato FERMO (T6),\nprossima stazione azzerata
 IN_VIAGGIO --> SENZA : T4 - stessa cosa in mezzo a una tratta
 BLOCCATO --> SENZA : T4 - stessa cosa mentre e' trattenuto
 SENZA --> SENZA : T3 - GET dell'itinerario fallita /\nnuovo tentativo fra 15 secondi
@@ -2444,8 +2376,8 @@ end note
 #+end_src
 
 **** T9 alert in ingresso dalla centrale
-- il treno in ascolto su railway/alerts: soppressioni, guasti delle stazioni, ripristini e itinerari aggiornati (TrainGateway.riceviAlert)
-- requisiti coperti: RF02.5.1 completo lato treno (lo STOP con il mio target), RF02.1.1.2.1, RF02.1.1.2.2 e RF02.2.1.1 parzialmente (decide il blocco e lo sblocco, che poi esegue T5), RF02.1.2 parzialmente (dal RESOLVED si esce dall'emergenza), RF02.5.2 parzialmente (qui arriva solo l'avviso, la ricarica e' T3)
+- il treno in ascolto su railway/alerts: soppressioni, guasti delle stazioni, ripristini, itinerari aggiornati e il ritardo che la Centrale gli comunica (TrainGateway.riceviAlert)
+- requisiti coperti: RF02.5.1 completo lato treno (lo STOP con il mio target), RF02.1.1.2.1, RF02.1.1.2.2 e RF02.2.1.1 parzialmente (decide il blocco e lo sblocco, che poi esegue T5), RF02.1.2 parzialmente (dal RESOLVED si esce dall'emergenza), RF02.5.2 parzialmente (qui arriva solo l'avviso, la ricarica e' T3); e' anche il punto in cui si chiude la richiesta della consegna di un convoglio capace di ricevere "guasti o ritardi", perche' il ramo RITARDO e' la seconda meta'
 #+begin_src  plantuml file: treno_09_macchina_alert_in_ingresso.png
 @startuml T9 - Alert in ingresso dalla Centrale
 ' =========================================================================
@@ -2488,6 +2420,7 @@ state "Stazione dichiarata guasta" as GuastoStazione
 state "Ripristino di una stazione" as ResolvedStazione
 state "Rientro dall'emergenza" as ResolvedTreno
 state "Itinerario da ricaricare" as Itinerario
+state "Ritardo comunicato" as Ritardo
 
 Ascolto --> Classificazione : messaggio ricevuto
 Classificazione --> Ascolto : [payload non interpretabile]\noppure [evento non gestito] /\nlog, ack
@@ -2496,6 +2429,7 @@ Classificazione --> GuastoStazione : [GUASTO, sorgenteTipo STAZIONE,\nseverita' 
 Classificazione --> ResolvedStazione : [RESOLVED, sorgenteTipo STAZIONE] /\nstazione tolta dalle guaste (T11)
 Classificazione --> ResolvedTreno : [RESOLVED, sorgenteTipo TRENO,\nsorgenteId = il mio ID] /\nse ero in EMERGENZA torno FERMO (T6)
 Classificazione --> Itinerario : [ITINERARIO_AGGIORNATO\ncon target = il mio ID] /\nrichiesta di ricarica (T3)
+Classificazione --> Ritardo : [RITARDO con target = il mio ID] /\nminuti, stazione e ora della misura\ncopiati a bordo
 
 GuastoStazione --> Ascolto : [e' la corrente o la prossima] /\nblocco immediato (T5), ack
 GuastoStazione --> Ascolto : [stazione fuori rotta] /\nsolo memorizzata, ack
@@ -2504,6 +2438,7 @@ ResolvedStazione --> Ascolto : [non mi bloccava] / ack
 Stop --> Ascolto : / ack
 ResolvedTreno --> Ascolto : / ack
 Itinerario --> Ascolto : / ack
+Ritardo --> Ascolto : / ack
 
 note right of Classificazione
   Il filtro tiene solo i guasti CRITICAL: un allarme WARNING non
@@ -2519,6 +2454,15 @@ note bottom of Ascolto
   reagisce solo a sorgenteTipo STAZIONE, quindi i propri passano
   senza effetto. Il target, invece, e' l'unica cosa che distingue
   una soppressione destinata a me da quella di un altro convoglio.
+end note
+
+note left of Ritardo
+  Il ritardo il convoglio non lo calcola: lo riceve. L'orario di
+  servizio ce l'ha la Centrale, che e' anche l'unica a sapere quando
+  il treno DOVEVA passare, quindi il numero nasce li' e arriva qui
+  gia' fatto. A bordo non decide niente, finisce solo nello stato
+  del twin e nelle sue REST: e' l'informazione che un display di
+  bordo mostra ai passeggeri.
 end note
 
 note left of ResolvedTreno
@@ -2794,9 +2738,11 @@ Dominio -[dotted]-> VersoCentrale : lo stato viaggia dentro\nogni heartbeat
 DalCampo -[dotted]-> S4 : ogni evento passa dal\ncontrollo di connettivita'
 
 note bottom of Dominio
-  Il nodo di campo tiene in RAM pochissimo stato: se e' guasto
-  o no, chi sta sui binari e quali eventi non sono ancora
-  partiti. Tutto il resto vive sulla Centrale.
+  Il nodo di campo tiene pochissimo stato: se e' guasto o no,
+  chi sta sui binari e quali eventi non sono ancora partiti.
+  Tutto il resto vive sulla Centrale. Quel poco pero' e' anche
+  scritto su un SQLite locale, perche' e' l'unico posto al
+  mondo dove esiste finche' non viene consegnato.
 end note
 
 note right of S1
@@ -2891,9 +2837,10 @@ note bottom of Operativo
   Il main non fa lavoro utile, tiene solo vivo il processo.
   Le sei macchine girano in parallelo sui thread dei connettori
   reattivi, dello scheduler e delle richieste HTTP, e comunicano
-  solo attraverso il DBLocale in RAM. Il buffer degli eventi non
-  inviati sta anch'esso in RAM: un riavvio lo perde (nel codice
-  e' annotato lo spostamento su SQLite come lavoro futuro).
+  solo attraverso il DBLocale. La RAM e' la copia di lavoro, non
+  l'originale: stato, treni presenti e coda degli eventi non
+  inviati sono scritti anche su un SQLite locale, quindi un
+  riavvio del nodo non se li porta via.
 end note
 
 @enduml
@@ -3205,10 +3152,11 @@ note bottom of InCoda
 end note
 
 note left of Generato
-  La coda vive in RAM: un riavvio del nodo perde gli eventi non
-  ancora consegnati. Nel codice e' segnato come lavoro futuro il
-  passaggio a un SQLite locale, che renderebbe il caching
-  resistente anche a una caduta di alimentazione della stazione.
+  La coda vive in RAM ma ogni evento viene scritto anche sulla
+  tabella bufferChache di un SQLite locale, e cancellato solo
+  dopo che l'invio e' andato a buon fine. Il caching regge cosi'
+  anche a una caduta di alimentazione della stazione: al riavvio
+  la coda si rilegge da disco nello stesso ordine di prima.
 end note
 
 @enduml
@@ -3471,7 +3419,7 @@ end note
 
 **** S9 alert in ingresso dalla centrale
 - la stazione in ascolto su railway/alerts: la riguardano solo il ripristino e l'invio della squadra, tutto il resto del topic condiviso viene scartato
-- requisiti coperti: RF02.1.1.2.2 parzialmente, la stazione da sola non si ripara: torna percorribile solo con il RESOLVED deciso dalla centrale in M10; RF01.4.1 parzialmente lato campo, perche' e' qui che arriva l'invio della squadra di manutenzione
+- requisiti coperti: RF02.1.1.2.2 parzialmente, la stazione da sola non si ripara: torna percorribile solo con il RESOLVED deciso dalla centrale in M10; RF01.4.1 lato campo, perche' e' qui che arriva l'invio della squadra di manutenzione: il nodo lo registra e basta, il suo stato locale resta GUASTA ed e' quello che continua a trattenere i treni per tutta la durata dell'intervento
 #+begin_src  plantuml file: stazione_09_macchina_alert_in_ingresso.png
 @startuml S9 - Alert in ingresso dalla Centrale
 ' =========================================================================
@@ -3618,7 +3566,7 @@ end note
 
 **** S11 presenza di un treno sui binari
 - macchina di entita': la fotografia dei treni fermi sui binari, quella che risponde alla GET /stazione/treni
-- requisiti coperti: RF02.3.1 completo lato nodo (quali convogli ci sono sui binari in questo momento, con l'ora di entrata e di uscita) e RF01.1.3 parzialmente, e' la fotografia in ram che risponde alla GET /stazione/treni
+- requisiti coperti: RF02.3.1 completo lato nodo (quali convogli ci sono sui binari in questo momento, con l'ora di entrata e di uscita) e RF01.1.3 parzialmente, e' la fotografia che risponde alla GET /stazione/treni, tenuta in RAM e rispecchiata sulla tabella Treno del db locale
 #+begin_src  plantuml file: stazione_11_macchina_presenza_treno.png
 @startuml S11 - Presenza di un treno sui binari
 ' =========================================================================
@@ -4386,14 +4334,21 @@ note bottom of Risolto
 end note
 
 note left of Aperto
-  Gli stati disegnati sono due, non tre: RF02.1.3 chiede un ciclo
-  "aperto -> preso in carico -> chiuso", ma l'entita' Guasto ha solo
-  il booleano "risolto", quindi la presa in carico non esiste come
-  stato a se'. Nemmeno l'assegnatario e' realizzato: la colonna
-  OperatoreCheSeNeStaOccupandoFK e la tabella
-  Storico_Assegnazioni_Guasti esistono nello schema, ma il campo
-  Guasto.operatore non viene mai valorizzato e quella tabella non
-  viene mai scritta. Chi chiude un allarme non lascia traccia di se'.
+  Gli stati disegnati qui sono due, non tre, perche' l'entita' Guasto
+  porta il solo booleano "risolto". Il terzo stato del ciclo di
+  RF02.1.3, "preso in carico", non e' pero' assente dal sistema: e'
+  la stazione che passa in MANUTENZIONE quando la squadra viene
+  inviata (M12), e finche' quello stato dura il guasto e' aperto ed
+  e' in lavorazione. Si e' scelto di derivarlo invece di duplicarlo:
+  guasto aperto piu' stazione sorgente in MANUTENZIONE significa
+  preso in carico, e cosi' lo stesso fatto non viene scritto in due
+  tabelle che possono contraddirsi.
+  Resta fuori l'assegnatario: la colonna OperatoreCheSeNeStaOccupandoFK
+  e la tabella Storico_Assegnazioni_Guasti esistono nello schema, ma
+  il campo Guasto.operatore non viene mai valorizzato e quella tabella
+  non viene mai scritta, quindi chi chiude un allarme non lascia
+  traccia di se'. E' l'unico pezzo scoperto, e la consegna non lo
+  chiede.
 end note
 
 @enduml
@@ -4650,7 +4605,7 @@ end note
 
 **** M10 gateway rest, crud e comandi operativi
 - ciclo di vita di una richiesta gia' autorizzata: letture, crud, comandi e notifiche verso il campo (RestApiGateway)
-- requisiti coperti: RF01.3 completo insieme a M9, RF01.5 completo per le letture dello storico, RF03.5 completo lato centrale perche' e' da qui che l'itinerario viene servito ai convogli, RF02.5.1 completo e RF02.5.2 parzialmente (da qui partono STOP e ITINERARIO_AGGIORNATO, ma il punto da cui si riprende lo decide il treno in T3), RF01.3.5 parzialmente perche' l'integrita' alle eliminazioni e' affidata ai vincoli del db. I tre comandi operativi sono tutti e tre solo parziali: RF01.4.1 perche' lo stato MANUTENZIONE dura quanto la chiamata (vedi la nota sotto e M12), RF01.4.2 perche' la chiusura dell'allarme c'e' ma non la presa in carico, che non registra nessun operatore (M7), RF01.4.3 perche' la precondizione "convoglio fermo in stazione" non viene verificata
+- requisiti coperti: RF01.3 completo insieme a M9, RF01.5 completo per le letture dello storico, RF03.5 completo lato centrale perche' e' da qui che l'itinerario viene servito ai convogli, RF02.5.1 completo e RF02.5.2 parzialmente (da qui partono STOP e ITINERARIO_AGGIORNATO, ma il punto da cui si riprende lo decide il treno in T3), RF01.3.5 parzialmente perche' l'integrita' alle eliminazioni e' affidata ai vincoli del db. Dei tre comandi operativi i due che riguardano il guasto sono completi: RF01.4.1 apre l'intervento e lo stato MANUTENZIONE dura fino alla chiusura (vedi la nota sotto e M12), RF01.4.2 lo chiude e sblocca chi era trattenuto (M7). Resta parziale RF01.4.3, perche' la precondizione "convoglio fermo in stazione" non viene verificata
 #+begin_src  plantuml file: 10_macchina_gateway_rest.png
 @startuml M10 - Gateway REST, CRUD e comandi operativi
 ' =========================================================================
@@ -4707,15 +4662,15 @@ note right of Comando
                    cache, STOP su railway/alerts
     risolvi        chiude il guasto (M7), riporta la stazione
                    ONLINE, RESOLVED su railway/alerts
-    manutenzione   MAINTENANCE_DISPATCHED, chiude tutti i
-                   guasti aperti della stazione, poi ONLINE
+    manutenzione   MAINTENANCE_DISPATCHED, stazione in
+                   MANUTENZIONE, guasti lasciati aperti
 
   Nessuno dei tre registra CHI lo ha impartito: l'identita' serve
   al filtro di M9 per decidere se lasciar passare, ma non viene
-  scritta da nessuna parte. Per questo la "presa in carico" di
-  RF01.4.2 non e' realizzata (M7), e "sopprimi" non controlla la
-  precondizione di RF01.4.3: sopprime il convoglio in qualunque
-  posizione si trovi, anche a meta' tratta.
+  scritta da nessuna parte. E' l'assegnatario che manca a RF02.1.3,
+  e la consegna non lo chiede. Resta invece scoperto che "sopprimi"
+  non controlla la precondizione di RF01.4.3: sopprime il convoglio
+  in qualunque posizione si trovi, anche a meta' tratta.
 end note
 
 note bottom of Scrittura
@@ -4883,18 +4838,18 @@ MANUTENZIONE --> ONLINE : fine del comando /\nchiude tutti i guasti aperti della
 OFFLINE --> [*] : M10 - stazione eliminata\n[409 se referenziata da tratte]
 
 note right of MANUTENZIONE
-  Dura quanto la chiamata REST: il comando lo imposta, avvisa il
-  campo, chiude i guasti e rimette subito ONLINE, tutto dentro
-  dispacciaManutenzione(). Serve pero' come stato protetto, perche'
-  il watchdog salta le stazioni in manutenzione e non le porta a
-  OFFLINE.
-  Da tenere presente quando si legge RF01.4.1: siccome nel mezzo non
-  parte nessun broadcast, questo stato non arriva mai al browser e la
-  stazione non risulta MAI "in manutenzione" nelle schermate. Il
-  frontend calcola operatorsDispatched come stato == MANUTENZIONE,
-  quindi quella spia resta di fatto sempre spenta. Per farlo vedere
-  davvero il ritorno a ONLINE andrebbe staccato dal comando e legato
-  alla fine effettiva dell'intervento.
+  Ci si entra con dispacciaManutenzione(), che imposta lo stato,
+  lo storicizza e avvisa il campo; il guasto pero' resta aperto,
+  quindi si esce di qui solo con la chiusura dell'allarme. E' lo
+  stato che dura l'intervento: sulla stazione vale "guasta piu'
+  squadra inviata", cioe' e' il "preso in carico" del guasto visto
+  dal lato del nodo.
+  E' anche uno stato protetto: il watchdog salta le stazioni in
+  manutenzione e non le porta a OFFLINE, e l'heartbeat della
+  stazione non lo riscrive - durante l'intervento il battito
+  aggiorna il solo istante di ultimo contatto. Senza quest'ultima
+  accortezza il primo battito, che dal campo arriva ancora come
+  GUASTA, cancellerebbe la manutenzione appena aperta.
 end note
 
 note bottom of OFFLINE
@@ -5030,8 +4985,8 @@ scritto (RF02.2.4). Dove i due giudizi divergono vale quello scritto accanto al 
 | RF01.2.2     |             | M6, M8, M11  | M6 è la porta del segnalato, M8 quella del dedotto, ma le due origini finiscono nello stesso tipo e l'elenco non le separa |
 | RF01.3       | M9, M10     |              | M9 decide chi può, M10 esegue                                                 |
 | RF01.3.5     |             | M10          | l'integrità alle eliminazioni la tengono i vincoli del db, non una macchina   |
-| RF01.4.1     |             | M10, M12, S9 | il comando parte da M10, il nodo lo riceve in S9 e M11 ne annuncia il cambio di stato, ma MANUTENZIONE dura quanto la chiamata: l'evento parte, lo stato no |
-| RF01.4.2     |             | M10, M7, T9, S9 | la chiusura c'è e il ripristino sblocca chi era trattenuto; la presa in carico no, nessun operatore viene registrato |
+| RF01.4.1     | M10, M12, S9 |            | il comando parte da M10, il nodo lo riceve in S9 e M11 ne annuncia il cambio di stato; MANUTENZIONE dura fino alla chiusura del guasto |
+| RF01.4.2     | M10, M7, T9, S9 |         | la chiusura sblocca chi era trattenuto e chiude in storico l'intervallo aperto da RF01.4.1; chi l'ha chiuso non viene registrato, ma non e' richiesto |
 | RF01.4.3     |             | M10, T6, T9  | l'effetto c'è, la precondizione "fermo in stazione" non viene verificata      |
 | RF01.5       | M10, M5     |              | M5 scrive lo storico, M10 lo serve alla dashboard                             |
 | RF01.6       | M9          |              |                                                                               |
@@ -5059,7 +5014,7 @@ scritto (RF02.2.4). Dove i due giudizi divergono vale quello scritto accanto al 
 | RF02.4.1     | T2, S2, M2  | T1, S1       | i due lati della stessa conversazione MQTT                                    |
 | RF02.4.2     | T1, S1      |              | il nodo non riconosciuto termina con codice 1, non resta acceso               |
 | RF02.5.1     | T9, T5, M10 | T4, T6       | la fase SENZA_ITINERARIO e' il "resta fermo in attesa": senza di essa il convoglio escluso continuava a dichiararsi in marcia |
-| RF02.5.2     |             | T3, T9, M10  | l'itinerario nuovo arriva, ma il viaggio riparte dalla prima tappa            |
+| RF02.5.2     | T3          | T4, T9, M10  | il convoglio si riaggancia nella stazione in cui si trova; a meta' tratta il percorso nuovo aspetta l'arrivo |
 | RF02.6.1     | M8          | S3, M12      |                                                                               |
 | RF02.6.2     | M8          |              |                                                                               |
 | RF02.6.3     | M8          | M11          | M8 scatta la fotografia, M11 la porta al browser                              |
@@ -6603,7 +6558,7 @@ end note
 *** SQ12 store and forward durante l'interruzione del collegamento
 - mentre il collegamento e' giu' non si tenta nemmeno l'invio: l'evento va dritto in coda, insieme al nome del canale su cui andra' rimandato
 - il punto vero e' il rientro in testa: se il reinvio fallisce a meta' svuotamento l'evento torna davanti a tutti, perche' rimetterlo in fondo lo renderebbe il piu' recente e la centrale riceverebbe una uscita prima della relativa entrata
-- il buffer sta in RAM: sopravvive alla caduta del collegamento, non a quella del processo
+- il buffer sta in RAM ma ha una copia su SQLite: sopravvive sia alla caduta del collegamento sia a quella del processo, e la riga sul disco viene cancellata solo dopo che l'invio e' riuscito
 - requisiti coperti: RF02.1.1.1.1 e RF02.1.1.1.2 completi, RF03.1 parzialmente per l'autonomia del nodo
 #+begin_src  plantuml file: sq_12_store_and_forward.png
 @startuml SQ12 - Store and forward della stazione
@@ -6724,10 +6679,11 @@ end
 deactivate SGW
 
 note over BUF, ING
-  Il buffer sta in RAM (ArrayDeque in un bean ApplicationScoped): sopravvive
-  alla caduta del collegamento, non a quella del processo. Per resistere anche
-  a un blackout del nodo servirebbe un SQLite locale, ed e' scritto come
-  limite noto nella parte di critica delle scelte progettuali.
+  L'ArrayDeque del bean ApplicationScoped e' solo la copia di lavoro: ogni
+  evento e' scritto anche sulla tabella bufferChache di un SQLite locale, e
+  la riga viene tolta solo dopo che l'emitter ha accettato il payload. Cosi'
+  il buffer regge sia alla caduta del collegamento sia a quella del processo,
+  e nemmeno un blackout nel mezzo dello svuotamento riesce a perdere un evento.
 end note
 
 @enduml
@@ -6791,7 +6747,7 @@ box "Web App" #F8F9FA
 end box
 
 box "Identity Provider" #FCE8E6
-    participant "Keycloak\nrealm railway :8180" as IDP
+    participant "Keycloak\nrealm railway :8543 https" as IDP
 end box
 
 box "Centrale Operativa" #F8F9FA
@@ -6957,7 +6913,7 @@ end note
 - in entrambi i casi il cronometro dell'heartbeat riparte: senza, una stazione rimessa operativa a mano ma in realta' ancora spenta resterebbe operativa per sempre
 - il filtro sul tipo di sorgente serve perche' l'identificativo da solo non e' univoco fra convogli e stazioni
 - di tutti e due i comandi si vede l'effetto ma non l'autore: nessuno dei due scrive chi lo ha impartito
-- requisiti coperti: RF01.4.1 parzialmente (il comando parte e il campo viene avvisato, ma lo stato MANUTENZIONE non sopravvive alla chiamata, vedi M12), RF01.4.2 parzialmente (la chiusura c'e', la presa in carico no), RF02.1.3 parzialmente per la sola chiusura del ciclo di vita del guasto
+- requisiti coperti: RF01.4.1 completo (il comando porta la stazione in MANUTENZIONE, lo storicizza e avvisa il campo, e lo stato dura fino alla chiusura del guasto, vedi M12), RF01.4.2 completo (la chiusura sblocca chi era trattenuto e chiude in storico l'intervallo aperto dal comando precedente), RF02.1.3 parzialmente: il ciclo di vita del guasto si apre e si chiude, e l'intervallo di lavorazione e' leggibile come MANUTENZIONE sulla stazione, ma l'assegnatario non viene mai registrato
 #+begin_src  plantuml file: sq_14_comandi_ripristino.png
 @startuml SQ14 - Comandi di ripristino dell'operatore
 ' =========================================================================
@@ -7020,37 +6976,36 @@ activate REST
 
 alt stazione non in cache
     REST --> API : 404
-else stazione trovata
-    REST -> CACHE : stato = "MANUTENZIONE"
-    REST -> BROKER : {"tipoEvento":"MAINTENANCE_DISPATCHED",\n"sorgenteId","timestamp"}
-    BROKER -> SGW : riceviAlert -> log "operatori in arrivo"
-
+else nessun guasto aperto sulla stazione
     REST -> PG : repository.guastiApertiDi(id, "STAZIONE")
     activate PG
-    PG --> REST : guasti ancora aperti
+    PG --> REST : nessuno
     deactivate PG
+    REST --> API : 409
     note right of REST
-      Il filtro su sorgenteTipo serve perche' sorgenteId da solo non
-      e' univoco: un convoglio con lo stesso identificativo di una
-      stazione si vedrebbe chiudere i propri guasti insieme ai suoi.
+      La squadra si manda dove c'e' davvero un guasto: e' la
+      precondizione di RF01.4.1. Il filtro su sorgenteTipo serve
+      perche' sorgenteId da solo non e' univoco: un convoglio con lo
+      stesso identificativo di una stazione farebbe passare il
+      controllo al posto suo.
     end note
-
-    loop per ogni guasto aperto
-        REST -> REST : chiudiGuasto(guasto)
-        REST -> PG : risolto = true, ts_risoluzione = now\nStoricoGuasto.tsChiusura = now
-        REST -> CACHE : risolviGuasto(id)
-        REST -> BROKER : pubblicaResolved\n{"tipoEvento":"RESOLVED","sorgenteTipo","sorgenteId",\n"guastoId","timestamp"}
-    end
-
-    REST -> CACHE : stato = "ONLINE", ultimoHeartbeat = now
-    REST -> PG : StoricoStatoStazione(funzionanteONo = true)
-    REST --> API : 200 stazione aggiornata
+else stazione guasta
+    REST -> CACHE : stato = "MANUTENZIONE"
+    REST -> API : broadcastStatoStazione (websocket)
+    REST -> PG : StoricoStatoStazione(MANUTENZIONE <- statoPrima)
+    REST -> BROKER : {"tipoEvento":"MAINTENANCE_DISPATCHED",\n"sorgenteId","timestamp"}
+    BROKER -> SGW : riceviAlert -> log "operatori in arrivo"\ndbLocale.stato resta GUASTA
+    REST --> API : 200 stazione in manutenzione
     note right of CACHE
-      MANUTENZIONE e ONLINE vengono scritti nella stessa chiamata e
-      senza nessun broadcast in mezzo: dal browser il passaggio non si
-      vede, la stazione risulta operativa subito. RF01.4.1 chiede che
-      "la stazione risulti in MANUTENZIONE": qui e' vero solo per la
-      durata del metodo. Vedi la nota di M12.
+      Il comando finisce qui: i guasti restano aperti e la stazione
+      resta in MANUTENZIONE finche' il tecnico non chiude l'allarme
+      (== Chiusura dell'allarme ==, piu' sotto). E' l'intervallo che
+      RF01.4.1 chiede di rendere osservabile, ed e' il "preso in
+      carico" del guasto visto dal lato della stazione.
+      Il nodo non cambia il proprio stato: resta GUASTA, ed e' quello
+      che continua a trattenere i treni in ingresso (SQ08). Anche il
+      suo heartbeat, che arriva ancora come GUASTA, durante
+      l'intervento non riscrive lo stato in centrale.
     end note
 end
 deactivate REST
@@ -7097,10 +7052,11 @@ note over USER, PG
   al filtro per decidere se il comando puo' passare, poi l'identita' non
   viene piu' guardata: ne' risolviAllarme ne' dispacciaManutenzione
   scrivono Guasto.operatore o una riga in Storico_Assegnazioni_Guasti.
-  Percio' questo diagramma copre "chiusura dell'allarme" ma non "presa
-  in carico": a guasto chiuso non si puo' piu' sapere chi lo ha chiuso
-  ne' quando lo aveva preso in carico, che e' meta' di RF01.4.2 e
-  l'assegnatario di RF02.1.3.
+  La presa in carico come intervallo c'e' ed e' lo stato MANUTENZIONE;
+  quello che manca e' l'assegnatario, cioe' QUALE operatore se ne sia
+  occupato. E' l'unico pezzo di RF02.1.3 rimasto scoperto, e la
+  consegna non lo chiede: vuole che gli operatori siano inviati e che
+  il guasto sia ripristinato, non il registro di chi ci ha messo mano.
 end note
 
 @enduml
@@ -7241,9 +7197,9 @@ end note
 *** SQ16 modifica dell'itinerario a sistema acceso
 - gli identificativi dei convogli assegnati vanno letti prima di riassegnare: chi viene sganciato non risulterebbe piu' da nessuna query e non riceverebbe mai la notifica, continuando a girare sul percorso vecchio
 - vengono avvisati sia i convogli esclusi sia quelli appena agganciati
-- chi resta assegnato riparte dalla prima stazione del percorso nuovo, non da dove si trovava; chi e' stato escluso resta senza itinerario e riprova ogni 15 secondi
+- chi resta assegnato si riaggancia al percorso nuovo nella stazione in cui si trova, e se era fra due stazioni lo fa appena arriva alla successiva; chi e' stato escluso resta senza itinerario e riprova ogni 15 secondi
 - il tempo di percorrenza di una tratta condivisa con altri itinerari non viene toccato, se no si cambierebbero di nascosto anche gli altri percorsi
-- requisiti coperti: RF02.5.1 completo e RF01.3.4 per la composizione dell'itinerario. RF02.5.2 *non* e' coperto: la notifica arriva a chi resta assegnato, ma la ripresa "dal punto in cui la modifica lo ha colto" non c'e', il viaggio riparte dal capolinea (vedi la nota finale, T3 e T4). E' lo stesso limite gia' segnato nella tabella di riepilogo delle macchine a stati
+- requisiti coperti: RF02.5.1 completo e RF01.3.4 per la composizione dell'itinerario. RF02.5.2 e' coperto per la parte di centrale, che avvisa tutti i convogli coinvolti; il punto da cui si riprende lo decide il treno (T3, T4 e la nota finale)
 #+begin_src  plantuml file: sq_16_itinerario_a_caldo.png
 @startuml SQ16 - Modifica dell'itinerario a sistema acceso
 ' =========================================================================
@@ -7364,26 +7320,30 @@ deactivate TGW
 
 ENG -> ENG : al tick successivo
 activate ENG
-ENG -> TDB : itinerario = lista vuota, itinerarioId = null,\nviaggioAvviato = false, retry azzerato
-ENG -> ENG : tentaCaricamentoItinerario() -> SQ03
+ENG -> ENG : tentaCaricamentoItinerario() -> SQ03\n(l'itinerario vecchio resta in uso finche' non arriva la risposta)
+alt fermo in stazione
+    ENG -> TDB : applicaItinerario() -> riancora():\nindiceStazione della stazione in cui si trova,\ndirezione e prossima fermata ricalcolate, sosta riaperta
+else in mezzo a una tratta
+    ENG -> ENG : itinerario nuovo tenuto in attesa,\ninstallato all'arrivo in stazione
+end
 deactivate ENG
 
 note over ENG, TDB
   Il convoglio escluso resta senza itinerario: la GET risponde 404 e
-  il motore riprova ogni 15 secondi finche' l'amministratore non gliene
-  assegna un altro. Quello ancora assegnato riparte invece dalla prima
-  stazione del percorso nuovo, non da dove si trovava.
+  solo allora il motore butta via il percorso che ha in memoria, si
+  dichiara fermo e riprova ogni 15 secondi finche' l'amministratore non
+  gliene assegna un altro.
 end note
 
 note over ENG, TDB
-  E' il punto in cui RF02.5.2 non viene soddisfatto. Il requisito chiede
-  che chi resta assegnato prosegua dal punto in cui la modifica lo ha
-  colto, senza salti di posizione; qui avviaViaggio() riparte da capo,
-  con indiceStazione a 0, direzione "andata", progressPercent a 0 e il
-  convoglio riposizionato sul primo capolinea. Del viaggio precedente
-  sopravvive solo ritardoMinuti. Il "caso limite" della specifica -
-  ripartire dal capolinea quando la stazione di provenienza non fa piu'
-  parte del percorso - e' in realta' l'unico caso realizzato.
+  E' il punto in cui viene soddisfatto RF02.5.2. Chi resta assegnato non
+  ricomincia da capo: la stazione in cui il treno si trova viene cercata
+  nella lista nuova e il viaggio riprende da li', conservando ritardo,
+  passeggeri e stato. Un convoglio fra due stazioni non si teletrasporta,
+  quindi finisce la tratta sul percorso vecchio e cambia all'arrivo.
+  Resta il "caso limite" della specifica: se quella stazione non fa piu'
+  parte del percorso non c'e' nessun punto a cui agganciarsi e si riparte
+  dal capolinea.
 end note
 
 @enduml
@@ -7732,8 +7692,8 @@ nel capitolo /Specifica/: qui si dice quale conversazione lo mostra, non se il s
 | RF01.3.3     | SQ17       |              |                                                                               |
 | RF01.3.4     | SQ16       | SQ17         | comporre l'itinerario e assegnarci i convogli e' la stessa chiamata            |
 | RF01.3.5     |            | SQ17         | i rifiuti si vedono qui, ma l'integrita' la tengono anche i vincoli del db     |
-| RF01.4.1     |            | SQ14         | il comando parte e il campo viene avvisato, ma MANUTENZIONE non sopravvive alla chiamata |
-| RF01.4.2     |            | SQ14, SQ08   | chiuso il guasto il ripristino sblocca chi era trattenuto, ma chi lo ha chiuso non viene registrato |
+| RF01.4.1     | SQ14       |              | il comando parte, il campo viene avvisato e MANUTENZIONE resta finche' il guasto non viene chiuso |
+| RF01.4.2     | SQ14, SQ08 |              | chiuso il guasto il ripristino sblocca chi era trattenuto; chi lo ha chiuso non viene registrato, ma non e' richiesto |
 | RF01.4.3     |            | SQ15         | l'effetto c'e', la precondizione "fermo in stazione" non viene verificata      |
 | RF01.5       | SQ06       | SQ18         | SQ06 scrive lo storico dei transiti, SQ18 lo porta a schermo                   |
 | RF01.6       | SQ13       |              |                                                                               |
@@ -7762,7 +7722,7 @@ nel capitolo /Specifica/: qui si dice quale conversazione lo mostra, non se il s
 | RF02.4.2     | SQ01, SQ02 |              | l'esito negativo e' l'uscita del processo, non un avviso                       |
 | RF02.4.3     | SQ01, SQ02 | SQ03         | senza centrale non si entra in servizio e non si carica l'itinerario           |
 | RF02.5.1     | SQ16       |              |                                                                               |
-| RF02.5.2     |            | SQ16, SQ03   | il convoglio ancora assegnato ricarica passando da SQ03, ma riparte dal capolinea invece che da dove si trovava |
+| RF02.5.2     | SQ16, SQ03 |              | il convoglio ancora assegnato ricarica passando da SQ03 e si riaggancia dove si trova; a meta' tratta il cambio scatta all'arrivo |
 | RF02.6.1     | SQ10       |              |                                                                               |
 | RF02.6.2     | SQ11       |              |                                                                               |
 | RF02.6.3     | SQ18       |              |                                                                               |
@@ -7778,9 +7738,13 @@ nel capitolo /Specifica/: qui si dice quale conversazione lo mostra, non se il s
 
 ** Diagrammi delle classi
 
-Sei diagrammi e una mappa: =C1= il nodo Treno, =C2= il nodo Stazione, la mappa della Centrale che
-tiene insieme =C3=, =C4= e =C5=, e =C6= la Web App. Le entita' JPA non hanno un diagramma a se':
-stanno nel capitolo /Modello/.
+Sette diagrammi e una mappa: =C1= il nodo Treno, =C2= il nodo Stazione, la mappa della Centrale che
+tiene insieme =C3=, =C4a=, =C4b= e =C5=, e =C6= la Web App. Le entita' JPA non hanno un diagramma a
+se': stanno nel capitolo /Modello/.
+
+La Centrale e' l'unica componente che non sta in un diagramma solo, e le sue quattro figure si
+dividono cosi': =C3= e' la faccia verso l'operatore, =C4a= la porta MQTT verso il campo, =C4b= i
+servizi che decidono, =C5= il piano della persistenza sotto a tutti.
 
 *Legenda degli archi.* Sono quelli di UML e in tutto il capitolo ne compaiono sei:
 
@@ -7963,7 +7927,10 @@ Sensori ..> TrainIngestion : POST su localhost:8082\n(non chiama i bean)
 note right of TrainDB
   Non e' un database: e' un singleton in RAM. Un riavvio del
   processo azzera tutto, itinerario compreso, che infatti viene
-  riscaricato dalla Centrale.
+  riscaricato dalla Centrale. E' la scelta opposta a quella
+  fatta sulla stazione (DBLocale su SQLite), e il motivo e' che
+  qui non si perde nessun dato: il treno non produce niente che
+  non sappia gia' la Centrale.
   stazioniGuaste e' un Set concorrente perche' lo scrive il thread
   MQTT e lo legge il tick del motore.
 end note
@@ -7989,19 +7956,20 @@ end note
 
 *** Il componente Stazione (C2)
 
-- requisiti coperti: RF02.1.1.1.1 e RF02.1.1.1.2 per la struttura che regge il caching, RF03.1 parzialmente per l'autonomia del nodo
+- requisiti coperti: RF02.1.1.1.1 e RF02.1.1.1.2 per la struttura che regge il caching, RF03.1 per l'autonomia del nodo (con PersistenzaLocale il nodo si ricostruisce da solo anche dopo un riavvio, senza chiedere niente alla Centrale)
 #+begin_src  plantuml file: classi_02_stazione.png
 @startuml C2 - Classi del componente Stazione
 ' =========================================================================
 '  DIAGRAMMA DELLE CLASSI C2 - modulo Stazioni (Quarkus, una istanza per stazione)
 '
 '  Sorgenti: Stazioni/src/main/java/it/uni/reti2/
-'    main.java, DBLocale.java, LocalBuffer.java, StationGateway.java,
-'    HeartbeatGenerator.java, HeartbeatKA.java, StationIngestion.java,
-'    StationDatabaseValidator.java, SecureHttpClient.java
+'    main.java, DBLocale.java, LocalBuffer.java, PersistenzaLocale.java,
+'    StationGateway.java, HeartbeatGenerator.java, HeartbeatKA.java,
+'    StationIngestion.java, StationDatabaseValidator.java, SecureHttpClient.java
 '
-'  E' l'unico componente con una interfaccia dichiarata (HeartbeatKA) e
-'  l'unico con una coda di persistenza temporanea (LocalBuffer).
+'  E' l'unico componente con una interfaccia dichiarata (HeartbeatKA), l'unico
+'  con una coda di persistenza temporanea (LocalBuffer) e l'unico nodo di campo
+'  con un database locale su file (PersistenzaLocale, SQLite).
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -8018,6 +7986,10 @@ skinparam class<<stato>> {
 skinparam class<<canale>> {
     BackgroundColor #FCE8E6
     BorderColor #C5221F
+}
+skinparam class<<persistenza>> {
+    BackgroundColor #F3E8FD
+    BorderColor #8430CE
 }
 skinparam interface {
     BackgroundColor #FFF3E0
@@ -8039,27 +8011,72 @@ class main <<QuarkusMain>> {
 
 class DBLocale <<ApplicationScoped>> <<stato>> {
   + stazioneId : String
-  + stato : String
   + stazioneRiconosciuta : boolean
   + connessioneCentrale : boolean
-  + treniPresenti : Map<String, Instant>
   + sensoriUltimoBattito : Map<String, Instant>
+  - stato : volatile String
+  - inizioUltimoFault : volatile Instant
+  - fineUltimoFault : volatile Instant
+  - treniPresenti : Map<String, Instant>
+  ~ ripristinaDaDisco() : void
+  + getStato() : String
+  + setStato(nuovoStato : String) : void
+  + registraEntrataTreno(trenoId : String) : void
+  + registraUscitaTreno(trenoId : String) : void
+  + getTreniPresenti() : Map<String, Instant>
 }
 
 class LocalBuffer <<ApplicationScoped>> <<stato>> {
   - bufferEventi : Deque<EventoBufferizzato>
+  - prossimoId : long
+  ~ ripristinaDaDisco() : void
   + add(canale : String, payload : String) : void
-  + addFirst(canale : String, payload : String) : void
+  + add(canale, payload, idGuasto : Long, idTreno : String) : void
+  + addFirst(evento : EventoBufferizzato) : void
   + poll() : EventoBufferizzato
+  + confermaInvio(evento : EventoBufferizzato) : void
   + isEmpty() : boolean
   + size() : int
   + getBuffer() : List<EventoBufferizzato>
 }
 
 class EventoBufferizzato <<record>> {
+  + idEvento : long
   + canale : String
   + payload : String
+  + idGuasto : Long
+  + idTreno : String
 }
+
+class PersistenzaLocale <<ApplicationScoped>> <<persistenza>> {
+  + percorsoDb : String
+  + abilitata : boolean
+  - connessione : Connection
+  - attiva : volatile boolean
+  ~ apri() : void
+  ~ chiudi() : void
+  - impostaPragma() : void
+  - creaSchema() : void
+  + salvaStato(stazioneId, stato, inizioFault, fineFault) : void
+  + leggiStato(stazioneId : String) : StatoPersistito
+  + registraEntrataTreno(trenoId : String, quando : Instant) : void
+  + registraUscitaTreno(trenoId : String, quando : Instant) : void
+  + leggiTreniPresenti() : Map<String, Instant>
+  + registraGuasto(tipo, descrizione, quando) : long
+  + risolviGuastiAperti(quando : Instant) : void
+  + contaGuastiAperti() : int
+  + salvaEventoBuffer(evento : EventoBufferizzato) : void
+  + rimuoviEventoBuffer(idEvento : long) : void
+  + leggiBuffer() : List<EventoBufferizzato>
+}
+
+class StatoPersistito <<record>> {
+  + stato : String
+  + inizioUltimoFault : Instant
+  + fineUltimoFault : Instant
+}
+
+entity "stazione-{id}.db\nil file SQLite del nodo" as FileDb <<persistenza>>
 
 interface HeartbeatKA {
   + generatePayload(stazioneId : String, stato : String, bufferSize : int) : String
@@ -8079,8 +8096,9 @@ class StationGateway <<ApplicationScoped>> <<canale>> {
   + riceviPassaggio(message) : CompletionStage<Void>
   + inviaGuasto(descrizione : String) : void
   + inviaGuasto(descrizione : String, severita : String) : void
+  + inviaGuasto(descrizione, severita, tipoGuasto : String) : void
   + inviaTransito(trenoId : String, tipo : String) : void
-  - inviaOppureBufferizza(canale : String, payload : String, emitter) : void
+  - inviaOppureBufferizza(canale, payload, emitter, idGuasto, idTreno) : void
   + flush() : void
 }
 
@@ -8108,6 +8126,7 @@ class StationIngestion <<@Path("/stazione")>> {
   + reteOffline() : Response
   + reteOnline() : Response
   + getTreniPresenti() : Response
+  + getPersistenza() : Response
 }
 
 class SecureHttpClient <<ApplicationScoped>> {
@@ -8116,6 +8135,7 @@ class SecureHttpClient <<ApplicationScoped>> {
 
 HeartbeatGenerator ..|> HeartbeatKA
 LocalBuffer +-- EventoBufferizzato
+PersistenzaLocale +-- StatoPersistito
 StationDatabaseValidator +-- EsitoVerifica
 
 main --> DBLocale : imposta stazioneId
@@ -8127,10 +8147,16 @@ HeartbeatGenerator --> StationGateway : flush() e inviaGuasto()\nper i sensori s
 
 StationGateway --> DBLocale
 StationGateway --> LocalBuffer : accoda e svuota
+StationGateway --> PersistenzaLocale : annota i guasti locali
 StationIngestion --> DBLocale
 StationIngestion --> LocalBuffer : ispezione diagnostica
 StationIngestion --> StationGateway
+StationIngestion --> PersistenzaLocale : GET /stazione/persistenza
 StationDatabaseValidator --> DBLocale : stazioneRiconosciuta
+
+DBLocale --> PersistenzaLocale : scrive stato e treni,\nrilegge all'avvio
+LocalBuffer --> PersistenzaLocale : rispecchia la coda
+PersistenzaLocale --> FileDb : JDBC (org.xerial:sqlite-jdbc)
 
 note right of LocalBuffer
   Deque e non Queue: serve poter rimettere un evento IN TESTA
@@ -8149,9 +8175,20 @@ note bottom of HeartbeatGenerator
 end note
 
 note bottom of DBLocale
-  Anche qui e' RAM, non un database: sopravvive alla caduta del
-  collegamento ma non a quella del processo. Un SQLite locale
-  sarebbe il passo successivo, ed e' scritto fra i limiti noti.
+  La RAM e' la copia di lavoro, il file SQLite e' la copia buona:
+  ogni scrittura va su tutte e due (write-through) e il
+  @PostConstruct rilegge il disco all'avvio. I campi pubblici
+  rimasti sono quelli volatili di proposito, che al riavvio si
+  ricalcolano invece di rileggersi: la connessione MQTT, la
+  validazione dell'ID e i keepalive dei sensori.
+end note
+
+note right of PersistenzaLocale
+  Driver JDBC liscio, non un datasource Quarkus: una connessione
+  sola su un file, metodi tutti synchronized perche' la toccano
+  i thread MQTT, lo scheduler e le richieste REST.
+  Non deve mai poter fermare la stazione: se il file non si apre
+  logga, mette attiva a false e il nodo lavora in RAM come prima.
 end note
 
 @enduml
@@ -8161,41 +8198,52 @@ end note
 #+RESULTS:
 [[file:/tmp/babel-vRTivD/plantuml-FNfkR2.png]]
 
-*** Il componente Centrale: mappa dei due diagrammi
+*** Il componente Centrale: mappa delle tre viste
 
-- requisiti coperti: nessuno in proprio, e' l'indice dei due diagrammi che seguono
+- requisiti coperti: nessuno in proprio, e' l'indice dei tre diagrammi che seguono
+- il confine fra C4a e C4b e' quello fra chi sa di MQTT e chi sa di ferrovia, ed e' la cosa che questa mappa serve soprattutto a far vedere
 #+begin_src  plantuml file: classi_mappa_centrale.png
 @startuml CC - Mappa dei diagrammi della centrale
+skinparam linetype ortho
 ' =========================================================================
 '  MAPPA DEI DIAGRAMMI DELLA CENTRALE
 '
 '  Questo non e' un diagramma delle classi e non ha nessuna semantica UML:
-'  e' un grafo e basta. I nodi sono le due viste in cui e' spezzata la sola
+'  e' un grafo e basta. I nodi sono le tre viste in cui e' spezzata la sola
 '  componente che non sta in un diagramma solo e le classi che ci stanno
-'  dentro; gli archi sono chi legge e chi scrive.
+'  dentro; gli archi sono chi chiama chi.
 '
-'    C3  verso l'operatore   REST, autorizzazione, WebSocket
-'    C4  verso il campo        ingestione MQTT, cache di rete, watchdog
+'    C3   verso l'operatore   REST, autorizzazione, uscita verso il browser
+'    C4a  la porta MQTT       i cinque consumatori e i messaggi tipizzati
+'    C4b  i servizi di dominio le regole, la cache di rete, il watchdog
+'
+'  Fra C4a e C4b corre un confine che vale la pena vedere: sopra si sa di
+'  protocollo e non si sa di ferrovia, sotto si sa di ferrovia e non si sa
+'  da dove la notizia sia arrivata. E' per questo che sono due figure e non
+'  due meta' della stessa.
 '
 '  Il riquadro dentro il riquadro dice "questa classe sta in quella vista",
-'  l'arco dice "l'altra vista la usa": gli unici tre archi disegnati sono
+'  l'arco dice "l'altra vista la usa": gli unici archi disegnati sono
 '  quelli che attraversano davvero il confine, quelli interni a una vista
 '  si guardano nel diagramma relativo.
 '
-'  I tre archi fra le due viste sono verificati sul codice
-'  (ServeCentraleOperativa):
-'    RestApiGateway.statoRete            -> TrafficLogicEngine
-'    IngestionService.webSocket          -> RealtimeWebSocket
-'    FaultMonitor.webSocket              -> RealtimeWebSocket
-'  e sono gli unici: nessun'altra classe di un lato ne inietta una
-'  dell'altro.
+'  Gli archi fra le viste sono verificati sul codice (ServeCentraleOperativa):
+'    IngestionService.treni / .stazioni / .transiti / .guasti -> i servizi
+'    RestApiGateway.statoRete       -> TrafficLogicEngine
+'    RestApiGateway.guasti / .treni / .stazioni -> i servizi di dominio
+'    RestApiGateway.pubblicatore    -> PubblicatoreAlert
+'    i cinque servizi e il FaultMonitor -> NotificatoreRealtime
+'  e sono gli unici: nessun'altra classe di una vista ne inietta una
+'  di un'altra.
 '
-'  Sotto tutte e due c'e' pero' una terza cosa in comune, il
-'  RailwayRepository (C5). Lo iniettano sette classi: cinque di C4
-'  (IngestionService, FaultMonitor, i due validatori e il
-'  TrafficLogicEngine, che pero' lo usa solo all'avvio) e due di C3
-'  (RestApiGateway e AuthController). Non sta in nessuna delle due viste
-'  perche' non e' di nessuna delle due: e' il piano di sotto.
+'  Sotto tutte c'e' pero' una cosa in comune, il RailwayRepository (C5). Lo
+'  iniettano undici classi: sette di C4b (i cinque servizi, PrevisioneArrivi
+'  e il TrafficLogicEngine, che pero' lo usa solo all'avvio), due di C4a (i
+'  validatori) e due di C3 (RestApiGateway e AuthController). Non lo
+'  iniettano ne' l'adapter MQTT ne' il watchdog: uno legge messaggi, l'altro
+'  guarda l'orologio, e il database non lo tocca nessuno dei due. Il
+'  repository non sta in nessuna vista perche' non e' di nessuna: e' il
+'  piano di sotto.
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -8209,6 +8257,10 @@ skinparam rectangle {
 skinparam rectangle<<vista>> {
     BackgroundColor #D2E3FC
     BorderColor #174EA6
+}
+skinparam rectangle<<porta>> {
+    BackgroundColor #F1F3F4
+    BorderColor #5F6368
 }
 skinparam rectangle<<campo>> {
     BackgroundColor #E6F4EA
@@ -8233,62 +8285,86 @@ skinparam note {
 
 hide stereotype
 
-title Il componente Centrale - come stanno insieme le due viste\nogni riquadro grande rimanda al diagramma delle classi che lo sviluppa
+title Il componente Centrale - come stanno insieme le tre viste\nogni riquadro grande rimanda al diagramma delle classi che lo sviluppa
 
 rectangle "C3 - verso l'operatore\n<size:11>l'operatore entra da qui: HTTP e WebSocket</size>" as C3 <<vista>> {
     rectangle "FiltroAutorizzazione\n<size:11>@Provider JAX-RS: passa di qui ogni</size>\n<size:11>richiesta, prima dell'endpoint</size>" as FILTRO <<classe>>
     rectangle "AuthController\n<size:11>/api/auth/me: il profilo ricostruito</size>\n<size:11>dai claim del token</size>" as AUTH <<classe>>
-    rectangle "RestApiGateway\n<size:11>tutti gli endpoint /api con i DTO annidati,</size>\n<size:11>e i comandi che escono su MQTT alerts-out</size>" as GATEWAY <<classe>>
-    rectangle "RealtimeWebSocket\n<size:11>/ws/realtime, di sola andata:</size>\n<size:11>la sola uscita verso il browser</size>" as WS <<incontro>>
+    rectangle "RestApiGateway\n<size:11>tutti gli endpoint /api con i DTO annidati;</size>\n<size:11>valida, sceglie il codice HTTP e delega</size>" as GATEWAY <<classe>>
+    rectangle "NotificatoreRealtime\n<size:11>l'unico che sa com'e' fatto un evento</size>\n<size:11>per il browser: TELEMETRY, ALERT, SNAPSHOT...</size>" as NOTIF <<incontro>>
+    rectangle "RealtimeWebSocket\n<size:11>/ws/realtime, di sola andata:</size>\n<size:11>la sola uscita verso il browser</size>" as WS <<classe>>
 }
 
-rectangle "C4 - verso il campo\n<size:11>il campo entra da qui: cinque topic MQTT</size>" as C4 <<campo>> {
-    rectangle "IngestionService\n<size:11>i cinque consumatori MQTT e le scritture</size>\n<size:11>su PostgreSQL, storico compreso</size>" as INGEST <<classe>>
+rectangle "C4a - la porta MQTT\n<size:11>il campo entra da qui: cinque topic</size>" as C4A <<porta>> {
+    rectangle "IngestionService\n<size:11>i cinque consumatori e basta: legge</size>\n<size:11>i byte e chiama chi di dovere</size>" as INGEST <<classe>>
+    rectangle "i cinque messaggi + Payload\n<size:11>TelemetriaMsg, HeartbeatMsg, TransitoMsg,</size>\n<size:11>PassaggioMsg, AlertMsg: da qui in giu'</size>\n<size:11>nessuno vede piu' un JsonNode</size>" as MSG <<classe>>
+    rectangle "ExistIdForEdge\nExistIdForEdgeStazione\n<size:11>validano l'id del nodo</size>\n<size:11>che si accende</size>" as VALID <<classe>>
+}
+
+rectangle "C4b - i servizi di dominio\n<size:11>qui si sa di ferrovia e non si sa piu' da dove</size>\n<size:11>la notizia sia arrivata</size>" as C4B <<campo>> {
+    rectangle "i cinque servizi\n<size:11>MonitoraggioTreni, MonitoraggioStazioni,</size>\n<size:11>TransitiService, GuastiService,</size>\n<size:11>NavigazioneItinerario (+ PrevisioneArrivi)</size>" as SERVIZI <<classe>>
+    rectangle "PubblicatoreAlert\n<size:11>l'unica bocca verso railway/alerts,</size>\n<size:11>usata anche dai comandi REST</size>" as PUB <<classe>>
     rectangle "FaultMonitor\n<size:11>i tre job da 10 s: heartbeat perso,</size>\n<size:11>treni fermi, fotografia periodica</size>" as WATCHDOG <<classe>>
-    rectangle "ExistIdForEdge\n<size:11>valida l'id del convoglio</size>\n<size:11>che si accende</size>" as EXIST <<classe>>
-    rectangle "ExistIdForEdgeStazione\n<size:11>valida l'id della stazione</size>\n<size:11>che si accende</size>" as EXISTST <<classe>>
     rectangle "TrafficLogicEngine\n<size:11>la cache di rete tenuta in RAM:</size>\n<size:11>treni, stazioni, guasti attivi</size>" as CACHE <<incontro>>
 }
 
-rectangle "C5 - la persistenza\n<size:11>non e' una vista: sta sotto tutte e due</size>" as C5 <<persistenza>> {
+rectangle "C5 - la persistenza\n<size:11>non e' una vista: sta sotto tutte</size>" as C5 <<persistenza>> {
     rectangle "RailwayRepository\n<size:11>46 metodi, l'unico punto della Centrale</size>\n<size:11>che parla con PostgreSQL. Nessuna</size>\n<size:11>transazione propria: gira in quella</size>\n<size:11>di chi lo chiama</size>" as REPO <<classe>>
 }
 
-' archi invisibili: servono solo a mandare le classi su due righe,
-' se no le cinque di C4 si mettono in fila e la figura viene lunga
-' il doppio della pagina
+' archi invisibili: servono solo a mandare le classi su piu' righe,
+' se no ogni vista si mette in fila e la figura viene lunga il doppio
+' della pagina
 FILTRO -[hidden]down- GATEWAY
-AUTH -[hidden]down- WS
-INGEST -[hidden]down- EXIST
-WATCHDOG -[hidden]down- EXISTST
+AUTH -[hidden]down- NOTIF
+NOTIF -[hidden]down- WS
+INGEST -[hidden]down- MSG
+MSG -[hidden]down- VALID
+SERVIZI -[hidden]down- PUB
+PUB -[hidden]down- WATCHDOG
+
+INGEST --> SERVIZI : ogni messaggio tipizzato\nfinisce a chi lo sa registrare
 
 GATEWAY --> CACHE : la legge a ogni GET e la riscrive\nquando l'operatore tocca l'anagrafica
-INGEST --> WS : gli eventi appena\narrivano dal campo
-WATCHDOG --> WS : lo SNAPSHOT\nogni 10 s
+GATEWAY --> SERVIZI : risolvi un allarme, sopprimi una corsa,\nmanda la squadra: le regole stanno di la'
+GATEWAY --> PUB : STOP e ITINERARIO_AGGIORNATO\nquando l'anagrafica cambia
+
+SERVIZI --> NOTIF : ogni notizia che\nil browser deve vedere
+WATCHDOG --> NOTIF : lo SNAPSHOT\nogni 10 s
 
 C3 --> C5 : gli endpoint leggono\ne scrivono solo da qui
-C4 --> C5 : scritture del campo, validazione\ndegli id, riempimento della cache
+C4A --> C5 : la validazione\ndegli id
+C4B --> C5 : scritture del campo\ne riempimento della cache
 
 note as CONFINE
-  Il confine fra C3 e C4 non e' una chiamata di servizio: sul piano delle
-  due viste i lati si incontrano su questi due oggetti e nient'altro, e
-  ognuno dei due sta in casa dell'altro. E' per questo che sono due
-  diagrammi distinti e non due meta' dello stesso.
+  Le viste si incontrano su due oggetti soli: la cache di rete, che sta in
+  casa di C4b e la legge C3, e il notificatore, che sta in casa di C3 e lo
+  chiama C4b. Ognuno dei due sta in casa dell'altro, ed e' per questo che
+  sono diagrammi distinti e non meta' dello stesso.
+
+  Fra C4a e C4b il confine e' di un altro tipo, e va in una direzione sola:
+  i messaggi scendono, non risalgono. Si riconosce da una regola semplice:
+  se una classe nomina un topic o un JsonNode sta sopra, se nomina un treno
+  o un guasto sta sotto.
+
+  L'arco da C3 ai servizi dice che i comandi operativi non tengono la
+  propria logica dentro l'endpoint: il RestApiGateway chiama i servizi come
+  li chiama l'ingestione. Chiudere un guasto vuol dire la stessa cosa che lo
+  chieda un operatore dalla dashboard o che lo dichiari rientrato una
+  stazione, e se le due strade non passassero di li' sarebbe scritto due
+  volte.
 
   Il RailwayRepository e' un incontro di natura diversa: non sta in casa di
-  nessuno dei due, sta sotto tutti e due, ed e' per questo che ha un
-  riquadro suo. Da quando c'e' lui, AuthController e i due validatori non
-  interrogano piu' le entita' JPA per conto loro: erano proprio le tre
-  classi che in questa mappa restavano senza nessun arco.
+  nessuna vista, sta sotto tutte, ed e' per questo che ha un riquadro suo.
 end note
 CONFINE .. C3
 
 legend bottom
   |= elemento |= significato |
   | riquadro grande | una vista, cioe' un diagramma delle classi a se' |
-  | riquadro bianco | una classe di quella vista |
-  | riquadro rosso | la classe su cui le due viste si incontrano, disegnata in casa di chi la possiede |
-  | riquadro giallo | il piano di sotto: non e' di nessuna delle due viste, ma le serve tutte e due |
+  | riquadro bianco | una classe di quella vista, o un gruppo di classi omogenee |
+  | riquadro rosso | le due classi su cui le viste si incontrano, disegnate in casa di chi le possiede |
+  | riquadro giallo | il piano di sotto: non e' di nessuna vista, ma le serve tutte |
   | freccia | l'altra vista la usa: e' un arco che attraversa il confine |
 end legend
 
@@ -8297,7 +8373,7 @@ end legend
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-D7O87v/plantuml-5rVhjy.png]]
+[[file:/tmp/babel-H10Rt9/plantuml-8tVVea.png]]
 
 *** Il componente Centrale: verso l'operatore (C3)
 - e' la faccia HTTP e websocket della centrale: ogni richiesta attraversa prima il filtro di autorizzazione, che e' un provider JAX-RS e non un controllo sparso negli endpoint
@@ -8309,10 +8385,19 @@ end legend
 '
 '  Sorgenti: ServeCentraleOperativa/src/main/java/it/uni/reti2/gateway/
 '    RestApiGateway.java, AuthController.java, FiltroAutorizzazione.java,
-'    RealtimeWebSocket.java
+'    RealtimeWebSocket.java, NotificatoreRealtime.java
 '
 '  E' la faccia HTTP e WebSocket della Centrale: tutto cio' che l'operatore
 '  puo' chiedere passa da qui, e ogni richiesta attraversa prima il filtro.
+'
+'  Da questa vista sono uscite due cose che non c'entravano con l'HTTP. La
+'  formattazione degli eventi per il browser sta adesso nel
+'  NotificatoreRealtime, che e' qui dentro perche' il vocabolario del
+'  frontend e' materia di questo lato; i tre comandi operativi
+'  (risolvi, sopprimi, manutenzione) sono scesi nei servizi di dominio di
+'  C4b, perche' le stesse regole servono identiche quando a chiudere un
+'  guasto e' il campo invece dell'operatore. Qui restano la validazione,
+'  il codice HTTP e la forma della risposta.
 '
 '  Con il passaggio a Keycloak SessioniAttive e' stata cancellata: la
 '  Centrale non tiene piu' nessun registro di sessioni, l'identita' gliela
@@ -8418,14 +8503,11 @@ class RestApiGateway <<@Path("/api")>> {
   .. supporto privato ..
   - creaTrenoSuDb(nome, dto) : EsitoScritturaTreno
   - aggiornaTrenoSuDb(id, dto) : EsitoScritturaTreno
+  - verificaTratteEsistenti(stazioni : List<String>) : Response
   - componiItinerario(itinerario, stazioni, travelTimes) : Response
   - assegnaTreni(itinerario, treniIds, sganciaAssenti) : void
-  - chiudiGuasto(guasto : Guasto) : void
-  - pubblicaResolved(guasto : Guasto) : void
-  - pubblicaItinerarioAggiornato(trenoId : String) : void
   - trattaToDto(it : Itinerario) : Map
-  - normalizzaStatoTreno(stato) : String
-  - normalizzaStatoStazione(stato) : String
+  - tipoAllarmePerFrontend(g : Guasto) : String
 }
 
 class StazioneDTO <<dto>> {
@@ -8459,6 +8541,22 @@ class EsitoScritturaTreno <<dto>> {
   ~ itinerarioCambiato : boolean
 }
 
+class NotificatoreRealtime <<ApplicationScoped>> {
+  .. treni ..
+  + telemetria(payloadDalCampo : JsonNode, treno : Treno) : void
+  + statoTreno(treno : Treno) : void
+  .. stazioni ..
+  + heartbeat(payloadDalCampo : JsonNode, stazione : Stazione) : void
+  + statoStazione(stazione : Stazione) : void
+  .. transiti, allarmi, fotografia ..
+  + transito(payloadDalCampo, msg : TransitoMsg, treno : Treno) : void
+  + allarme(guasto : Guasto) : void
+  + snapshot(kpi : Map, treni : List, stazioni : List) : void
+  .. traduzioni verso il vocabolario del browser ..
+  - scriviPrevisione(evento : ObjectNode, treno : Treno) : void
+  - statoPerFrontend(stato : String) : String
+}
+
 class RealtimeWebSocket <<@ServerEndpoint("/ws/realtime")>> {
   - sessions : Set<Session>
   + onOpen(session : Session) : void
@@ -8485,10 +8583,13 @@ OIDC ..> FiltroAutorizzazione : arriva qui solo\nse il token e' valido
 FiltroAutorizzazione ..> RestApiGateway : lascia passare\no rifiuta 401/403
 FiltroAutorizzazione ..> AuthController : /api/auth/me\ncome ogni altra rotta protetta
 
-RestApiGateway ..> "TrafficLogicEngine\n(C4)" : legge e aggiorna la cache
+RestApiGateway ..> "TrafficLogicEngine\n(C4b)" : legge e aggiorna la cache
 RestApiGateway --> "RailwayRepository\n<size:11>(C5)</size>" : ogni lettura e ogni scrittura\nsul database, dentro la\ntransazione dell'endpoint
-RestApiGateway ..> "Emitter alerts-out" : STOP, RESOLVED,\nMAINTENANCE_DISPATCHED,\nITINERARIO_AGGIORNATO
-RealtimeWebSocket <.. "IngestionService\ne FaultMonitor (C4)" : broadcast
+RestApiGateway --> "GuastiService, MonitoraggioTreni,\nMonitoraggioStazioni (C4b)" : i tre comandi operativi:\nqui resta il codice HTTP,\nla decisione sta di la'
+RestApiGateway --> "PubblicatoreAlert\n(C4b)" : STOP e ITINERARIO_AGGIORNATO\nquando l'anagrafica cambia
+RestApiGateway --> NotificatoreRealtime : i cambi di stato decisi\ndall'amministratore
+NotificatoreRealtime --> RealtimeWebSocket : l'unico che ci scrive
+NotificatoreRealtime <.. "i servizi di dominio\ne il watchdog (C4b)" : ogni notizia che il\nbrowser deve vedere
 
 note right of EsitoScritturaTreno
   Esiste per un motivo preciso: permette di chiudere la transazione
@@ -8525,28 +8626,246 @@ end note
 
 #+end_src
 
-*** Il componente Centrale: verso il campo (C4)
-- requisiti coperti: RF02.6.1, RF02.6.2 e RF02.6.3 per le anomalie dedotte, RF02.7 parzialmente per la scrittura della memoria storica
-#+begin_src  plantuml file: classi_04_centrale_ingestione.png
-@startuml C4 - Classi della Centrale verso il campo
+*** Il componente Centrale: verso il campo, la porta MQTT (C4a)
+- e' tutto cio' che la Centrale sa di MQTT, e finisce qui: l'adapter legge i byte, li trasforma in un messaggio con un nome e chiama chi di dovere, poi da C4b in giu' nessuno vede piu' un topic
+- requisiti coperti: RF03.3 per i due consumatori distinti dello stesso fatto fisico, RF02.4 per la validazione degli id dei nodi che si accendono
+#+begin_src  plantuml file: classi_04a_centrale_porta_mqtt.png
+@startuml C4a - Classi della Centrale verso il campo - la porta MQTT
 ' =========================================================================
-'  DIAGRAMMA DELLE CLASSI C4 - Centrale Operativa, lato MQTT
+'  DIAGRAMMA DELLE CLASSI C4a - Centrale Operativa, la porta MQTT
 '
 '  Sorgenti: ServeCentraleOperativa/src/main/java/it/uni/reti2/
 '    ingestion/IngestionService.java
-'    elaboration/TrafficLogicEngine.java
-'    elaboration/FaultMonitor.java
+'    ingestion/payload/  (i cinque messaggi + Payload)
+'    entity/StatiCanonici.java
 '    DbValidator/ExistIdForEdge.java, DbValidator/ExistIdForEdgeStazione.java
 '
-'  Qui entrano tutti i messaggi del campo e da qui esce tutto cio' che la
-'  Centrale decide per conto suo. Il TrafficLogicEngine e' la sola cosa
-'  che questo lato condivide con il lato REST (C3).
+'  Questa vista e' tutto cio' che la Centrale sa di MQTT, e finisce qui: da
+'  C4b in giu' nessuno tocca piu' un topic, un byte o un JsonNode.
 '
-'  Le cinque classi di questa vista non toccano piu' il database da se':
-'  le query stanno nel RailwayRepository (C5). Qui restano la decisione di
-'  che cosa scrivere e il confine della transazione, che per l'ingestione
-'  e per il watchdog e' QuarkusTransaction.requiringNew() chiamato dentro
-'  il try.
+'  Il confine fra le due meta' e' quello che il riordino ha creato ed e' il
+'  motivo per cui sono due figure e non una: sopra si sa di protocollo e non
+'  si sa di ferrovia, sotto si sa di ferrovia e non si sa da dove sia
+'  arrivata la notizia. Prima le due cose stavano nella stessa classe da
+'  1292 righe, e infatti non c'era nessun confine da disegnare.
+'
+'  I quattro riquadri con il rimando (C4b) sono i servizi di dominio: qui
+'  compaiono solo come destinatari, la loro vita si guarda nell'altra vista.
+' =========================================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam class {
+    BackgroundColor #E8F0FE
+    BorderColor #1A73E8
+    FontColor #202124
+    ArrowColor #5F6368
+}
+skinparam class<<canale>> {
+    BackgroundColor #FCE8E6
+    BorderColor #C5221F
+}
+skinparam class<<messaggio>> {
+    BackgroundColor #F1F3F4
+    BorderColor #9AA0A6
+}
+skinparam package {
+    BackgroundColor #FEFEFE
+    BorderColor #9AA0A6
+}
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+}
+hide empty members
+
+title C4a - Centrale Operativa: la porta MQTT, i messaggi e la validazione degli id
+
+class IngestionService <<ApplicationScoped>> <<canale>> {
+  .. i cinque consumatori (@Incoming, @Blocking) ..
+  + onTelemetry(message) : CompletionStage<Void>
+  + onHeartbeat(message) : CompletionStage<Void>
+  + onTransit(message) : CompletionStage<Void>
+  + onPassaggio(message) : CompletionStage<Void>
+  + onAlert(message) : CompletionStage<Void>
+}
+
+package "ingestion.payload" as MSG {
+  class TelemetriaMsg <<record>> <<messaggio>> {
+    + trenoId, stato, direzione : String
+    + latitudine, longitudine : double
+    + velocita, progresso : double
+    + passeggeri : int
+    + {static} da(root : JsonNode) : TelemetriaMsg
+  }
+  class HeartbeatMsg <<record>> <<messaggio>> {
+    + stazioneId, stato : String
+    + {static} da(root : JsonNode) : HeartbeatMsg
+  }
+  class TransitoMsg <<record>> <<messaggio>> {
+    + trenoId, stazioneId, tipo : String
+    + quando : Instant
+    + {static} da(root : JsonNode) : TransitoMsg
+    + entrata() : boolean
+  }
+  class PassaggioMsg <<record>> <<messaggio>> {
+    + trenoId, stazioneId, tipo : String
+    + quando : Instant
+    + {static} da(root : JsonNode) : PassaggioMsg
+    + direzione(inCache : String) : String
+  }
+  class AlertMsg <<record>> <<messaggio>> {
+    + {static} ORIGINE_CENTRALE : String
+    + sorgenteTipo, sorgenteId : String
+    + severita, messaggio : String
+    + {static} da(root, payloadGrezzo) : AlertMsg
+    + segnalaGuasto() / segnalaRisoluzione() : boolean
+    + dallaCentrale() / critico() : boolean
+  }
+  class Payload <<utility>> <<messaggio>> {
+    + {static} testo(root, campo, ripiego) : String
+    + {static} testoOpzionale(root, campo) : String
+    + {static} numero / intero(...) : double / int
+    + {static} istante(root : JsonNode) : Instant
+  }
+
+  ' i sei riquadri su due colonne, se no il package viene lungo una pagina
+  TelemetriaMsg -[hidden]right- HeartbeatMsg
+  TelemetriaMsg -[hidden]down- TransitoMsg
+  TransitoMsg -[hidden]right- PassaggioMsg
+  TransitoMsg -[hidden]down- AlertMsg
+  AlertMsg -[hidden]right- Payload
+}
+
+class StatiCanonici <<utility>> <<messaggio>> {
+  + {static} TRENO : List<String>
+  + {static} STAZIONE_ONLINE / GUASTA : String
+  + {static} STAZIONE_MANUTENZIONE / OFFLINE : String
+  + {static} trenoDalCampo(dichiarato : String) : String
+  + {static} trenoDallOperatore(scelto : String) : String
+  + {static} stazioneDallOperatore(scelto : String) : String
+}
+
+' i riquadri di rimando: dichiarati qui e non dentro le frecce, perche'
+' cosi' si possono mettere in colonna invece che in fila
+class "MonitoraggioTreni\n<size:11>(C4b)</size>" as SRV_TRENI
+class "MonitoraggioStazioni\n<size:11>(C4b)</size>" as SRV_STAZ
+class "TransitiService\n<size:11>(C4b)</size>" as SRV_TRANS
+class "GuastiService\n<size:11>(C4b)</size>" as SRV_GUASTI
+class "RailwayRepository\n<size:11>(C5)</size>" as REPO
+
+class ExistIdForEdge <<ApplicationScoped>> <<canale>> {
+  + interrogaIlDPerValidazione(messaggio) : CompletionStage<Void>
+}
+
+class ExistIdForEdgeStazione <<ApplicationScoped>> <<canale>> {
+  + interrogaIlDbPerValidazione(messaggio) : CompletionStage<Void>
+}
+
+' l'adapter costruisce il messaggio: un arco per record, come per ogni
+' altra dipendenza, e non uno solo verso il bordo del package
+IngestionService ..> TelemetriaMsg : da(root), uno\nper ogni topic
+IngestionService ..> HeartbeatMsg
+IngestionService ..> TransitoMsg
+IngestionService ..> PassaggioMsg
+IngestionService ..> AlertMsg
+TelemetriaMsg ..> Payload : i cinque record\nleggono tutti da qui
+TelemetriaMsg ..> StatiCanonici : lo stato arriva gia'\ntradotto per il database
+
+' e poi chiama chi di dovere: qui i servizi sono solo destinatari
+IngestionService --> SRV_TRENI : telemetria e passaggi
+IngestionService --> SRV_STAZ : battiti
+IngestionService --> SRV_TRANS : transiti
+IngestionService --> SRV_GUASTI : allarmi dal campo, e la chiusura\ndel "treno fermo" quando riparte
+
+ExistIdForEdge --> REPO : esisteTreno
+ExistIdForEdgeStazione --> REPO : esisteStazione
+
+' archi invisibili: mettono in colonna i rimandi e i due validatori,
+' se no la figura viene una striscia larga il triplo della pagina
+SRV_TRENI -[hidden]down- SRV_STAZ
+SRV_STAZ -[hidden]down- SRV_TRANS
+SRV_TRANS -[hidden]down- SRV_GUASTI
+ExistIdForEdge -[hidden]down- ExistIdForEdgeStazione
+StatiCanonici -[hidden]down- ExistIdForEdge
+
+note left of IngestionService
+  I consumatori NON sono @Transactional: con quell'annotazione il commit
+  avveniva all'uscita del metodo, cioe' fuori dal try, quindi una
+  violazione di vincolo risaliva fino al connettore reattivo e spegneva
+  il canale. Le transazioni sono scese in C4b, dove i servizi le aprono e
+  le chiudono PRIMA di annunciare qualsiasi cosa. Qui resta solo il
+  try/catch, che tiene vivo il canale, e i metodi restano @Blocking
+  perche' sotto c'e' JDBC.
+
+  Il messaggio si conferma sempre (ack), anche quando e' illeggibile o
+  parla di un nodo sconosciuto: un frame che nessuno sapra' mai
+  interpretare non va rimesso in coda, verrebbe riconsegnato all'infinito.
+end note
+
+note bottom of MSG
+  Cinque record e un attrezzo di lettura. I valori di ripiego di un campo
+  assente (una velocita' che manca vale 0, uno stato che manca vale
+  "fermo") sono decisioni, e stanno scritte qui una volta sola: prima
+  erano una cinquantina di espressioni ternarie dentro i consumatori.
+  I metodi che non sono da(...) sono le domande che i servizi fanno al
+  messaggio: e' entrata o uscita, l'alert viene dal campo o e' l'eco di
+  uno nostro. Cosi' da C4b in giu' nessuno vede piu' un JsonNode.
+end note
+
+note left of StatiCanonici
+  Il vocabolario degli stati ammessi dal CHECK del database. Sta in
+  entity/ perche' descrive il contenuto di due colonne, ed e' l'unica
+  classe di questa vista che serve anche a C3: l'amministratore che
+  scrive uno stato dal pannello passa di qui come ci passa un convoglio
+  che lo dichiara su MQTT. Prima era un metodo omonimo scritto due volte,
+  in due classi diverse, con due significati diversi.
+end note
+
+note bottom of ExistIdForEdge
+  I due validatori sono gli unici consumatori MQTT che non passano dai
+  servizi: rispondono a una domanda sola (questo id esiste in
+  anagrafica?) e la risposta ce l'ha il database, non il dominio.
+end note
+
+@enduml
+
+#+end_src
+
+*** Il componente Centrale: verso il campo, i servizi di dominio (C4b)
+- e' la vista che il riordino dell'ingestione ha fatto nascere: qui la Centrale sa di ferrovia e non sa piu' da dove la notizia sia arrivata, e infatti le stesse regole servono al messaggio MQTT di C4a e alla richiesta REST di C3
+- requisiti coperti: RF02.6.1, RF02.6.2 e RF02.6.3 per le anomalie dedotte, RF02.1.3 per il ciclo di vita del guasto, RF02.7 parzialmente per la scrittura della memoria storica
+#+begin_src  plantuml file: classi_04b_centrale_servizi.png
+@startuml C4b - Classi della Centrale verso il campo - i servizi di dominio
+skinparam linetype ortho
+' =========================================================================
+'  DIAGRAMMA DELLE CLASSI C4b - Centrale Operativa, i servizi di dominio
+'
+'  Sorgenti: ServeCentraleOperativa/src/main/java/it/uni/reti2/elaboration/
+'    MonitoraggioTreni.java, MonitoraggioStazioni.java, TransitiService.java,
+'    GuastiService.java, NavigazioneItinerario.java, PrevisioneArrivi.java,
+'    TrafficLogicEngine.java, FaultMonitor.java
+'    piu' ingestion/PubblicatoreAlert.java
+'
+'  Qui la Centrale sa di ferrovia e non sa piu' niente di MQTT: nessuna di
+'  queste classi vede un topic, un byte o un JsonNode. La notizia le arriva
+'  gia' tipizzata da C4a, oppure da una richiesta REST (C3), oppure dal
+'  watchdog che guarda l'orologio, e da qui in poi il trattamento e' lo
+'  stesso qualunque sia la strada: e' esattamente la ragione per cui questi
+'  servizi esistono.
+'
+'  Prima tutto questo stava dentro l'IngestionService (1292 righe) e, per la
+'  parte dei comandi, dentro il RestApiGateway: la chiusura di un guasto era
+'  scritta in quattro copie, una per ogni strada da cui poteva arrivare la
+'  richiesta.
+'
+'  Le dipendenze non hanno cicli. L'unica che poteva chiudere un anello e'
+'  GuastiService -> MonitoraggioTreni (un treno che segnala un'avaria
+'  diventa "rotto"): il rientro, cioe' chiudere il guasto quando il treno
+'  riparte, non lo chiede MonitoraggioTreni ma l'adapter di C4a, che vede
+'  la telemetria e chiede le due cose separatamente.
+'
+'  Le quattro classi in basso sono i punti in comune, ognuno con il suo
+'  rimando: la cache sta qui, il notificatore in C3, il repository in C5.
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -8564,50 +8883,122 @@ skinparam class<<canale>> {
     BackgroundColor #FCE8E6
     BorderColor #C5221F
 }
+skinparam class<<servizio>> {
+    BackgroundColor #D2E3FC
+    BorderColor #174EA6
+}
+skinparam class<<messaggio>> {
+    BackgroundColor #F1F3F4
+    BorderColor #9AA0A6
+}
 skinparam note {
     BackgroundColor #FFF9C4
     BorderColor #F9A825
 }
 hide empty members
 
-title C4 - Centrale Operativa: ingestione MQTT, cache di rete e watchdog
+title C4b - Centrale Operativa: i servizi di dominio, la cache di rete e il watchdog
 
-class IngestionService <<ApplicationScoped>> <<canale>> {
-  + {static} ORIGINE_CENTRALE : String
-  + {static} MSG_HEARTBEAT_PERSO : String
-  - {static} STATI_TRENO_VALIDI : List<String>
-  .. consumatori MQTT (@Incoming, @Blocking) ..
-  + onTelemetry(message) : CompletionStage<Void>
-  + onHeartbeat(message) : CompletionStage<Void>
-  + onTransit(message) : CompletionStage<Void>
-  + onPassaggio(message) : CompletionStage<Void>
-  + onAlert(message) : CompletionStage<Void>
-  .. scritture sul database ..
-  - salvaStatoTreno(trenoId : String, stato : String) : void
-  - storicizzaStatoStazione(stazioneId : String, stato : String) : void
-  - registraTransito(trenoId, stazioneId, tipo) : void
-  - storicizzaTransito(transito : Transito) : void
-  - chiudiGuastiHeartbeatPerso(stazioneId : String) : List<Guasto>
-  - aggiornaMessaggioGuasto(guastoId : String, messaggio : String) : void
-  - aggiornaPosizioneSuTratta(trenoId, stazioneId, tipo, direzione) : EsitoPassaggio
-  - calcolaProssimaStazione(itinerarioId, stazioneId, direzione) : String
-  - trovaTratta(itinerarioId, stazioneId, tipo, direzione) : Tratta
-  .. uscite ..
-  + broadcastAlert(guasto : Guasto) : void
-  + pubblicaGuastoSuMqtt(guasto : Guasto) : void
-  + pubblicaRisoluzioneSuMqtt(guasto : Guasto) : void
-  - broadcastTransit(root, trenoId, stazioneId, tipo) : void
-  - inviaSuMqtt(payload : String) : void
-  .. normalizzazioni ..
-  - normalizzaStatoTreno(rawStato : String) : String
-  - statoStazionePerFrontend(stato : String) : String
-  - tipoGuastoPerFrontend(sorgenteTipo : String, messaggio : String) : String
-  - parseTimestamp(root : JsonNode) : Instant
+class MonitoraggioTreni <<ApplicationScoped>> <<servizio>> {
+  + registraTelemetria(msg, payloadDalCampo) : Treno
+  + registraPassaggio(msg : PassaggioMsg) : void
+  + marcaRotto(trenoId : String) : Treno
+  + rimettiInServizio(trenoId : String) : void
+  + sopprimi(trenoId : String) : EsitoComando
+  - salvaStato(trenoId : String, stato : String) : void
+  - allineaAlPassaggio(treno : Treno, entrata : boolean) : void
+  - aggiornaPosizioneSuDb(msg, direzione) : Posizione
+}
+class EsitoComando <<record>> <<messaggio>> {
+  + treno : Treno
+  + errore : String
+  + trovato : boolean
 }
 
-class EsitoPassaggio <<record>> {
+class MonitoraggioStazioni <<ApplicationScoped>> <<servizio>> {
+  + registraHeartbeat(msg, payloadDalCampo) : void
+  + inviaSquadra(stazioneId : String) : EsitoInvioSquadra
+  - storicizza(stazioneId, stato, statoPrecedente) : void
+}
+enum EsitoInvioSquadra <<messaggio>> {
+  NON_TROVATA
+  NESSUN_GUASTO_APERTO
+  SQUADRA_INVIATA
+}
+
+class TransitiService <<ApplicationScoped>> <<servizio>> {
+  + registra(msg, payloadDalCampo) : void
+  - scrivi(msg : TransitoMsg, ritardoMinuti : int) : void
+  - apri(treno, stazione, quando, ritardo) : Transito
+  - storicizza(transito : Transito) : void
+  - aggiornaContatoreStazione(msg : TransitoMsg) : void
+}
+
+class GuastiService <<ApplicationScoped>> <<servizio>> {
+  + {static} tipoPerFrontend(sorgenteTipo, tipoDichiarato) : String
+  .. apertura ..
+  + nuovoDedotto(tipo, severita, sorgenteTipo, sorgenteId, messaggio) : Guasto
+  + apri(guasto : Guasto, audit : EventoAudit) : Guasto
+  + registraSegnalazione(msg : AlertMsg) : Guasto
+  .. chiusura ..
+  + chiudi(guasto : Guasto) : void
+  + chiudiDedotti(sorgenteId, sorgenteTipo, prefisso) : List<Guasto>
+  + annunciaChiusure(chiusi : List<Guasto>, motivo : String) : void
+  + chiudiDedottiSeTrenoRiparte(treno : Treno) : void
+  + chiudiSuDichiarazioneDalCampo(msg : AlertMsg) : void
+  + risolviSuComandoOperatore(guastoId : String) : Guasto
+  .. conseguenze ..
+  - marcaSorgenteGuasta(msg : AlertMsg) : void
+  - marcaStazionePerConvoglioGuasto(treno : Treno) : void
+  - chiudiDerivatiDaConvoglio(trenoId : String) : Stazione
+  - riportaOnlineSeLibera(stazioneId, soloSeGuasta) : Stazione
+}
+class EventoAudit <<record>> <<messaggio>> {
+  + stato, tipoEvento : String
+  + descrizione, statoPrecedente : String
+}
+
+class NavigazioneItinerario <<ApplicationScoped>> <<servizio>> {
+  + dopoIlPassaggio(itinerarioId, stazioneId, entrata, direzione) : Posizione
+  + prossimaStazione(itinerarioId, stazioneId, direzione) : String
+  - trattaDelPassaggio(itinerarioId, stazioneId, entrata, direzione) : Tratta
+  - andata(direzione : String) : boolean
+}
+class Posizione <<record>> <<messaggio>> {
   + prossimaStazione : String
-  + posizione : Tratta
+  + trattaCorrente : Tratta
+}
+
+class PrevisioneArrivi <<ApplicationScoped>> <<servizio>> {
+  + aggiornaPrevisione(treno : Treno) : void
+  + programmaArrivo(treno, stazionePartenza, quandoEUscito, direzione) : void
+  + registraArrivo(treno, stazioneRaggiunta, quandoEEntrato) : boolean
+  + previsioneVerso(treno : Treno, stazioneTarget : String) : Previsione
+  + treniAttesi(stazioneId : String) : List<Map>
+  + dimenticaTreno(trenoId : String) : void
+  + itinerariCambiati() : void
+}
+
+class FaultMonitor <<ApplicationScoped>> {
+  + heartbeatTimeoutSecondi : long
+  + trenoFermoTimeoutSecondi : long
+  - fermiDa : Map<String, Instant>
+  + controllaHeartbeat() : void
+  + controllaTreniFermi() : void
+  + broadcastSnapshot() : void
+}
+
+class PubblicatoreAlert <<ApplicationScoped>> <<canale>> {
+  + {static} CAUSA_RITARDO_IN_LINEA : String
+  + {static} CAUSA_SOSTA_PROLUNGATA : String
+  + pubblicaGuasto(guasto : Guasto) : void
+  + pubblicaRisoluzione(guasto : Guasto) : void
+  + pubblicaRitardo(treno, stazioneId, variazione, entrata) : void
+  + pubblicaStop(trenoId : String, motivo : String) : void
+  + pubblicaManutenzioneInviata(stazioneId : String) : void
+  + pubblicaItinerarioAggiornato(trenoId : String) : void
+  - nuovoAlert(tipoEvento : String) : ObjectNode
+  - invia(alert : ObjectNode) : void
 }
 
 class TrafficLogicEngine <<ApplicationScoped>> <<cache>> {
@@ -8630,69 +9021,121 @@ class TrafficLogicEngine <<ApplicationScoped>> <<cache>> {
   + kpiDashboard() : Map<String, Object>
 }
 
-class FaultMonitor <<ApplicationScoped>> {
-  + heartbeatTimeoutSecondi : long
-  + trenoFermoTimeoutSecondi : long
-  + controllaHeartbeat() : void
-  + controllaTreniFermi() : void
-  + broadcastSnapshot() : void
-  - creaGuastoAutomatico(tipo, severita, sorgenteTipo, sorgenteId, messaggio) : Guasto
-}
+' i riquadri di rimando alle altre viste
+class "IngestionService\n<size:11>(C4a)</size>" as ADAPTER
+class "RestApiGateway\n<size:11>(C3)</size>" as REST
+class "NotificatoreRealtime\n<size:11>(C3)</size>" as NOTIF
+class "RailwayRepository\n<size:11>(C5)</size>" as REPO
 
-class ExistIdForEdge <<ApplicationScoped>> <<canale>> {
-  + interrogaIlDPerValidazione(messaggio) : CompletionStage<Void>
-}
+MonitoraggioTreni +-- EsitoComando
+MonitoraggioStazioni +-- EsitoInvioSquadra
+GuastiService +-- EventoAudit
+NavigazioneItinerario +-- Posizione
 
-class ExistIdForEdgeStazione <<ApplicationScoped>> <<canale>> {
-  + interrogaIlDbPerValidazione(messaggio) : CompletionStage<Void>
-}
+' 1. da dove arriva la notizia: due strade, stesso trattamento
+ADAPTER --> MonitoraggioTreni : telemetria e passaggi
+ADAPTER --> MonitoraggioStazioni : battiti
+ADAPTER --> TransitiService : transiti
+ADAPTER --> GuastiService : allarmi dal campo
+REST --> MonitoraggioTreni : sopprimi una corsa
+REST --> MonitoraggioStazioni : manda la squadra
+REST --> GuastiService : risolvi un allarme
 
-IngestionService +-- EsitoPassaggio
+' 2. la collaborazione fra i servizi: si scende, non si torna su
+MonitoraggioTreni --> NavigazioneItinerario : dove si trova adesso\ne che fermata ha davanti
+MonitoraggioTreni --> PrevisioneArrivi : orario previsto\ne ritardo misurato
+MonitoraggioStazioni --> GuastiService : chiude il fail-stop\nquando il battito torna
+GuastiService --> MonitoraggioTreni : un'avaria segnalata\nmarca il convoglio rotto
+FaultMonitor --> GuastiService : apre il guasto\ndedotto dal silenzio
 
-IngestionService --> TrafficLogicEngine : legge e aggiorna\nla fotografia della rete
-IngestionService ..> "RealtimeWebSocket\n(C3)" : broadcast degli eventi
-IngestionService --> "RailwayRepository\n<size:11>(C5)</size>" : tutte le scritture del campo,\nstorico compreso, dentro la\ntransazione aperta qui
+' 3. le due uscite e i due piani in comune
+MonitoraggioTreni --> PubblicatoreAlert : quello che il campo\ndeve sapere
+MonitoraggioStazioni --> PubblicatoreAlert
+GuastiService --> PubblicatoreAlert
 
+MonitoraggioTreni ..> NOTIF : quello che il browser\ndeve vedere
+MonitoraggioStazioni ..> NOTIF
+TransitiService ..> NOTIF
+GuastiService ..> NOTIF
+FaultMonitor ..> NOTIF : lo SNAPSHOT\nogni 10 s
+
+MonitoraggioTreni --> TrafficLogicEngine : leggono e aggiornano\nla fotografia della rete
+MonitoraggioStazioni --> TrafficLogicEngine
+TransitiService --> TrafficLogicEngine
+GuastiService --> TrafficLogicEngine
+PrevisioneArrivi --> TrafficLogicEngine
 FaultMonitor --> TrafficLogicEngine : scorre stazioni e treni,\ncontrolla i duplicati
-FaultMonitor --> IngestionService : broadcastAlert +\npubblicaGuastoSuMqtt
-FaultMonitor ..> "RealtimeWebSocket\n(C3)" : SNAPSHOT ogni 10s
-FaultMonitor --> "RailwayRepository\n<size:11>(C5)</size>" : il guasto automatico, la sua riga\ndi storico e l'evento di audit
 
-ExistIdForEdge --> "RailwayRepository\n<size:11>(C5)</size>" : esisteTreno
-ExistIdForEdgeStazione --> "RailwayRepository\n<size:11>(C5)</size>" : esisteStazione
+MonitoraggioTreni --> REPO : tutte le scritture del campo,\nstorico compreso
+MonitoraggioStazioni --> REPO
+TransitiService --> REPO
+GuastiService --> REPO
+NavigazioneItinerario --> REPO
+PrevisioneArrivi --> REPO
+TrafficLogicEngine --> REPO : le tre letture\ndell'avvio
 
-TrafficLogicEngine --> "RailwayRepository\n<size:11>(C5)</size>" : tutteLeStazioni, tuttiITreni,\nguastiNonRisolti: solo all'avvio
+' archi invisibili: impilano i rimandi e tengono la figura in pagina
+ADAPTER -[hidden]down- REST
+NOTIF -[hidden]right- REPO
 
-note right of TrafficLogicEngine
-  E' una cache in RAM, non un secondo database: viene riempita
-  all'avvio dalle tre letture del repository e poi tenuta viva
-  dai messaggi del campo.
-  Le API REST leggono da qui, ed e' per questo che rispondono
-  senza toccare PostgreSQL a ogni richiesta.
-  Le tre mappe sono ConcurrentHashMap perche' ci scrivono in
-  parallelo i canali MQTT, i job schedulati e le richieste REST.
+note right of GuastiService
+  E' la classe che il riordino ha fatto nascere piu' grossa, e non e' un
+  caso: il ciclo di vita di un guasto era la materia piu' sparsa di tutte.
+  La chiusura di un guasto stava scritta in quattro copie (ingestione,
+  watchdog, comando dell'operatore, rientro dal campo) e la frase "se non
+  le resta nessun altro guasto aperto la stazione torna operativa" in tre.
+  I due metodi che chiudevano i guasti dedotti erano identici parola per
+  parola tranne il prefisso del messaggio: adesso sono chiudiDedotti(...)
+  con il prefisso come argomento.
+
+  E' anche il motivo per cui in questa vista entra il RestApiGateway:
+  chiudere un guasto vuol dire la stessa cosa che lo chieda un operatore
+  dalla dashboard o che lo dichiari rientrato una stazione.
 end note
 
-note bottom of IngestionService
-  I consumatori NON sono @Transactional: con quell'annotazione il commit
-  avveniva all'uscita del metodo, cioe' fuori dal try, quindi una
-  violazione di vincolo risaliva fino al connettore reattivo e spegneva
-  il canale. Ogni scrittura gira dentro QuarkusTransaction.requiringNew()
-  chiamato dentro il try, e i metodi restano @Blocking perche' usano JDBC.
+note bottom of PubblicatoreAlert
+  L'unica bocca verso railway/alerts. Ogni messaggio esce firmato
+  origine=CENTRALE, perche' la Centrale e' sottoscritta al proprio stesso
+  topic e senza firma si riascolta da sola. Prima i comandi delle API REST
+  uscivano da un'altra parte, scritti a mano con String.format, e quella
+  firma non ce l'avevano.
+end note
+
+note right of TrafficLogicEngine
+  E' una cache in RAM, non un secondo database: viene riempita all'avvio
+  dalle tre letture del repository e poi tenuta viva dai servizi. Le API
+  REST leggono da qui, ed e' per questo che rispondono senza toccare
+  PostgreSQL a ogni richiesta. Le tre mappe sono ConcurrentHashMap perche'
+  ci scrivono in parallelo i canali MQTT, i job schedulati e le richieste
+  REST.
 end note
 
 note bottom of FaultMonitor
-  Tre job da 10 secondi, tutti con ConcurrentExecution.SKIP: due
-  esecuzioni sovrapposte leggerebbero la stessa cache e aprirebbero
-  lo stesso guasto due volte.
+  Tre job da 10 secondi, tutti con ConcurrentExecution.SKIP: due esecuzioni
+  sovrapposte leggerebbero la stessa cache e aprirebbero lo stesso guasto
+  due volte. Non scrive piu' niente da se': dice al GuastiService che cosa
+  ha visto, e il guasto lo apre lui, con la stessa procedura che serve
+  quando a segnalarlo e' un nodo.
+end note
+
+note bottom of MonitoraggioTreni
+  Le transazioni si aprono qui dentro con QuarkusTransaction.requiringNew()
+  e non con @Transactional sul metodo: con l'annotazione il commit arriva
+  all'uscita, cioe' DOPO che la cache e' aggiornata e le notifiche sono
+  partite, e un vincolo violato lascerebbe in memoria e sulle dashboard
+  valori che sul database non esistono. La regola vale per tutti e cinque i
+  servizi.
 end note
 
 @enduml
 
 #+end_src
 
+#+RESULTS:
+[[file:/tmp/babel-H10Rt9/plantuml-UO9W3t.png]]
+
 *** Il componente Centrale: la persistenza (C5)
-- non e' una terza vista ma il piano sotto le altre due: e' l'unica classe della Centrale che chiama Panache, e la usano sia il lato operatore (C3) sia il lato campo (C4)
+- non e' una quarta vista ma il piano sotto le altre tre: e' l'unica classe della Centrale che chiama Panache, e la usano sia il lato operatore (C3) sia il lato campo (C4a e C4b)
 - requisiti coperti: nessuno in proprio; da qui passano le scritture della memoria storica (RF02.7) e le letture dell'anagrafica che servono a RF01.3
 #+begin_src  plantuml file: classi_05_persistenza.png
 @startuml C5 - Classi della persistenza della Centrale
@@ -8708,10 +9151,17 @@ end note
 '  AuthController 1, i due validatori dell'id 1 a testa e una perfino
 '  dentro l'entita' StoricoGuasto.
 '
-'  I sette riquadri intorno sono i clienti (a sinistra quelli di C3, a
-'  destra quelli di C4) e la freccia dice per che cosa lo usano. Le entita'
-'  in basso sono le tredici che il repository tocca, e stanno nel capitolo
-'  Modello.
+'  I riquadri intorno sono i clienti (a sinistra quelli di C3, a destra
+'  quelli di C4a e C4b) e la freccia dice per che cosa lo usano. Erano sette
+'  finche' l'ingestione era una classe sola; adesso sono undici, ma non
+'  perche' le chiamate siano aumentate: sono le stesse, distribuite fra i
+'  servizi che le fanno. L'IngestionService e il FaultMonitor sono spariti
+'  da questa figura, ed e' il segno che il lavoro e' andato a posto: uno
+'  legge messaggi, l'altro guarda l'orologio, e il database non lo tocca
+'  piu' nessuno dei due.
+'
+'  Le entita' in basso sono le tredici che il repository tocca, e stanno
+'  nel capitolo Modello.
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -8743,11 +9193,15 @@ title C5 - Centrale Operativa: l'unica classe che parla con PostgreSQL
 
 class RestApiGateway <<C3>>
 class AuthController <<C3>>
-class IngestionService <<C4>> <<campo>>
-class FaultMonitor <<C4>> <<campo>>
-class ExistIdForEdge <<C4>> <<campo>>
-class ExistIdForEdgeStazione <<C4>> <<campo>>
-class TrafficLogicEngine <<C4>> <<campo>>
+class MonitoraggioTreni <<C4b>> <<campo>>
+class MonitoraggioStazioni <<C4b>> <<campo>>
+class TransitiService <<C4b>> <<campo>>
+class GuastiService <<C4b>> <<campo>>
+class NavigazioneItinerario <<C4b>> <<campo>>
+class PrevisioneArrivi <<C4b>> <<campo>>
+class ExistIdForEdge <<C4a>> <<campo>>
+class ExistIdForEdgeStazione <<C4a>> <<campo>>
+class TrafficLogicEngine <<C4b>> <<campo>>
 
 class RailwayRepository <<ApplicationScoped>> <<persistenza>> {
   .. stazioni ..
@@ -8810,8 +9264,12 @@ class "entita' JPA\n<size:11>Stazione, Treno, Tratta, Itinerario, ItinerarioTrat
 
 RestApiGateway --> RailwayRepository : anagrafica, comandi operativi,\nitinerario dei nodi di campo
 AuthController --> RailwayRepository : trovaUtentePerMatricola,\ncon la matricola presa dal token
-IngestionService --> RailwayRepository : stato dei treni, transiti,\nguasti e storici
-FaultMonitor --> RailwayRepository : guasto automatico,\nstorico ed evento di audit
+MonitoraggioTreni --> RailwayRepository : stato del convoglio, storico\ndei cambi, posizione sulla tratta
+MonitoraggioStazioni --> RailwayRepository : storico dei cambi di stato\ndella stazione
+TransitiService --> RailwayRepository : transiti aperti e chiusi,\ne il loro storico
+GuastiService --> RailwayRepository : guasti, storico dei guasti\ned eventi di audit
+NavigazioneItinerario --> RailwayRepository : tratte e stazioni\nordinate dell'itinerario
+PrevisioneArrivi --> RailwayRepository : i tempi di percorrenza\nsu cui fa la stima
 ExistIdForEdge --> RailwayRepository : esisteTreno
 ExistIdForEdgeStazione --> RailwayRepository : esisteStazione
 TrafficLogicEngine --> RailwayRepository : le tre letture dell'avvio
@@ -9058,7 +9516,7 @@ class "TrainsPage / StationsPage /\nRoutesPage / TrackSegmentsPage" as P4 <<vist
 class "AlertsPage" as P5 <<vista>>
 class "AdminPage (+ i quattro modali)" as P6 <<vista>>
 
-class "Keycloak\n(realm railway, :8180)" as IDP <<esterno>>
+class "Keycloak\n(realm railway, :8543 https)" as IDP <<esterno>>
 
 wsClient ..|> WebSocketClient
 keycloak +-- TokenKeycloak
@@ -9139,7 +9597,7 @@ end note
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-D7O87v/plantuml-my2NCd.png]]
+[[file:/tmp/babel-H10Rt9/plantuml-QmfHwo.png]]
 
 *** riepilogo requisiti - diagrammi delle classi
 
@@ -9155,19 +9613,19 @@ end note
 | RF01.6 (accesso)    | C3         | C6              | filtro lato server, client OAuth2 e custodia del token lato browser        |
 | RF02.1.1.1          |            | C2              | la coda locale e il gateway che la riempie e la svuota                     |
 | RF02.1.1.2          |            | C1, C2          | l'insieme delle stazioni guaste e il motore che si blocca                  |
-| RF02.1.2            |            | C1, C4          | il gateway di bordo e l'ingestione degli allarmi                           |
-| RF02.1.3            |            | modello, C4     | il ciclo di vita e' un campo dell'entita' e non una classe: due stati, senza assegnatario |
+| RF02.1.2            |            | C1, C4a, C4b    | il gateway di bordo, l'ingestione degli allarmi e il servizio che li apre  |
+| RF02.1.3            |            | modello, C4b    | il ciclo di vita e' un campo dell'entita', ma da quando c'e' il GuastiService le sue transizioni stanno in un posto solo: restano due stati, senza assegnatario |
 | RF02.2.1            |            | C1              | il contatore del ritardo sta nel motore di viaggio                         |
 | RF02.2.2            |            | C1, modello     | i campi volatili del convoglio, negli stessi nomi ai due capi              |
 | RF02.2.3            |            | C1              | direzione e indice della stazione nel modello locale del treno             |
-| RF02.3              |            | C2, C4          | lo stato del nodo e la sua copia nella cache della centrale                |
-| RF02.4              |            | C1, C2, C4      | i due validatori di campo e i due bean che rispondono in centrale          |
+| RF02.3              |            | C2, C4b         | lo stato del nodo e la sua copia nella cache della centrale                |
+| RF02.4              |            | C1, C2, C4a     | i due validatori di campo e i due bean che rispondono in centrale          |
 | RF02.5              |            | C3, C1          | il metodo che ricompone l'itinerario e il motore che lo riscarica, ma ripartendo da capo |
-| RF02.6              |            | C4              | il watchdog con i suoi tre lavori periodici                                |
+| RF02.6              |            | C4b             | il watchdog con i suoi tre lavori periodici                                |
 | RF02.7              |            | modello, C5     | le sei tabelle di storico stanno nel Modello e non in un diagramma; a scriverle e' tutte il repository, che e' l'unica classe che parla col database; due di esse restano sempre vuote |
 | RF03.1              |            | C1, C2          | ogni nodo ha il proprio stato e il proprio punto di ingresso               |
-| RF03.2              |            | C1, C2, C4      | nessuna classe condivisa fra i processi: e' la mappa C0 a dirlo            |
-| RF03.3              |            | C4              | due consumatori distinti per lo stesso fatto fisico                        |
+| RF03.2              |            | C1, C2, C4a     | nessuna classe condivisa fra i processi: e' la mappa C0 a dirlo            |
+| RF03.3              |            | C4a             | due consumatori distinti per lo stesso fatto fisico                        |
 | RF03.4              |            | C1, C2          | gli endpoint REST dei nodi sono l'unica porta dei sensori                  |
 | RF03.5              |            | C3, C1          | l'endpoint dell'itinerario e il client che lo chiama                       |
 | RF04.1, RF04.2      | C3         | C6              | verifica del token (quarkus-oidc), filtro sui ruoli, flusso PKCE lato SPA  |
@@ -9216,15 +9674,24 @@ variabili le scrive su disco ma solo quando gliel'ha detto qualcun altro.
 |----------------------------------------+----------------+-----------------------------------------------------------------------------|
 | *C3 - la Centrale verso l'operatore*    |                |                                                                             |
 | FiltroAutorizzazione                   | M9 (meta' server) | e' il =@Provider= che ogni richiesta attraversa: la meta' di M9 che decide. L'altra meta' e' in C6 |
-| RestApiGateway                         | M10            | la vita della richiesta dopo il filtro, con i DTO annidati e i comandi che escono su =alerts-out= |
+| RestApiGateway                         | M10            | la vita della richiesta dopo il filtro, con i DTO annidati; i tre comandi operativi li apre lui ma la transizione la scrivono i servizi di C4 |
 | RealtimeWebSocket                      | M11            | l'uscita comune di tutte le altre macchine verso la dashboard, di sola andata |
+| NotificatoreRealtime                   | --             | e' il contorno di M11: decide che forma ha l'evento, non quando parte. Nessuno stato del dominio nasce qui |
 | AuthController                         | --             | sta dentro M9 ma non ne e' il cuore: ricostruisce il profilo dai claim, non decide nessun permesso |
 |----------------------------------------+----------------+-----------------------------------------------------------------------------|
-| *C4 - la Centrale verso il campo*       |                |                                                                             |
-| IngestionService                       | M3, M4, M5, M6 | un consumatore MQTT per macchina: telemetria, battiti, transiti e allarmi   |
-| FaultMonitor                           | M8             | l'unica macchina che reagisce a un silenzio invece che a un messaggio: i tre job da 10 secondi |
+| *C4a - la porta MQTT*                   |                |                                                                             |
+| IngestionService                       | --             | e' il contorno di M3-M6: riceve i messaggi e li smista, ma non scrive nessuna variabile di stato. Prima era il cuore di tutte e quattro |
+| i cinque messaggi e Payload            | --             | sono dati, non comportamento: dicono che cosa il campo ha detto, e nessuno di loro decide niente |
 | ExistIdForEdge, ExistIdForEdgeStazione | M2             | una macchina sola in due classi gemelle: cambiano il topic e la tabella interrogata, non il comportamento |
-| TrafficLogicEngine                     | --             | e' la cache dove vivono le variabili di M12 e M13, come =TrainDB= a bordo: le transizioni gliele scrivono le altre tre classi |
+|----------------------------------------+----------------+-----------------------------------------------------------------------------|
+| *C4b - i servizi di dominio*            |                |                                                                             |
+| MonitoraggioTreni                      | M3, meta' di M5 | scrive =Treno.stato=, la posizione e il ritardo: la telemetria e' M3, il passaggio dichiarato dal convoglio e' la meta' di M5 che misura il tempo |
+| MonitoraggioStazioni                   | M4             | l'unica che scrive =Stazione.stato= partendo da un battito, ed e' lei a decidere che in MANUTENZIONE il battito non conta (RF01.4.1) |
+| TransitiService                        | meta' di M5    | l'altra meta': il passaggio rilevato dal sensore di terra, che apre e chiude la riga del transito |
+| GuastiService                          | M6, M7         | M6 e' l'allarme che arriva dal campo; M7 e' il ciclo di vita del guasto, che da qui in poi ha un solo posto in cui transita |
+| FaultMonitor                           | M8             | l'unica macchina che reagisce a un silenzio invece che a un messaggio: i tre job da 10 secondi. La transizione la chiede al =GuastiService= |
+| PubblicatoreAlert, NavigazioneItinerario, PrevisioneArrivi | -- | nessuna transizione: il primo scrive messaggi, gli altri due rispondono a domande (dove sono, quando arrivo) |
+| TrafficLogicEngine                     | --             | e' la cache dove vivono le variabili di M12 e M13, come =TrainDB= a bordo: le transizioni gliele scrivono i servizi |
 |----------------------------------------+----------------+-----------------------------------------------------------------------------|
 | *C5 - la persistenza*                   |                |                                                                             |
 | RailwayRepository                      | --             | non fa transitare niente: esegue le query per conto delle altre. E' il contorno di tutte le macchine della centrale che lasciano una traccia su database, cioe' M3-M6, M8 e M10 |
@@ -9233,17 +9700,114 @@ variabili le scrive su disco ma solo quando gliel'ha detto qualcun altro.
 | keycloak, authStore                    | M9 (meta' browser) | PKCE, scambio del codice e rinnovo del token: M9 e' l'unica macchina che attraversa due componenti |
 | apiClient, WebSocketClient, railwayStore, useRealtimeUpdates, le pagine | -- | sono i consumatori di M10 e M11: ridisegnano quello che ricevono, nessuno stato del dominio nasce qui |
 
-*Le quattro macchine che non hanno una riga.* Trentuno delle trentacinque stanno nella tabella, le
-altre quattro sono tutte della centrale e mancano per due motivi diversi:
+*Le tre macchine che non hanno una riga.* Trentadue delle trentacinque stanno nella tabella, le
+altre tre sono tutte della centrale e mancano per due motivi diversi:
 
 - M1, il ciclo di vita del processo :: il suo cuore e' il =main= di =ServeCentraleOperativa=, che non
   e' disegnato ne' in C3 ne' in C4 perche' le due viste cominciano a container gia' avviato. Sui nodi
   di campo la macchina corrispondente (T1, S1) invece c'e', e la ragione e' che li' il =main= fa
   anche la validazione dell'id.
-- M7 (guasto), M12 (stazione), M13 (treno) :: sono le tre macchine di dominio della centrale, e il
-  loro cuore e' un campo di un'entita' JPA (=Guasto.risolto=, =Stazione.stato=, =Treno.stato=), che
-  sta nel capitolo /Modello/ e non in un diagramma delle classi. Le transizioni gliele scrivono tre
-  classi diverse, =IngestionService= (M4 e M6), =FaultMonitor= (M8) e =RestApiGateway= (M10), e
-  nessuna delle tre ne e' il cuore: e' il caso in cui la variabile e' l'unica cosa che tiene insieme
-  la macchina, ed e' proprio quello che il capitolo /Diagrammi degli stati/ chiama macchina di
-  dominio.
+- M12 (stazione), M13 (treno) :: sono due delle tre macchine di dominio della centrale, e il loro
+  cuore e' un campo di un'entita' JPA (=Stazione.stato=, =Treno.stato=), che sta nel capitolo
+  /Modello/ e non in un diagramma delle classi. Le transizioni gliele scrivono classi diverse
+  (=MonitoraggioStazioni= e =MonitoraggioTreni= quando la notizia arriva dal campo,
+  =GuastiService= quando e' la conseguenza di un guasto, =RestApiGateway= quando e' l'amministratore
+  a cambiare l'anagrafica), e nessuna ne e' il cuore: e' il caso in cui la variabile e' l'unica cosa
+  che tiene insieme la macchina, ed e' proprio quello che il capitolo /Diagrammi degli stati/ chiama
+  macchina di dominio.
+
+  La terza, M7 (guasto), fino allo scorporo dell'ingestione stava con queste due: =Guasto.risolto=
+  lo scrivevano quattro classi in punti diversi. Adesso ha una riga in tabella perche' ha un cuore
+  vero, il =GuastiService=: e' l'unico posto in cui un guasto si apre e si chiude, qualunque sia la
+  strada da cui la notizia e' arrivata. E' il risultato piu' concreto del riordino, ed e' anche il
+  motivo per cui la tabella e' passata da trentuno righe a trentadue.
+
+* Validazione
+** Come è stato verificato
+
+La verifica procede su tre livelli, perché i requisiti non sono tutti della stessa natura. I
+*test automatici* controllano le singole funzioni e gli endpoint, e sono l'unica parte che si
+rilancia a costo zero a ogni modifica. Gli *scenari SV01-SV06* controllano il comportamento
+d'insieme, quello che nessun test unitario vede perché nasce dall'interazione fra nodi
+separati, e si eseguono a mano sul sistema acceso. I *requisiti non funzionali* non si
+asseriscono ma si misurano, e per ciascuno serve uno strumento diverso.
+
+** Ambiente di prova
+
+I test automatici non hanno bisogno di nessun servizio esterno: la Centrale gira su H2 in
+memoria (vedi /I test hanno un database loro/), i nodi di campo partono con
+=quarkus.http.test-port=0=, cioè su una porta assegnata dal sistema, così la suite può girare
+mentre il sistema vero è acceso senza contendergli né le porte né il database. Si lanciano con
+=./mvnw test= dalla radice e =npx vitest run= dentro =ClientWebAppIntefacciaUtente=.
+
+Le prove manuali richiedono invece il sistema completo: =docker compose up= per broker,
+PostgreSQL e Keycloak, i tre moduli Quarkus e la web app.
+
+** Test automatici
+
+Esito dell'esecuzione del 21 agosto 2026: *57 test, tutti superati, nessun fallimento*.
+
+#+ATTR_LATEX: :environment longtable :align L{0.13\textwidth}L{0.24\textwidth}L{0.07\textwidth}L{0.42\textwidth} :font \small
+| modulo   | classe                  | test | che cosa verifica                                                        |
+|----------+-------------------------+------+--------------------------------------------------------------------------|
+| Centrale | =AdminApiTest=          |   13 | gli endpoint dell'anagrafica e il filtro sui ruoli: senza token si viene respinti, il tecnico legge ma non crea, i nomi duplicati sono rifiutati (RF01.3, RF04.2) |
+| Centrale | =ItinerariTratteTest=   |    8 | un itinerario si appoggia solo su tratte esistenti; il rifiuto lascia l'itinerario com'era e non a metà (RF01.3.3, RF01.3.4) |
+| Centrale | =RegressioniBugTest=    |    7 | i bug trovati e chiusi, con un test a guardia di ciascuno               |
+| Centrale | =MemoriaStoricaTest=    |    4 | eliminare una stazione o un convoglio non cancella la loro storia (RF01.5, RF02.7) |
+| Centrale | =GuastoTest=            |    2 | i campi del guasto e la distinzione fra allarme segnalato e dedotto (RF01.2.2) |
+| Centrale | =QuarkusSmokeTest=      |    1 | il contesto si avvia e l'applicazione risponde                          |
+| Treni    | =RiaggancioItinerarioTest= | 5 | il riaggancio dopo un cambio di itinerario: il treno resta dov'è, si inverte al capolinea nuovo, aspetta se è in mezzo a una tratta (RF02.5, SV05) |
+| Treni    | =ExampleTest=           |    1 | l'arrivo di un allarme al convoglio                                     |
+| Stazioni | =ExampleTest=           |    1 | segnaposto, vedi i limiti in fondo al capitolo                          |
+| Web app  | =TrafficMapPage=, =apiClient=, =Card= | 15 | il rendering della mappa, le chiamate con il token e i componenti di base |
+
+*** Le prove di regressione
+
+=RegressioniBugTest= merita una riga a parte perché non nasce da un requisito ma da un errore.
+Ogni suo test corrisponde a un bug che il sistema aveva davvero e che è stato chiuso: i nomi dei
+metodi sono l'enunciato del bug — =modificareLeStazioniNonSganciaITreniAssegnati=,
+=itinerarioCheRipassaSullaStessaTrattaVieneRifiutato=,
+=trattaUsataComePosizioneDiUnTrenoNonSiElimina=. Servono a impedire che tornino.
+
+** Esecuzione degli scenari
+
+Gli scenari sono enunciati nel capitolo /Scenari di verifica/ con il comportamento atteso passo
+per passo; qui sta il modo in cui vengono provocati sul sistema acceso. Le leve sono gli endpoint
+REST dei nodi di campo, cioè la stessa porta da cui entrerebbero i sensori veri (RF03.4), più la
+console interattiva =Sensori= dei due nodi.
+
+#+ATTR_LATEX: :environment longtable :align L{0.09\textwidth}L{0.45\textwidth}L{0.36\textwidth} :font \small
+| scenario | come si provoca                                                              | dove si osserva l'esito                                    |
+|----------+------------------------------------------------------------------------------+------------------------------------------------------------|
+| SV01     | =POST /stazione/sensore/guasto= sulla stazione B, poi i due comandi del tecnico dalla dashboard | schermata delle stazioni e degli allarmi; i due convogli si fermano e ripartono da soli |
+| SV02     | =POST /stazione/rete/offline= su A, si fanno transitare dei convogli, poi =POST /stazione/rete/online= | =GET /stazione/buffer= durante l'interruzione, lo storico dei transiti dopo |
+| SV03     | =POST /treno/sensore/guasto= su due convogli, uno in sosta e uno in tratta   | l'elenco degli allarmi: la sorgente è la stazione nel primo caso, la tratta nel secondo |
+| SV04     | si ferma un convoglio fuori stazione e si aspetta =T_fer=                    | l'allarme compare da solo ed è marcato come dedotto        |
+| SV05     | si modifica l'itinerario dalla dashboard a convogli in marcia                 | posizione e ritardo dei due convogli prima e dopo          |
+| SV06     | si lascia percorrere una corsa intera, andata e ritorno                       | lo storico dei transiti: entrate e uscite nell'ordine reale |
+
+** Verifica dei requisiti non funzionali
+
+#+ATTR_LATEX: :environment longtable :align L{0.10\textwidth}L{0.22\textwidth}L{0.58\textwidth} :font \small
+| #     | requisito       | come si misura                                                                    |
+|-------+-----------------+-----------------------------------------------------------------------------------|
+| RNF01 | prontezza       | si cronometra fra la chiamata al sensore e la comparsa sulla schermata            |
+| RNF02 | nessuna perdita | si contano i transiti provocati durante SV02 e li si ritrova tutti nello storico  |
+| RNF03 | degradazione    | si spengono i nodi uno alla volta e si annota che cosa resta funzionante          |
+| RNF04 | riservatezza    | cattura del traffico sotto profilo =%tls=: il payload non è leggibile             |
+| RNF05 | numerosità      | si avviano più istanze di stazione e di treno con id diversi                      |
+| RNF06 | riavviabilità   | si arresta e si riavvia un nodo a sistema acceso, senza toccare nient'altro       |
+
+** Limiti della verifica
+
+Tre cose vanno dette, perché non sono coperte.
+
+- I test automatici si fermano al confine del nodo :: verificano gli endpoint e la logica interna,
+  ma non la conversazione via broker fra processi separati. Che la telemetria pubblicata dal treno
+  arrivi davvero in Centrale è verificato dagli scenari a mano, non da un test.
+- Il nodo Stazione non ha test propri :: il suo =ExampleTest= è un segnaposto. È il modulo con
+  meno copertura automatica, e non per caso: la sua logica interessante (la coda locale e il suo
+  svuotamento) vive proprio nell'interazione con la rete, che è quello che i test unitari non
+  vedono.
+- Scenari e requisiti non funzionali sono verificati a mano :: si rieseguono a ogni modifica solo
+  se qualcuno si ricorda di farlo.

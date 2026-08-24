@@ -48,6 +48,7 @@ const treno = (id: string, campi: Partial<Train> = {}): Train => ({
   routeId: 'r-1',
   direction: 'andata',
   arrivalTime: null,
+  minutesToArrival: null,
   departureTime: null,
   delayMinutes: 0,
   passengers: 42,

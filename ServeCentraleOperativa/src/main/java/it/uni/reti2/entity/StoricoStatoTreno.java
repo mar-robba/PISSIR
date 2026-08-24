@@ -21,7 +21,7 @@ import java.time.Instant;
  * quel convoglio viene eliminato dalla flotta.</p>
  *
  * @see it.uni.reti2.entity.Treno
- * @see it.uni.reti2.ingestion.IngestionService#onTelemetry
+ * @see it.uni.reti2.elaboration.MonitoraggioTreni#registraTelemetria
  */
 @Entity
 @Table(name = "Storico_Stato_Treni")

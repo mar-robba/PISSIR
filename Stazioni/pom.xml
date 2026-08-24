@@ -47,6 +47,19 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-scheduler</artifactId>
         </dependency>
+        <!--
+            Driver JDBC di SQLite per la persistenza locale del nodo (PersistenzaLocale).
+            Non e' un'estensione Quarkus ma il driver liscio: il nodo Stazione apre una
+            connessione sola su un file e non ha bisogno del datasource, delle transazioni
+            o di Hibernate, che invece servono alla Centrale con PostgreSQL. Il jar si porta
+            dentro la libreria nativa di SQLite gia' compilata, quindi non c'e' niente da
+            installare sulla macchina.
+        -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.45.1.0</version>
+        </dependency>
         
         <!-- Test dependencies -->
         <dependency>

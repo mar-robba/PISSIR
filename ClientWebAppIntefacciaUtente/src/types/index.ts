@@ -62,7 +62,19 @@ export interface Train {
   previousStationId: string | null;
   routeId: string;
   direction: 'andata' | 'ritorno';
-  arrivalTime: number | null; // stima timestamp d'arrivo prossima stazione
+  /**
+   * Stima dell'orario di arrivo nella prossima stazione, in millisecondi Unix: la
+   * calcola la Centrale componendo i tempi di percorrenza dell'itinerario con il
+   * progresso sulla tratta. È null quando la previsione non si può fare (convoglio
+   * senza itinerario o corsa soppressa).
+   */
+  arrivalTime: number | null;
+  /**
+   * Lo stesso dato nei minuti dell'orario di servizio ("arriva fra 12 minuti"): sono
+   * l'unità in cui è espresso anche delayMinutes, mentre arrivalTime è un istante
+   * dell'orologio reale (la simulazione corre accelerata, i due numeri non coincidono).
+   */
+  minutesToArrival: number | null;
   departureTime: number | null;
   delayMinutes: number; // ritardo positivo o negativo (anticipo)
   passengers: number;
@@ -114,6 +126,7 @@ export type AlertSeverity = 'info' | 'warning' | 'critical';
 export type AlertType =
   | 'treno_fermo'
   | 'stazione_guasta'
+  | 'binario_guasto'
   | 'sensore_offline'
   | 'ritardo'
   | 'heartbeat_mancante';
@@ -144,7 +157,11 @@ export interface Alert {
 export interface UiNotification {
   id: string;
   kind: 'treno_soppresso' | 'operatori_inviati' | 'errore_comando';
-  severity: AlertSeverity;
+  /**
+   * Come AlertSeverity ma con in più "success": una notifica d'interfaccia può dire
+   * che un comando è andato a buon fine, cosa che un guasto non può fare.
+   */
+  severity: AlertSeverity | 'success';
   message: string;
   timestamp: number;
 }
@@ -173,13 +190,24 @@ export interface DashboardKPI {
 }
 
 // --- EXPECTED TRAINS ---
+/**
+ * Riga del tabellone di una stazione: un convoglio che la Centrale si aspetta in
+ * ingresso, oppure quello fermo lì che ne uscirà. Lo calcola la Centrale
+ * sull'itinerario dei treni (GET /api/stazioni/{id}/treni-attesi), non il browser
+ * sulla loro posizione istantanea.
+ */
 export interface ExpectedTrain {
   trainId: string;
-  convoglio: string;
-  type: 'ingresso' | 'uscita';
-  expectedTime: number;
-  delayMinutes: number;
+  /** "in_arrivo" per chi deve ancora passare, "in_partenza" per chi è fermo qui. */
+  kind: 'in_arrivo' | 'in_partenza';
   status: TrainStatus;
-  fromStationId?: string;
-  toStationId?: string;
+  delayMinutes: number;
+  /** Minuti di servizio che mancano all'arrivo (0 per un treno già in stazione). */
+  minutesToArrival: number;
+  /** Quante fermate il convoglio farà prima di questa. */
+  stopsBefore: number;
+  /** Orario previsto in millisecondi Unix, null per chi è già in stazione. */
+  arrivalTime: number | null;
+  nextStationId: string | null;
+  direction: 'andata' | 'ritorno';
 }

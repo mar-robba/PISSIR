@@ -1,14 +1,21 @@
 import { useRailwayStore } from '../store/railwayStore';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Building2, Wrench, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { apiClient } from '../api/apiClient';
+import type { ExpectedTrain } from '../types';
+
+/** Millisecondi fra due letture del tabellone: è una previsione, si rinfresca da sola. */
+const RINFRESCO_ATTESI_MS = 5000;
 
 export default function StationsPage() {
-  const { stations, trains, completeMaintenance } = useRailwayStore();
+  const { stations, completeMaintenance } = useRailwayStore();
   const [search, setSearch] = useState('');
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+  const [expectedTrains, setExpectedTrains] = useState<ExpectedTrain[]>([]);
+  const [expectedError, setExpectedError] = useState<string | null>(null);
   const user = useAuthStore((s) => s.user);
 
   const filteredStations = stations.filter(s => 
@@ -18,15 +25,42 @@ export default function StationsPage() {
 
   const selectedStation = stations.find(s => s.id === selectedStationId);
 
-  // Trova i treni attesi per la stazione selezionata (UC4)
-  const getExpectedTrains = (stationId: string) => {
-    return trains.filter(t => 
-      t.nextStationId === stationId || t.currentStationId === stationId
-    ).map(t => ({
-      ...t,
-      type: t.currentStationId === stationId ? 'fermo/partenza' : 'arrivo'
-    }));
-  };
+  // Treni attesi (UC4): l'elenco lo calcola la Centrale sull'itinerario dei convogli.
+  // Prima lo costruiva questa pagina filtrando i treni la cui posizione istantanea
+  // coincideva con la stazione, quindi si vedeva solo chi stava arrivando dalla tratta
+  // adiacente e chi era fermo lì: chi sarebbe passato di lì due fermate più avanti non
+  // compariva, e l'orario previsto non c'era proprio.
+  useEffect(() => {
+    if (!selectedStationId) {
+      setExpectedTrains([]);
+      setExpectedError(null);
+      return;
+    }
+    // Le risposte in volo di una stazione deselezionata non devono più scrivere lo stato.
+    let valido = true;
+    const carica = async () => {
+      try {
+        const attesi = await apiClient.getExpectedTrains(selectedStationId);
+        if (valido) {
+          setExpectedTrains(attesi);
+          setExpectedError(null);
+        }
+      } catch (errore) {
+        if (valido) {
+          setExpectedError(errore instanceof Error ? errore.message : 'Centrale non raggiungibile');
+        }
+      }
+    };
+    carica();
+    const rinfresco = setInterval(carica, RINFRESCO_ATTESI_MS);
+    return () => {
+      valido = false;
+      clearInterval(rinfresco);
+    };
+  }, [selectedStationId]);
+
+  /** Nome leggibile di una stazione, per la riga "prossima fermata". */
+  const nomeStazione = (id: string | null) => stations.find(s => s.id === id)?.name ?? id ?? '—';
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in h-full">
@@ -127,15 +161,20 @@ export default function StationsPage() {
               </h4>
               
               <div className="flex flex-col gap-3 overflow-y-auto">
-                {getExpectedTrains(selectedStation.id).length === 0 ? (
+                {expectedError && (
+                  <p className="text-sm text-danger italic">
+                    Previsioni non disponibili: {expectedError}
+                  </p>
+                )}
+                {!expectedError && expectedTrains.length === 0 ? (
                   <p className="text-sm text-muted italic">Nessun treno atteso al momento.</p>
                 ) : (
-                  getExpectedTrains(selectedStation.id).map(train => (
-                    <div key={train.id} className="p-3 bg-black/20 border border-border-color rounded-md flex flex-col gap-2">
+                  expectedTrains.map(train => (
+                    <div key={train.trainId} className="p-3 bg-black/20 border border-border-color rounded-md flex flex-col gap-2">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold font-mono text-primary">{train.id}</span>
-                        <Badge type={train.type === 'arrivo' ? 'info' : 'warning'}>
-                          {train.type.toUpperCase()}
+                        <span className="font-bold font-mono text-primary">{train.trainId}</span>
+                        <Badge type={train.kind === 'in_arrivo' ? 'info' : 'warning'}>
+                          {train.kind === 'in_arrivo' ? 'IN ARRIVO' : 'IN PARTENZA'}
                         </Badge>
                       </div>
                       
@@ -151,10 +190,28 @@ export default function StationsPage() {
                         </div>
                       )}
                       
-                      {train.arrivalTime && train.type === 'arrivo' && (
+                      {train.kind === 'in_arrivo' ? (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted">Arriva fra:</span>
+                            <span>
+                              {train.minutesToArrival} min
+                              {train.stopsBefore > 0 && ` (${train.stopsBefore} fermate prima)`}
+                            </span>
+                          </div>
+                          {/* Il riquadro ETA esisteva già ma non compariva mai: il campo
+                              arrivalTime era una costante null nel mapper del frontend. */}
+                          {train.arrivalTime && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted">ETA:</span>
+                              <span className="font-mono">{new Date(train.arrivalTime).toLocaleTimeString()}</span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted">ETA:</span>
-                          <span className="font-mono">{new Date(train.arrivalTime).toLocaleTimeString()}</span>
+                          <span className="text-muted">Riparte verso:</span>
+                          <span>{nomeStazione(train.nextStationId)}</span>
                         </div>
                       )}
                     </div>

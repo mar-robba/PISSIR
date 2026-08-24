@@ -25,7 +25,7 @@ fi
 N_INSTANCES=${#ARGS[@]}
 
 # Comando base
-JAR_CMD="java -jar target/quarkus-app/quarkus-run.jar"
+JAR_CMD=" java -Dquarkus.profile=tls -jar target/quarkus-app/quarkus-run.jar"
 
 # Porta di partenza (prima istanza su 8080, poi 8081...)
 BASE_PORT=8080

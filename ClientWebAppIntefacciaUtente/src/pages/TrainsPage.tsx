@@ -179,6 +179,10 @@ export default function TrainsPage() {
                         ? new Date(selectedTrain.arrivalTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                         : '--:--'}
                     </p>
+                    {/* I minuti dell'orario di servizio: sono la stessa unità del ritardo. */}
+                    {selectedTrain.minutesToArrival !== null && (
+                      <p className="text-xs text-muted">fra {selectedTrain.minutesToArrival} min</p>
+                    )}
                   </div>
                 </div>
 

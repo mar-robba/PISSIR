@@ -24,7 +24,7 @@ import java.time.Instant;
  * se ne era occupato non lavora più in centrale.</p>
  *
  * @see it.uni.reti2.entity.Guasto
- * @see it.uni.reti2.ingestion.IngestionService#onAlert
+ * @see it.uni.reti2.elaboration.GuastiService
  */
 @Entity
 @Table(name = "Storico_Guasti")

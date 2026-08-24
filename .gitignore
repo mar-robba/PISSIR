@@ -27,3 +27,6 @@ node_modules/
 
 # Existing
 BrokerMosquitto/data/
+
+# Database locali SQLite dei nodi Stazione (-wal e -shm sono i file del journal WAL)
+Stazioni/data/

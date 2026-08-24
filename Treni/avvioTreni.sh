@@ -19,7 +19,7 @@ fi
 # Numero di istanze (una per ogni riga letta dal file)
 N_INSTANCES=${#ARGS[@]}
 # Comando base
-JAR_CMD="java -jar target/quarkus-app/quarkus-run.jar"
+JAR_CMD="java -Dquarkus.profile=tls -jar target/quarkus-app/quarkus-run.jar"
 # Porta di partenza (prima istanza su 9080, poi 9081...)
 # NB: le stazioni usano 8080+, quindi i treni partono da 9080 per non collidere
 BASE_PORT=9080

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    POM aggregatore del progetto: non produce nessun artefatto suo, serve solo a
+    tenere insieme i tre moduli Maven (centrale operativa, stazioni, treni) e a
+    compilarli tutti con un solo comando, anche in parallelo.
+
+    I pom dei singoli moduli NON ereditano da questo (nessun tag <parent>), quindi
+    ognuno resta compilabile/avviabile da solo entrando nella sua cartella:
+    esempio "cd Stazioni && ./mvnw quarkus:dev" continua a funzionare come prima.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>it.uni.reti2</groupId>
+    <artifactId>monitoraggio-traffico-ferroviario</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Monitoraggio e Gestione del Traffico Ferroviario</name>
+    <description>Aggregatore dei moduli Maven del sistema (la web app React non c'entra, si builda con npm)</description>
+
+    <!-- I moduli non dipendono l'uno dall'altro: Maven puo' buildarli in parallelo con -T -->
+    <modules>
+        <module>ServeCentraleOperativa</module>
+        <module>Stazioni</module>
+        <module>Treni</module>
+    </modules>
+</project>

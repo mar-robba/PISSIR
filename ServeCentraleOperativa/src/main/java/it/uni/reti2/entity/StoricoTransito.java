@@ -22,7 +22,7 @@ import java.time.Instant;
  * storia (lo faceva davvero {@code RestApiGateway.deleteStazione}).</p>
  *
  * @see it.uni.reti2.entity.Transito
- * @see it.uni.reti2.ingestion.IngestionService#onTransit
+ * @see it.uni.reti2.elaboration.TransitiService#registra
  */
 @Entity
 @Table(name = "Storico_Transiti")

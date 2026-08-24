@@ -24,6 +24,25 @@ export interface ApiTrainPayload {
   stazioneCorrente?: string | null;
   prossimaStazione?: string | null;
   direzione?: string;
+  /** Istante ISO in cui la Centrale prevede l'arrivo nella prossima stazione. */
+  arrivoPrevisto?: string | null;
+  /** Gli stessi minuti mancanti, nell'orario di servizio (come il ritardo). */
+  minutiAllArrivo?: number | null;
+}
+
+/** Riga di GET /api/stazioni/{id}/treni-attesi. */
+export interface ApiExpectedTrainPayload {
+  trenoId: string;
+  tipo?: string;
+  stato?: string;
+  direzione?: string;
+  itinerarioId?: string;
+  stazioneCorrente?: string | null;
+  prossimaStazione?: string | null;
+  ritardoMinuti?: number;
+  minutiAllArrivo?: number;
+  fermateIntermedie?: number;
+  arrivoPrevisto?: string | null;
 }
 
 export interface ApiStationPayload {

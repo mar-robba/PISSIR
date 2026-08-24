@@ -31,7 +31,7 @@ public class TrainElab {
     /**
      * Generatore reattivo continuo per i dati di telemetria. Uguale a all'heath beath della stazione
      * Viene eseguito in background e invia pacchetti di dati (posizioni, velocità, stato,
-     * progresso della tratta, ritardo, passeggeri) sul canale d'uscita "telemetry-out"
+     * progresso della tratta, passeggeri) sul canale d'uscita "telemetry-out"
      * verso la Centrale Operativa.
      *
      * Come l'heartbeat della stazione, il flusso è filtrato su trenoRiconosciuto: finché
@@ -68,12 +68,12 @@ public class TrainElab {
                     // (stazioneCorrente/prossimaStazione: stringa vuota se assenti)
                     String json = String.format(Locale.US,
                             "{\"trenoId\":\"%s\",\"stato\":\"%s\",\"latitudine\":%.5f,\"longitudine\":%.5f,"
-                                    + "\"velocita\":%.1f,\"progressPercent\":%.1f,\"ritardoMinuti\":%d,\"passeggeri\":%d,"
+                                    + "\"velocita\":%.1f,\"progressPercent\":%.1f,\"passeggeri\":%d,"
                                     + "\"stazioneCorrente\":\"%s\",\"prossimaStazione\":\"%s\",\"direzione\":\"%s\",\"timestamp\":\"%s\"}",
                             trainDB.trenoId, trainDB.stato,
                             trainDB.latitudine, trainDB.longitudine,
                             trainDB.velocita, trainDB.progressPercent,
-                            trainDB.ritardoMinuti, trainDB.passeggeri,
+                            trainDB.passeggeri,
                             trainDB.stazioneCorrente != null ? trainDB.stazioneCorrente : "",
                             trainDB.prossimaStazione != null ? trainDB.prossimaStazione : "",
                             trainDB.direzione,

@@ -68,6 +68,12 @@ export function useRealtimeUpdates() {
           // lo portava solo lo snapshot, e per una decina di secondi il pannello annunciava
           // ancora "corsa di andata" mentre il convoglio stava già tornando indietro.
           ...(data.direzione ? { direction: data.direzione === 'ritorno' ? 'ritorno' : 'andata' } : {}),
+          // Previsione di arrivo calcolata dalla Centrale. Il null è un valore vero e va
+          // scritto: vuol dire che per questo convoglio una stima non c'è più (corsa
+          // soppressa, itinerario tolto), e tenersi quella di prima mostrerebbe un orario
+          // di arrivo per un treno che non arriverà.
+          arrivalTime: typeof data.arrivoPrevisto === 'string' ? new Date(data.arrivoPrevisto).getTime() : null,
+          minutesToArrival: typeof data.minutiAllArrivo === 'number' ? data.minutiAllArrivo : null,
           lastUpdate: istanteEvento(data.timestamp)
         });
       }

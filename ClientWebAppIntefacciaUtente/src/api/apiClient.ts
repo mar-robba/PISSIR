@@ -1,4 +1,4 @@
-import { Train, Station, Route, TrackSegment, Alert, DashboardKPI, Transit, TrainStatus, User, UserRole } from '../types';
+import { Train, Station, Route, TrackSegment, Alert, DashboardKPI, Transit, TrainStatus, User, UserRole, ExpectedTrain } from '../types';
 import type {
   ApiAlertPayload,
   ApiCoppiaMancante,
@@ -9,17 +9,20 @@ import type {
   ApiTrackSegmentPayload,
   ApiStationPayload,
   ApiTransitPayload,
-  ApiTrainPayload
+  ApiTrainPayload,
+  ApiExpectedTrainPayload
 } from './apiTypes';
 
 /**
  * L'URL di base del server backend Java Quarkus (RestApiGateway).
  * Non è più fisso nel codice: si legge dalla variabile d'ambiente di Vite
- * VITE_API_BASE_URL (file .env), così lanciando la Centrale con il profilo tls
- * basta puntare a https://localhost:8444/api senza ricompilare nulla.
- * Default: HTTP sulla 8781, cioè il profilo di default (quarkus.http.port=8781).
+ * VITE_API_BASE_URL (file .env), così puntare a un'altra porta non richiede di
+ * ricompilare nulla.
+ * Default: HTTPS sulla 8444, cioè la Centrale avviata con -Dquarkus.profile=tls.
+ * Non è più la 8781 in chiaro perché la pagina ora è servita in https: il
+ * browser bloccherebbe come "mixed content" ogni chiamata verso http://.
  */
-const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8781/api';
+const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'https://localhost:8444/api';
 
 /**
  * Access token OAuth2 rilasciato da Keycloak: la Centrale lo pretende nell'header
@@ -140,7 +143,11 @@ export const mapApiTrain = (t: ApiTrainPayload): Train => {
     previousStationId: t.stazioneCorrente || estremoPartenza || null,
     routeId: t.itinerario?.id || '',
     direction: inRitorno ? 'ritorno' : 'andata',
-    arrivalTime: null,
+    // La previsione di arrivo arriva calcolata dalla Centrale: qui c'era una costante
+    // null, e siccome i riquadri "ETA" e "Arrivo previsto" sono dentro una condizione
+    // su questo campo non comparivano mai.
+    arrivalTime: t.arrivoPrevisto ? new Date(t.arrivoPrevisto).getTime() : null,
+    minutesToArrival: t.minutiAllArrivo ?? null,
     departureTime: null,
     delayMinutes: t.ritardo || 0,
     passengers: t.passeggeri || 0,
@@ -175,6 +182,19 @@ const mapApiRoute = (r: ApiRoutePayload): Route => ({
   travelTimes: r.travelTimes || [],
   active: r.attivo || false,
   createdAt: Date.now()
+});
+
+/** Converte una riga del tabellone dei treni attesi nella shape del frontend. */
+const mapApiExpectedTrain = (t: ApiExpectedTrainPayload): ExpectedTrain => ({
+  trainId: t.trenoId,
+  kind: t.tipo === 'in_partenza' ? 'in_partenza' : 'in_arrivo',
+  status: mapBackendStatus(t.stato ?? ''),
+  delayMinutes: t.ritardoMinuti ?? 0,
+  minutesToArrival: t.minutiAllArrivo ?? 0,
+  stopsBefore: t.fermateIntermedie ?? 0,
+  arrivalTime: t.arrivoPrevisto ? new Date(t.arrivoPrevisto).getTime() : null,
+  nextStationId: t.prossimaStazione || null,
+  direction: t.direzione === 'ritorno' ? 'ritorno' : 'andata',
 });
 
 const mapApiTrackSegment = (t: ApiTrackSegmentPayload): TrackSegment => ({
@@ -268,6 +288,23 @@ export const apiClient = {
     if (!res.ok) throw new Error('Failed to fetch stations');
     const data = await res.json() as ApiStationPayload[];
     return data.map(mapApiStation);
+  },
+
+  /**
+   * I convogli che la Centrale si aspetta in una stazione, con l'orario previsto.
+   *
+   * <p>Il calcolo lo fa la Centrale sull'itinerario dei treni: prima questo elenco lo
+   * costruiva la pagina Stazioni filtrando i convogli la cui posizione istantanea
+   * coincideva con la stazione, quindi mostrava solo chi stava già arrivando dalla
+   * tratta adiacente e non chi sarebbe passato di lì qualche fermata più avanti.</p>
+   */
+  getExpectedTrains: async (stationId: string): Promise<ExpectedTrain[]> => {
+    const res = await fetch(`${API_BASE_URL}/stazioni/${encodeURIComponent(stationId)}/treni-attesi`, {
+      headers: authHeaders()
+    });
+    if (!res.ok) throw await createApiError(res);
+    const data = await res.json() as ApiExpectedTrainPayload[];
+    return data.map(mapApiExpectedTrain);
   },
 
   /**

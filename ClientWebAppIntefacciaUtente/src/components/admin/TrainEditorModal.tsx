@@ -54,6 +54,7 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
           previousStationId: null,
           direction: 'andata',
           arrivalTime: null,
+          minutesToArrival: null,
           departureTime: null,
           passengers: 0,
           delayMinutes: 0,

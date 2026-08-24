@@ -1701,6 +1701,8 @@ export default function TrafficMapPage() {
                     <span className="map-detail__etichetta">Arrivo previsto</span>
                     <span className="map-detail__valore">
                       {new Date(trenoSelezionato.arrivalTime).toLocaleTimeString()}
+                      {trenoSelezionato.minutesToArrival !== null
+                        && ` (fra ${trenoSelezionato.minutesToArrival} min)`}
                     </span>
                   </div>
                 )}

@@ -2,7 +2,7 @@
   "realm": "railway",
   "displayName": "Rete Ferroviaria - Centrale Operativa",
   "enabled": true,
-  "sslRequired": "none",
+  "sslRequired": "all",
   "registrationAllowed": false,
   "loginTheme": "keycloak",
   "accessTokenLifespan": 1800,
@@ -33,16 +33,16 @@
       "serviceAccountsEnabled": false,
       "fullScopeAllowed": true,
       "redirectUris": [
-        "http://localhost:5173/*",
-        "http://127.0.0.1:5173/*"
+        "https://localhost:5173/*",
+        "https://127.0.0.1:5173/*"
       ],
       "webOrigins": [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173"
+        "https://localhost:5173",
+        "https://127.0.0.1:5173"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5173/*##http://127.0.0.1:5173/*"
+        "post.logout.redirect.uris": "https://localhost:5173/*##https://127.0.0.1:5173/*"
       },
       "protocolMappers": [
         {

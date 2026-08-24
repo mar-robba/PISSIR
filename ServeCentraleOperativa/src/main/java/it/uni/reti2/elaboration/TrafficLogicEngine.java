@@ -19,13 +19,14 @@ import java.util.concurrent.ConcurrentHashMap;
  Dove si scrive sul database, e perché non qui.
 
  Questa classe è una cache in RAM: la riempie all'avvio leggendo dal database e poi la
- tiene aggiornata il consumer MQTT (IngestionService). Le API REST la leggono per non
+ tengono aggiornata i servizi di monitoraggio. Le API REST la leggono per non
  ripassare dal database a ogni richiesta.
 
  Da quando esiste RailwayRepository ogni lettura e ogni scrittura passa da lì: nessuna
  classe chiama più findById, list o persist sulle entità. I punti in cui il database
  cambia davvero restano due:
-   - l'IngestionService, che a ogni messaggio MQTT aggiorna treni, stazioni, transiti e
+   - i servizi di monitoraggio (MonitoraggioTreni, MonitoraggioStazioni, TransitiService,
+     GuastiService), che a ogni messaggio MQTT aggiornano treni, stazioni, transiti e
      guasti e ne scrive le righe di storico (repository.salvaTreno, salvaStoricoTransito,
      salvaGuasto, ...);
    - gli endpoint amministrativi del RestApiGateway, che creano e cancellano stazioni,
@@ -39,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Cache in-memory dello stato corrente della rete ferroviaria.
- * Viene aggiornato dal consumer MQTT in tempo reale (IngestionService) e letto 
+ * Viene aggiornato in tempo reale dai servizi di monitoraggio e letto 
  * in modo veloce dalle API REST (RestApiGateway), fungendo da strato intermedio
  * per ridurre il carico sul database relazionale.
  * e allora quando il database in back aggiorna il proprio stato e viceversa

@@ -369,7 +369,7 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
     try {
       await apiClient.suppressTrain(trainId);
       const { updateTrain, pushNotification } = get();
-      updateTrain(trainId, { status: 'soppresso', arrivalTime: null, departureTime: null });
+      updateTrain(trainId, { status: 'soppresso', arrivalTime: null, minutesToArrival: null, departureTime: null });
       pushNotification({
         kind: 'treno_soppresso',
         severity: 'warning',
@@ -411,14 +411,33 @@ export const useRailwayStore = create<RailwayState>((set, get) => ({
   },
 
   /**
-   * Completa la manutenzione di una stazione, riportandola operativa.
+   * Chiude l'intervento di manutenzione su una stazione (RF01.4.2).
+   *
+   * Va chiuso il *guasto*, non ridipinta la stazione: prima qui si chiamava
+   * updateStation({ status: 'operativa' }), che rimetteva il pallino verde lasciando
+   * l'allarme aperto sulla Centrale e i treni fermi in stazione, perché il RESOLVED
+   * non partiva mai verso il campo. Il ritorno a ONLINE lo decide la Centrale come
+   * conseguenza della chiusura, e torna indietro da solo sulla WebSocket.
    */
   completeMaintenance: async (stationId) => {
     const station = get().stations.find((s) => s.id === stationId);
+    const aperti = get().alerts.filter((a) => a.stationId === stationId && !a.acknowledged);
+    if (aperti.length === 0) {
+      get().pushNotification({
+        kind: 'errore_comando',
+        severity: 'warning',
+        message: `Nessun allarme aperto per la stazione ${station?.code ?? stationId}: niente da chiudere.`,
+      });
+      return;
+    }
     try {
-      await apiClient.updateStation(stationId, { status: 'operativa' });
+      // Una stazione può avere più di un allarme aperto (es. sensore muto più guasto
+      // segnalato): la Centrale la rimette ONLINE solo quando li ha chiusi tutti.
+      for (const allarme of aperti) {
+        await apiClient.acknowledgeAlert(allarme.id);
+      }
       const { updateStation, pushNotification } = get();
-      updateStation(stationId, { status: 'operativa', operatorsDispatched: false });
+      updateStation(stationId, { operatorsDispatched: false });
       pushNotification({
         kind: 'operatori_inviati',
         severity: 'success',

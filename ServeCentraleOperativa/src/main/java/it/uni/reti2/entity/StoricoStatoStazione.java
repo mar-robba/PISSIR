@@ -18,7 +18,7 @@ import java.time.Instant;
  * è stata rinominata o eliminata dall'anagrafica.</p>
  *
  * @see it.uni.reti2.entity.Stazione
- * @see it.uni.reti2.ingestion.IngestionService#onHeartbeat
+ * @see it.uni.reti2.elaboration.MonitoraggioStazioni#registraHeartbeat
  */
 @Entity
 @Table(name = "Storico_Stato_Stazioni")

@@ -19,8 +19,12 @@
 // conosce nessuna password e si limita a verificare la firma del token.
 // ============================================================
 
-/** Indirizzo di Keycloak (container railway-keycloak del docker-compose). */
-const KEYCLOAK_URL: string = import.meta.env.VITE_KEYCLOAK_URL ?? 'http://localhost:8180';
+/**
+ * Indirizzo di Keycloak (container railway-keycloak del docker-compose).
+ * E' in https perche' il container espone soltanto il listener cifrato: su
+ * questo canale viaggiano le password degli utenti (RF04.3).
+ */
+const KEYCLOAK_URL: string = import.meta.env.VITE_KEYCLOAK_URL ?? 'https://localhost:8543';
 /** Realm che contiene utenti, ruoli e client del progetto. */
 const REALM: string = import.meta.env.VITE_KEYCLOAK_REALM ?? 'railway';
 /** Client pubblico della SPA, dichiarato in Keycloak/realm-railway.json. */

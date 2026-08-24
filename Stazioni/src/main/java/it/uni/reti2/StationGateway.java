@@ -39,6 +39,20 @@ public class StationGateway {
     @Inject
     LocalBuffer localBuffer;
 
+    /**
+     * Db locale su file: qui serve per annotare i guasti segnalati da questa stazione
+     * nella tabella Guasto_Locale_Momentaneo.
+     */
+    @Inject
+    PersistenzaLocale persistenza;
+
+    /**
+     * I sensori di binario: sono loro a vedere passare i convogli.
+     * Il gateway non registra più i transiti di testa sua, li fa rilevare al sensore.
+     */
+    @Inject
+    SimulatoreSensori simulatoreSensori;
+
     //==== Alias per l'uso dei topic in output(quelli in imput naturalmente devono possedere listener reattivi siccome si
     // tratta di un flusso di dati)
     /**
@@ -84,7 +98,7 @@ public class StationGateway {
                     // La Centrale ha risolto un guasto: se riguarda questa stazione si riparte
                     if ("STAZIONE".equals(json.path("sorgenteTipo").asText())
                             && dbLocale.stazioneId.equals(sorgenteId)) {
-                        dbLocale.stato = "ONLINE";
+                        dbLocale.setStato("ONLINE");
                         LOG.info("🔧 Stazione ripristinata dalla Centrale! Stato di nuovo ONLINE.");
                     }
                     break;
@@ -100,7 +114,7 @@ public class StationGateway {
                     if ("STAZIONE".equals(json.path("sorgenteTipo").asText())
                             && dbLocale.stazioneId.equals(sorgenteId)
                             && "CRITICAL".equalsIgnoreCase(json.path("severita").asText(""))) {
-                        dbLocale.stato = "GUASTA";
+                        dbLocale.setStato("GUASTA");
                         LOG.warnf("🚨 Stazione marcata GUASTA dalla Centrale: %s",
                                 json.path("messaggio").asText(""));
                     }
@@ -119,8 +133,8 @@ public class StationGateway {
      * Intercetta i passaggi fisici dei treni pubblicati sul topic wildcard
      * railway/train/+/passaggio. Ogni stazione riceve i passaggi di TUTTI i treni,
      * quindi filtra i soli messaggi indirizzati al proprio stazioneId.
-     * Aggiorna la mappa dei treni presenti e notifica il transito ufficiale alla Centrale.
-     * Se la stazione è GUASTA e un treno entra, viene pubblicato un alert che lo trattiene.
+     * Il passaggio viene girato ai sensori di binario, che sono i soli a poterlo rilevare:
+     * la registrazione vera e propria avviene poi in {@link #registraTransitoRilevato}.
      *
      * @param message Il messaggio di passaggio in arrivo dal broker.
      * @return CompletionStage che indica il processamento completato.
@@ -142,20 +156,12 @@ public class StationGateway {
             String tipo = json.path("tipo").asText();
             LOG.infof("🚂 [PASSAGGIO] Treno %s in %s dalla stazione %s", trenoId, tipo, stazioneId);
 
-            // Aggiorna la fotografia locale dei binari
-            if ("ENTRATA".equals(tipo)) {
-                dbLocale.treniPresenti.put(trenoId, Instant.now());
-            } else if ("USCITA".equals(tipo)) {
-                dbLocale.treniPresenti.remove(trenoId);
-            }
-
-            // Notifica ufficiale del transito verso la Centrale (fonte per la storicizzazione)
-            inviaTransito(trenoId, tipo);
-
-            // Stazione guasta: il treno appena entrato viene trattenuto con un alert dedicato
-            if ("GUASTA".equals(dbLocale.stato) && "ENTRATA".equals(tipo)) {
-                inviaGuasto(String.format("Stazione %s guasta: treno %s trattenuto", dbLocale.stazioneId, trenoId), "CRITICAL");
-            }
+            // Il convoglio annuncia il proprio passaggio, ma a vederlo fisicamente è il
+            // sensore piazzato sul binario, che poi lo comunica alla stazione via REST.
+            // Se quel sensore è fermo (fail-stop) il transito non viene rilevato da nessuno:
+            // è esattamente il motivo per cui una stazione senza sensori è una stazione
+            // guasta, e non un dettaglio da aggirare registrando il transito lo stesso.
+            simulatoreSensori.rilevaPassaggio(trenoId, tipo);
         } catch (Exception e) {
             LOG.errorf("Payload passaggio non interpretabile: %s", payload);
         }
@@ -165,6 +171,37 @@ public class StationGateway {
     // ---------------- END  listener per canali in imput
 
     // ================= inizion degli inviatori dei messaggi in out dalla stazione
+
+    /**
+     * Registra un transito che un sensore di binario ha appena rilevato.
+     *
+     * <p>È il punto unico in cui la stazione prende atto che un convoglio è entrato o
+     * uscito: aggiorna la fotografia locale dei binari (RAM + db locale), manda alla
+     * Centrale la notifica ufficiale del transito e, se la stazione è guasta, pubblica
+     * l'alert che trattiene il treno appena arrivato. Ci si arriva solo dall'endpoint
+     * {@code POST /stazione/sensore/treno}, cioè da un sensore: prima questa roba stava
+     * dentro il listener MQTT e la stazione si registrava i passaggi da sola, senza che
+     * nessun sensore avesse visto niente.</p>
+     *
+     * @param trenoId Identificativo del convoglio rilevato.
+     * @param tipo    "ENTRATA" oppure "USCITA".
+     */
+    public void registraTransitoRilevato(String trenoId, String tipo) {
+        // Aggiorna la fotografia locale dei binari
+        if ("ENTRATA".equals(tipo)) {
+            dbLocale.registraEntrataTreno(trenoId);
+        } else if ("USCITA".equals(tipo)) {
+            dbLocale.registraUscitaTreno(trenoId);
+        }
+
+        // Notifica ufficiale del transito verso la Centrale (fonte per la storicizzazione)
+        inviaTransito(trenoId, tipo);
+
+        // Stazione guasta: il treno appena entrato viene trattenuto con un alert dedicato
+        if ("GUASTA".equals(dbLocale.getStato()) && "ENTRATA".equals(tipo)) {
+            inviaGuasto(String.format("Stazione %s guasta: treno %s trattenuto", dbLocale.stazioneId, trenoId), "CRITICAL");
+        }
+    }
 
     /**
      * Segnala un guasto infrastrutturale locale con severità CRITICAL (default).
@@ -206,14 +243,47 @@ public class StationGateway {
      */
     public void inviaGuasto(String descrizione, String severita, String tipoGuasto) {
         if ("CRITICAL".equals(severita)) {
-            dbLocale.stato = "GUASTA";
+            dbLocale.setStato("GUASTA");
         }
+
+        // Il guasto viene annotato anche sul db locale (Guasto_Locale_Momentaneo): resta
+        // aperto finche' non arriva il RESOLVED della Centrale, e sopravvive a un riavvio
+        // del nodo insieme allo stato GUASTA. La numerazione e' locale e non ha niente a
+        // che vedere con l'id dell'allarme lato Centrale.
+        Instant adesso = Instant.now();
+        long idGuasto = persistenza.registraGuasto(
+                tipoGuasto != null ? tipoGuasto : "stazione_guasta", descrizione, adesso);
+
         String campoTipo = tipoGuasto != null ? String.format("\"tipoGuasto\":\"%s\",", tipoGuasto) : "";
         String alertJson = String.format(
                 "{\"tipoEvento\":\"GUASTO\",\"sorgenteTipo\":\"STAZIONE\",\"sorgenteId\":\"%s\",%s\"severita\":\"%s\",\"messaggio\":\"%s\",\"timestamp\":\"%s\"}",
-                dbLocale.stazioneId, campoTipo, severita, descrizione, Instant.now().toString());
+                dbLocale.stazioneId, campoTipo, severita, descrizione, adesso.toString());
 
-        inviaOppureBufferizza("alert", alertJson, alertsEmitter);
+        inviaOppureBufferizza("alert", alertJson, alertsEmitter, idGuasto >= 0 ? idGuasto : null, null);
+    }
+
+    /**
+     * Comunica alla Centrale che un guasto segnalato da questa stazione è rientrato da solo.
+     *
+     * <p>Serve al fail-stop dei sensori: quando i keepalive ricominciano ad arrivare la
+     * stazione torna operativa per conto suo, e se non lo dicesse a nessuno l'allarme
+     * resterebbe rosso sulla dashboard e i treni continuerebbero a considerare la stazione
+     * bloccata (il RESOLVED sul topic condiviso lo ascoltano anche i convogli, che è quello
+     * che li fa ripartire). Il formato è quello del canale railway/alerts, con lo stesso
+     * discriminante "tipoEvento" usato dalla Centrale quando è lei a chiudere un guasto.</p>
+     *
+     * <p>Non viene messo il campo "origine": quello è il marcatore che la Centrale usa per
+     * non riascoltare i propri messaggi, e questo messaggio arriva invece dal campo.</p>
+     *
+     * @param tipoGuasto  Classificazione del guasto che è rientrato ("sensore_offline").
+     * @param descrizione Testo leggibile del rientro.
+     */
+    public void inviaRipristino(String tipoGuasto, String descrizione) {
+        String payload = String.format(
+                "{\"tipoEvento\":\"RESOLVED\",\"sorgenteTipo\":\"STAZIONE\",\"sorgenteId\":\"%s\",\"tipoGuasto\":\"%s\",\"messaggio\":\"%s\",\"timestamp\":\"%s\"}",
+                dbLocale.stazioneId, tipoGuasto, descrizione, Instant.now().toString());
+
+        inviaOppureBufferizza("alert", payload, alertsEmitter, null, null);
     }
 
     /**
@@ -228,7 +298,7 @@ public class StationGateway {
                 "{\"stazioneId\":\"%s\",\"trenoId\":\"%s\",\"tipo\":\"%s\",\"timestamp\":\"%s\"}",
                 dbLocale.stazioneId, trenoId, tipo, Instant.now().toString());
 
-        inviaOppureBufferizza("transit", payload, transitEmitter);
+        inviaOppureBufferizza("transit", payload, transitEmitter, null, trenoId);
     }
 
     /**
@@ -241,11 +311,14 @@ public class StationGateway {
      * @param canale Canale logico dell'evento ("transit" o "alert").
      * @param payload Il payload JSON da recapitare.
      * @param emitter L'emitter MQTT su cui pubblicare.
+     * @param idGuasto Guasto locale che ha generato l'evento, null se non c'entra.
+     * @param idTreno Convoglio a cui l'evento si riferisce, null se non c'entra.
      */
-    private void inviaOppureBufferizza(String canale, String payload, Emitter<String> emitter) {
+    private void inviaOppureBufferizza(String canale, String payload, Emitter<String> emitter,
+                                       Long idGuasto, String idTreno) {
         if (!dbLocale.connessioneCentrale) {
             LOG.warnf("🔌 Offline: evento '%s' salvato nel buffer locale.", canale);
-            localBuffer.add(canale, payload);
+            localBuffer.add(canale, payload, idGuasto, idTreno);
             return;
         }
         try {
@@ -253,7 +326,7 @@ public class StationGateway {
         } catch (Exception e) {
             LOG.errorf("Impossibile inviare '%s', salvo nel buffer locale.", canale);
             // Meccanismo Store and Forward: se il broker è irraggiungibile si accoda
-            localBuffer.add(canale, payload);
+            localBuffer.add(canale, payload, idGuasto, idTreno);
             dbLocale.connessioneCentrale = false;
         }
     }
@@ -265,6 +338,10 @@ public class StationGateway {
      * IN TESTA al buffer e il flush si interrompe (si riproverà al prossimo giro):
      * rimetterlo in fondo lo farebbe diventare il più recente e la Centrale
      * potrebbe ricevere l'USCITA di un treno prima della sua ENTRATA.
+     *
+     * <p>La riga sul db locale viene cancellata solo dopo che l'emitter ha accettato il
+     * payload (confermaInvio): fino a quel momento l'evento resta scritto su disco, così
+     * nemmeno un blackout nel mezzo del flush riesce a farlo sparire.</p>
      */
     public void flush() {
         while (!localBuffer.isEmpty()) {
@@ -278,11 +355,13 @@ public class StationGateway {
                 } else {
                     transitEmitter.send(evento.payload());
                 }
+                // Consegnato: adesso si può togliere anche dal db locale
+                localBuffer.confermaInvio(evento);
                 LOG.infof("📤 Re-invio dal buffer [%s]: %s", evento.canale(), evento.payload());
             } catch (Exception e) {
                 LOG.error("🔌 Flush interrotto: connessione ancora assente, evento rimesso in testa.");
                 // L'evento non è partito: torna davanti a tutti (mantiene l'ordine cronologico)
-                localBuffer.addFirst(evento.canale(), evento.payload());
+                localBuffer.addFirst(evento);
                 dbLocale.connessioneCentrale = false;
                 break;
             }

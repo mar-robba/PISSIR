@@ -65,6 +65,23 @@ public class Treno extends PanacheEntityBase {
     /** Direzione di percorrenza dell'itinerario ("andata" o "ritorno"). */
     @Transient
     public String direzione;
+    /**
+     * Istante in cui la Centrale prevede che il convoglio entri nella prossima stazione.
+     * Lo ricalcola {@code PrevisioneArrivi} a ogni frame di telemetria componendo il tempo
+     * di percorrenza dell'itinerario con il progresso sulla tratta; e' null quando la
+     * previsione non si puo' fare (convoglio senza itinerario, senza prossima stazione,
+     * oppure soppresso).
+     */
+    @Transient
+    public Instant arrivoPrevisto;
+    /**
+     * Gli stessi minuti che mancano all'arrivo, ma nell'orario del servizio invece che
+     * in tempo reale: la simulazione corre accelerata, quindi "fra 12 minuti" e l'istante
+     * di {@link #arrivoPrevisto} non sono lo stesso numero. E' la cifra confrontabile con
+     * {@link #ritardo}, che è anch'esso in minuti di servizio.
+     */
+    @Transient
+    public Integer minutiAllArrivo;
 
 
     public Treno() {}

@@ -19,11 +19,11 @@ import java.time.Instant;
  * <p>Oltre ai dati persistiti, la classe mantiene in memoria informazioni
  * <em>volatili</em> come lo stato operativo, le coordinate GPS, il numero di binari
  * e il timestamp dell'ultimo heartbeat. Questi dati vengono aggiornati in tempo reale
- * da {@code IngestionService} quando arriva un heartbeat MQTT dalla stazione edge,
+ * da {@code MonitoraggioStazioni} quando arriva un heartbeat MQTT dalla stazione edge,
  * e letti da {@code RestApiGateway} e {@code TrafficLogicEngine} per alimentare
  * le API REST e la cache di sistema.</p>
  *
- * @see it.uni.reti2.ingestion.IngestionService#onHeartbeat
+ * @see it.uni.reti2.elaboration.MonitoraggioStazioni#registraHeartbeat
  * @see it.uni.reti2.elaboration.TrafficLogicEngine
  */
 @Entity

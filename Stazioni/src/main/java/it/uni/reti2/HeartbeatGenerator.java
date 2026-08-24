@@ -5,20 +5,21 @@ import io.smallrye.mutiny.Multi;
 import it.uni.reti2.DBLocale;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Outgoing;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 
 /**
  * Componente responsabile della generazione e dell'invio ciclico del segnale
  * di vitalità (Heartbeat) della stazione verso la Centrale Operativa.
  * Gestisce anche il meccanismo di Store and Forward per svuotare il buffer
- * degli eventi pendenti non appena la connessione viene ristabilita, e il
- * controllo di keepalive dei sensori di binario.
+ * degli eventi pendenti non appena la connessione viene ristabilita.
+ *
+ * <p>Il keepalive dei sensori di binario, che prima stava qui dentro, adesso è tutto in
+ * {@link MonitorSensori}: sono due heartbeat diversi (questo va verso la Centrale, quello
+ * arriva dai dispositivi di campo) e tenerli insieme aveva solo confuso le cose.</p>
  */
 @ApplicationScoped
 public class HeartbeatGenerator implements HeartbeatKA {
@@ -31,17 +32,10 @@ public class HeartbeatGenerator implements HeartbeatKA {
     LocalBuffer localBuffer;
 
     /**
-     * Gateway verso la Centrale: usato per il flush reale del buffer
-     * e per segnalare i sensori che non rispondono più.
+     * Gateway verso la Centrale: usato per il flush reale del buffer.
      */
     @Inject
     StationGateway stationGateway;
-
-    /**
-     * Secondi di silenzio oltre i quali un sensore viene considerato guasto.
-     */
-    @ConfigProperty(name = "sensori.timeout.secondi", defaultValue = "30")
-    long timeoutSensoriSecondi;
 
     /**
      * Costruisce il messaggio JSON di heartbeat implementando l'interfaccia.
@@ -57,9 +51,8 @@ public class HeartbeatGenerator implements HeartbeatKA {
 
     /**
      * Job periodico di manutenzione del nodo, volutamente SEPARATO dal flusso di heartbeat:
-     * - controlla i keepalive dei sensori di binario;
-     * - se la connessione è attiva e ci sono eventi pendenti, svuota il buffer
-     *   tramite il flush reale del Gateway (store and forward).
+     * se la connessione è attiva e ci sono eventi pendenti, svuota il buffer
+     * tramite il flush reale del Gateway (store and forward).
      *
      * Prima queste due operazioni giravano dentro l'.invoke() del Multi dell'heartbeat:
      * siccome un Multi che fallisce termina, al primo errore MQTT si fermava anche lo
@@ -68,9 +61,6 @@ public class HeartbeatGenerator implements HeartbeatKA {
      */
     @Scheduled(every = "10s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     void manutenzionePeriodica() {
-        // Verifica dei sensori che non mandano più il keepalive
-        controllaSensori();
-
         // Se la connessione è attiva e ci sono eventi che non erano stati inviati...
         if (dbLocale.connessioneCentrale && !localBuffer.isEmpty()) {
             LOG.infof("📡 Connessione ok, svuoto il buffer (%d eventi)...", localBuffer.size());
@@ -119,7 +109,7 @@ public class HeartbeatGenerator implements HeartbeatKA {
                 })
                 .map(tick -> {
                     // Prepara il messaggio
-                    String json = generatePayload(dbLocale.stazioneId, dbLocale.stato, localBuffer.size());
+                    String json = generatePayload(dbLocale.stazioneId, dbLocale.getStato(), localBuffer.size());
                     LOG.infof("💓 [HEARTBEAT] Invio heartbeat: %s", json);
                     return json;
                 })
@@ -137,30 +127,4 @@ public class HeartbeatGenerator implements HeartbeatKA {
                 .onFailure().retry().withBackOff(Duration.ofSeconds(1), Duration.ofSeconds(10)).indefinitely();
     }
 
-   //boh
-
-    /**
-     * Controlla la mappa dei sensori monitorati: quelli il cui ultimo battito
-     * è più vecchio del timeout configurato vengono segnalati alla Centrale
-     * e rimossi dalla mappa, così la segnalazione avviene una sola volta.
-     *
-     * La severità è CRITICAL perché il PDF chiede che una stazione che non riceve
-     * più i keepalive dai propri sensori "segnali lo stato di guasta alla Centrale
-     * Operativa": inviaGuasto con CRITICAL porta dbLocale.stato a GUASTA, quindi i
-     * treni in arrivo vengono trattenuti finché non arriva la squadra di manutenzione.
-     */
-    private void controllaSensori() {
-        Instant limite = Instant.now().minusSeconds(timeoutSensoriSecondi);
-        for (Map.Entry<String, Instant> sensore : dbLocale.sensoriUltimoBattito.entrySet()) {
-            if (sensore.getValue().isBefore(limite)) {
-                LOG.warnf("⚠️ Sensore %s silente da oltre %d secondi: stazione GUASTA!", sensore.getKey(), timeoutSensoriSecondi);
-                // "sensore_offline" dichiarato esplicitamente: questo è davvero il guasto di
-                // un sensore di binario, e va distinto dagli altri guasti di terra.
-                stationGateway.inviaGuasto("Sensore " + sensore.getKey() + " non invia keepalive",
-                        "CRITICAL", "sensore_offline");
-                // Rimozione dalla mappa: evita di rigenerare lo stesso alert a ogni tick
-                dbLocale.sensoriUltimoBattito.remove(sensore.getKey());
-            }
-        }
-    }
 }

@@ -83,7 +83,10 @@ export default function AlertsPage() {
               className="flex items-center justify-between gap-3 p-3 border border-border-color rounded-md bg-black/20"
             >
               <div className="flex items-center gap-3">
-                <Info size={16} className={notification.severity === 'critical' ? 'text-danger' : 'text-info'} />
+                <Info size={16} className={
+                  notification.severity === 'critical' ? 'text-danger'
+                    : notification.severity === 'success' ? 'text-success' : 'text-info'
+                } />
                 <span className="text-sm">{notification.message}</span>
                 <span className="text-xs text-muted">
                   {new Date(notification.timestamp).toLocaleTimeString()}
