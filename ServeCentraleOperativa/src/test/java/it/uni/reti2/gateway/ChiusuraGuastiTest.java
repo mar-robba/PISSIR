@@ -8,6 +8,7 @@ import it.uni.reti2.elaboration.TrafficLogicEngine;
 import it.uni.reti2.entity.Guasto;
 import it.uni.reti2.entity.StatiCanonici;
 import it.uni.reti2.entity.Stazione;
+import it.uni.reti2.ingestion.payload.AlertMsg;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
@@ -60,9 +62,11 @@ public class ChiusuraGuastiTest {
         .then()
             .statusCode(201);
 
-        // Il guasto lo apre il servizio, esattamente come farebbe il watchdog.
+        // Il guasto lo apre il servizio, esattamente come farebbe il watchdog: stessa
+        // severità WARNING, perché una stazione che tace non è una stazione impercorribile
+        // e i convogli non si fermano mentre ci passano (vedi FaultMonitor).
         Guasto guasto = guasti.apri(guasti.nuovoDedotto(
-                "sensore_offline", "CRITICAL", "STAZIONE", STAZIONE,
+                "sensore_offline", "WARNING", "STAZIONE", STAZIONE,
                 Guasto.MSG_HEARTBEAT_PERSO + " la stazione " + STAZIONE + " non invia heartbeat"), null);
         Assertions.assertNotNull(guasto, "il guasto doveva essere scritto a database");
         idGuastoAperto = guasto.id;
@@ -99,12 +103,46 @@ public class ChiusuraGuastiTest {
     }
 
     /**
+     * Il caso che rompeva l'intervento: la stazione e' in manutenzione ma il nodo di se'
+     * continua a dichiararsi guasto, e rimanda l'alert a ogni treno che entra. Quella
+     * ripetizione non deve riportare la stazione a GUASTA, altrimenti l'intervento
+     * sparisce e con lui il motivo per cui i convogli sono fermi.
+     */
+    @Test
+    @Order(4)
+    public void unAlertRipetutoDalCampoNonCancellaLIntervento() {
+        guasti.registraSegnalazione(new AlertMsg("GUASTO", "", "STAZIONE", STAZIONE, "CRITICAL",
+                "Sensore di binario B2 non invia keepalive", "sensore_offline", Instant.now()));
+
+        Stazione stazione = statoRete.getStazione(STAZIONE);
+        Assertions.assertEquals(StatiCanonici.STAZIONE_MANUTENZIONE, stazione.stato,
+                "un guasto nuovo e' un allarme in piu' su una stazione gia' chiusa, non un cambio di stato");
+    }
+
+    /**
+     * Il seguito del test precedente: il campo dichiara rientrato il proprio guasto (i
+     * sensori ricominciano a battere) mentre la squadra e' ancora sul posto. La stazione
+     * non torna in servizio da sola: a dire che l'intervento e' finito e' il tecnico.
+     */
+    @Test
+    @Order(5)
+    public void ilRientroDichiaratoDalCampoNonChiudeLIntervento() {
+        guasti.chiudiSuDichiarazioneDalCampo(new AlertMsg("RESOLVED", "", "STAZIONE", STAZIONE, "CRITICAL",
+                "Keepalive dei sensori di binario ripristinato", "sensore_offline", Instant.now()));
+
+        Assertions.assertEquals(StatiCanonici.STAZIONE_MANUTENZIONE, statoRete.getStazione(STAZIONE).stato,
+                "i tecnici sono ancora sui binari");
+        Assertions.assertNotNull(statoRete.getGuastoApertoPerSorgente(STAZIONE, "sensore_offline"),
+                "l'allarme resta aperto: e' quello che tiene fermi i convogli fino a fine intervento");
+    }
+
+    /**
      * La chiusura dell'allarme e' l'unico punto in cui la stazione torna operativa
      * (RF01.4.2): il guasto risulta risolto e lo stato torna ONLINE senza aspettare un
      * heartbeat.
      */
     @Test
-    @Order(4)
+    @Order(6)
     @TestSecurity(user = "mat003", roles = {"tecnico"})
     public void chiudereLAllarmeRimetteLaStazioneInServizio() {
         given()
@@ -125,7 +163,7 @@ public class ChiusuraGuastiTest {
 
     /** Un identificativo che non esiste e' un 404, non un 500. */
     @Test
-    @Order(5)
+    @Order(7)
     @TestSecurity(user = "mat003", roles = {"tecnico"})
     public void chiudereUnAllarmeInesistenteE404() {
         given()

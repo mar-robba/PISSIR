@@ -1,4 +1,5 @@
 import { useRailwayStore } from '../store/railwayStore';
+import { descriviIncertezzaPosizione } from '../api/apiClient';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { useState } from 'react';
@@ -77,11 +78,17 @@ export default function TrainsPage() {
                         {train.status.replace('_', ' ').toUpperCase()}
                       </Badge>
                     </td>
-                    <td className="capitalize">{train.direction}</td>
+                    <td className="capitalize">{train.direction ?? '?'}</td>
+                    {/* Quando la Centrale non garantisce la posizione qui non si compone
+                        niente: "Tra X e Y" messo insieme con una partenza vecchia e un
+                        arrivo aggiornato era il modo in cui comparivano tratte che nella
+                        rete non esistono. Meglio un punto di domanda onesto. */}
                     <td className="text-sm">
-                      {train.status === 'in_viaggio' 
-                        ? `Tra ${getStationName(train.previousStationId)} e ${getStationName(train.nextStationId)}`
-                        : getStationName(train.currentStationId)
+                      {!train.positionKnown
+                        ? <span className="text-warning">? · posizione incerta</span>
+                        : train.status === 'in_viaggio'
+                          ? `Tra ${getStationName(train.previousStationId)} e ${getStationName(train.nextStationId)}`
+                          : getStationName(train.currentStationId)
                       }
                     </td>
                     <td>
@@ -139,7 +146,20 @@ export default function TrainsPage() {
                   <h4 className="text-xs text-muted uppercase tracking-wider mb-2 flex items-center gap-1">
                     <MapPin size={14} /> Posizione
                   </h4>
-                  {selectedTrain.status === 'in_viaggio' ? (
+                  {/* La barra di avanzamento ha senso solo fra due estremi noti: senza la
+                      partenza non si sa nemmeno da dove parte il riempimento. */}
+                  {!selectedTrain.positionKnown ? (
+                    <div>
+                      <p className="font-medium text-sm text-warning">
+                        Posizione incerta: {descriviIncertezzaPosizione(selectedTrain.positionDoubt)}
+                      </p>
+                      {selectedTrain.nextStationId && (
+                        <p className="text-xs mt-1 text-muted">
+                          Ultima destinazione dichiarata: {getStationName(selectedTrain.nextStationId)}
+                        </p>
+                      )}
+                    </div>
+                  ) : selectedTrain.status === 'in_viaggio' ? (
                     <div>
                       <div className="flex justify-between text-sm mb-1">
                         <span>{getStationName(selectedTrain.previousStationId)}</span>

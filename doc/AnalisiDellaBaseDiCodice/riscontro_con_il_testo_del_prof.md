@@ -18,7 +18,9 @@ come, e con quali limiti dichiarati.
 **Aggiornamento del 24 agosto 2026**: chiusa anche la 2.2, il capolinea che non era mai un fine
 corsa (voce 1.7 qui sotto). Nella stessa giornata e` cambiata la strada del passaggio in stazione:
 il treno non lo dichiara piu` alla Centrale su un topic suo, lo annuncia ai sensori di binario ed
-e` la stazione a certificarlo. Resta aperta la sola voce 2.1, i guasti alle linee.
+e` la stazione a certificarlo. In serata e` arrivata la voce 1.8: la stazione in manutenzione
+trattiene i convogli come una guasta, cosa che prima non succedeva. Resta aperta la sola voce 2.1,
+i guasti alle linee.
 
 A differenza di [`requisiti_da_implementare.md`](requisiti_da_implementare.md), che parte dai
 requisiti RFxx ricavati dall'analisi del codice, questo documento parte dal testo della consegna:
@@ -35,6 +37,7 @@ serve a rispondere alla domanda "che cosa chiede il prof che io non ho fatto".
 | 1.5 | keepalive dei sensori verso la stazione | **fatto**: i due sensori di binario sono simulati come dispositivi a se`, battono da soli e si spengono dalla CLI | `SimulatoreSensori.java`, `MonitorSensori.java`, `ConsoleSensori.java` |
 | 1.6 | guasto a una particolare via della stazione | **fatto**: tipo `binario_guasto`, dichiarato da chi lo segnala | `StationIngestion./sensore/guasto`, `ConsoleSensori.java:150` |
 | 1.7 | il treno puo` entrare in stazione senza uscirvi (capolinea) | **fatto** il 24 agosto 2026: l'itinerario puo` marcare un estremo come capolinea, e chi ci arriva chiude la corsa | `Itinerario.capolineaId`, `TrainJourneyEngine.java:752` |
+| 1.8 | *"la stazione resta inutilizzabile per tutta la durata dell'intervento"* | **fatto** il 24 agosto 2026: l'alert `STATO_STAZIONE` dice ai convogli in che stato e` la stazione, e per loro MANUTENZIONE e GUASTA sono lo stesso blocco | `PubblicatoreAlert.pubblicaStatoStazione`, `TrainDB.stazioneImpercorribile` |
 | 2.1 | guasti alle linee (alle tratte fra due stazioni) | non esistono: la sorgente di un guasto e` solo una stazione o un treno | `Guasto.sorgenteTipo` |
 | — | resto della consegna (ingestion, caching locale, heartbeat stazione, T_fer/T_sil, guasto permanente, prossima stazione in entrambe le varianti, storico, ruoli tecnico/amministratore, REST+webapp, OAuth2, TLS) | coperto | — |
 | — | varianti ammesse usate | solo la 1 (web app anziche` SPA), zero penalita` | — |
@@ -263,6 +266,31 @@ bastava agganciare un altro treno alla tratta per farlo ripartire.
 Il caso opposto era gia` coperto: alla prima partenza viene pubblicata solo l'USCITA, senza ENTRATA
 inventata.
 
+### 1.8 La stazione in manutenzione trattiene i treni — fatto il 24 agosto 2026
+
+Il PDF vuole che, per un guasto permanente, la centrale mandi gli operatori e la stazione resti
+inutilizzabile fino al ripristino. La prima meta` c'era da tempo (`POST /stazioni/{id}/manutenzione`,
+stato MANUTENZIONE, storicizzazione); la seconda no, e per un motivo che si vedeva solo mettendosi
+dal lato del treno: il convoglio conosceva un solo stato della stazione, quello che nasce da un
+`GUASTO` segnalato dal campo. La MANUTENZIONE la decide la Centrale e non nasce da nessun guasto,
+quindi i treni entravano in stazione mentre i tecnici erano sui binari; e appena qualcuno chiudeva il
+guasto vecchio, un convoglio fermo ripartiva con l'intervento ancora in corso.
+
+Adesso la Centrale annuncia lo stato al campo con un evento nuovo su `railway/alerts`,
+`STATO_STAZIONE` (`PubblicatoreAlert.pubblicaStatoStazione`), e lo fa nei tre punti in cui quello
+stato lo decide lei: l'invio della squadra (`MonitoraggioStazioni.inviaSquadra`), il cambio fatto a
+mano dal pannello (`RestApiGateway.updateStazione`) e il ritorno a ONLINE alla chiusura dell'allarme
+(`GuastiService.annunciaStatoAlCampo`). Il treno tiene lo stato di ogni stazione in
+`TrainDB.statoStazioni` e la domanda che si fa e` una sola, `stazioneImpercorribile()`: guasta o in
+manutenzione, per chi viaggia quei binari non si attraversano. Ne segue la regola che vale la pena
+ricordare in sede di prova: **il `RESOLVED` di un guasto non basta piu` a far ripartire un
+convoglio**, perche' guasto chiuso e squadra ancora al lavoro sono due condizioni diverse.
+
+Nella stessa modifica `GET /api/treni/{id}/itinerario` ha cominciato a restituire lo `stato` di ogni
+tappa. E` il pezzo che chiude il buco storico di **RF02.1.1.2.3**: gli alert su un topic li sente
+solo chi era acceso quando sono passati, quindi un convoglio avviato dopo l'annuncio non aveva modo
+di sapere che una fermata della sua tratta era chiusa. Adesso lo sa dal percorso stesso.
+
 ### Come si verifica
 
 - `ServeCentraleOperativa/src/test/java/it/uni/reti2/elaboration/PrevisioneArriviTest.java`
@@ -322,7 +350,9 @@ Due righe di quel documento sono superate dai fatti:
 - **RF02.5.2** (il convoglio ricomincia dal capolinea dopo la modifica dell'itinerario) e` stato
   implementato: il riaggancio nella posizione corrente sta in
   `TrainJourneyEngine.java:329-455`.
-- **RF02.1.1.2.3** (il convoglio avviato dopo l'allarme non sa che la stazione e` guasta) di fatto
-  si chiude da solo: quando quel convoglio entra, la stazione si accorge di essere GUASTA e
-  ripubblica l'alert, e il treno si blocca li` (`StationGateway.registraTransitoRilevato`, ramo
-  "stazione guasta", e `TrainGateway.java:95-108`).
+- **RF02.1.1.2.3** (il convoglio avviato dopo l'allarme non sa che la stazione e` guasta) e` stato
+  chiuso per davvero il 24 agosto: lo stato di ogni fermata arriva dentro l'itinerario che il treno
+  scarica all'avvio (sezione 1.8). Restano anche le due reti di sicurezza che c'erano gia`: la
+  stazione che si accorge di essere GUASTA quando il convoglio entra e ripubblica l'alert
+  (`StationGateway.registraTransitoRilevato`, ramo "stazione guasta") e il controllo che il motore
+  rifa` prima di ogni partenza.

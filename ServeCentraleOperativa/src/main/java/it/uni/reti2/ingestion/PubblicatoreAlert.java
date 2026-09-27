@@ -3,6 +3,7 @@ package it.uni.reti2.ingestion;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import it.uni.reti2.entity.Guasto;
+import it.uni.reti2.entity.StatiCanonici;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.ingestion.payload.AlertMsg;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -155,6 +156,35 @@ public class PubblicatoreAlert {
         ObjectNode alert = nuovoAlert("MAINTENANCE_DISPATCHED");
         alert.put("sorgenteTipo", "STAZIONE");
         alert.put("sorgenteId", stazioneId);
+        alert.put("timestamp", Instant.now().toString());
+        invia(alert);
+    }
+
+    /**
+     * Dice al campo in che stato si trova adesso una stazione.
+     *
+     * <p>Serve perche' lo stato di una stazione lo decide la Centrale (RF01.4.1) ma a
+     * subirlo sono i convogli, che stanno da tutt'altra parte. Finche' l'unico messaggio
+     * che partiva era il GUASTO, una stazione messa in MANUTENZIONE dal pannello
+     * dell'operatore non fermava nessuno: i treni ci entravano dentro mentre i tecnici
+     * lavoravano sui binari. Con questo annuncio il twin di bordo sa che quella fermata
+     * non e' attraversabile e si comporta esattamente come davanti a un guasto.</p>
+     *
+     * <p>Il messaggio si manda a ogni cambio deciso dalla Centrale, anche quando la
+     * stazione torna agibile: e' quello il momento in cui i convogli trattenuti hanno il
+     * permesso di ripartire.</p>
+     *
+     * @param stazioneId La stazione di cui si dichiara lo stato.
+     * @param stato Stato canonico (ONLINE, GUASTA, MANUTENZIONE, OFFLINE).
+     */
+    public void pubblicaStatoStazione(String stazioneId, String stato) {
+        ObjectNode alert = nuovoAlert("STATO_STAZIONE");
+        alert.put("sorgenteTipo", "STAZIONE");
+        alert.put("sorgenteId", stazioneId);
+        alert.put("stato", stato);
+        // La severita' non la guarda il treno (per lui conta lo stato) ma tiene il
+        // messaggio nello stesso formato degli altri del canale.
+        alert.put("severita", StatiCanonici.stazioneTrattieneITreni(stato) ? "CRITICAL" : "INFO");
         alert.put("timestamp", Instant.now().toString());
         invia(alert);
     }

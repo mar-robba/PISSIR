@@ -6,6 +6,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -84,7 +85,8 @@ public class TrainDB {
 
     /**
      * Fase corrente della macchina a stati del viaggio.
-     * Valori possibili: IN_STAZIONE, IN_VIAGGIO, BLOCCATO_GUASTO_STAZIONE,
+     * Valori possibili: IN_STAZIONE, IN_VIAGGIO, BLOCCATO_GUASTO_STAZIONE (la stazione
+     * davanti non è attraversabile: guasta oppure con la squadra di manutenzione al lavoro),
      * SENZA_ITINERARIO (nessun percorso assegnato: il convoglio è fermo e aspetta),
      * FERMO_CAPOLINEA (corsa finita all'estremo marcato dell'itinerario),
      * TERMINATO.
@@ -197,6 +199,50 @@ public class TrainDB {
      * Set concorrente perché scritto dal thread MQTT e letto dal tick del motore.
      */
     public Set<String> stazioniGuaste = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Ultimo stato che la Centrale ha dichiarato per ogni stazione (alert STATO_STAZIONE,
+     * più quello che arriva insieme all'itinerario): ONLINE, GUASTA, MANUTENZIONE, OFFLINE.
+     *
+     * <p>Sta separato da {@link #stazioniGuaste} perché le due cose sono indipendenti: una
+     * stazione può avere il guasto risolto e i tecnici ancora sui binari, e in quel caso il
+     * RESOLVED non deve far ripartire nessuno. Mappa concorrente per lo stesso motivo del
+     * set: la scrive il thread MQTT, la legge il tick del motore.</p>
+     */
+    public Map<String, String> statoStazioni = new ConcurrentHashMap<>();
+
+    /**
+     * Dice se in quella stazione il treno non può entrare (o da cui non può uscire).
+     *
+     * <p>Per il convoglio una stazione guasta e una stazione in manutenzione sono la stessa
+     * cosa: in tutti e due i casi i binari non sono suoi, quindi si ferma. Le due condizioni
+     * arrivano da messaggi diversi (il GUASTO lo segnala il campo, la MANUTENZIONE la decide
+     * la Centrale) ma la reazione è una sola, ed è per questo che la domanda si fa qui e non
+     * in tre punti diversi del motore.</p>
+     */
+    public boolean stazioneImpercorribile(String stazioneId) {
+        if (stazioneId == null) {
+            return false;
+        }
+        if (stazioniGuaste.contains(stazioneId)) {
+            return true;
+        }
+        return statoImpercorribile(statoStazioni.get(stazioneId));
+    }
+
+    /**
+     * Dice se uno stato dichiarato dalla Centrale chiude i binari.
+     *
+     * <p>Sta separato da {@link #stazioneImpercorribile} perché rispondono a due domande
+     * diverse: qui si guarda il solo stato appena arrivato, là si mette insieme tutto
+     * quello che il treno sa di quella stazione. Serve quando l'alert dichiara la stazione
+     * agibile e il convoglio ha ancora in memoria il guasto di prima: con la domanda
+     * completa la memoria vecchia vincerebbe sull'annuncio nuovo, e il treno non
+     * ripartirebbe più.</p>
+     */
+    public static boolean statoImpercorribile(String stato) {
+        return "GUASTA".equalsIgnoreCase(stato) || "MANUTENZIONE".equalsIgnoreCase(stato);
+    }
 
     /**
      * Singola tappa dell'itinerario del treno, così come fornita dalla Centrale

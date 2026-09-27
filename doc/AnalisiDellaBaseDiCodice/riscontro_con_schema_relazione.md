@@ -30,10 +30,10 @@ revert-buffer`**, altrimenti succede di nuovo.
 |---|---|---|
 | 1 | Specifiche funzionali | coperto, meno la premessa sulle due classi di funzionalita` |
 | 2 | Analisi delle scelte tecnologiche disponibili | parziale: il materiale c'e`, ma sparso e senza un capitolo suo |
-| 3 | Scelta dell'approccio tecnologico | parziale: c'e` il perche' del broker, non il confronto con le alternative |
+| 3 | Scelta dell'approccio tecnologico | coperto nei contenuti, ma non come capitolo a se` |
 | 4 | Architettura del software | coperto, esagoni compresi |
-| 5 | Descrizione dell'implementazione | parziale (manca l'interfaccia utente) |
-| 6 | Validazione del software | coperto e allineato al codice (86 test) |
+| 5 | Descrizione dell'implementazione | coperto (aggiunto `** Interfaccia utente`, restano da fare gli screenshot) |
+| 6 | Validazione del software | coperto e allineato al codice (94 test) |
 
 ## 1. Specifiche funzionali — coperto, meno la premessa
 
@@ -64,7 +64,7 @@ C'e` quindi tutto il materiale, ma disposto per argomentare le scelte del proget
 rispondere alla domanda dello schema. Serve un capitolo che raccolga le tre voci prima di
 `* Progettazione`.
 
-## 3. Scelta dell'approccio tecnologico — parziale
+## 3. Scelta dell'approccio tecnologico — coperto nei contenuti
 
 Lo schema chiede: *"Quali vantaggi offre a vostro parere questa scelta [il message broker]? Come la
 giudicate rispetto ad altre che avete analizzato nel capitolo precedente?"*.
@@ -74,10 +74,14 @@ chiamate REST periodiche su tre punti (NAT e nodi non raggiungibili, disaccoppia
 `LocalBuffer` e QoS 1, fan-out uno-a-molti per RNF05) e chiude con REST, WebSocket, SQLite contro
 PostgreSQL e Keycloak.
 
-La seconda meta` no: il confronto con AMQP e Kafka (header di 2 byte contro le intestazioni HTTP,
-exchange che qui non servono, Kafka sovradimensionato per una rete di sensori) e` stato cancellato
-nella riorganizzazione a mano e adesso non c'e` piu`. Se ne trova il testo nel `.tex` esportato prima
-del 24 agosto, oppure nella cronologia git del `.org`.
+La seconda meta` c'era gia` scritta ed era andata persa nella riorganizzazione a mano: il confronto
+*"Perche' MQTT e non AMQP o Kafka"* (header di 2 byte contro le intestazioni HTTP, exchange che qui
+non servono, Kafka sovradimensionato per una rete di sensori, vincoli soft real-time) e` stato
+recuperato dalla cronologia git e rimesso in `*** Metodi di interfacciamento tra microservizzi`,
+subito prima del paragrafo *"Il resto"*.
+
+Resta la sola questione di forma: e` argomentazione dentro `* Progettazione` e non un capitolo che
+risponda alla domanda dello schema. Contenuto completo, collocazione diversa da quella chiesta.
 
 ## 4. Architettura del software — coperto
 
@@ -98,28 +102,49 @@ microservizzi` e` un C4 di livello 2 disegnato con C4-PlantUML in cui i contenit
 della consegna. Il diagramma delle componenti in notazione UML classica resta accanto, e va bene
 cosi`: sono due letture diverse dello stesso sistema.
 
-## 5. Descrizione dell'implementazione — parziale
+## 5. Descrizione dell'implementazione — coperto
 
 Le classi sono documentate bene: `** Diagrammi delle classi` copre C1-C6 con la tabella di riepilogo
 requisiti e quella "riepilogo classi - macchine a stati" che incrocia classi e macchine a stati.
 
-Manca pero` la seconda meta` che lo schema chiede esplicitamente: *"Descrizione dell'interfaccia
-utente"*. Nel documento `interfaccia utente` compare una sola volta, dentro la tabella dello stack
-tecnologico (`React 18, TypeScript, Vite, zustand`). Non c'e` nessuna descrizione delle pagine, di
-cosa mostra ciascuna, di come si naviga o di cosa vede in piu` l'amministratore rispetto al
-tecnico. Nella cartella delle immagini
+La seconda meta` che lo schema chiede esplicitamente — *"Descrizione dell'interfaccia utente"* —
+prima non c'era: `interfaccia utente` compariva una volta sola, dentro la tabella dello stack
+tecnologico. Ora c'e` il capitolo `** Interfaccia utente` in fondo a `* Progettazione`, con:
+
+- come si entra (login senza password, PKCE, ripristino della sessione) e com'e` fatta la cornice
+  (barra laterale con il contatore degli allarmi, barra del titolo, logout che chiude anche la
+  sessione su Keycloak);
+- il diagramma `ui_00_mappa_navigazione.png`: le otto schermate, la porta d'ingresso unica e il
+  confine di ruolo su `/admin`;
+- la tabella delle schermate (rotta, chi la vede, che cosa mostra) e la descrizione di ciascuna,
+  con le condizioni con cui compaiono i due comandi del tecnico, che sono esse stesse specifica
+  (la squadra prima della chiusura dell'allarme);
+- la tabella di che cosa cambia fra tecnico e amministratore, con la nota che nascondere un
+  pulsante non e` la difesa: quella sta nel filtro della Centrale;
+- che cosa si aggiorna da solo, con i cinque eventi WebSocket e il loro effetto sullo schermo;
+- i limiti dichiarati.
+
+Resta da fare una cosa sola, ed e` materiale e non testuale: nella cartella delle immagini
 (`immaginiDocumentazioneDelSistemaMonitoraggioEGestioneDelTrafficoFerroviario/`) non c'e` nessuno
-screenshot dell'app, solo diagrammi PlantUML compilati.
+screenshot dell'applicazione, solo diagrammi PlantUML compilati. Il capitolo lo dichiara.
+
+Il capitolo ha fatto emergere un fatto che nessun documento riportava: **la schermata dei transiti
+non e` raggiungibile**. `TransitsPage.tsx` c'e` per intero e i dati arrivano nello store, ma la
+rotta in `App.tsx` e la voce di menu in `Sidebar.tsx` sono state tolte il 19 agosto (commit
+`e5a58c8b`) e non sono state rimesse. Finche` restano fuori, RF01.5 e` soddisfatto dalla Centrale ma
+non dall'interfaccia.
 
 ## 6. Validazione — coperto e allineato al codice
 
 Rieseguito `./mvnw test` dalla radice e `npx vitest run` nella web app, per verificare la tabella
-contro il codice attuale invece di fidarsi del testo. Risultato: **86 test, tutti superati** (55
-Centrale, 11 Treni, 5 Stazioni, 15 web app). La tabella e la frase di apertura in `** Test
+contro il codice attuale invece di fidarsi del testo. Risultato: **94 test, tutti superati** (55
+Centrale, 19 Treni, 5 Stazioni, 15 web app). Il numero e` stato rifatto due volte nella stessa
+giornata: la prima misura (86) e` di prima del commit `ffc72215`, che ha portato `FiltroLogMqttTest`
+(4), e prima che arrivasse `StazioneInManutenzioneTest` (4, non ancora committato). La tabella e la frase di apertura in `** Test
 automatici` sono state riscritte con questo numero e con la data di oggi, aggiungendo le classi che
 la tabella non citava: `ChiusuraGuastiTest`, `PrevisioneArriviTest` e `AlertRitardoTest` nella
-Centrale, `RitardoComunicatoTest` nei Treni, `SensoriFailStopTest` nelle Stazioni. I due test in piu`
-rispetto alla passata precedente (84) sono quelli del capolinea in `RiaggancioItinerarioTest`.
+Centrale, `RitardoComunicatoTest` nei Treni, `SensoriFailStopTest` nelle Stazioni. I due test del capolinea in `RiaggancioItinerarioTest` sono quelli che avevano
+portato il conto da 84 a 86.
 
 Nota sul metodo: contare `grep -c "@Test"` nel codice da` numeri quasi doppi (es. `AdminApiTest` 26
 invece di 13), perche' il grep prende anche le righe `@TestSecurity(...)`. I numeri della tabella
@@ -160,3 +185,21 @@ questa passata. Tre cose erano cambiate nel codice e non nel `.org`:
 
 E` stata anche ricucita una riga rimasta a meta` in `*** Sul sistema di validazione` (il paragrafo sul
 database H2 dei test finiva con "artiva affatto").
+
+### Seconda tornata della stessa giornata
+
+Dopo il commit `ffc72215` sono arrivate altre due cose, documentate subito:
+
+4. **L'alert `STATO_STAZIONE`.** La Centrale annuncia al campo in che stato ha messo una stazione
+   (invio della squadra, cambio a mano dal pannello, ritorno a ONLINE alla chiusura dell'allarme).
+   Serviva perche' la MANUTENZIONE non nasce da nessun guasto segnalato dal campo, quindi i treni ci
+   entravano dentro mentre i tecnici lavoravano sui binari. Per il twin GUASTA e MANUTENZIONE sono lo
+   stesso blocco, e il `RESOLVED` di un guasto non basta piu` a liberare un convoglio: a liberarlo e`
+   lo stato del nodo. Toccati: `** Topic`, RF02.1.1.2 con i suoi tre figli, T3, T5, T9, T11 (che
+   adesso si chiama *stato delle stazioni noto al treno*), M12, SQ03, SQ08, SQ14, SQ17, C1, C4a, C4b
+   e le tabelle di riepilogo.
+5. **Lo stato di ogni fermata dentro l'itinerario.** `GET /api/treni/{id}/itinerario` restituisce
+   anche lo `stato` di ogni tappa. E` il pezzo che chiude RF02.1.1.2.3, che era `parziale` da sempre:
+   gli alert li sente solo chi era acceso quando sono passati, quindi un convoglio avviato dopo
+   l'annuncio non sapeva che una fermata era chiusa. Adesso la fotografia con cui entra in servizio
+   e` gia` quella giusta.

@@ -1,7 +1,9 @@
 package it.uni.reti2.elaboration;
 
 import it.uni.reti2.entity.Guasto;
+import it.uni.reti2.entity.StatiCanonici;
 import it.uni.reti2.entity.Stazione;
+import it.uni.reti2.entity.StoricoStatoStazione;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.persistence.RailwayRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -9,6 +11,7 @@ import jakarta.inject.Inject;
 import jakarta.enterprise.event.Observes;
 import jakarta.transaction.Transactional;
 import io.quarkus.runtime.StartupEvent;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -60,6 +63,15 @@ public class TrafficLogicEngine {
     @Inject
     RailwayRepository repository;
 
+    /**
+     * Oltre quanti secondi di silenzio la telemetria di un convoglio è considerata
+     * vecchia, e quindi la sua posizione non più garantita. Il digital twin trasmette
+     * ogni secondo: qualche secondo di margine copre una riconnessione al broker senza
+     * dichiarare perso un treno che sta benissimo.
+     */
+    @ConfigProperty(name = "posizione.telemetria.freschezza.secondi", defaultValue = "15")
+    long freschezzaTelemetriaSecondi;
+
 /*Prevenire errori di "Lazy Loading" (Caricamento Pigro): Se la tua entità Stazioni ha dei campi collegati (ad esempio una lista di Sensori o di Storici) che non vengono caricati immediatamente dalla query principale, l'ORM (come Hibernate) proverà a leggerli nel momento in cui accedi a quei campi. Senza una transazione aperta, riceveresti un blocco totale (il famoso errore LazyInitializationException).***/
     @Transactional
     void onStart(@Observes StartupEvent ev) {
@@ -96,6 +108,38 @@ public class TrafficLogicEngine {
             guastiAttivi.put(g.id, g);
         }
         System.out.println("Caricati " + guastiAttivi.size() + " guasti attivi.");
+
+        riprendiInterventiAperti();
+    }
+
+    /**
+     * Rimette in MANUTENZIONE le stazioni su cui un intervento era aperto quando la
+     * Centrale si e' spenta.
+     *
+     * <p>Lo stato runtime non e' persistito (e' @Transient, vive in questa cache) e per
+     * ONLINE/OFFLINE va benissimo cosi': il primo battito lo ricostruisce da solo. La
+     * MANUTENZIONE no, perche' non e' un dato di campo — la decide la Centrale e la
+     * stazione continua a dichiararsi GUASTA per conto suo. Senza questo giro un riavvio
+     * fatto a intervento aperto rimetteva la stazione OFFLINE e poi ONLINE al primo
+     * heartbeat, cioe' riapriva i binari con i tecnici ancora sopra.</p>
+     *
+     * <p>Le due condizioni vanno prese insieme: l'ultima riga di storico dice che si era
+     * in manutenzione, il guasto ancora aperto dice che l'intervento non e' mai stato
+     * chiuso. Con la sola riga di storico si sarebbe ripescato anche un intervento
+     * concluso di cui e' arrivata dopo la chiusura.</p>
+     */
+    private void riprendiInterventiAperti() {
+        for (Stazione stazione : stazioni.values()) {
+            if (!haGuastiAperti(stazione.id, "STAZIONE")) {
+                continue;
+            }
+            StoricoStatoStazione ultimo = repository.ultimoStatoStoricizzato(stazione.id);
+            if (ultimo != null && StatiCanonici.interventoInCorso(ultimo.stato)) {
+                stazione.stato = StatiCanonici.STAZIONE_MANUTENZIONE;
+                System.out.println("Intervento ancora aperto su " + stazione.id
+                        + ": stazione ripresa in MANUTENZIONE.");
+            }
+        }
     }
 
     /**
@@ -104,6 +148,7 @@ public class TrafficLogicEngine {
      */
     // sostituisce la vecchia occorreza dell'oggetto treno mappato per il proprio id con quella nuova
     public void aggiornaTreno(Treno treno) {
+        certificaPosizione(treno);
         treni.put(treno.id, treno);
     }
 
@@ -113,7 +158,7 @@ public class TrafficLogicEngine {
      * @return Il treno richiesto, o null se non presente.
      */
     public Treno getTreno(String id) {
-        return treni.get(id);
+        return certificaPosizione(treni.get(id));
     }
 
     /**
@@ -121,14 +166,85 @@ public class TrafficLogicEngine {
      * @return Una nuova lista contenente i valori memorizzati.
      */
     public List<Treno> getTuttiTreni() {
-        return new ArrayList<>(treni.values());
+        List<Treno> tutti = new ArrayList<>(treni.values());
+        tutti.forEach(this::certificaPosizione);
+        return tutti;
+    }
+
+    /**
+     * Rivaluta quanto la Centrale è sicura di dove si trova il convoglio.
+     *
+     * <p>Serve sia in scrittura sia in lettura, e per due motivi diversi. In scrittura,
+     * perché ogni frame di telemetria e ogni passaggio cambiano le premesse del giudizio,
+     * e chi legge subito dopo (il broadcast dell'evento TELEMETRY) deve trovarlo già
+     * aggiornato. In lettura, perché una delle condizioni è il <em>tempo</em>: un
+     * convoglio il cui processo si spegne non produce più nessuna scrittura, e senza
+     * questa riga resterebbe per sempre nell'ultima posizione che ha dichiarato, marcata
+     * come certa.</p>
+     *
+     * @param treno Convoglio da valutare, anche null (i chiamanti girano su cache mancanti).
+     * @return Lo stesso convoglio, per comodità di chi lo restituisce.
+     */
+    private Treno certificaPosizione(Treno treno) {
+        PosizioneConvoglio.valuta(treno, freschezzaTelemetriaSecondi);
+        return treno;
     }
 
     /**
      * Aggiorna i dati di una stazione nella cache.
+     *
+     * <p>Serve per i campi che non sono lo stato (istante dell'ultimo battito, treni
+     * presenti): lo stato si scrive con {@link #cambiaStatoStazione} o
+     * {@link #forzaStatoStazione}, che sono l'unico punto in cui vale la regola
+     * dell'intervento in corso.</p>
+     *
      * @param stazione L'entità Stazione aggiornata.
      */
     public void aggiornaStazione(Stazione stazione) {
+        stazioni.put(stazione.id, stazione);
+    }
+
+    /**
+     * Scrive lo stato di una stazione per un evento che <b>non</b> e' un comando
+     * dell'operatore: un guasto segnalato dal campo, un battito, il watchdog.
+     *
+     * <p>E' qui che sta la regola dell'intervento: finche' la squadra e' sul posto lo
+     * stato non si tocca (RF01.4.1). Prima ogni chiamante scriveva {@code stazione.stato}
+     * per conto suo e la regola era ripetuta a memoria in due punti su cinque: bastava un
+     * alert ripetuto dal campo — e una stazione guasta ne manda uno per ogni treno che
+     * entra — per riportare a GUASTA una stazione in manutenzione. Da li' il primo
+     * RESOLVED del campo la rimetteva ONLINE e i convogli ripartivano con i tecnici
+     * ancora sui binari.</p>
+     *
+     * @return true se lo stato e' stato scritto davvero, false se e' stato rifiutato
+     *         perche' sulla stazione c'e' un intervento in corso.
+     */
+    public boolean cambiaStatoStazione(Stazione stazione, String nuovoStato) {
+        if (stazione == null || nuovoStato == null) {
+            return false;
+        }
+        if (StatiCanonici.interventoInCorso(stazione.stato)
+                && !StatiCanonici.interventoInCorso(nuovoStato)) {
+            return false;
+        }
+        stazione.stato = nuovoStato;
+        stazioni.put(stazione.id, stazione);
+        return true;
+    }
+
+    /**
+     * Scrive lo stato di una stazione per un comando esplicito della Centrale: l'invio
+     * della squadra, la chiusura dell'allarme che chiude l'intervento (RF01.4.2) e il
+     * pannello dell'amministratore.
+     *
+     * <p>E' l'unica strada che puo' far uscire una stazione dalla manutenzione, ed e'
+     * giusto che sia cosi': l'intervento lo apre e lo chiude chi lo ha deciso.</p>
+     */
+    public void forzaStatoStazione(Stazione stazione, String nuovoStato) {
+        if (stazione == null || nuovoStato == null) {
+            return;
+        }
+        stazione.stato = nuovoStato;
         stazioni.put(stazione.id, stazione);
     }
 
@@ -204,6 +320,26 @@ public class TrafficLogicEngine {
      * @param tipo Tipologia del guasto (es. "sensore_offline", "treno_fermo").
      * @return Il guasto aperto corrispondente, o null se non esiste.
      */
+    /**
+     * Dice se una sorgente ha ancora almeno un guasto aperto, di qualunque tipo.
+     *
+     * <p>Diverso da {@link #getGuastoApertoPerSorgente}, che cerca l'episodio preciso per
+     * non duplicarlo: qui la domanda e' "questo nodo e' pulito?", ed e' quella che serve
+     * prima di dire al campo che una stazione e' di nuovo agibile. Si guarda la cache e
+     * non il database perche' la si chiama anche fuori da una transazione, sul thread che
+     * sta smaltendo un messaggio MQTT.</p>
+     */
+    public boolean haGuastiAperti(String sorgenteId, String sorgenteTipo) {
+        for (Guasto g : guastiAttivi.values()) {
+            if (!g.risolto
+                    && sorgenteId != null && sorgenteId.equals(g.sorgenteId)
+                    && sorgenteTipo != null && sorgenteTipo.equalsIgnoreCase(g.sorgenteTipo)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public Guasto getGuastoApertoPerSorgente(String sorgenteId, String tipo) {
         for (Guasto g : guastiAttivi.values()) {
             if (!g.risolto

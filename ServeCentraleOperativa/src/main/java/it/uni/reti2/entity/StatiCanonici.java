@@ -85,4 +85,34 @@ public final class StatiCanonici {
         String normalizzato = scelto.trim().toUpperCase();
         return "OPERATIVA".equals(normalizzato) ? STAZIONE_ONLINE : normalizzato;
     }
+
+    /**
+     * Dice se in questo stato la stazione trattiene i convogli.
+     *
+     * <p>GUASTA e MANUTENZIONE sono due situazioni diverse per l'operatore (una e' un
+     * guasto da lavorare, l'altra e' la squadra gia' sul posto) ma per chi viaggia sono
+     * la stessa identica cosa: quei binari non si possono attraversare, quindi il treno
+     * che sta per arrivarci si ferma e quello che e' gia' dentro resta fermo. OFFLINE
+     * invece non basta: una stazione che non batte e' un nodo di cui non si sa niente,
+     * e se e' davvero caduta ci pensa il watchdog ad aprirle un guasto dedotto.</p>
+     */
+    public static boolean stazioneTrattieneITreni(String stato) {
+        return STAZIONE_GUASTA.equalsIgnoreCase(stato) || STAZIONE_MANUTENZIONE.equalsIgnoreCase(stato);
+    }
+
+    /**
+     * Dice se sulla stazione c'e' una squadra al lavoro.
+     *
+     * <p>MANUTENZIONE non e' uno stato alternativo a GUASTA: vale "guasta piu' squadra
+     * inviata" (RF01.4.1), quindi riscriverla GUASTA non e' una transizione ma la perdita
+     * di un'informazione. Finche' l'intervento dura lo stato non lo tocca nessun evento
+     * del campo: un guasto nuovo su quella stazione e' un allarme in piu' su un nodo che
+     * e' gia' chiuso e per di piu' preso in carico, non un cambio di stato.</p>
+     *
+     * <p>Serve a {@code TrafficLogicEngine.cambiaStatoStazione}, che e' il punto in cui la
+     * regola viene applicata una volta sola per tutti.</p>
+     */
+    public static boolean interventoInCorso(String stato) {
+        return STAZIONE_MANUTENZIONE.equalsIgnoreCase(stato);
+    }
 }

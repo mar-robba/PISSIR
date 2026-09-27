@@ -3,6 +3,7 @@ package it.uni.reti2.elaboration;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import it.uni.reti2.entity.StatiCanonici;
+import it.uni.reti2.entity.Tratta;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.gateway.NotificatoreRealtime;
 import it.uni.reti2.ingestion.PubblicatoreAlert;
@@ -92,6 +93,10 @@ public class MonitoraggioTreni {
         treno.direzione = msg.direzione();
         treno.ultimoAggiornamento = java.time.Instant.now();
 
+        // La tratta in corso non la scrive piu' soltanto il sensore di terra: la fermata
+        // che il convoglio dichiara di avere davanti basta a dedurla, e arriva a ogni frame.
+        allineaTrattaAllaProssimaFermata(treno);
+
         // Con la posizione appena aggiornata si rifa' la previsione: e' il frame di
         // telemetria a dire quanta strada resta della tratta in corso.
         previsioni.aggiornaPrevisione(treno);
@@ -101,6 +106,71 @@ public class MonitoraggioTreni {
 
         notificatore.telemetria(payloadDalCampo, treno);
         return treno;
+    }
+
+    /**
+     * Rimette la Centrale sulla tratta giusta usando la fermata che il convoglio dichiara
+     * di avere davanti.
+     *
+     * <p>{@code posizioneAttualeTratta} la scriveva solo {@link #registraPassaggio}, cioe'
+     * il sensore di terra della stazione. Se una stazione del percorso e' spenta il suo
+     * transito non arriva mai e il campo resta indietro di un segmento: la Centrale
+     * continua a dire "sta fra Bologna e Firenze" per un treno che ha gia' superato
+     * Firenze e sta andando verso Torino. Il frontend da quel segmento ricava i due capi
+     * dell'arco su cui disegnare il convoglio, e con la tratta sbagliata gli capitava di
+     * ricavare la stessa stazione da tutte e due le parti (l'estremo dedotto per il verso
+     * coincideva con la prossima fermata): a quel punto non c'era piu' nessun arco da
+     * interpolare e il treno spariva dalla mappa, contato fra quelli "senza posizione
+     * nota". E' esattamente il caso di un convoglio fermo a meta' tratta per un guasto,
+     * che sulla mappa e' proprio quello che si vuole vedere.</p>
+     *
+     * <p>Il ricalcolo costa una lettura dell'itinerario, quindi si fa solo quando serve:
+     * se la tratta che si ha in cache porta gia' alla fermata dichiarata e' quella giusta
+     * e il database non si tocca. A regime succede una volta per tratta percorsa.</p>
+     */
+    private void allineaTrattaAllaProssimaFermata(Treno treno) {
+        // Senza percorso o al capolinea non c'e' nessuna fermata da cui dedurre la tratta.
+        if (treno.itinerario == null || treno.prossimaStazione == null) {
+            return;
+        }
+        Tratta inCache = treno.posizioneAttualeTratta;
+        if (inCache != null && treno.prossimaStazione.equals(
+                navigazione.estremoVersoCuiSiViaggia(inCache, treno.direzione))) {
+            return; // gia' coerente con quello che il treno dichiara
+        }
+
+        // Copie locali: la lambda della transazione vuole variabili effettivamente finali.
+        String itinerarioId = treno.itinerario.id;
+        String prossima = treno.prossimaStazione;
+        String direzione = treno.direzione;
+        Tratta dedotta = QuarkusTransaction.requiringNew()
+                .call(() -> scriviTrattaDedotta(treno.id, itinerarioId, prossima, direzione));
+        if (dedotta != null) {
+            treno.posizioneAttualeTratta = dedotta;
+            LOG.debugf("🧭 Treno %s riallineato sulla tratta %s (prossima fermata %s, corsa di %s)",
+                    treno.id, dedotta.id, prossima, direzione);
+        }
+    }
+
+    /**
+     * Deduce la tratta dalla prossima fermata e la scrive anche sulla riga del treno, cosi'
+     * che a rileggerla dal database (i transiti ci appendono la tratta percorsa) si trovi
+     * la stessa cosa che sta in cache. Gira dentro una transazione.
+     *
+     * @return La tratta dedotta, oppure null se l'itinerario non ne ha nessuna verso quella
+     *         stazione: in quel caso quella gia' nota si lascia dov'e'.
+     */
+    private Tratta scriviTrattaDedotta(String trenoId, String itinerarioId,
+                                       String prossimaStazione, String direzione) {
+        Tratta tratta = navigazione.trattaVerso(itinerarioId, prossimaStazione, direzione);
+        if (tratta == null) {
+            return null;
+        }
+        Treno dbTreno = repository.trovaTreno(trenoId);
+        if (dbTreno != null) {
+            dbTreno.posizioneAttualeTratta = tratta;
+        }
+        return tratta;
     }
 
     /**

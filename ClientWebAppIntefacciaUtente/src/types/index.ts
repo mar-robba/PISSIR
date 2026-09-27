@@ -67,7 +67,24 @@ export interface Train {
   nextStationId: string | null;
   previousStationId: string | null;
   routeId: string;
-  direction: 'andata' | 'ritorno';
+  /** null quando la Centrale non è in grado di garantire il verso di marcia. */
+  direction: 'andata' | 'ritorno' | null;
+  /**
+   * true quando la Centrale sa dire dove sta il convoglio: fermo in una stazione,
+   * oppure in linea con TUTTI E DUE gli estremi della tratta noti.
+   *
+   * È la condizione per disegnarlo sulla mappa. Quando è false il convoglio non si
+   * piazza da nessuna parte — nemmeno partendo dall'ultima stazione che gli si conosce,
+   * che è il modo in cui prima comparivano convogli in viaggio su tratte inesistenti —
+   * ma finisce nell'elenco di quelli a posizione incerta. Torna sulla mappa da solo
+   * appena la Centrale rimette insieme partenza e arrivo.
+   */
+  positionKnown: boolean;
+  /**
+   * Perché la posizione è incerta, così l'elenco non dice solo "non lo so" ma anche da
+   * dove viene il buco. null quando la posizione è nota.
+   */
+  positionDoubt: string | null;
   /**
    * Stima dell'orario di arrivo nella prossima stazione, in millisecondi Unix: la
    * calcola la Centrale componendo i tempi di percorrenza dell'itinerario con il
@@ -222,5 +239,15 @@ export interface ExpectedTrain {
   /** Orario previsto in millisecondi Unix, null per chi è già in stazione. */
   arrivalTime: number | null;
   nextStationId: string | null;
-  direction: 'andata' | 'ritorno';
+  /** null quando la Centrale non garantisce il verso di marcia. */
+  direction: 'andata' | 'ritorno' | null;
+  /**
+   * true quando la posizione del convoglio è confermata. Il convoglio resta sul
+   * tabellone anche quando è false — la stazione lo aspetta comunque, il tabellone lo
+   * costruisce l'itinerario — ma l'orario qui accanto è calcolato sull'ultima posizione
+   * certa, che può essere vecchia: va detto a chi legge.
+   */
+  positionKnown: boolean;
+  /** Perché la posizione è incerta. null quando è nota. */
+  positionDoubt: string | null;
 }

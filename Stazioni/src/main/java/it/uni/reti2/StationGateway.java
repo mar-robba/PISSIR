@@ -78,7 +78,11 @@ public class StationGateway {
      * Il discriminante è il campo "tipoEvento" del payload:
      * - RESOLVED riferito a questa stazione: la Centrale ha risolto il guasto, si torna ONLINE.
      * - MAINTENANCE_DISPATCHED riferito a questa stazione: gli operatori sono in viaggio.
-     * Gli altri tipi (GUASTO, STOP, ITINERARIO_AGGIORNATO) non richiedono azioni lato stazione.
+     * Gli altri tipi (STOP, ITINERARIO_AGGIORNATO) non richiedono azioni lato stazione, e
+     * nemmeno STATO_STAZIONE: quello e' l'annuncio con cui la Centrale dice ai treni che la
+     * stazione e' guasta o in manutenzione, ma il nodo di se' stesso conosce solo ONLINE e
+     * GUASTA (RF02.3.4) e in manutenzione non deve passarci, se no smetterebbe di trattenere
+     * i convogli proprio mentre i tecnici lavorano.
      *
      * @param message Il messaggio in arrivo dal broker.
      * @return CompletionStage che indica il processamento completato.

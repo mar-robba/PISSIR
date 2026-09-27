@@ -311,6 +311,52 @@
   border-radius: var(--radius-full);
 }
 
+/* --- Convogli a posizione incerta ---
+   Stessi colori dell'avviso, ma un riquadro invece di una pillola: qui dentro ci sono
+   dei nomi da leggere uno per uno, non un conteggio. L'elenco ha un tetto d'altezza e
+   scorre, così una rete con molte stazioni spente non si mangia la mappa. */
+
+.map-incerti {
+  max-width: 18rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.7rem;
+  color: var(--warning);
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-md, 0.5rem);
+}
+
+.map-incerti__titolo {
+  font-weight: 700;
+  text-align: right;
+}
+
+.map-incerti__elenco {
+  margin: 0.3rem 0 0;
+  padding: 0;
+  max-height: 7rem;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.map-incerti__voce {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.1rem 0;
+}
+
+.map-incerti__treno {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.map-incerti__motivo {
+  text-align: right;
+  opacity: 0.85;
+}
+
 /* --- Barra di scala --- */
 
 .map-scala {

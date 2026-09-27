@@ -39,8 +39,15 @@ public class NavigazioneItinerario {
         }
     }
 
-    /** true se il convoglio sta percorrendo l'itinerario nel verso originario. */
-    private boolean andata(String direzione) {
+    /**
+     * true se il convoglio sta percorrendo l'itinerario nel verso originario.
+     *
+     * <p>Statica e pubblica perche' la stessa convenzione serve anche a
+     * {@link PosizioneConvoglio}, che legge una tratta nel verso di marcia senza toccare
+     * il database: riscriverla la' vorrebbe dire tenere due elenchi di sinonimi
+     * ("ritorno", "R") che possono andare fuori sincrono.</p>
+     */
+    public static boolean andata(String direzione) {
         return !"ritorno".equalsIgnoreCase(direzione) && !"R".equalsIgnoreCase(direzione);
     }
 
@@ -78,6 +85,43 @@ public class NavigazioneItinerario {
             return null; // capolinea
         }
         return stazioni.get(successiva);
+    }
+
+    /**
+     * La tratta che il convoglio sta percorrendo <b>adesso</b>, dedotta dalla fermata che
+     * dichiara di avere davanti: e' quella dell'itinerario che porta a
+     * {@code prossimaStazione}, cioe' quella che la ha come stazione di arrivo in andata e
+     * come stazione di partenza al ritorno.
+     *
+     * <p>Serve perche' {@link #dopoIlPassaggio} sa rispondere solo quando un sensore di
+     * terra segnala un passaggio: se una stazione del percorso e' spenta quel transito non
+     * arriva mai e la posizione del treno resta indietro di un segmento. La telemetria
+     * invece arriva ogni secondo e la prossima fermata la porta sempre con se'.</p>
+     *
+     * @return null se nessuna tratta dell'itinerario porta a quella stazione (capolinea
+     *         raggiunto, oppure stazione che non appartiene al percorso).
+     */
+    public Tratta trattaVerso(String itinerarioId, String prossimaStazione, String direzione) {
+        if (itinerarioId == null || prossimaStazione == null) {
+            return null;
+        }
+        for (ItinerarioTratta riga : repository.tratteOrdinateDi(itinerarioId)) {
+            if (prossimaStazione.equals(estremoVersoCuiSiViaggia(riga.tratta, direzione))) {
+                return riga.tratta;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * L'estremo della tratta che il convoglio incontra per ultimo percorrendola in questa
+     * direzione: la stazione di arrivo in andata, quella di partenza al ritorno.
+     *
+     * <p>E' pubblico perche' con questo si controlla, senza leggere niente dal database,
+     * se una tratta gia' nota e' ancora quella giusta per la fermata dichiarata.</p>
+     */
+    public String estremoVersoCuiSiViaggia(Tratta tratta, String direzione) {
+        return andata(direzione) ? tratta.stazioneArrivo.id : tratta.stazionePartenza.id;
     }
 
     /**

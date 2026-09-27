@@ -107,6 +107,33 @@ const mapProfilo = (dati: ApiProfiloResponse): User => ({
 });
 
 /**
+ * Traduce per l'operatore il motivo per cui la Centrale non garantisce la posizione di
+ * un convoglio (le costanti le definisce PosizioneConvoglio, lato Centrale).
+ *
+ * Sta qui, insieme agli altri traduttori del vocabolario del backend, perché la usano
+ * due schermate diverse — la mappa nell'elenco dei convogli da ritrovare e la pagina
+ * Treni nel pannello di dettaglio — e devono dire la stessa cosa. Il codice grezzo non
+ * si mostra mai: all'operatore serve capire di chi è il silenzio, perché è quello che gli
+ * dice se deve preoccuparsi del convoglio o riaccendere una stazione.
+ */
+export const descriviIncertezzaPosizione = (motivo: string | null): string => {
+  switch (motivo) {
+    case 'NESSUNA_TELEMETRIA':
+      return 'il convoglio non trasmette';
+    case 'PARTENZA_SCONOSCIUTA':
+      return 'nessun sensore conferma da dove è uscito';
+    case 'ARRIVO_SCONOSCIUTO':
+      return 'non dichiara verso quale fermata sta andando';
+    case 'DIREZIONE_SCONOSCIUTA':
+      return 'verso di marcia non noto';
+    case 'STAZIONE_NON_DISEGNABILE':
+      return 'la sua fermata non è sulla mappa';
+    default:
+      return 'posizione non confermata';
+  }
+};
+
+/**
  * Converte il DTO treno della Centrale nella shape Train del frontend.
  * Esportata perché la usano in due: la GET /api/treni e lo SNAPSHOT che arriva ogni dieci
  * secondi dalla WebSocket, che porta gli stessi identici oggetti. Un mappatore solo per
@@ -114,19 +141,20 @@ const mapProfilo = (dati: ApiProfiloResponse): User => ({
  * possono discordare.
  */
 export const mapApiTrain = (t: ApiTrainPayload): Train => {
-  // La tratta è ORIENTATA come sta a database (partenza → arrivo), ma nella corsa di
-  // ritorno il convoglio la percorre al contrario: lì "stazionePartenza" è la stazione
-  // verso cui sta andando, non quella da cui è uscito. Leggendola alla lettera
-  // previousStationId finiva sulla stessa stazione di prossimaStazione e la mappa,
-  // interpolando fra due punti coincidenti, disegnava il treno fermo sul nodo di arrivo
-  // per tutta la tratta di ritorno (metà di ogni viaggio).
-  const inRitorno = t.direzione === 'ritorno';
-  const estremoPartenza = inRitorno
-    ? t.posizioneAttualeTratta?.stazioneArrivo?.id
-    : t.posizioneAttualeTratta?.stazionePartenza?.id;
-  const estremoArrivo = inRitorno
-    ? t.posizioneAttualeTratta?.stazionePartenza?.id
-    : t.posizioneAttualeTratta?.stazioneArrivo?.id;
+  // Gli estremi della tratta NON si ricavano più da posizioneAttualeTratta.
+  //
+  // Quel campo lo scrive solo il passaggio rilevato dai sensori di terra, che arriva
+  // alla Centrale passando dal nodo Stazione: se una stazione è spenta i suoi passaggi
+  // non li registra nessuno e la tratta resta ferma sull'ultima confermata, mentre il
+  // convoglio è andato avanti. Leggerla lo stesso significava comporre una partenza
+  // vecchia con un arrivo attuale e ottenere tratte che in rete non esistono (il caso
+  // classico: un convoglio disegnato in viaggio da Milano a Berlino).
+  //
+  // Adesso il giudizio lo dà la Centrale, che le due fonti le incrocia lei
+  // (PosizioneConvoglio): qui si prende quello che garantisce, e quando garantisce null
+  // il null si tiene. È il punto di domanda che le schermate mostrano e il motivo per
+  // cui il convoglio finisce nell'elenco di quelli a posizione incerta.
+  const direzione = t.direzioneCorrente ?? null;
 
   return {
     // L'id È il nome del convoglio (chiave primaria Treni.id_convoglio): la Centrale
@@ -134,15 +162,14 @@ export const mapApiTrain = (t: ApiTrainPayload): Train => {
     id: t.id,
     status: mapBackendStatus(t.stato ?? ''),
     currentStationId: t.stazioneCorrente || null,
-    nextStationId: t.prossimaStazione || estremoArrivo || null,
-    // Se il convoglio è in una stazione l'ultima stazione è quella, come scrive l'evento
-    // TELEMETRY: altrimenti le due strade che riempiono lo stesso campo raccontavano due
-    // cose diverse (la telemetria la fermata attuale, lo snapshot quella prima ancora).
-    // Fuori dalla stazione vale l'estremo di partenza della tratta che sta percorrendo,
-    // che al primo avvio può non essere ancora persistito: da lì il null.
-    previousStationId: t.stazioneCorrente || estremoPartenza || null,
+    nextStationId: t.arrivoCorrente ?? null,
+    previousStationId: t.partenzaCorrente ?? null,
     routeId: t.itinerario?.id || '',
-    direction: inRitorno ? 'ritorno' : 'andata',
+    direction: direzione === 'ritorno' ? 'ritorno' : (direzione ? 'andata' : null),
+    // Il default è false apposta: una Centrale che non manda il campo è una Centrale
+    // che non si è espressa, e nel dubbio il convoglio va in elenco, non sulla mappa.
+    positionKnown: t.posizioneNota === true,
+    positionDoubt: t.incertezzaPosizione ?? null,
     // La previsione di arrivo arriva calcolata dalla Centrale: qui c'era una costante
     // null, e siccome i riquadri "ETA" e "Arrivo previsto" sono dentro una condizione
     // su questo campo non comparivano mai.
@@ -195,7 +222,9 @@ const mapApiExpectedTrain = (t: ApiExpectedTrainPayload): ExpectedTrain => ({
   stopsBefore: t.fermateIntermedie ?? 0,
   arrivalTime: t.arrivoPrevisto ? new Date(t.arrivoPrevisto).getTime() : null,
   nextStationId: t.prossimaStazione || null,
-  direction: t.direzione === 'ritorno' ? 'ritorno' : 'andata',
+  direction: t.direzione === 'ritorno' ? 'ritorno' : (t.direzione ? 'andata' : null),
+  positionKnown: t.posizioneNota === true,
+  positionDoubt: t.incertezzaPosizione ?? null,
 });
 
 const mapApiTrackSegment = (t: ApiTrackSegmentPayload): TrackSegment => ({

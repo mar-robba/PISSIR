@@ -56,14 +56,25 @@ Note di progetto:
 {"tipoEvento":"RESOLVED","sorgenteTipo":"STAZIONE","sorgenteId":"S2","guastoId":"alert-...","timestamp":"..."}
 {"tipoEvento":"STOP","target":"TRN001","motivo":"Soppresso da operatore","timestamp":"..."}
 {"tipoEvento":"MAINTENANCE_DISPATCHED","sorgenteId":"S2","timestamp":"..."}
+{"tipoEvento":"STATO_STAZIONE","sorgenteTipo":"STAZIONE","sorgenteId":"S2","stato":"MANUTENZIONE","severita":"CRITICAL","timestamp":"..."}
 {"tipoEvento":"ITINERARIO_AGGIORNATO","target":"TRN001","timestamp":"..."}
 ```
+
+`STATO_STAZIONE` lo pubblica solo la centrale, che è l'unica a decidere lo stato di una
+stazione: parte quando l'operatore manda la squadra (`POST /stazioni/{id}/manutenzione`),
+quando cambia lo stato a mano dal pannello (`PUT /stazioni/{id}`) e quando la stazione
+torna ONLINE alla chiusura dell'allarme. Serve perché la MANUTENZIONE non nasce da nessun
+guasto segnalato dal campo, quindi senza questo messaggio i treni non ne saprebbero niente.
 
 Regole di reazione:
 
 - **Treno**: `GUASTO` con `sorgenteId` ∈ {prossima stazione, stazione corrente} → si ferma;
-  `RESOLVED` della stazione bloccante → riparte; `STOP` con `target` = proprio id →
-  SOPPRESSO definitivo; `ITINERARIO_AGGIORNATO` → riscarica l'itinerario dalla centrale.
+  `STATO_STAZIONE` con `stato` GUASTA o MANUTENZIONE sulle stesse due stazioni → si ferma
+  allo stesso modo (chi è già dentro resta fermo), con `stato` ONLINE → riparte;
+  `RESOLVED` della stazione bloccante → riparte, ma non se quella stazione è ancora in
+  manutenzione (guasto chiuso e tecnici ancora sui binari sono due cose diverse);
+  `STOP` con `target` = proprio id → SOPPRESSO definitivo; `ITINERARIO_AGGIORNATO` →
+  riscarica l'itinerario dalla centrale.
 - **Stazione**: `RESOLVED` con `sorgenteId` = proprio id → torna ONLINE;
   `MAINTENANCE_DISPATCHED` → log operatori in arrivo.
 - **Centrale**: `GUASTO` → persistenza + storicizzazione + inoltro WebSocket al frontend;

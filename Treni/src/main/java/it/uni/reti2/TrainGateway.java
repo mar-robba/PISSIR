@@ -24,6 +24,14 @@ public class TrainGateway {
     private static final Logger LOG = Logger.getLogger(TrainGateway.class);
 
     /**
+     * Lo stato con cui la Centrale dichiara che una fermata è di nuovo attraversabile.
+     * È l'unico che autorizza un convoglio trattenuto a rimettersi in moto: OFFLINE non
+     * basta (è una stazione che tace, non una stazione riaperta) e la chiusura di un
+     * allarme nemmeno, perché parla del guasto e non dei binari.
+     */
+    private static final String STATO_STAZIONE_AGIBILE = "ONLINE";
+
+    /**
      * Riferimento allo stato in-memory del treno.
      * Viene iniettato per permettere di leggere lo stato attuale o aggiornarlo in base ai messaggi.
      */
@@ -65,7 +73,11 @@ public class TrainGateway {
      * "railway/alerts". Il campo discriminante del payload è "tipoEvento":
      * - STOP con target questo treno: soppressione definitiva della corsa;
      * - GUASTO di una STAZIONE corrente/prossima: il treno si blocca (trattenuto);
-     * - RESOLVED della stazione bloccante: il treno riprende il viaggio;
+     * - STATO_STAZIONE con stato GUASTA o MANUTENZIONE: la stazione non è attraversabile,
+     *   il treno si ferma come per un guasto; con stato ONLINE è invece il permesso di
+     *   ripartire, ed è l'unico messaggio che lo dà;
+     * - RESOLVED di una STAZIONE: quel singolo allarme è chiuso, ma il treno fermo resta
+     *   fermo: i binari li riapre solo lo STATO_STAZIONE qui sopra;
      * - RESOLVED di questo TRENO: rientro dall'emergenza (pronto a ripartire);
      * - ITINERARIO_AGGIORNATO con target questo treno: ricarica dell'itinerario;
      * - RITARDO con target questo treno: la Centrale comunica quanti minuti di
@@ -102,20 +114,65 @@ public class TrainGateway {
                         // Memorizza la stazione guasta per i controlli di partenza
                         trainDB.stazioniGuaste.add(sorgenteId);
                         // Il treno si blocca solo se la stazione guasta lo riguarda direttamente
-                        if (sorgenteId.equals(trainDB.prossimaStazione) || sorgenteId.equals(trainDB.stazioneCorrente)) {
+                        if (miRiguarda(sorgenteId)) {
                             LOG.warnf("🚨 [ALERT] Stazione %s guasta sulla mia rotta: mi fermo", sorgenteId);
                             journeyEngine.bloccaPerGuastoStazione(sorgenteId);
                         }
                     }
                 }
 
+                case "STATO_STAZIONE" -> {
+                    // La Centrale dichiara in che stato ha messo una stazione. Per chi viaggia
+                    // GUASTA e MANUTENZIONE sono la stessa identica cosa: quei binari non si
+                    // attraversano, quindi il treno che sta per arrivarci si ferma e quello
+                    // che è già dentro resta fermo. È l'unico modo che il convoglio ha di
+                    // sapere che i tecnici sono sul posto: la manutenzione la decide la
+                    // Centrale e non nasce da nessun guasto segnalato dal campo.
+                    if ("STAZIONE".equals(sorgenteTipo) && !sorgenteId.isEmpty()) {
+                        String statoDichiarato = alert.path("stato").asText("");
+                        trainDB.statoStazioni.put(sorgenteId, statoDichiarato);
+                        if (TrainDB.statoImpercorribile(statoDichiarato)) {
+                            if (miRiguarda(sorgenteId)) {
+                                LOG.warnf("🛠️ [ALERT] Stazione %s dichiarata %s sulla mia rotta: mi fermo",
+                                        sorgenteId, statoDichiarato);
+                                journeyEngine.bloccaPerGuastoStazione(sorgenteId);
+                            }
+                        } else if (STATO_STAZIONE_AGIBILE.equalsIgnoreCase(statoDichiarato)) {
+                            // È l'unico messaggio che rimette in marcia un convoglio fermo,
+                            // e per questo cancella anche il guasto che il treno si era
+                            // segnato: la Centrale sta dicendo che quei binari sono liberi,
+                            // e lei è l'unica a saperlo davvero. Senza questa riga la
+                            // memoria vecchia avrebbe continuato a fermare il treno, perché
+                            // l'annuncio della stazione agibile e la chiusura dell'allarme
+                            // sono due messaggi distinti e arrivano nell'ordine che capita.
+                            trainDB.stazioniGuaste.remove(sorgenteId);
+                            if (sorgenteId.equals(trainDB.stazioneBloccante)) {
+                                LOG.infof("✅ [ALERT] Stazione %s di nuovo agibile (%s): riprendo il viaggio",
+                                        sorgenteId, statoDichiarato);
+                                journeyEngine.sbloccaDaGuastoStazione();
+                            }
+                        }
+                        // Gli altri stati (OFFLINE su tutti) si annotano e basta: una
+                        // stazione muta non è una stazione riaperta, e chi è fermo davanti
+                        // a dei binari chiusi ci resta finché non è la Centrale a dire
+                        // che sono di nuovo suoi.
+                    }
+                }
+
                 case "RESOLVED" -> {
                     if ("STAZIONE".equals(sorgenteTipo)) {
-                        // La stazione torna agibile
+                        // Quel singolo allarme non è più aperto: il treno se ne prende nota
+                        // e nient'altro. Un guasto chiuso NON vuol dire binari liberi — la
+                        // stazione può avere la squadra ancora al lavoro, o un secondo
+                        // allarme aperto — e a saperlo è solo la Centrale, che quando la
+                        // fermata torna agibile lo dice con STATO_STAZIONE. Prima si
+                        // ripartiva da qui, e siccome questo messaggio lo pubblica anche il
+                        // nodo di terra quando i suoi sensori tornano a battere, bastava
+                        // quello per far entrare un convoglio in una stazione in manutenzione.
                         trainDB.stazioniGuaste.remove(sorgenteId);
                         if (sorgenteId.equals(trainDB.stazioneBloccante)) {
-                            LOG.infof("✅ [ALERT] Guasto risolto alla stazione %s: riprendo il viaggio", sorgenteId);
-                            journeyEngine.sbloccaDaGuastoStazione();
+                            LOG.infof("🛠️ [ALERT] Guasto risolto alla stazione %s: resto fermo finché la Centrale non la dichiara agibile",
+                                    sorgenteId);
                         }
                     } else if ("TRENO".equals(sorgenteTipo) && trainDB.trenoId.equals(sorgenteId)) {
                         // Rientro dall'emergenza di bordo: il treno è pronto a ripartire
@@ -164,6 +221,20 @@ public class TrainGateway {
         // Conferma (acknowledge) l'avvenuta processazione del messaggio al broker
         return message.ack();
     }
+
+    /**
+     * Dice se quella stazione è una di quelle che il treno ha davanti adesso: la fermata in
+     * cui si trova o la prossima. È il filtro che evita di fermare il convoglio per una
+     * stazione dall'altra parte della rete, che con questo itinerario non incontrerà mai.
+     *
+     * <p>Se l'alert arriva mentre il treno è altrove non si perde niente: lo stato resta
+     * scritto nel TrainDB e il motore lo ricontrolla prima di ogni partenza
+     * ({@code TrainJourneyEngine.tickInStazione}).</p>
+     */
+    private boolean miRiguarda(String stazioneId) {
+        return stazioneId.equals(trainDB.prossimaStazione) || stazioneId.equals(trainDB.stazioneCorrente);
+    }
+
 //---- END listeners
 // =========================== inizio emettitori ======================
 

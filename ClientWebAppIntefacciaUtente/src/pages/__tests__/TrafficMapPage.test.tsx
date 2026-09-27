@@ -47,6 +47,10 @@ const treno = (id: string, campi: Partial<Train> = {}): Train => ({
   previousStationId: null,
   routeId: 'r-1',
   direction: 'andata',
+  // Il convoglio di riferimento è uno di cui la Centrale sa dire dove sta: i casi
+  // incerti si costruiscono passando positionKnown: false nei campi.
+  positionKnown: true,
+  positionDoubt: null,
   arrivalTime: null,
   minutesToArrival: null,
   departureTime: null,
@@ -64,6 +68,7 @@ const itinerario: Route = {
   stationIds: ['st-mi', 'st-to', 'st-pa'],
   trainIds: [],
   travelTimes: [30, 30],
+  terminusStationId: null, // nessun capolinea: la corsa gira all'infinito
   active: true,
   createdAt: Date.now(),
 };
@@ -218,7 +223,60 @@ describe('TrafficMapPage', () => {
     const { container } = render(<TrafficMapPage />);
 
     expect(container.querySelectorAll('.map-marker')).toHaveLength(3); // le sole stazioni
-    expect(screen.getByText('1 treni senza posizione nota')).toBeInTheDocument();
+    expect(screen.getByText('1 convoglio a posizione incerta')).toBeInTheDocument();
+    expect(screen.getByText('REG 400')).toBeInTheDocument();
+  });
+
+  it('con la sola partenza sconosciuta non disegna la corsa: mette il convoglio in elenco', () => {
+    // È il caso della stazione spenta. La destinazione si conosce (Palermo), la
+    // provenienza no: prima la mappa pescava l'ultima stazione nota e tracciava la corsa
+    // fino a lì, disegnando un convoglio in viaggio su una tratta che non esiste.
+    useRailwayStore.setState({
+      trains: [
+        treno('REG 600', {
+          status: 'in_viaggio',
+          currentStationId: null,
+          previousStationId: null,
+          nextStationId: 'st-pa',
+          progressPercent: 45,
+          positionKnown: false,
+          positionDoubt: 'PARTENZA_SCONOSCIUTA',
+        }),
+      ],
+    });
+
+    const { container } = render(<TrafficMapPage />);
+
+    expect(container.querySelectorAll('.map-marker')).toHaveLength(3); // le sole stazioni
+    expect(screen.getByText('1 convoglio a posizione incerta')).toBeInTheDocument();
+    expect(screen.getByText('REG 600')).toBeInTheDocument();
+    expect(screen.getByText('nessun sensore conferma da dove è uscito')).toBeInTheDocument();
+  });
+
+  it('rimette sulla mappa il convoglio appena partenza e arrivo tornano noti', () => {
+    // L'incertezza non è uno stato in cui il treno resta finché qualcuno lo tocca: basta
+    // che la Centrale rimetta insieme i due estremi e il convoglio torna disegnato.
+    const incerto = treno('REG 700', {
+      status: 'in_viaggio',
+      currentStationId: null,
+      previousStationId: null,
+      nextStationId: 'st-pa',
+      progressPercent: 50,
+      positionKnown: false,
+      positionDoubt: 'PARTENZA_SCONOSCIUTA',
+    });
+    useRailwayStore.setState({ trains: [incerto] });
+
+    const { container, rerender } = render(<TrafficMapPage />);
+    expect(container.querySelectorAll('.map-marker')).toHaveLength(3);
+
+    useRailwayStore.setState({
+      trains: [{ ...incerto, previousStationId: 'st-to', positionKnown: true, positionDoubt: null }],
+    });
+    rerender(<TrafficMapPage />);
+
+    expect(container.querySelectorAll('.map-marker')).toHaveLength(4); // stazioni + treno
+    expect(screen.queryByText(/posizione incerta/)).not.toBeInTheDocument();
   });
 
   it('tiene in stazione il convoglio che ne dichiara una, anche se lo stato dice "in viaggio"', () => {

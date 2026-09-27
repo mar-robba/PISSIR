@@ -1,37 +1,38 @@
-# Processo Treno
-## compilazione 
-mvn clean package
-## Esecuzione:
-java -jar target/quarkus-app/quarkus-run.jar ALFA-10
+# Nodo Treno
 
-## o con il wrapper maven
-./mvnw clean package -DskipTests
-./mvnw quarkus:dev -Dtreno.id=ALFA-100
+Un processo per ogni treno: scarica l'itinerario dalla Centrale, lo percorre
+simulando il viaggio, manda telemetria e annuncia il passaggio ai sensori delle
+stazioni. Istruzioni generali di avvio nel `README.md` della radice.
 
-# Sever Rest per la ricezione dei messaggi dai sensori
-** si attiva con l'avvio dell'applicazione precedente** 
+## Avvio
 
-Sto verificando quale server REST viene usato nel modulo Treni e come si avvia nel progetto.
+```bash
+./mvnw quarkus:dev -Dtreno.id=Jaz -Dquarkus.http.port=8082
+./mvnw quarkus:dev -Dtreno.id=Jaz -Dquarkus.http.port=8082 -Dquarkus.profile=tls
+```
 
-Server REST del modulo Treni
-Il modulo Treni usa un server HTTP Quarkus con RESTEasy/Jackson.
+L'ID deve esistere nel database centrale (`Jaz, LUNGO, Smeraldo, Rosso, Pietra`
+con i dati attuali). Per lanciarne tanti insieme c'e' `./avvioTreni.sh`, che legge
+gli ID da `treni.conf` e scrive un log per istanza in `logs/`.
 
-Framework: Quarkus
-Endpoint base: @Path("/treno")
-Porta configurata: quarkus.http.port=8082
-Classe REST: it.uni.reti2.TrainIngestion
-Cosa espone
-Alcuni endpoint disponibili:
+Il viaggio parte da solo (`viaggio.autostart`), accelerato di
+`viaggio.fattore.accelerazione` (100) rispetto ai tempi reali, con
+`viaggio.sosta.secondi` di fermata in stazione.
 
-GET /treno/info
-GET /treno/stato
-GET /treno/tratta
-POST /treno/tratta
-POST /treno/sensore/guasto
-POST /treno/sensore/passaggio
-Come avviarlo
-Con Maven in sviluppo
-Dal modulo Treni:
+## Cosa espone
 
+REST sotto `/treno`: `info`, `stato`, `viaggio`, `tratta` (GET e POST) e i due
+ingressi dei sensori di bordo, `sensore/passaggio` e `sensore/guasto`.
 
+## MQTT
 
+Pubblica `railway/train/{id}/telemetry` e
+`railway/treno-simulatoriSensori/{id}`; ascolta `railway/alerts` e reagisce:
+si ferma se una stazione del suo tragitto va in GUASTO o MANUTENZIONE, riparte
+quando l'allarme si chiude, si sopprime su `STOP` con il proprio ID e riscarica
+l'itinerario su `ITINERARIO_AGGIORNATO`.
+
+## Codice
+
+`TrainJourneyEngine` fa avanzare il viaggio, `TrainDB` tiene lo stato in memoria,
+`TrainElab` decide le reazioni agli alert, `TrainGateway` parla col broker.

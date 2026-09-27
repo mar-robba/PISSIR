@@ -83,6 +83,44 @@ public class Treno extends PanacheEntityBase {
     @Transient
     public Integer minutiAllArrivo;
 
+    // ──────────────────────────────────────────────────────────────
+    // POSIZIONE DICHIARATA ALL'INTERFACCIA
+    //
+    // I cinque campi qui sotto sono la risposta della Centrale alla domanda "dove sta
+    // questo convoglio?", e li calcola PosizioneConvoglio a ogni scrittura e a ogni
+    // lettura della cache. Sono separati da stazioneCorrente/prossimaStazione/direzione
+    // apposta: quelli sono le notizie grezze che arrivano dal campo, questi sono ciò che
+    // la Centrale è disposta a garantire. Quando non è sicura scrive null, che nel JSON
+    // diventa il punto di domanda mostrato all'operatore, e il convoglio finisce
+    // nell'elenco di quelli a posizione incerta invece che sulla mappa.
+    // ──────────────────────────────────────────────────────────────
+
+    /** Stazione da cui il convoglio è uscito (o in cui sosta), null se non è nota. */
+    @Transient
+    public String partenzaCorrente;
+
+    /** Stazione verso cui il convoglio sta andando, null se non è nota. */
+    @Transient
+    public String arrivoCorrente;
+
+    /** Verso di percorrenza garantito dalla Centrale, null se non è noto. */
+    @Transient
+    public String direzioneCorrente;
+
+    /**
+     * True quando la Centrale sa dove disegnare il convoglio: fermo in una stazione,
+     * oppure in linea con entrambi gli estremi della tratta noti. Basta questo.
+     */
+    @Transient
+    public boolean posizioneNota;
+
+    /**
+     * Perché la posizione non è nota, per l'elenco dei convogli da ritrovare (le
+     * costanti stanno in {@code PosizioneConvoglio}). Null quando è nota.
+     */
+    @Transient
+    public String incertezzaPosizione;
+
 
     public Treno() {}
 

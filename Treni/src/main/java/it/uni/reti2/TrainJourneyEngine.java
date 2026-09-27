@@ -38,8 +38,9 @@ import java.util.Random;
  * - all'estremo dell'itinerario il treno inverte la direzione (con sosta doppia),
  *   a meno che quell'estremo sia il capolinea marcato dall'amministratore: in quel caso
  *   la corsa finisce li' (fase FERMO_CAPOLINEA) e riparte solo con un itinerario nuovo;
- * - se una stazione della tratta (corrente o prossima) risulta guasta il treno
- *   si blocca finché non arriva l'alert RESOLVED (il ritardo che ne segue lo
+ * - se una stazione della tratta (corrente o prossima) non è attraversabile — guasta
+ *   oppure in MANUTENZIONE, che per chi viaggia è la stessa cosa — il treno si blocca
+ *   finché la Centrale non la dichiara di nuovo agibile (il ritardo che ne segue lo
  *   misura la Centrale, confrontando l'arrivo con l'orario previsto);
  * - se l'amministratore cambia l'itinerario a viaggio iniziato il convoglio non
  *   ricomincia da capo: si riaggancia al percorso nuovo nella stazione in cui si
@@ -320,6 +321,15 @@ public class TrainJourneyEngine {
                         nodo.path("tempoVersoProssimaMinuti").asInt());
                 tappe.add(tappa);
                 soloId.add(tappa.id);
+                // Insieme al percorso arriva anche lo stato di ogni fermata. Serve perché gli
+                // alert su railway/alerts li sente solo chi era acceso quando sono passati: un
+                // convoglio che si avvia adesso, senza questa riga, non saprebbe che una
+                // stazione della sua tratta è chiusa (guasta o in manutenzione) e ci andrebbe
+                // dentro lo stesso.
+                String statoTappa = nodo.path("stato").asText("");
+                if (!statoTappa.isEmpty()) {
+                    trainDB.statoStazioni.put(tappa.id, statoTappa);
+                }
             }
 
             // un contrllo del cavolo sulla validità dell'itinerario,  e si dovrebbe attendere che la stazione riflagghi vera la ricaricaItinerarioRichiesta se no il treno rimane fermo
@@ -479,13 +489,13 @@ public class TrainJourneyEngine {
         sostaCorrenteSecondi = sostaSecondi;
 
         if ("BLOCCATO_GUASTO_STAZIONE".equals(trainDB.faseViaggio)) {
-            // Il blocco era scattato sul percorso vecchio: resta solo se una stazione guasta è
-            // ancora fra quelle che mi riguardano. Adesso comunque sono fermo in stazione, non
+            // Il blocco era scattato sul percorso vecchio: resta solo se una stazione chiusa
+            // (guasta o in manutenzione) è ancora fra quelle che mi riguardano. Adesso comunque sono fermo in stazione, non
             // più a metà tratta, quindi è da lì che riprenderò.
             fasePrimaDelBlocco = "IN_STAZIONE";
-            boolean ancoraGuasta = trainDB.stazioniGuaste.contains(trainDB.stazioneCorrente)
-                    || (trainDB.prossimaStazione != null && trainDB.stazioniGuaste.contains(trainDB.prossimaStazione));
-            if (!ancoraGuasta) {
+            boolean ancoraChiusa = trainDB.stazioneImpercorribile(trainDB.stazioneCorrente)
+                    || trainDB.stazioneImpercorribile(trainDB.prossimaStazione);
+            if (!ancoraChiusa) {
                 sbloccaDaGuastoStazione();
             }
         } else if (stazioneAncora.equals(trainDB.capolineaId)) {
@@ -614,13 +624,19 @@ public class TrainJourneyEngine {
 
     /**
      * Fase IN_STAZIONE: il treno riparte quando la sosta è scaduta, lo stato è FERMO
-     * (non SOPPRESSO/EMERGENZA) e né la stazione corrente né la prossima risultano guaste.
+     * (non SOPPRESSO/EMERGENZA) e né la stazione corrente né la prossima risultano chiuse
+     * (guaste o con la squadra di manutenzione al lavoro).
      * Alla partenza pubblica il passaggio USCITA via TrainGateway.
      */
     private void tickInStazione() {
         trainDB.velocita = 0;
+        // Il confronto è in millisecondi e non con getSeconds(): quello tronca, e siccome i
+        // tick non cadono mai esattamente sul secondo bastava un millesimo di anticipo perché
+        // una sosta di 2s venisse letta come "1 secondo trascorso" e il treno aspettasse un
+        // tick in più. Un secondo reale, col fattore 100, vale quasi due minuti di orario:
+        // era ritardo che il convoglio si prendeva a ogni singola fermata senza motivo.
         if (trainDB.tArrivoInStazione == null
-                || Duration.between(trainDB.tArrivoInStazione, Instant.now()).getSeconds() < sostaCorrenteSecondi) { // sostaCorrenteSecondi: hardcoddato nelle proprietà di application.propriety modificate in run allinizione del file
+                || Duration.between(trainDB.tArrivoInStazione, Instant.now()).toMillis() < sostaCorrenteSecondi * 1000) {
             return; // sosta ancora in corso
         }
         // cotrollo di robustezza
@@ -635,20 +651,21 @@ public class TrainJourneyEngine {
             return;
         }
 
-        // Trattenuto in stazione se la corrente o la prossima sono note come guaste.
-        // Non basta un return "muto": si entra nella fase BLOCCATO_GUASTO_STAZIONE, così
-        // il convoglio resta fermo davvero e /treno/viaggio dice anche QUALE stazione lo blocca.
-        // Serve quando l'alert di guasto è arrivato mentre il treno era altrove: in quel
-        // caso il gateway non aveva chiamato bloccaPerGuastoStazione perché la stazione
-        // non era né la corrente né la prossima.
-        String stazioneGuasta = null;
-        if (trainDB.stazioniGuaste.contains(corrente.id)) {
-            stazioneGuasta = corrente.id;
-        } else if (trainDB.stazioniGuaste.contains(prossima.id)) {
-            stazioneGuasta = prossima.id;
+        // Trattenuto in stazione se la corrente o la prossima non sono attraversabili: o
+        // sono guaste, o ci stanno lavorando i tecnici. Non basta un return "muto": si entra
+        // nella fase BLOCCATO_GUASTO_STAZIONE, così il convoglio resta fermo davvero e
+        // /treno/viaggio dice anche QUALE stazione lo blocca.
+        // Serve quando l'alert è arrivato mentre il treno era altrove: in quel caso il
+        // gateway non aveva chiamato bloccaPerGuastoStazione perché la stazione non era
+        // né la corrente né la prossima.
+        String stazioneChiusa = null;
+        if (trainDB.stazioneImpercorribile(corrente.id)) {
+            stazioneChiusa = corrente.id;
+        } else if (trainDB.stazioneImpercorribile(prossima.id)) {
+            stazioneChiusa = prossima.id;
         }
-        if (stazioneGuasta != null) {
-            bloccaPerGuastoStazione(stazioneGuasta);
+        if (stazioneChiusa != null) {
+            bloccaPerGuastoStazione(stazioneChiusa);
             return;
         }
 
@@ -812,10 +829,15 @@ public class TrainJourneyEngine {
     // ===============================================================
 
     /**
-     * Blocca il treno perché una stazione rilevante (corrente o prossima) è guasta.
+     * Blocca il treno perché una stazione rilevante (corrente o prossima) non è
+     * attraversabile: è guasta oppure la Centrale ci ha mandato la squadra di manutenzione.
      * Memorizza la fase in corso per poterla riprendere allo sblocco.
      *
-     * @param stazioneId Stazione guasta che causa il blocco.
+     * <p>Il nome della fase resta BLOCCATO_GUASTO_STAZIONE anche per la manutenzione: per
+     * il convoglio è lo stesso identico blocco, cambia solo il motivo per cui quei binari
+     * non sono suoi.</p>
+     *
+     * @param stazioneId Stazione chiusa che causa il blocco.
      */
     public void bloccaPerGuastoStazione(String stazioneId) {
         if (!viaggioAvviato || "SOPPRESSO".equals(trainDB.stato)
@@ -827,12 +849,14 @@ public class TrainJourneyEngine {
         trainDB.faseViaggio = "BLOCCATO_GUASTO_STAZIONE";
         trainDB.stato = "FERMO";
         trainDB.velocita = 0;
-        LOG.warnf("⛔ [TWIN] Treno bloccato: stazione %s guasta (ero in fase %s)", stazioneId, fasePrimaDelBlocco);
+        LOG.warnf("⛔ [TWIN] Treno bloccato: stazione %s non attraversabile (%s), ero in fase %s",
+                stazioneId, trainDB.statoStazioni.getOrDefault(stazioneId, "GUASTA"), fasePrimaDelBlocco);
     }
 
     /**
-     * Sblocca il treno dopo la risoluzione del guasto della stazione bloccante
-     * e riprende la fase in cui si trovava prima del blocco.
+     * Sblocca il treno quando la stazione che lo tratteneva torna agibile (guasto risolto
+     * o squadra di manutenzione che ha finito) e riprende la fase in cui si trovava prima
+     * del blocco.
      */
     public void sbloccaDaGuastoStazione() {
         if (!"BLOCCATO_GUASTO_STAZIONE".equals(trainDB.faseViaggio)) {
@@ -845,7 +869,7 @@ public class TrainJourneyEngine {
         if ("IN_VIAGGIO".equals(faseDaRiprendere)) {
             trainDB.stato = "IN_VIAGGIO"; // riprende la marcia dal punto in cui era
         }
-        LOG.infof("✅ [TWIN] Guasto stazione risolto: riprendo la fase %s", faseDaRiprendere);
+        LOG.infof("✅ [TWIN] Stazione di nuovo agibile: riprendo la fase %s", faseDaRiprendere);
     }
 
     /**

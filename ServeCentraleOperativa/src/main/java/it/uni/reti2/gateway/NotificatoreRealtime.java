@@ -64,6 +64,7 @@ public class NotificatoreRealtime {
         evento.put("latitudine", treno.latitudine);
         evento.put("longitudine", treno.longitudine);
         scriviPrevisione(evento, treno);
+        scriviPosizione(evento, treno);
         webSocket.broadcast(evento.toString());
     }
 
@@ -85,7 +86,40 @@ public class NotificatoreRealtime {
         evento.put("latitudine", treno.latitudine);
         evento.put("longitudine", treno.longitudine);
         scriviPrevisione(evento, treno);
+        scriviPosizione(evento, treno);
         webSocket.broadcast(evento.toString());
+    }
+
+    /**
+     * Attacca a un evento TELEMETRY la posizione che la Centrale è disposta a garantire.
+     *
+     * <p>Nel frame grezzo la stazione corrente e la prossima ci sono già, ma sono ciò che
+     * il convoglio <em>dichiara</em>; questi campi sono invece il giudizio della Centrale,
+     * che incrocia quella dichiarazione con l'ultimo passaggio rilevato dai sensori di
+     * terra (vedi {@code PosizioneConvoglio}).</p>
+     *
+     * <p>Vanno scritti <b>sempre</b>, anche a null, per lo stesso motivo della previsione
+     * di arrivo: sono il modo in cui il browser cancella quello che sapeva prima. Se
+     * l'incertezza arrivasse come "campo assente" l'interfaccia terrebbe l'ultima
+     * posizione buona e continuerebbe a disegnare il convoglio in viaggio verso una
+     * fermata che nessuno gli ha più confermato — che è esattamente il difetto per cui
+     * questi campi esistono.</p>
+     */
+    private void scriviPosizione(ObjectNode evento, Treno treno) {
+        scriviTestoONull(evento, "partenzaCorrente", treno.partenzaCorrente);
+        scriviTestoONull(evento, "arrivoCorrente", treno.arrivoCorrente);
+        scriviTestoONull(evento, "direzioneCorrente", treno.direzioneCorrente);
+        scriviTestoONull(evento, "incertezzaPosizione", treno.incertezzaPosizione);
+        evento.put("posizioneNota", treno.posizioneNota);
+    }
+
+    /** Scrive il campo, oppure un null esplicito che vale "non lo so". */
+    private void scriviTestoONull(ObjectNode evento, String campo, String valore) {
+        if (valore != null) {
+            evento.put(campo, valore);
+        } else {
+            evento.putNull(campo);
+        }
     }
 
     /**

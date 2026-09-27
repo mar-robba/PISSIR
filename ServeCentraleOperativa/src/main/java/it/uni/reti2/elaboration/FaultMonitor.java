@@ -108,13 +108,23 @@ public class FaultMonitor {
 
                 // Evita duplicati: un solo guasto aperto per episodio di silenzio
                 if (statoRete.getGuastoApertoPerSorgente(stazione.id, "sensore_offline") == null) {
-                    // Severità CRITICAL (non warning): è il fail-stop della stazione, e
-                    // TrainGateway.riceviAlert blocca i treni solo sui guasti CRITICAL.
+                    // Severità WARNING e non CRITICAL, apposta: i treni si fermano solo sui
+                    // guasti CRITICAL (TrainGateway.riceviAlert) e una stazione che tace NON
+                    // è una stazione impercorribile. È la stessa regola che StatiCanonici
+                    // applica agli stati — GUASTA e MANUTENZIONE trattengono i convogli,
+                    // OFFLINE no — e prima le due cose si contraddicevano: lo stato diceva
+                    // "passa pure" mentre il guasto dedotto fermava tutti. Ne usciva anche un
+                    // comportamento che dipendeva dall'ordine di accensione, perché l'alert
+                    // passa una volta sola: il convoglio già in marcia si bloccava, quello
+                    // avviato dopo attraversava la stessa stazione senza accorgersene.
+                    // Quello che il silenzio produce davvero è un buco di informazione, non
+                    // un binario chiuso: lo raccontano l'allarme in dashboard e la posizione
+                    // dichiarata incerta (PosizioneConvoglio), non un treno fermo.
                     // Il messaggio parte con MSG_HEARTBEAT_PERSO così la Centrale
                     // riconosce il guasto come "suo" e lo richiude da sola quando il
                     // battito torna (vedi MonitoraggioStazioni.registraHeartbeat).
                     Guasto guasto = guasti.nuovoDedotto(
-                            "sensore_offline", "CRITICAL", "STAZIONE", stazione.id,
+                            "sensore_offline", "WARNING", "STAZIONE", stazione.id,
                             Guasto.MSG_HEARTBEAT_PERSO + " la stazione " + stazione.id
                                     + " non invia heartbeat da oltre " + heartbeatTimeoutSecondi + " secondi");
                     guasti.apri(guasto, new GuastiService.EventoAudit(

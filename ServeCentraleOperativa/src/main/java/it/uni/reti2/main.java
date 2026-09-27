@@ -28,10 +28,16 @@ public class main implements QuarkusApplication {
     public int run(String... args) throws Exception {
         LOG.info("✅ Centrale Operativa AVVIATA CORRETTAMENTE");
         LOG.infof("🌐 Server REST disponibile su http://localhost:%d/api", portaHttp);
-        LOG.info("🔄 Ingresso nel ciclo infinito di mantenimento del servizio Centrale Operativa...");
+        LOG.info("🔄 Servizio Centrale Operativa in esercizio: resto in piedi fino allo spegnimento...");
 
-        while (true) {
-            Thread.sleep(1000);
-        }
+        // Il processo resta in piedi finche' qualcuno non chiede lo spegnimento (Ctrl-C, SIGTERM,
+        // o il riavvio a caldo di quarkus:dev quando cambia un sorgente). Prima qui c'era un
+        // "while (true) Thread.sleep(1000)": quel ciclo non usciva MAI, e siccome Quarkus per
+        // fermarsi aspetta che run() ritorni, ogni spegnimento restava appeso. In dev mode il
+        // sintomo era vistoso: bastava toccare un file e la Centrale smetteva di rispondere sia
+        // in HTTP sia su MQTT, in attesa di un riavvio che non si completava.
+        Quarkus.waitForExit();
+        LOG.info("🛑 Spegnimento della Centrale Operativa richiesto: esco dal ciclo di servizio");
+        return 0;
     }
 }

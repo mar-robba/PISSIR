@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { Building2, Maximize2, Minus, Plus, Tag, Train as TrainIcon, X } from 'lucide-react';
 import { useRailwayStore } from '../store/railwayStore';
+import { descriviIncertezzaPosizione } from '../api/apiClient';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { Route, Station, TrackSegment, Train as TrainType } from '../types';
@@ -58,6 +59,12 @@ type ElementoMappa = {
 
 /** Insieme di elementi che cadono praticamente nello stesso punto della mappa. */
 type GruppoSovrapposti = { chiave: string; ancora: DiagramPoint; elementi: ElementoMappa[] };
+
+/**
+ * Convoglio che la mappa non disegna perché non si sa dove sia. Il motivo arriva dalla
+ * Centrale (PosizioneConvoglio) tranne quando è la mappa stessa a non poterlo piazzare.
+ */
+type TrenoIncerto = { id: string; motivo: string | null };
 
 type Selezione = { tipo: TipoElemento; id: string } | null;
 
@@ -543,6 +550,7 @@ function descriviStato(stato: string): string {
   return stato.replace(/_/g, ' ').toUpperCase();
 }
 
+
 /**
  * Arrotonda i chilometri della barra di scala a 1, 2 o 5 per decade, come fanno
  * le cartine: si preferisce scrivere "200 km" invece di "187 km".
@@ -864,7 +872,8 @@ export default function TrafficMapPage() {
   // Stesse due condizioni usate per posizionare il simbolo sul diagramma, così il pannello
   // non racconta un avanzamento che la mappa non è in grado di disegnare.
   const inLineaSelezionato = !!trenoSelezionato && inLinea(trenoSelezionato);
-  const trattaSelezionataNota = !!trenoSelezionato?.previousStationId
+  const trattaSelezionataNota = !!trenoSelezionato?.positionKnown
+    && !!trenoSelezionato?.previousStationId
     && !!trenoSelezionato?.nextStationId
     && trenoSelezionato.previousStationId !== trenoSelezionato.nextStationId;
 
@@ -872,7 +881,7 @@ export default function TrafficMapPage() {
    * Costruisce l'elenco di tutto ciò che va disegnato (stazioni e treni
    * localizzabili) e ne separa i simboli sovrapposti.
    */
-  const { elementi, gruppi, trainiNonLocalizzabili } = useMemo(() => {
+  const { elementi, gruppi, treniIncerti } = useMemo(() => {
     const elencoStazioni: ElementoMappa[] = [...stations]
       .sort((primo, secondo) => primo.id.localeCompare(secondo.id))
       .map(station => {
@@ -894,11 +903,21 @@ export default function TrafficMapPage() {
         };
       });
 
-    let scartati = 0;
+    const incerti: TrenoIncerto[] = [];
     const elencoTreni: ElementoMappa[] = [...trains]
       .filter(({ status }) => status !== 'soppresso')
       .sort((primo, secondo) => primo.id.localeCompare(secondo.id))
       .map((train): ElementoMappa | null => {
+        // Se la Centrale non garantisce la posizione qui non si prova a rimediare con
+        // quello che resta in memoria: il convoglio va in elenco e basta. È la regola
+        // che vale anche nel caso più insidioso, quello in cui manca SOLO la partenza:
+        // l'arrivo lo si conosce, e prima si disegnava la corsa dall'ultima stazione
+        // nota fino a lì, inventando una tratta che in rete non esiste.
+        if (!train.positionKnown) {
+          incerti.push({ id: train.id, motivo: train.positionDoubt });
+          return null;
+        }
+
         const prevStation = stations.find(({ id }) => id === train.previousStationId);
         const nextStation = stations.find(({ id }) => id === train.nextStationId);
         const currentStation = stations.find(({ id }) => id === train.currentStationId);
@@ -928,9 +947,11 @@ export default function TrafficMapPage() {
           ancora = getCoordinates(currentStation.id);
         }
 
-        // Un treno senza stazione corrente né estremi di tratta non è localizzabile.
+        // Rete di sicurezza locale: la Centrale garantisce la posizione in termini di
+        // stazioni, ma qui serve un punto sul diagramma, e può mancare comunque (una
+        // fermata cancellata dall'anagrafica, oppure senza coordinate). Stesso elenco.
         if (!ancora) {
-          scartati += 1;
+          incerti.push({ id: train.id, motivo: 'STAZIONE_NON_DISEGNABILE' });
           return null;
         }
 
@@ -958,7 +979,7 @@ export default function TrafficMapPage() {
     const raggruppati = raggruppaSovrapposti(tutti, unitaPerPixel);
     raggruppati.forEach(gruppo => sventaglia(gruppo, unitaPerPixel));
 
-    return { elementi: tutti, gruppi: raggruppati, trainiNonLocalizzabili: scartati };
+    return { elementi: tutti, gruppi: raggruppati, treniIncerti: incerti };
   }, [stations, trains, graphLayout, senzaGps, unitaPerPixel]);
 
   const etichette = useMemo(
@@ -1300,8 +1321,13 @@ export default function TrafficMapPage() {
   const itinerarioTreno = trenoSelezionato
     ? routes.find(({ id }) => id === trenoSelezionato.routeId)
     : null;
+  // Il punto di domanda è quello che manda la Centrale quando non è sicura, e va
+  // distinto dal trattino: "—" vuol dire "non si applica" (un capolinea non ha una
+  // prossima fermata), "?" vuol dire "c'è, ma non lo sappiamo".
   const nomeStazione = (stationId: string | null) =>
     stations.find(({ id }) => id === stationId)?.name ?? '—';
+  const nomeStazioneODubbio = (stationId: string | null, noto: boolean) =>
+    (noto ? nomeStazione(stationId) : '?');
 
   return (
     <div className="map-page animate-fade-in">
@@ -1464,9 +1490,27 @@ export default function TrafficMapPage() {
 
           {/* Avvisi e barra di scala impilati nell'angolo, così non si coprono. */}
           <div className="map-angolo">
-            {trainiNonLocalizzabili > 0 && (
-              <div className="map-avviso">
-                {trainiNonLocalizzabili} treni senza posizione nota
+            {/* I convogli che la mappa non disegna non spariscono: restano qui, con il
+                nome e il motivo. Un treno tolto dal diagramma e basta è un treno che
+                l'operatore smette di sorvegliare senza accorgersene; e una posizione
+                inventata al suo posto sarebbe anche peggio. Appena la Centrale rimette
+                insieme partenza e arrivo il convoglio esce da questo elenco e torna sul
+                diagramma da solo, senza bisogno di ricaricare. */}
+            {treniIncerti.length > 0 && (
+              <div className="map-incerti">
+                <div className="map-incerti__titolo">
+                  {treniIncerti.length === 1
+                    ? '1 convoglio a posizione incerta'
+                    : `${treniIncerti.length} convogli a posizione incerta`}
+                </div>
+                <ul className="map-incerti__elenco">
+                  {treniIncerti.map(({ id, motivo }) => (
+                    <li key={id} className="map-incerti__voce">
+                      <span className="map-incerti__treno">{id}</span>
+                      <span className="map-incerti__motivo">{descriviIncertezzaPosizione(motivo)}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 
@@ -1630,7 +1674,10 @@ export default function TrafficMapPage() {
               <h3 className="map-detail__titolo font-mono">{trenoSelezionato.id}</h3>
               <p className="map-detail__sottotitolo">
                 {itinerarioTreno ? `${itinerarioTreno.name} · ` : ''}
-                corsa di {trenoSelezionato.direction}
+                {/* Il verso lo garantisce la Centrale insieme alla posizione: quando non
+                    lo sa scrive null, e qui si mostra il punto di domanda invece di
+                    ripiegare su "andata", che sarebbe un'informazione inventata. */}
+                corsa di {trenoSelezionato.direction ?? '?'}
               </p>
 
               <div className="map-detail__stati">
@@ -1673,10 +1720,12 @@ export default function TrafficMapPage() {
                 </div>
               ) : (
                 <p className="map-detail__sottotitolo">
-                  {trenoSelezionato.currentStationId
-                    ? `In sosta a ${nomeStazione(trenoSelezionato.currentStationId)}`
-                    : 'Avanzamento sulla tratta non disponibile'}
-                  {trenoSelezionato.nextStationId
+                  {!trenoSelezionato.positionKnown
+                    ? `Posizione incerta: ${descriviIncertezzaPosizione(trenoSelezionato.positionDoubt)}`
+                    : (trenoSelezionato.currentStationId
+                      ? `In sosta a ${nomeStazione(trenoSelezionato.currentStationId)}`
+                      : 'Avanzamento sulla tratta non disponibile')}
+                  {trenoSelezionato.positionKnown && trenoSelezionato.nextStationId
                     ? ` · prossima fermata ${nomeStazione(trenoSelezionato.nextStationId)}`
                     : ''}
                 </p>
@@ -1686,13 +1735,19 @@ export default function TrafficMapPage() {
                 <div className="map-detail__riga">
                   <span className="map-detail__etichetta">Da (ultima stazione)</span>
                   <span className="map-detail__valore">
-                    {nomeStazione(trenoSelezionato.previousStationId)}
+                    {nomeStazioneODubbio(
+                      trenoSelezionato.previousStationId,
+                      !!trenoSelezionato.previousStationId,
+                    )}
                   </span>
                 </div>
                 <div className="map-detail__riga">
                   <span className="map-detail__etichetta">Verso (prossima)</span>
                   <span className="map-detail__valore">
-                    {nomeStazione(trenoSelezionato.nextStationId)}
+                    {nomeStazioneODubbio(
+                      trenoSelezionato.nextStationId,
+                      !!trenoSelezionato.nextStationId || trenoSelezionato.positionKnown,
+                    )}
                   </span>
                 </div>
                 <div className="map-detail__riga">

@@ -247,12 +247,23 @@ public class RestApiGateway {
         if (dto.latitudine != null) cache.latitudine = dto.latitudine;
         if (dto.longitudine != null) cache.longitudine = dto.longitudine;
         if (dto.binari != null) cache.binari = dto.binari;
-        if (dto.stato != null) cache.stato = StatiCanonici.stazioneDallOperatore(dto.stato);
         statoRete.aggiornaStazione(cache);
+        if (dto.stato != null) {
+            // Lo stato scelto a mano dall'amministratore e' un comando esplicito e passa
+            // sopra a tutto, manutenzione compresa: e' lui che decide, e se toglie una
+            // stazione dall'intervento lo sta facendo apposta.
+            statoRete.forzaStatoStazione(cache, StatiCanonici.stazioneDallOperatore(dto.stato));
+        }
         if (dto.stato != null) {
             // Anche lo stato cambiato a mano dall'amministratore deve arrivare subito
             // alle altre schermate aperte, non al prossimo ricaricamento.
             notificatore.statoStazione(cache);
+            // E deve arrivare anche ai treni: se l'amministratore mette la stazione in
+            // MANUTENZIONE (o la dichiara GUASTA) dal pannello, i convogli che stanno per
+            // arrivarci devono fermarsi come per un guasto segnalato dal campo, e quelli
+            // gia' fermi li' devono restarci. Il pannello, prima, cambiava solo il colore
+            // del pallino sulla mappa.
+            pubblicatore.pubblicaStatoStazione(cache.id, cache.stato);
         }
 
         return Response.ok(cache).build();
@@ -992,6 +1003,13 @@ public class RestApiGateway {
         tappa.put("latitudine", stazione.latitudine != null ? stazione.latitudine : 0.0);
         tappa.put("longitudine", stazione.longitudine != null ? stazione.longitudine : 0.0);
         tappa.put("tempoVersoProssimaMinuti", tempoVersoProssima);
+        // Lo stato di ogni fermata viaggia insieme al percorso: gli alert su railway/alerts
+        // li sente solo chi era acceso quando sono passati, e un convoglio che si avvia
+        // adesso non ha modo di sapere che una stazione della sua tratta e' chiusa. Si
+        // legge dalla cache e non dalla riga di anagrafica perche' e' la cache la copia
+        // aggiornata: la PUT dell'amministratore scrive li'.
+        Stazione inCache = statoRete.getStazione(stazione.id);
+        tappa.put("stato", inCache != null ? inCache.stato : stazione.stato);
         return tappa;
     }
 

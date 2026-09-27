@@ -4,7 +4,7 @@ import Badge from '../components/ui/Badge';
 import { useEffect, useState } from 'react';
 import { Building2, Wrench, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { apiClient } from '../api/apiClient';
+import { apiClient, descriviIncertezzaPosizione } from '../api/apiClient';
 import type { ExpectedTrain } from '../types';
 
 /** Millisecondi fra due letture del tabellone: è una previsione, si rinfresca da sola. */
@@ -187,6 +187,18 @@ export default function StationsPage() {
                         <div className="flex justify-between text-sm text-danger font-medium">
                           <span>Ritardo:</span>
                           <span>+{train.delayMinutes} min</span>
+                        </div>
+                      )}
+
+                      {/* Il convoglio resta in tabellone anche a posizione incerta — la
+                          stazione lo aspetta comunque, l'elenco lo costruisce l'itinerario
+                          — ma l'orario qui sotto è calcolato sull'ultima posizione certa,
+                          che può essere vecchia. Meglio dirlo che lasciar credere a una
+                          stima che non ha più niente sotto. */}
+                      {!train.positionKnown && (
+                        <div className="flex justify-between text-sm text-warning">
+                          <span>Posizione:</span>
+                          <span>? · {descriviIncertezzaPosizione(train.positionDoubt)}</span>
                         </div>
                       )}
                       

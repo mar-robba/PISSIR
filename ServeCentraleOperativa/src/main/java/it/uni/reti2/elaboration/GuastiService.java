@@ -275,8 +275,19 @@ public class GuastiService {
         if (msg.sorgenteStazione()) {
             Stazione stazione = statoRete.getStazione(msg.sorgenteId());
             if (stazione != null) {
-                stazione.stato = StatiCanonici.STAZIONE_GUASTA;
-                statoRete.aggiornaStazione(stazione);
+                if (!statoRete.cambiaStatoStazione(stazione, StatiCanonici.STAZIONE_GUASTA)) {
+                    // La squadra e' sul posto: l'allarme nuovo entra in elenco ma la
+                    // stazione resta in MANUTENZIONE, che e' gia' uno stato chiuso e in
+                    // piu' dice che qualcuno ci sta lavorando (RF01.4.1). Il nodo intanto
+                    // di se' continua a dichiararsi GUASTA e rimanda l'alert a ogni treno
+                    // che entra: e' questa la ripetizione che prima cancellava l'intervento.
+                    LOG.infof("🛠️ Guasto segnalato da %s mentre la squadra e' al lavoro: la stazione resta in MANUTENZIONE",
+                            msg.sorgenteId());
+                    // Lo stato si ri-annuncia al campo: l'alert dell'invio squadra passa
+                    // una volta sola, e un convoglio acceso dopo (o che ha perso quel
+                    // messaggio) non saprebbe che quei binari sono chiusi.
+                    pubblicatore.pubblicaStatoStazione(stazione.id, stazione.stato);
+                }
                 notificatore.statoStazione(stazione);
             }
             return;
@@ -306,15 +317,18 @@ public class GuastiService {
                     stazioneId, treno.id);
             return;
         }
-        if (StatiCanonici.STAZIONE_GUASTA.equalsIgnoreCase(stazione.stato)) {
-            LOG.infof("♻️ Stazione %s già GUASTA: convoglio %s non genera un guasto duplicato",
-                    stazioneId, treno.id);
+        // Una stazione gia' chiusa non si richiude: vale per la GUASTA (era il controllo
+        // di prima) e a maggior ragione per la MANUTENZIONE, dove riscrivere GUASTA
+        // cancellerebbe l'intervento in corso per un convoglio che si e' rotto dentro a
+        // una stazione che era gia' inagibile.
+        if (StatiCanonici.stazioneTrattieneITreni(stazione.stato)) {
+            LOG.infof("♻️ Stazione %s già chiusa (%s): il convoglio %s non ne cambia lo stato",
+                    stazioneId, stazione.stato, treno.id);
             return;
         }
 
         String statoPrecedente = stazione.stato;
-        stazione.stato = StatiCanonici.STAZIONE_GUASTA;
-        statoRete.aggiornaStazione(stazione);
+        statoRete.cambiaStatoStazione(stazione, StatiCanonici.STAZIONE_GUASTA);
         notificatore.statoStazione(stazione);
 
         // Deduplica: un solo guasto aperto per episodio.
@@ -461,6 +475,7 @@ public class GuastiService {
         LOG.infof("✅ Guasto %s chiuso: %s dichiara che la condizione è rientrata", inCache.id, msg.sorgenteId());
 
         notificatore.statoStazione(tornataOperativa);
+        annunciaStatoAlCampo(tornataOperativa);
         notificatore.allarme(inCache);
     }
 
@@ -499,6 +514,7 @@ public class GuastiService {
             return null;
         }
         notificatore.statoStazione(tornataOperativa);
+        annunciaStatoAlCampo(tornataOperativa);
         pubblicatore.pubblicaRisoluzione(chiuso[0]);
         notificatore.allarme(chiuso[0]);
         return chiuso[0];
@@ -524,6 +540,24 @@ public class GuastiService {
             }
         }
         return tornataOperativa;
+    }
+
+    /**
+     * Dice ai convogli che la stazione e' tornata agibile.
+     *
+     * <p>Il RESOLVED del guasto da solo non basta piu': da quando anche la MANUTENZIONE
+     * trattiene i treni, un convoglio fermo davanti a una stazione chiusa deve sapere che
+     * lo stato del nodo e' cambiato, non solo che quel singolo allarme e' stato chiuso.
+     * Sono due informazioni diverse — una stazione puo' avere il guasto risolto e i
+     * tecnici ancora sul posto — e il treno riparte solo quando arriva questa.</p>
+     *
+     * <p>Va chiamato a commit avvenuto, come tutte le notifiche di questa classe.</p>
+     */
+    private void annunciaStatoAlCampo(Stazione stazione) {
+        if (stazione == null) {
+            return; // non e' tornata operativa: non c'e' niente di nuovo da dire
+        }
+        pubblicatore.pubblicaStatoStazione(stazione.id, stazione.stato);
     }
 
     /**
@@ -556,9 +590,11 @@ public class GuastiService {
         }
 
         String statoPrecedente = stazione.stato;
-        stazione.stato = StatiCanonici.STAZIONE_ONLINE;
+        // Qui si esce anche dalla manutenzione, ed e' l'unico posto in cui e' lecito:
+        // questa riga la si raggiunge solo dalla chiusura di un allarme, cioe' dal
+        // comando con cui il tecnico dichiara finito l'intervento (RF01.4.2).
         stazione.ultimoHeartbeat = Instant.now();
-        statoRete.aggiornaStazione(stazione);
+        statoRete.forzaStatoStazione(stazione, StatiCanonici.STAZIONE_ONLINE);
 
         // Chiude in storico l'intervallo aperto dall'invio della squadra: senza questa
         // riga la transizione MANUTENZIONE -> ONLINE non resterebbe da nessuna parte e

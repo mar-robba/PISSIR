@@ -67,16 +67,14 @@ public class MonitoraggioStazioni {
         }
 
         String statoPrecedente = stazione.stato;
-        // Finche' la squadra e' sul posto il battito aggiorna il solo istante di ultimo
-        // contatto. Lo stato torna a essere quello dichiarato dal campo quando il tecnico
-        // chiude il guasto.
-        String statoEffettivo = StatiCanonici.STAZIONE_MANUTENZIONE.equalsIgnoreCase(statoPrecedente)
-                ? StatiCanonici.STAZIONE_MANUTENZIONE
-                : msg.stato();
-        boolean statoCambiato = statoPrecedente == null || !statoPrecedente.equalsIgnoreCase(statoEffettivo);
         boolean tornataDalFailStop = StatiCanonici.STAZIONE_OFFLINE.equalsIgnoreCase(statoPrecedente);
 
-        stazione.stato = statoEffettivo;
+        // Finche' la squadra e' sul posto il battito aggiorna il solo istante di ultimo
+        // contatto: e' la cache a rifiutare il cambio di stato, con la stessa regola che
+        // vale per i guasti segnalati dal campo. Lo stato torna a essere quello dichiarato
+        // dal nodo quando il tecnico chiude il guasto.
+        statoRete.cambiaStatoStazione(stazione, msg.stato());
+        boolean statoCambiato = statoPrecedente == null || !statoPrecedente.equalsIgnoreCase(stazione.stato);
         stazione.ultimoHeartbeat = Instant.now();
         statoRete.aggiornaStazione(stazione);
 
@@ -84,7 +82,7 @@ public class MonitoraggioStazioni {
             // Si storicizza solo al cambio di stato, come per i treni: a ogni battito
             // sarebbero circa 8.600 righe identiche al giorno per stazione.
             if (statoCambiato) {
-                storicizza(msg.stazioneId(), statoEffettivo, statoPrecedente);
+                storicizza(msg.stazioneId(), stazione.stato, statoPrecedente);
             }
             if (tornataDalFailStop) {
                 return guasti.chiudiDedotti(msg.stazioneId(), "STAZIONE", Guasto.MSG_HEARTBEAT_PERSO);
@@ -93,6 +91,20 @@ public class MonitoraggioStazioni {
         });
 
         guasti.annunciaChiusure(guastiChiusi, "[FAIL-STOP] Stazione " + msg.stazioneId() + " di nuovo raggiungibile");
+
+        // Il nodo dichiara di essere tornato in servizio e non gli resta aperto nessun
+        // allarme: i convogli che aspettavano davanti a quella stazione vanno avvisati.
+        // La chiusura del guasto da sola non basta piu' a farli ripartire — un guasto
+        // chiuso non vuol dire binari liberi, puo' esserci ancora la squadra al lavoro —
+        // quindi il permesso di ripartire e' questo messaggio e nessun altro. La
+        // condizione sui guasti aperti serve a non aprire i binari mentre un allarme e'
+        // ancora rosso in dashboard.
+        if (statoCambiato
+                && !StatiCanonici.stazioneTrattieneITreni(stazione.stato)
+                && !statoRete.haGuastiAperti(msg.stazioneId(), "STAZIONE")) {
+            pubblicatore.pubblicaStatoStazione(msg.stazioneId(), stazione.stato);
+        }
+
         notificatore.heartbeat(payloadDalCampo, stazione);
     }
 
@@ -141,12 +153,20 @@ public class MonitoraggioStazioni {
             return EsitoInvioSquadra.NESSUN_GUASTO_APERTO;
         }
 
-        stazione.stato = StatiCanonici.STAZIONE_MANUTENZIONE;
-        statoRete.aggiornaStazione(stazione);
+        // Entrare in manutenzione e' un comando esplicito dell'operatore, quindi si scrive
+        // senza chiedere permesso: da qui in avanti sara' la cache a difendere lo stato
+        // dagli eventi del campo, finche' l'intervento non viene chiuso (RF01.4.2).
+        statoRete.forzaStatoStazione(stazione, StatiCanonici.STAZIONE_MANUTENZIONE);
         notificatore.statoStazione(stazione);
         // Notifica informativa: il nodo la registra e basta, il suo stato locale resta
         // GUASTA ed e' quello che continua a trattenere i treni che entrano.
         pubblicatore.pubblicaManutenzioneInviata(stazioneId);
+        // Ai convogli invece serve lo stato vero: con la squadra sui binari la stazione
+        // non e' attraversabile, e chi ci sta arrivando deve fermarsi come davanti a un
+        // guasto. Senza questo annuncio il treno avrebbe visto solo il GUASTO che c'era
+        // prima, e appena qualcuno lo avesse chiuso sarebbe ripartito con i tecnici
+        // ancora al lavoro.
+        pubblicatore.pubblicaStatoStazione(stazioneId, StatiCanonici.STAZIONE_MANUTENZIONE);
         return EsitoInvioSquadra.SQUADRA_INVIATA;
     }
 

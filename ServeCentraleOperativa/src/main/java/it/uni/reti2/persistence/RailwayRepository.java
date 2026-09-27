@@ -327,6 +327,21 @@ public class RailwayRepository {
     }
 
     /**
+     * L'ultimo stato storicizzato di una stazione, o null se non ne ha mai avuto uno.
+     *
+     * <p>Serve all'avvio della Centrale: lo stato runtime non e' persistito, e questa riga
+     * e' l'unica traccia che resta di un intervento di manutenzione aperto prima dello
+     * spegnimento. L'ordinamento e' su timestamp e, a parita', su chiave: due cambi nello
+     * stesso istante non sono impossibili (l'invio della squadra scrive subito dopo il
+     * guasto) e senza il secondo criterio l'ordine fra i due sarebbe arbitrario.</p>
+     */
+    public StoricoStatoStazione ultimoStatoStoricizzato(String stazioneId) {
+        return StoricoStatoStazione
+                .find("stazioneId = ?1 order by tsStoricizzazione desc, id desc", stazioneId)
+                .firstResult();
+    }
+
+    /**
      * Riga di audit sulla tabella eventi_stazioni. È complementare a Storico_Stato_Stazioni:
      * quello registra il cambio di stato, questa registra il fatto che l'ha provocato.
      *

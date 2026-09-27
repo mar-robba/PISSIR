@@ -57,16 +57,18 @@ public class PrevisioneArrivi {
     private static final Logger LOG = Logger.getLogger(PrevisioneArrivi.class);
 
     /**
-     * Sotto questo scarto non si parla di ritardo ma di rumore di misura.
-     *
-     * <p>Il twin controlla la propria posizione una volta al secondo, quindi l'arrivo lo
-     * annuncia con un ritardo di campionamento che arriva fino a un tick; a quello si
-     * somma il tempo che il messaggio impiega ad attraversare il broker. Con il fattore di
-     * accelerazione in uso (100) un solo secondo reale vale gia' quasi due minuti di
-     * servizio: senza una tolleranza ogni convoglio accumulerebbe un paio di minuti di
-     * ritardo a ogni fermata anche viaggiando perfettamente in orario.</p>
+     * Il quanto di campionamento del convoglio: la sua macchina a stati gira una volta al
+     * secondo, quindi entrata e uscita le annuncia sul tick successivo a quello in cui sono
+     * successe davvero.
      */
-    private static final int TOLLERANZA_MINUTI = 2;
+    private static final Duration TICK_DEL_TWIN = Duration.ofSeconds(1);
+
+    /**
+     * Quanti tick di scarto restano rumore di misura e non diventano ritardo: uno lo mette
+     * il campionamento del twin, l'altro il viaggio del passaggio fino a qui (sensore di
+     * stazione, broker, consumer).
+     */
+    private static final int TICK_DI_TOLLERANZA = 2;
 
     /** Tempo di percorrenza di riserva per una tratta che non lo dichiara. */
     private static final int MINUTI_TRATTA_PREDEFINITI = 15;
@@ -256,10 +258,21 @@ public class PrevisioneArrivi {
             // sono quelli che vedra' ENTRARE: sono le due liste che chiede la consegna.
             riga.put("tipo", inSosta ? "in_partenza" : "in_arrivo");
             riga.put("stato", treno.stato);
-            riga.put("direzione", treno.direzione != null ? treno.direzione : "andata");
+            // La direzione e' quella che la Centrale garantisce, e resta null quando non
+            // la garantisce. Prima qui c'era un "andata" di ripiego: un valore inventato,
+            // indistinguibile da uno vero proprio nel caso in cui il convoglio non
+            // trasmette piu' e nessuno sa piu' da che parte stia andando.
+            riga.put("direzione", treno.direzioneCorrente);
             riga.put("itinerarioId", treno.itinerario.id);
             riga.put("stazioneCorrente", treno.stazioneCorrente);
             riga.put("prossimaStazione", treno.prossimaStazione);
+            // Il tabellone si costruisce sull'itinerario, quindi il convoglio ci compare
+            // anche quando la sua posizione non e' confermata: la stazione lo aspetta lo
+            // stesso. Quello che cambia e' quanto vale l'orario qui accanto, ed e' giusto
+            // che chi legge lo sappia invece di prendere per buona una stima calcolata
+            // sull'ultima posizione certa, che puo' essere vecchia.
+            riga.put("posizioneNota", treno.posizioneNota);
+            riga.put("incertezzaPosizione", treno.incertezzaPosizione);
             riga.put("ritardoMinuti", treno.ritardo);
             riga.put("minutiAllArrivo", previsione.minuti());
             riga.put("fermateIntermedie", previsione.fermateIntermedie());
@@ -340,14 +353,17 @@ public class PrevisioneArrivi {
             // l'itinerario e' cambiato mentre il treno era in viaggio.
             return false;
         }
-        int scarto = arrotonda(minutiDiServizio(Duration.between(marcia.arrivoProgrammato(), quandoEEntrato)));
-        if (Math.abs(scarto) < TOLLERANZA_MINUTI) {
+        // Il confronto con la tolleranza si fa sullo scarto vero, non su quello arrotondato:
+        // il quanto del twin vale 1,67 minuti di orario, che arrotondati diventano 2 e
+        // passavano un controllo scritto proprio per fermarli.
+        double scarto = minutiDiServizio(Duration.between(marcia.arrivoProgrammato(), quandoEEntrato));
+        if (Math.abs(scarto) < tolleranzaMinuti()) {
             return false;
         }
         int prima = treno.ritardo;
-        treno.ritardo = Math.max(0, treno.ritardo + scarto);
+        treno.ritardo = Math.max(0, treno.ritardo + arrotonda(scarto));
         LOG.infof("⏱️ %s arrivato a %s con %+d minuti sull'orario: ritardo da %d a %d",
-                treno.id, stazioneRaggiunta, scarto, prima, treno.ritardo);
+                treno.id, stazioneRaggiunta, arrotonda(scarto), prima, treno.ritardo);
         return treno.ritardo != prima;
     }
 
@@ -375,14 +391,16 @@ public class PrevisioneArrivi {
         }
         boolean capolinea = qui == 0 || qui == fermate - 1;
         double sostaPrevista = capolinea ? sostaMinuti() * 2 : sostaMinuti();
-        int eccesso = arrotonda(minutiDiServizio(Duration.between(entrato, quandoEUscito)) - sostaPrevista);
-        if (eccesso < TOLLERANZA_MINUTI) {
+        // Come per l'arrivo: si confronta l'eccesso vero con la tolleranza e si arrotonda solo
+        // quello che finisce davvero nel ritardo.
+        double eccesso = minutiDiServizio(Duration.between(entrato, quandoEUscito)) - sostaPrevista;
+        if (eccesso < tolleranzaMinuti()) {
             return;
         }
         int prima = treno.ritardo;
-        treno.ritardo = Math.max(0, treno.ritardo + eccesso);
+        treno.ritardo = Math.max(0, treno.ritardo + arrotonda(eccesso));
         LOG.infof("⏱️ %s trattenuto in %s per %d minuti oltre la sosta: ritardo da %d a %d",
-                treno.id, stazione, eccesso, prima, treno.ritardo);
+                treno.id, stazione, arrotonda(eccesso), prima, treno.ritardo);
     }
 
     /** Il convoglio non c'e' piu' (eliminato o soppresso): via il suo orario e la sua sosta. */
@@ -489,6 +507,20 @@ public class PrevisioneArrivi {
         }
         double quotaResidua = (100.0 - Math.max(0.0, Math.min(100.0, progresso))) / 100.0;
         return tappe.get(portaIlTempo).minutiVersoProssima() * quotaResidua;
+    }
+
+    /**
+     * Sotto questo scarto non si parla di ritardo ma di rumore di misura.
+     *
+     * <p>Non e' un numero fisso perche' non lo e' quello che deve coprire: il rumore nasce
+     * da un tempo <em>reale</em> (i tick del twin e la latenza del passaggio) letto con il
+     * righello dell'orario di servizio, quindi cresce insieme al fattore di accelerazione.
+     * Con il fattore 100 un solo secondo reale vale gia' 1,67 minuti di orario: la vecchia
+     * tolleranza di 2 minuti fissi ci passava sotto per un soffio, e ogni convoglio si
+     * prendeva due minuti di ritardo a ogni fermata pur viaggiando in perfetto orario.</p>
+     */
+    private double tolleranzaMinuti() {
+        return minutiDiServizio(TICK_DEL_TWIN.multipliedBy(TICK_DI_TOLLERANZA));
     }
 
     /** La sosta in fermata, espressa nei minuti dell'orario di servizio. */

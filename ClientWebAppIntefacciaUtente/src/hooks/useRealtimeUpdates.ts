@@ -41,15 +41,19 @@ export function useRealtimeUpdates() {
 
     // Sottoscrizione ai vari topic/eventi
     const unsubTelemetry = wsClient.subscribe('TELEMETRY', (data) => {
-      // Ogni frame contiene anche la stazione da cui il treno è partito e quella
-      // verso cui è diretto: servono alla mappa per scegliere l'arco corretto.
+      // Ogni frame porta anche i due estremi della tratta come li garantisce la Centrale:
+      // servono alla mappa per scegliere l'arco corretto.
       if (data.trainId) {
         const originStationId = typeof data.stazioneCorrente === 'string' && data.stazioneCorrente
           ? data.stazioneCorrente
           : null;
-        const destinationStationId = typeof data.prossimaStazione === 'string' && data.prossimaStazione
-          ? data.prossimaStazione
-          : null;
+        // Questi tre NON sono ciò che il convoglio dichiara ma il giudizio della Centrale,
+        // che incrocia la telemetria con l'ultimo passaggio rilevato dai sensori di terra.
+        const testo = (valore: unknown): string | null =>
+          typeof valore === 'string' && valore ? valore : null;
+        const partenza = testo(data.partenzaCorrente);
+        const arrivo = testo(data.arrivoCorrente);
+        const direzione = testo(data.direzioneCorrente);
 
         updateTrain(data.trainId, {
           progressPercent: data.progressPercent ?? undefined,
@@ -60,14 +64,20 @@ export function useRealtimeUpdates() {
           // resta "fermo a Milano Centrale" nel pannello di dettaglio e continua a
           // comparire fra i treni attesi della stazione da cui è appena uscito.
           currentStationId: originStationId,
-          // previousStationId invece si tiene: alla mappa serve sapere da dove è partito
-          // per disegnarlo sull'arco giusto.
-          ...(originStationId ? { previousStationId: originStationId } : {}),
-          ...(destinationStationId ? { nextStationId: destinationStationId } : {}),
+          // Gli estremi e il verso si scrivono SEMPRE, null compreso: quel null è la
+          // notizia (nessuno conferma più da dove il convoglio sta arrivando), non
+          // l'assenza di una notizia. Prima si scrivevano solo se valorizzati, e il
+          // risultato era il peggiore dei due mondi: l'ultima posizione buona restava
+          // appiccicata al treno mentre lo snapshot successivo gli metteva accanto un
+          // arrivo aggiornato, e la coppia che ne usciva non era una tratta della rete.
+          previousStationId: partenza,
+          nextStationId: arrivo,
+          positionKnown: data.posizioneNota === true,
+          positionDoubt: testo(data.incertezzaPosizione),
           // Al capolinea il twin inverte la marcia: senza questa riga il verso della corsa
           // lo portava solo lo snapshot, e per una decina di secondi il pannello annunciava
           // ancora "corsa di andata" mentre il convoglio stava già tornando indietro.
-          ...(data.direzione ? { direction: data.direzione === 'ritorno' ? 'ritorno' : 'andata' } : {}),
+          direction: direzione === 'ritorno' ? 'ritorno' : (direzione ? 'andata' : null),
           // Previsione di arrivo calcolata dalla Centrale. Il null è un valore vero e va
           // scritto: vuol dire che per questo convoglio una stima non c'è più (corsa
           // soppressa, itinerario tolto), e tenersi quella di prima mostrerebbe un orario

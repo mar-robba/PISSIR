@@ -28,6 +28,21 @@ export interface ApiTrainPayload {
   arrivoPrevisto?: string | null;
   /** Gli stessi minuti mancanti, nell'orario di servizio (come il ritardo). */
   minutiAllArrivo?: number | null;
+
+  // La posizione che la Centrale GARANTISCE, distinta da stazioneCorrente/
+  // prossimaStazione/direzione qui sopra, che sono quello che il convoglio dichiara.
+  // La Centrale incrocia le due cose con l'ultimo passaggio rilevato dai sensori di
+  // terra: quando non tornano scrive null, ed è il punto di domanda da mostrare.
+  /** Stazione da cui il convoglio è uscito, o in cui sosta. null = non nota. */
+  partenzaCorrente?: string | null;
+  /** Stazione verso cui sta andando. null = non nota. */
+  arrivoCorrente?: string | null;
+  /** Verso di marcia garantito. null = non noto. */
+  direzioneCorrente?: string | null;
+  /** true quando il convoglio si può disegnare sulla mappa. */
+  posizioneNota?: boolean;
+  /** Perché la posizione non è nota (NESSUNA_TELEMETRIA, PARTENZA_SCONOSCIUTA, ...). */
+  incertezzaPosizione?: string | null;
 }
 
 /** Riga di GET /api/stazioni/{id}/treni-attesi. */
@@ -43,6 +58,10 @@ export interface ApiExpectedTrainPayload {
   minutiAllArrivo?: number;
   fermateIntermedie?: number;
   arrivoPrevisto?: string | null;
+  /** true quando la Centrale garantisce la posizione del convoglio. */
+  posizioneNota?: boolean;
+  /** Perché non la garantisce, se non la garantisce. */
+  incertezzaPosizione?: string | null;
 }
 
 export interface ApiStationPayload {

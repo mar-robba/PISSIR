@@ -11,10 +11,6 @@ export default function AlertsPage() {
   const trains = useRailwayStore((s) => s.trains);
   const acknowledgeAlert = useRailwayStore((s) => s.acknowledgeAlert);
   const dispatchOperators = useRailwayStore((s) => s.dispatchOperators);
-  // Le conferme dei comandi stanno in un elenco a parte: sono notifiche di questo browser,
-  // non guasti della rete (vedi UiNotification).
-  const notifications = useRailwayStore((s) => s.notifications);
-  const dismissNotification = useRailwayStore((s) => s.dismissNotification);
   const [filter, setFilter] = useState<'all' | 'active' | 'resolved'>('active');
   const user = useAuthStore((s) => s.user);
 
@@ -74,43 +70,6 @@ export default function AlertsPage() {
           </button>
         </div>
       </div>
-
-      {/* Notifiche d'interfaccia: esiti dei comandi dati da questo browser. Sono tenute
-          fuori dall'elenco degli allarmi perché sulla Centrale non esiste nessun guasto
-          corrispondente — prima venivano infilate lì dentro con id inventati, gonfiavano
-          il contatore degli allarmi attivi e la "Presa Visione" finiva in un 404. */}
-      {notifications.length > 0 && (
-        <Card title="Notifiche operative" className="flex flex-col gap-2">
-          <p className="text-xs text-muted m-0 mb-2">
-            Esiti dei comandi dati da questa postazione: non sono guasti della rete e
-            restano solo in questa sessione.
-          </p>
-          {notifications.map(notification => (
-            <div
-              key={notification.id}
-              className="flex items-center justify-between gap-3 p-3 border border-border-color rounded-md bg-black/20"
-            >
-              <div className="flex items-center gap-3">
-                <Info size={16} className={
-                  notification.severity === 'critical' ? 'text-danger'
-                    : notification.severity === 'success' ? 'text-success' : 'text-info'
-                } />
-                <span className="text-sm">{notification.message}</span>
-                <span className="text-xs text-muted">
-                  {new Date(notification.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
-              <button
-                title="Togli la notifica"
-                className="p-1 hover:bg-white/10 rounded-full transition-colors"
-                onClick={() => dismissNotification(notification.id)}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ))}
-        </Card>
-      )}
 
       <div className="grid grid-cols-1 gap-4">
         {filteredAlerts.length === 0 ? (
