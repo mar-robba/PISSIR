@@ -1,15 +1,12 @@
 package it.uni.reti2.gateway;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
 import it.uni.reti2.entity.Guasto;
 import it.uni.reti2.entity.StatiCanonici;
 import it.uni.reti2.entity.Stazione;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.ingestion.payload.TransitoMsg;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 import java.time.Instant;
 import java.util.List;
@@ -22,24 +19,20 @@ import java.util.Map;
  * ({@code trainId}, {@code stationId}, {@code delayMinutes}, {@code status}) che non
  * sono quelli del database ne' quelli dei topic MQTT. Prima quelle traduzioni erano
  * sparse fra l'ingestione, il watchdog e le API REST, e ogni pezzo di Centrale che
- * voleva far sapere qualcosa al browser doveva rifarsi da capo il proprio ObjectNode.
+ * voleva far sapere qualcosa al browser doveva rifarsi da capo il proprio oggetto JSON.
  * Adesso chi ha una notizia da dare chiama un metodo con nome parlante e non sa
  * nemmeno come e' fatto il JSON che parte.</p>
  *
- * <p><b>Perche' certi metodi ricevono ancora il JsonNode grezzo.</b> Per telemetria,
+ * <p><b>Perche' certi metodi ricevono ancora il JsonObject grezzo.</b> Per telemetria,
  * heartbeat e transiti l'evento si costruisce copiando il payload arrivato dal campo e
  * aggiungendoci i campi canonici. Non e' pigrizia: quel payload porta anche campi che
  * la Centrale non usa ma il browser si', e ricostruirlo da un record vorrebbe dire
  * decidere qui, una volta per tutte, che cosa il frontend ha il diritto di vedere.</p>
  */
-@ApplicationScoped
 public class NotificatoreRealtime {
 
-    @Inject
-    ObjectMapper mapper;
-
-    @Inject
-    RealtimeWebSocket webSocket;
+    /** Le connessioni aperte dalla web app. */
+    public RealtimeWebSocket webSocket;
 
     // ──────────────────────────────────────────────────────────────
     // TRENI
@@ -53,16 +46,16 @@ public class NotificatoreRealtime {
      * @param payloadDalCampo Il messaggio originale del convoglio.
      * @param treno           Il treno gia' aggiornato in cache.
      */
-    public void telemetria(JsonNode payloadDalCampo, Treno treno) {
-        ObjectNode evento = payloadDalCampo.deepCopy();
-        evento.put("eventType", "TELEMETRY");
-        evento.put("trainId", treno.id);
-        evento.put("stato", treno.stato);
-        evento.put("progressPercent", treno.progresso);
-        evento.put("delayMinutes", treno.ritardo);
-        evento.put("velocita", treno.velocita);
-        evento.put("latitudine", treno.latitudine);
-        evento.put("longitudine", treno.longitudine);
+    public void telemetria(JsonObject payloadDalCampo, Treno treno) {
+        JsonObject evento = payloadDalCampo.deepCopy();
+        evento.addProperty("eventType", "TELEMETRY");
+        evento.addProperty("trainId", treno.id);
+        evento.addProperty("stato", treno.stato);
+        evento.addProperty("progressPercent", treno.progresso);
+        evento.addProperty("delayMinutes", treno.ritardo);
+        evento.addProperty("velocita", treno.velocita);
+        evento.addProperty("latitudine", treno.latitudine);
+        evento.addProperty("longitudine", treno.longitudine);
         scriviPrevisione(evento, treno);
         scriviPosizione(evento, treno);
         webSocket.broadcast(evento.toString());
@@ -76,15 +69,15 @@ public class NotificatoreRealtime {
      * ricevuto, cioe' sano e in corsa.</p>
      */
     public void statoTreno(Treno treno) {
-        ObjectNode evento = mapper.createObjectNode();
-        evento.put("eventType", "TELEMETRY");
-        evento.put("trainId", treno.id);
-        evento.put("stato", treno.stato);
-        evento.put("velocita", treno.velocita);
-        evento.put("progressPercent", treno.progresso);
-        evento.put("delayMinutes", treno.ritardo);
-        evento.put("latitudine", treno.latitudine);
-        evento.put("longitudine", treno.longitudine);
+        JsonObject evento = new JsonObject();
+        evento.addProperty("eventType", "TELEMETRY");
+        evento.addProperty("trainId", treno.id);
+        evento.addProperty("stato", treno.stato);
+        evento.addProperty("velocita", treno.velocita);
+        evento.addProperty("progressPercent", treno.progresso);
+        evento.addProperty("delayMinutes", treno.ritardo);
+        evento.addProperty("latitudine", treno.latitudine);
+        evento.addProperty("longitudine", treno.longitudine);
         scriviPrevisione(evento, treno);
         scriviPosizione(evento, treno);
         webSocket.broadcast(evento.toString());
@@ -105,20 +98,20 @@ public class NotificatoreRealtime {
      * fermata che nessuno gli ha più confermato — che è esattamente il difetto per cui
      * questi campi esistono.</p>
      */
-    private void scriviPosizione(ObjectNode evento, Treno treno) {
+    private void scriviPosizione(JsonObject evento, Treno treno) {
         scriviTestoONull(evento, "partenzaCorrente", treno.partenzaCorrente);
         scriviTestoONull(evento, "arrivoCorrente", treno.arrivoCorrente);
         scriviTestoONull(evento, "direzioneCorrente", treno.direzioneCorrente);
         scriviTestoONull(evento, "incertezzaPosizione", treno.incertezzaPosizione);
-        evento.put("posizioneNota", treno.posizioneNota);
+        evento.addProperty("posizioneNota", treno.posizioneNota);
     }
 
     /** Scrive il campo, oppure un null esplicito che vale "non lo so". */
-    private void scriviTestoONull(ObjectNode evento, String campo, String valore) {
+    private void scriviTestoONull(JsonObject evento, String campo, String valore) {
         if (valore != null) {
-            evento.put(campo, valore);
+            evento.addProperty(campo, valore);
         } else {
-            evento.putNull(campo);
+            evento.add(campo, JsonNull.INSTANCE);
         }
     }
 
@@ -133,16 +126,16 @@ public class NotificatoreRealtime {
      * continuerebbe a mostrare l'orario di un convoglio che una stima non ce l'ha piu'
      * (corsa soppressa).</p>
      */
-    private void scriviPrevisione(ObjectNode evento, Treno treno) {
+    private void scriviPrevisione(JsonObject evento, Treno treno) {
         if (treno.arrivoPrevisto != null) {
-            evento.put("arrivoPrevisto", treno.arrivoPrevisto.toString());
+            evento.addProperty("arrivoPrevisto", treno.arrivoPrevisto.toString());
         } else {
-            evento.putNull("arrivoPrevisto");
+            evento.add("arrivoPrevisto", JsonNull.INSTANCE);
         }
         if (treno.minutiAllArrivo != null) {
-            evento.put("minutiAllArrivo", treno.minutiAllArrivo);
+            evento.addProperty("minutiAllArrivo", treno.minutiAllArrivo);
         } else {
-            evento.putNull("minutiAllArrivo");
+            evento.add("minutiAllArrivo", JsonNull.INSTANCE);
         }
     }
 
@@ -154,11 +147,11 @@ public class NotificatoreRealtime {
      * Rilancia il battito di una stazione con lo stato che la Centrale ha deciso di
      * darle, che non sempre e' quello dichiarato dal nodo (RF01.4.1).
      */
-    public void heartbeat(JsonNode payloadDalCampo, Stazione stazione) {
-        ObjectNode evento = payloadDalCampo.deepCopy();
-        evento.put("eventType", "HEARTBEAT");
-        evento.put("stationId", stazione.id);
-        evento.put("status", statoPerFrontend(stazione.stato));
+    public void heartbeat(JsonObject payloadDalCampo, Stazione stazione) {
+        JsonObject evento = payloadDalCampo.deepCopy();
+        evento.addProperty("eventType", "HEARTBEAT");
+        evento.addProperty("stationId", stazione.id);
+        evento.addProperty("status", statoPerFrontend(stazione.stato));
         webSocket.broadcast(evento.toString());
     }
 
@@ -183,11 +176,11 @@ public class NotificatoreRealtime {
         if (stazione == null) {
             return;
         }
-        ObjectNode evento = mapper.createObjectNode();
-        evento.put("eventType", "STATION_STATUS");
-        evento.put("stationId", stazione.id);
-        evento.put("status", statoPerFrontend(stazione.stato));
-        evento.put("timestamp", Instant.now().toString());
+        JsonObject evento = new JsonObject();
+        evento.addProperty("eventType", "STATION_STATUS");
+        evento.addProperty("stationId", stazione.id);
+        evento.addProperty("status", statoPerFrontend(stazione.stato));
+        evento.addProperty("timestamp", Instant.now().toString());
         webSocket.broadcast(evento.toString());
     }
 
@@ -213,15 +206,15 @@ public class NotificatoreRealtime {
      *
      * @param treno Il convoglio in cache, o null se non e' noto.
      */
-    public void transito(JsonNode payloadDalCampo, TransitoMsg msg, Treno treno) {
-        ObjectNode evento = payloadDalCampo.deepCopy();
-        evento.put("eventType", "TRANSIT");
-        evento.put("trainId", msg.trenoId());
-        evento.put("stationId", msg.stazioneId());
-        evento.put("type", msg.entrata() ? "ingresso" : "uscita");
-        evento.put("delayMinutes", treno != null ? treno.ritardo : 0);
+    public void transito(JsonObject payloadDalCampo, TransitoMsg msg, Treno treno) {
+        JsonObject evento = payloadDalCampo.deepCopy();
+        evento.addProperty("eventType", "TRANSIT");
+        evento.addProperty("trainId", msg.trenoId());
+        evento.addProperty("stationId", msg.stazioneId());
+        evento.addProperty("type", msg.entrata() ? "ingresso" : "uscita");
+        evento.addProperty("delayMinutes", treno != null ? treno.ritardo : 0);
         if (treno != null && treno.posizioneAttualeTratta != null) {
-            evento.put("trattaId", treno.posizioneAttualeTratta.id);
+            evento.addProperty("trattaId", treno.posizioneAttualeTratta.id);
         }
         webSocket.broadcast(evento.toString());
     }
@@ -241,23 +234,23 @@ public class NotificatoreRealtime {
      * rientrata.</p>
      */
     public void allarme(Guasto guasto) {
-        ObjectNode evento = mapper.createObjectNode();
-        evento.put("eventType", "ALERT");
-        evento.put("id", guasto.id);
-        evento.put("type", guasto.tipo);
-        evento.put("severity", guasto.severita != null ? guasto.severita.toLowerCase() : "warning");
-        evento.put("message", guasto.messaggio);
-        evento.put("sorgenteId", guasto.sorgenteId);
-        evento.put("origine", Guasto.originePerOperatore(guasto));
-        evento.put("timestamp", guasto.timestamp != null ? guasto.timestamp.toString() : Instant.now().toString());
-        evento.put("risolto", guasto.risolto);
+        JsonObject evento = new JsonObject();
+        evento.addProperty("eventType", "ALERT");
+        evento.addProperty("id", guasto.id);
+        evento.addProperty("type", guasto.tipo);
+        evento.addProperty("severity", guasto.severita != null ? guasto.severita.toLowerCase() : "warning");
+        evento.addProperty("message", guasto.messaggio);
+        evento.addProperty("sorgenteId", guasto.sorgenteId);
+        evento.addProperty("origine", Guasto.originePerOperatore(guasto));
+        evento.addProperty("timestamp", guasto.timestamp != null ? guasto.timestamp.toString() : Instant.now().toString());
+        evento.addProperty("risolto", guasto.risolto);
         if (guasto.timestampRisoluzione != null) {
-            evento.put("timestampRisoluzione", guasto.timestampRisoluzione.toString());
+            evento.addProperty("timestampRisoluzione", guasto.timestampRisoluzione.toString());
         }
         if ("TRENO".equalsIgnoreCase(guasto.sorgenteTipo)) {
-            evento.put("trainId", guasto.sorgenteId);
+            evento.addProperty("trainId", guasto.sorgenteId);
         } else if ("STAZIONE".equalsIgnoreCase(guasto.sorgenteTipo)) {
-            evento.put("stationId", guasto.sorgenteId);
+            evento.addProperty("stationId", guasto.sorgenteId);
         }
         webSocket.broadcast(evento.toString());
     }
@@ -271,11 +264,13 @@ public class NotificatoreRealtime {
      * di GET /api/dashboard: la dashboard non deve rifarsi i conti per suo conto.</p>
      */
     public void snapshot(Map<String, Object> kpi, List<Treno> treni, List<Stazione> stazioni) {
-        ObjectNode evento = mapper.createObjectNode();
-        evento.put("eventType", "SNAPSHOT");
-        evento.set("dashboard", mapper.valueToTree(kpi));
-        evento.set("treni", mapper.valueToTree(treni));
-        evento.set("stazioni", mapper.valueToTree(stazioni));
+        JsonObject evento = new JsonObject();
+        evento.addProperty("eventType", "SNAPSHOT");
+        // Json.GSON e' lo stesso convertitore delle API REST: gli oggetti escono identici a
+        // quelli di GET /api/treni e GET /api/stazioni
+        evento.add("dashboard", Json.GSON.toJsonTree(kpi));
+        evento.add("treni", Json.GSON.toJsonTree(treni));
+        evento.add("stazioni", Json.GSON.toJsonTree(stazioni));
         webSocket.broadcast(evento.toString());
     }
 }

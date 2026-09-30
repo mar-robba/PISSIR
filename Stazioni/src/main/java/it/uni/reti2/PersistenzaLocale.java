@@ -1,11 +1,5 @@
 package it.uni.reti2;
 
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-import jakarta.enterprise.context.ApplicationScoped;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -23,9 +17,11 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- * Persistenza locale del nodo Stazione su un file SQLite.
+ * Persistenza locale del nodo Stazione su un file SQLite, con JDBC.
  *
  * <p>Prima lo stato della stazione viveva solo dentro {@link DBLocale} e {@link LocalBuffer},
  * cioè in RAM: se il processo moriva (il "fault energetico" del nodo di campo) tutto spariva
@@ -43,32 +39,32 @@ import java.util.Map;
  * non è apribile (permessi, disco pieno, cartella in sola lettura) si logga l'errore, si mette
  * {@link #attiva} a false e il nodo continua a lavorare in memoria esattamente come faceva
  * prima. Vale anche per le singole query: una scrittura fallita è un warning, non un'eccezione
- * che risale fino al listener MQTT.</p>
+ * che risale fino al gestore degli eventi.</p>
  */
-@ApplicationScoped
 public class PersistenzaLocale {
 
-    private static final Logger LOG = Logger.getLogger(PersistenzaLocale.class);
+    private static final Logger LOG = Logger.getLogger(PersistenzaLocale.class.getName());
 
     /**
-     * Percorso del file SQLite. Nell'application.properties contiene l'id della stazione,
-     * perché sulla stessa macchina girano più nodi e ognuno deve avere il suo file.
+     * Percorso del file SQLite, assegnato dal main (property stazione.db.path). Di default
+     * contiene l'id della stazione, perché sulla stessa macchina girano più nodi e ognuno deve
+     * avere il suo file.
      */
-    @ConfigProperty(name = "stazione.db.path", defaultValue = "data/stazione.db")
     String percorsoDb;
 
     /**
      * Interruttore per spegnere del tutto la persistenza (test, o demo in cui si vuole
      * far ripartire la stazione "pulita" senza andare a cancellare il file a mano).
+     * Assegnato dal main (property stazione.db.abilitata).
      */
-    @ConfigProperty(name = "stazione.db.abilitata", defaultValue = "true")
     boolean abilitata;
 
     /**
      * L'unica connessione JDBC del nodo. SQLite scrive su un file solo e il traffico di
      * una stazione è irrisorio, quindi non serve un pool: basta una connessione sola con
-     * tutti i metodi synchronized, visto che a toccarla sono thread diversi (i listener
-     * MQTT, il job schedulato di manutenzione e le richieste REST).
+     * tutti i metodi synchronized, visto che a toccarla sono thread diversi (il gestore degli
+     * eventi, che gira sui thread di Paho, di Javalin e dell'orologio, e il consumatore del
+     * buffer).
      */
     private Connection connessione;
 
@@ -81,14 +77,12 @@ public class PersistenzaLocale {
 
     /**
      * Apre (creandolo se non c'è) il file SQLite ed esegue lo schema.
-     * È un @PostConstruct e non un osservatore di StartupEvent perché DBLocale e
-     * LocalBuffer si ripristinano dentro il loro @PostConstruct: il proxy CDI costruisce
-     * questo bean alla prima chiamata, quindi il db è già pronto quando serve.
+     * La chiama il main per prima cosa, perché DBLocale e LocalBuffer si ripristinano
+     * leggendo da qui.
      */
-    @PostConstruct
-    void apri() {
+    public void apri() {
         if (!abilitata) {
-            LOG.warn("💾 Persistenza locale disabilitata da configurazione: la stazione lavora solo in RAM.");
+            LOG.warning("💾 Persistenza locale disabilitata da configurazione: la stazione lavora solo in RAM.");
             return;
         }
         try {
@@ -102,11 +96,11 @@ public class PersistenzaLocale {
             creaSchema();
 
             attiva = true;
-            LOG.infof("💾 Persistenza locale attiva su %s", file);
+            LOG.info(String.format("💾 Persistenza locale attiva su %s", file));
         } catch (SQLException | IOException e) {
             // Volutamente non si rilancia: senza db la stazione funziona lo stesso,
             // perde solo la capacità di sopravvivere a un riavvio.
-            LOG.errorf(e, "💾 Impossibile aprire il database locale '%s': si prosegue solo in memoria.", percorsoDb);
+            LOG.log(Level.SEVERE, String.format("💾 Impossibile aprire il database locale '%s': si prosegue solo in memoria.", percorsoDb), e);
             attiva = false;
         }
     }
@@ -138,9 +132,9 @@ public class PersistenzaLocale {
      */
     private void creaSchema() throws SQLException {
         String ddl;
-        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream("schema.sql")) {
+        try (InputStream in = PersistenzaLocale.class.getClassLoader().getResourceAsStream("schema.sql")) {
             if (in == null) {
-                LOG.warn("💾 schema.sql non trovato nel classpath: il db locale resta senza tabelle.");
+                LOG.warning("💾 schema.sql non trovato nel classpath: il db locale resta senza tabelle.");
                 return;
             }
             ddl = new String(in.readAllBytes(), StandardCharsets.UTF_8);
@@ -163,9 +157,12 @@ public class PersistenzaLocale {
         }
     }
 
-    /** Chiude la connessione allo spegnimento del nodo (fa anche il checkpoint del WAL). */
-    @PreDestroy
-    void chiudi() {
+    /**
+     * Chiude la connessione allo spegnimento del nodo (fa anche il checkpoint del WAL).
+     * La chiama lo shutdown hook del main; è synchronized come le scritture, così aspetta
+     * che finisca quella eventualmente in corso.
+     */
+    public synchronized void chiudi() {
         if (connessione == null) {
             return;
         }
@@ -173,9 +170,10 @@ public class PersistenzaLocale {
             connessione.close();
             LOG.info("💾 Database locale chiuso correttamente.");
         } catch (SQLException e) {
-            LOG.warnf("💾 Chiusura del database locale non riuscita: %s", e.getMessage());
+            LOG.warning(String.format("💾 Chiusura del database locale non riuscita: %s", e.getMessage()));
         } finally {
             attiva = false;
+            connessione = null;
         }
     }
 
@@ -235,7 +233,7 @@ public class PersistenzaLocale {
             ps.setString(6, testo(fineFault));
             ps.executeUpdate();
         } catch (SQLException e) {
-            LOG.warnf("💾 Salvataggio dello stato non riuscito: %s", e.getMessage());
+            LOG.warning(String.format("💾 Salvataggio dello stato non riuscito: %s", e.getMessage()));
         }
     }
 
@@ -264,7 +262,7 @@ public class PersistenzaLocale {
                         istante(rs.getString("timestampFineUltimoFault")));
             }
         } catch (SQLException e) {
-            LOG.warnf("💾 Lettura dello stato non riuscita: %s", e.getMessage());
+            LOG.warning(String.format("💾 Lettura dello stato non riuscita: %s", e.getMessage()));
             return null;
         }
     }
@@ -298,7 +296,7 @@ public class PersistenzaLocale {
             ps.setString(2, testo(quando));
             ps.executeUpdate();
         } catch (SQLException e) {
-            LOG.warnf("💾 Salvataggio dell'entrata del treno %s non riuscito: %s", trenoId, e.getMessage());
+            LOG.warning(String.format("💾 Salvataggio dell'entrata del treno %s non riuscito: %s", trenoId, e.getMessage()));
         }
     }
 
@@ -319,7 +317,7 @@ public class PersistenzaLocale {
             ps.setString(2, trenoId);
             ps.executeUpdate();
         } catch (SQLException e) {
-            LOG.warnf("💾 Salvataggio dell'uscita del treno %s non riuscito: %s", trenoId, e.getMessage());
+            LOG.warning(String.format("💾 Salvataggio dell'uscita del treno %s non riuscito: %s", trenoId, e.getMessage()));
         }
     }
 
@@ -344,7 +342,7 @@ public class PersistenzaLocale {
                 presenti.put(rs.getString("id_Treno"), entrata != null ? entrata : Instant.now());
             }
         } catch (SQLException e) {
-            LOG.warnf("💾 Lettura dei treni presenti non riuscita: %s", e.getMessage());
+            LOG.warning(String.format("💾 Lettura dei treni presenti non riuscita: %s", e.getMessage()));
         }
         return presenti;
     }
@@ -354,7 +352,8 @@ public class PersistenzaLocale {
     // ================================================================
 
     /**
-     * Scrive un guasto segnalato da questo nodo, aperto (statoRisoltoONo = 0).
+     * Scrive un guasto per cui la stazione è GUASTA, aperto (statoRisoltoONo = 0): uno
+     * segnalato da questo nodo o quello che gli ha dichiarato la Centrale.
      * L'id_Guasto non viene passato: lo assegna SQLite ed è una numerazione locale,
      * che non ha niente a che vedere con quella degli allarmi della Centrale.
      *
@@ -379,15 +378,16 @@ public class PersistenzaLocale {
                 return chiavi.next() ? chiavi.getLong(1) : -1;
             }
         } catch (SQLException e) {
-            LOG.warnf("💾 Salvataggio del guasto locale non riuscito: %s", e.getMessage());
+            LOG.warning(String.format("💾 Salvataggio del guasto locale non riuscito: %s", e.getMessage()));
             return -1;
         }
     }
 
     /**
      * Chiude tutti i guasti ancora aperti. Viene chiamata quando la stazione torna ONLINE,
-     * cioè quando la Centrale manda il RESOLVED: da quel momento nessun guasto locale è più
-     * in corso, e il timestamp di chiusura è lo stesso che finisce in Stato.
+     * cioè col RESOLVED della Centrale o quando tornano a battere i sensori che l'avevano
+     * fatta guastare: da quel momento nessun guasto locale è più in corso, e il timestamp di
+     * chiusura è lo stesso che finisce in Stato.
      *
      * @param quando istante della risoluzione.
      */
@@ -400,18 +400,42 @@ public class PersistenzaLocale {
             ps.setString(1, testo(quando));
             int chiusi = ps.executeUpdate();
             if (chiusi > 0) {
-                LOG.infof("💾 Chiusi %d guasti locali ancora aperti.", chiusi);
+                LOG.info(String.format("💾 Chiusi %d guasti locali ancora aperti.", chiusi));
             }
         } catch (SQLException e) {
-            LOG.warnf("💾 Chiusura dei guasti locali non riuscita: %s", e.getMessage());
+            LOG.warning(String.format("💾 Chiusura dei guasti locali non riuscita: %s", e.getMessage()));
         }
     }
 
     /**
-     * Come {@link #contaGuastiAperti()} ma limitato a una sola classificazione.
-     * Serve al riavvio del nodo: la stazione che riparte GUASTA deve capire se quel guasto
-     * era colpa dei sensori (e quindi può rientrare da solo quando i keepalive tornano)
-     * oppure di qualcos'altro, che invece lo chiude solo la Centrale.
+     * Chiude i soli guasti aperti di una classificazione. Serve quando tornano a battere i
+     * sensori di una stazione che resta GUASTA per un altro motivo: i guasti dei sensori sono
+     * finiti davvero, l'altro no.
+     *
+     * @param tipo   classificazione da chiudere, per esempio "sensore_offline".
+     * @param quando istante della risoluzione.
+     */
+    public synchronized void risolviGuastiApertiDiTipo(String tipo, Instant quando) {
+        if (!attiva) {
+            return;
+        }
+        try (PreparedStatement ps = connessione.prepareStatement(
+                "UPDATE Guasto_Locale_Momentaneo SET statoRisoltoONo = 1, timestamp = ? "
+                        + "WHERE statoRisoltoONo = 0 AND tipo = ?")) {
+            ps.setString(1, testo(quando));
+            ps.setString(2, tipo);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            LOG.warning(String.format("💾 Chiusura dei guasti locali di tipo %s non riuscita: %s", tipo, e.getMessage()));
+        }
+    }
+
+    /**
+     * Quanti guasti locali di una classificazione risultano ancora non risolti.
+     * Serve al riavvio del nodo, insieme a {@link #contaGuastiApertiTranne}: la stazione che
+     * riparte GUASTA deve capire se lo era soltanto per i sensori (e quindi può rientrare da
+     * sola quando i keepalive tornano) oppure anche per qualcos'altro, che invece lo chiude
+     * solo la Centrale.
      *
      * @param tipo classificazione da contare, per esempio "sensore_offline".
      * @return quanti guasti locali di quel tipo risultano ancora non risolti.
@@ -427,7 +451,31 @@ public class PersistenzaLocale {
                 return rs.next() ? rs.getInt(1) : 0;
             }
         } catch (SQLException e) {
-            LOG.warnf("💾 Conteggio dei guasti aperti di tipo %s non riuscito: %s", tipo, e.getMessage());
+            LOG.warning(String.format("💾 Conteggio dei guasti aperti di tipo %s non riuscito: %s", tipo, e.getMessage()));
+            return 0;
+        }
+    }
+
+    /**
+     * Il contrario di {@link #contaGuastiApertiDiTipo}: quanti guasti aperti hanno una
+     * classificazione diversa da quella indicata.
+     *
+     * @param tipo classificazione da escludere dal conteggio.
+     * @return quanti guasti locali di un altro tipo risultano ancora non risolti.
+     */
+    public synchronized int contaGuastiApertiTranne(String tipo) {
+        if (!attiva) {
+            return 0;
+        }
+        try (PreparedStatement ps = connessione.prepareStatement(
+                "SELECT COUNT(*) FROM Guasto_Locale_Momentaneo WHERE statoRisoltoONo = 0 "
+                        + "AND (tipo IS NULL OR tipo <> ?)")) {
+            ps.setString(1, tipo);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        } catch (SQLException e) {
+            LOG.warning(String.format("💾 Conteggio dei guasti aperti non di tipo %s non riuscito: %s", tipo, e.getMessage()));
             return 0;
         }
     }
@@ -442,7 +490,7 @@ public class PersistenzaLocale {
              ResultSet rs = ps.executeQuery()) {
             return rs.next() ? rs.getInt(1) : 0;
         } catch (SQLException e) {
-            LOG.warnf("💾 Conteggio dei guasti aperti non riuscito: %s", e.getMessage());
+            LOG.warning(String.format("💾 Conteggio dei guasti aperti non riuscito: %s", e.getMessage()));
             return 0;
         }
     }
@@ -452,10 +500,9 @@ public class PersistenzaLocale {
     // ================================================================
 
     /**
-     * Aggiunge (o rimette) un evento nella coda store and forward.
-     * È un INSERT OR REPLACE perché la stessa riga può tornare indietro: se il reinvio
-     * fallisce a metà flush l'evento viene rimesso in testa alla coda in RAM e qui deve
-     * ritrovarsi identico, id compreso.
+     * Aggiunge un evento alla coda store and forward. È un INSERT OR REPLACE perché la
+     * chiave è l'id assegnato da LocalBuffer: se per qualche motivo la stessa riga venisse
+     * riscritta, deve ritrovarsi identica e al suo posto, id compreso.
      *
      * @param evento l'evento da persistere, con il suo id già assegnato da LocalBuffer.
      */
@@ -479,7 +526,7 @@ public class PersistenzaLocale {
             ps.setString(6, Instant.now().toString());
             ps.executeUpdate();
         } catch (SQLException e) {
-            LOG.warnf("💾 Salvataggio dell'evento %d nel buffer non riuscito: %s", evento.idEvento(), e.getMessage());
+            LOG.warning(String.format("💾 Salvataggio dell'evento %d nel buffer non riuscito: %s", evento.idEvento(), e.getMessage()));
         }
     }
 
@@ -497,7 +544,7 @@ public class PersistenzaLocale {
             ps.setLong(1, idEvento);
             ps.executeUpdate();
         } catch (SQLException e) {
-            LOG.warnf("💾 Rimozione dell'evento %d dal buffer non riuscita: %s", idEvento, e.getMessage());
+            LOG.warning(String.format("💾 Rimozione dell'evento %d dal buffer non riuscita: %s", idEvento, e.getMessage()));
         }
     }
 
@@ -530,7 +577,7 @@ public class PersistenzaLocale {
                         rs.getString("id_Treno")));
             }
         } catch (SQLException e) {
-            LOG.warnf("💾 Lettura del buffer non riuscita: %s", e.getMessage());
+            LOG.warning(String.format("💾 Lettura del buffer non riuscita: %s", e.getMessage()));
         }
         return eventi;
     }
@@ -552,7 +599,7 @@ public class PersistenzaLocale {
         try {
             return Instant.parse(testo);
         } catch (DateTimeParseException e) {
-            LOG.warnf("💾 Timestamp '%s' non interpretabile, ignorato.", testo);
+            LOG.warning(String.format("💾 Timestamp '%s' non interpretabile, ignorato.", testo));
             return null;
         }
     }

@@ -1,25 +1,20 @@
 package it.uni.reti2.ingestion;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.gson.JsonObject;
 import it.uni.reti2.entity.Guasto;
 import it.uni.reti2.entity.StatiCanonici;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.ingestion.payload.AlertMsg;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
-import org.jboss.logging.Logger;
 
 import java.time.Instant;
 import java.util.Locale;
+import java.util.logging.Logger;
 
 /**
  * L'unica bocca con cui la Centrale parla al campo sul topic condiviso railway/alerts.
  *
  * <p>Prima i messaggi in uscita nascevano in due classi diverse e in due modi diversi:
- * l'ingestione li componeva con l'ObjectMapper, le API REST li scrivevano a mano con
+ * l'ingestione li componeva con un oggetto JSON, le API REST li scrivevano a mano con
  * {@code String.format} su una stringa JSON. Da quella doppia scrittura era gia' nato un
  * difetto silenzioso: il RESOLVED pubblicato dalle REST non portava il campo
  * {@code origine}, quindi quando rientrava alla Centrale (che e' sottoscritta al proprio
@@ -28,15 +23,14 @@ import java.util.Locale;
  * da qui e viene firmato {@link AlertMsg#ORIGINE_CENTRALE}, cosi' l'eco si riconosce da
  * sola.</p>
  *
- * <p>Il JSON si costruisce sempre con l'ObjectMapper e mai concatenando stringhe: un
+ * <p>Il JSON si costruisce sempre con un {@link JsonObject} di Gson e mai concatenando stringhe: un
  * apice o un accento nel messaggio di un guasto basterebbe a produrre un payload
  * illeggibile, e dall'altra parte del topic un payload illeggibile viene scartato in
  * silenzio.</p>
  */
-@ApplicationScoped
 public class PubblicatoreAlert {
 
-    private static final Logger LOG = Logger.getLogger(PubblicatoreAlert.class);
+    private static final Logger LOG = Logger.getLogger(PubblicatoreAlert.class.getName());
 
     /**
      * Causa dichiarata nell'alert RITARDO quando il tempo si e' perso in linea: il
@@ -52,13 +46,14 @@ public class PubblicatoreAlert {
      */
     public static final String CAUSA_SOSTA_PROLUNGATA = "SOSTA_PROLUNGATA";
 
-    @Inject
-    ObjectMapper mapper;
+    /** Il topic condiviso con i nodi del campo. */
+    public static final String TOPIC_ALERTS = "railway/alerts";
 
-    /** Canale verso railway/alerts, lo stesso su cui parlano i nodi del campo. */
-    @Inject
-    @Channel("alerts-out")
-    Emitter<String> alertsEmitter;
+    /**
+     * La coda delle pubblicazioni MQTT: qui si mette il messaggio e si torna subito, a
+     * consegnarlo al broker ci pensa il suo thread.
+     */
+    public CodaPubblicazioni coda;
 
     /**
      * Annuncia al campo un guasto rilevato dalla Centrale, nello stesso formato usato
@@ -66,17 +61,17 @@ public class PubblicatoreAlert {
      *
      * <p>E' il pezzo che rende vero il fail-stop: senza questa pubblicazione i treni non
      * saprebbero nulla della stazione caduta e ci andrebbero dentro lo stesso. Con
-     * severita' CRITICAL entra in funzione la logica di blocco gia' scritta in
-     * TrainGateway/TrainJourneyEngine.</p>
+     * severita' CRITICAL entra in funzione la logica di blocco gia' scritta nel treno
+     * (TrainGateway la traduce in un evento, GestoreEventi e AutomaViaggio fermano il convoglio).</p>
      */
     public void pubblicaGuasto(Guasto guasto) {
-        ObjectNode alert = nuovoAlert("GUASTO");
-        alert.put("sorgenteTipo", guasto.sorgenteTipo);
-        alert.put("sorgenteId", guasto.sorgenteId);
-        alert.put("severita", guasto.severita);
-        alert.put("messaggio", guasto.messaggio);
-        alert.put("guastoId", guasto.id);
-        alert.put("timestamp", guasto.timestamp != null ? guasto.timestamp.toString() : Instant.now().toString());
+        JsonObject alert = nuovoAlert("GUASTO");
+        alert.addProperty("sorgenteTipo", guasto.sorgenteTipo);
+        alert.addProperty("sorgenteId", guasto.sorgenteId);
+        alert.addProperty("severita", guasto.severita);
+        alert.addProperty("messaggio", guasto.messaggio);
+        alert.addProperty("guastoId", guasto.id);
+        alert.addProperty("timestamp", guasto.timestamp != null ? guasto.timestamp.toString() : Instant.now().toString());
         invia(alert);
     }
 
@@ -85,11 +80,11 @@ public class PubblicatoreAlert {
      * convogli trattenuti da una stazione e rimette in servizio il nodo.
      */
     public void pubblicaRisoluzione(Guasto guasto) {
-        ObjectNode alert = nuovoAlert("RESOLVED");
-        alert.put("sorgenteTipo", guasto.sorgenteTipo != null ? guasto.sorgenteTipo : "STAZIONE");
-        alert.put("sorgenteId", guasto.sorgenteId != null ? guasto.sorgenteId : "");
-        alert.put("guastoId", guasto.id);
-        alert.put("timestamp", Instant.now().toString());
+        JsonObject alert = nuovoAlert("RESOLVED");
+        alert.addProperty("sorgenteTipo", guasto.sorgenteTipo != null ? guasto.sorgenteTipo : "STAZIONE");
+        alert.addProperty("sorgenteId", guasto.sorgenteId != null ? guasto.sorgenteId : "");
+        alert.addProperty("guastoId", guasto.id);
+        alert.addProperty("timestamp", Instant.now().toString());
         invia(alert);
     }
 
@@ -117,22 +112,22 @@ public class PubblicatoreAlert {
             return;
         }
         String dove = stazioneId != null ? stazioneId : "";
-        ObjectNode alert = nuovoAlert("RITARDO");
-        alert.put("sorgenteTipo", "STAZIONE");
-        alert.put("sorgenteId", dove);
-        alert.put("target", treno.id);
-        alert.put("ritardoMinuti", treno.ritardo);
-        alert.put("variazioneMinuti", variazione);
-        alert.put("causa", entrata ? CAUSA_RITARDO_IN_LINEA : CAUSA_SOSTA_PROLUNGATA);
+        JsonObject alert = nuovoAlert("RITARDO");
+        alert.addProperty("sorgenteTipo", "STAZIONE");
+        alert.addProperty("sorgenteId", dove);
+        alert.addProperty("target", treno.id);
+        alert.addProperty("ritardoMinuti", treno.ritardo);
+        alert.addProperty("variazioneMinuti", variazione);
+        alert.addProperty("causa", entrata ? CAUSA_RITARDO_IN_LINEA : CAUSA_SOSTA_PROLUNGATA);
         // Un convoglio tornato in orario non e' un allarme: e' una buona notizia.
-        alert.put("severita", treno.ritardo > 0 ? "WARNING" : "INFO");
-        alert.put("messaggio", String.format(Locale.US,
+        alert.addProperty("severita", treno.ritardo > 0 ? "WARNING" : "INFO");
+        alert.addProperty("messaggio", String.format(Locale.US,
                 "Ritardo aggiornato a %d minuti (%+d) al passaggio di %s",
                 treno.ritardo, variazione, dove.isEmpty() ? "?" : dove));
-        alert.put("timestamp", Instant.now().toString());
+        alert.addProperty("timestamp", Instant.now().toString());
         invia(alert);
-        LOG.infof("⏱️ Comunicato a %s il ritardo di %d minuti (%+d) misurato a %s",
-                treno.id, treno.ritardo, variazione, dove);
+        LOG.info(String.format("⏱️ Comunicato a %s il ritardo di %d minuti (%+d) misurato a %s",
+                treno.id, treno.ritardo, variazione, dove));
     }
 
     /**
@@ -140,10 +135,10 @@ public class PubblicatoreAlert {
      * e' stato eliminato dall'anagrafica e non deve continuare a girare per la rete.
      */
     public void pubblicaStop(String trenoId, String motivo) {
-        ObjectNode alert = nuovoAlert("STOP");
-        alert.put("target", trenoId);
-        alert.put("motivo", motivo);
-        alert.put("timestamp", Instant.now().toString());
+        JsonObject alert = nuovoAlert("STOP");
+        alert.addProperty("target", trenoId);
+        alert.addProperty("motivo", motivo);
+        alert.addProperty("timestamp", Instant.now().toString());
         invia(alert);
     }
 
@@ -153,10 +148,10 @@ public class PubblicatoreAlert {
      * quello che continua a trattenere i treni in ingresso.
      */
     public void pubblicaManutenzioneInviata(String stazioneId) {
-        ObjectNode alert = nuovoAlert("MAINTENANCE_DISPATCHED");
-        alert.put("sorgenteTipo", "STAZIONE");
-        alert.put("sorgenteId", stazioneId);
-        alert.put("timestamp", Instant.now().toString());
+        JsonObject alert = nuovoAlert("MAINTENANCE_DISPATCHED");
+        alert.addProperty("sorgenteTipo", "STAZIONE");
+        alert.addProperty("sorgenteId", stazioneId);
+        alert.addProperty("timestamp", Instant.now().toString());
         invia(alert);
     }
 
@@ -178,14 +173,14 @@ public class PubblicatoreAlert {
      * @param stato Stato canonico (ONLINE, GUASTA, MANUTENZIONE, OFFLINE).
      */
     public void pubblicaStatoStazione(String stazioneId, String stato) {
-        ObjectNode alert = nuovoAlert("STATO_STAZIONE");
-        alert.put("sorgenteTipo", "STAZIONE");
-        alert.put("sorgenteId", stazioneId);
-        alert.put("stato", stato);
+        JsonObject alert = nuovoAlert("STATO_STAZIONE");
+        alert.addProperty("sorgenteTipo", "STAZIONE");
+        alert.addProperty("sorgenteId", stazioneId);
+        alert.addProperty("stato", stato);
         // La severita' non la guarda il treno (per lui conta lo stato) ma tiene il
         // messaggio nello stesso formato degli altri del canale.
-        alert.put("severita", StatiCanonici.stazioneTrattieneITreni(stato) ? "CRITICAL" : "INFO");
-        alert.put("timestamp", Instant.now().toString());
+        alert.addProperty("severita", StatiCanonici.stazioneTrattieneITreni(stato) ? "CRITICAL" : "INFO");
+        alert.addProperty("timestamp", Instant.now().toString());
         invia(alert);
     }
 
@@ -195,26 +190,27 @@ public class PubblicatoreAlert {
      * percorrere un percorso che in rete non esiste piu'.
      */
     public void pubblicaItinerarioAggiornato(String trenoId) {
-        ObjectNode alert = nuovoAlert("ITINERARIO_AGGIORNATO");
-        alert.put("target", trenoId);
-        alert.put("timestamp", Instant.now().toString());
+        JsonObject alert = nuovoAlert("ITINERARIO_AGGIORNATO");
+        alert.addProperty("target", trenoId);
+        alert.addProperty("timestamp", Instant.now().toString());
         invia(alert);
     }
 
     /** Apre un messaggio gia' firmato: nessun alert esce da qui senza il marcatore. */
-    private ObjectNode nuovoAlert(String tipoEvento) {
-        ObjectNode alert = mapper.createObjectNode();
-        alert.put("tipoEvento", tipoEvento);
-        alert.put("origine", AlertMsg.ORIGINE_CENTRALE);
+    private JsonObject nuovoAlert(String tipoEvento) {
+        JsonObject alert = new JsonObject();
+        alert.addProperty("tipoEvento", tipoEvento);
+        alert.addProperty("origine", AlertMsg.ORIGINE_CENTRALE);
         return alert;
     }
 
-    /** Invio difensivo: un broker giu' non deve far cadere chi stava solo notificando. */
-    private void invia(ObjectNode alert) {
-        try {
-            alertsEmitter.send(alert.toString());
-        } catch (Exception e) {
-            LOG.errorf("Impossibile pubblicare l'alert su railway/alerts: %s", e.getMessage());
-        }
+    /**
+     * Mette l'alert in coda a QoS 1: sono messaggi che nessuno ripete (un GUASTO perso vuol
+     * dire un treno che entra in una stazione chiusa), quindi se il broker è giù la coda li
+     * riprova finché non torna. Chi notifica non aspetta niente e non può cadere per colpa
+     * del broker.
+     */
+    private void invia(JsonObject alert) {
+        coda.metti(TOPIC_ALERTS, alert.toString(), 1);
     }
 }

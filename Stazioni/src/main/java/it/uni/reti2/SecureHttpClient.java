@@ -1,55 +1,47 @@
 package it.uni.reti2;
 
-import jakarta.annotation.PostConstruct;
-import jakarta.enterprise.context.ApplicationScoped;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManagerFactory;
-import java.io.InputStream;
 import java.net.http.HttpClient;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.KeyStore;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
 import java.time.Duration;
-/**
- * Client HTTPS che considera attendibile solo la CA privata del progetto.
- * Gemello di quello del Treno: oggi la Stazione parla con la Centrale solo via MQTT,
- * ma la classe è pronta per le chiamate REST verso la Centrale
- * (per esempio GET /api/prossima-stazione) sotto profilo tls.
- */
-@ApplicationScoped
-public class SecureHttpClient {
-    private static final Logger LOG = Logger.getLogger(SecureHttpClient.class);
+import java.util.logging.Logger;
 
-    @ConfigProperty(name = "centrale.tls.ca.path")
+/**
+ * Client HTTP che considera attendibile solo la CA privata del progetto. Con questo i
+ * sensori di binario simulati ({@link SimulatoreSensori}) e la console dei sensori
+ * ({@link ConsoleSensori}) chiamano le API REST della stazione.
+ *
+ * <p>Sotto profilo tls quelle API rispondono solo in HTTPS, con un certificato firmato dalla
+ * CA del progetto (server-stazione.crt) che il truststore della JVM non conosce: con il client
+ * standard i keepalive dei sensori fallirebbero all'handshake, e dopo il timeout la stazione
+ * si dichiarerebbe GUASTA da sola. Il contesto TLS lo prepara ContestoTls, lo stesso che usa
+ * ClientMqtt per il broker. In chiaro (profilo di default) lo stesso client va bene uguale: le
+ * chiamate http:// il contesto TLS non lo usano.</p>
+ */
+public class SecureHttpClient {
+    private static final Logger LOG = Logger.getLogger(SecureHttpClient.class.getName());
+
+    /** Percorso del certificato della CA (ca.crt), assegnato dal main. */
     String caPath;
 
     private HttpClient client;
 
-    @PostConstruct
+    /**
+     * Costruisce il client: lo chiama il main dopo aver assegnato {@link #caPath}. Il connect
+     * timeout è corto perché si parla con localhost: se la stazione non risponde entro due
+     * secondi non risponderà nemmeno aspettando di più.
+     */
     void init() {
-        try (InputStream input = Files.newInputStream(Path.of(caPath))) {
-            X509Certificate ca = (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(input);
-            KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-            trustStore.load(null, null);
-            trustStore.setCertificateEntry("railway-ca", ca);
-            TrustManagerFactory trustManagers = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            trustManagers.init(trustStore);
-            SSLContext tls = SSLContext.getInstance("TLS");
-            tls.init(null, trustManagers.getTrustManagers(), null);
-            client = HttpClient.newBuilder().sslContext(tls).connectTimeout(Duration.ofSeconds(5)).build();
+        try {
+            client = HttpClient.newBuilder()
+                    .sslContext(ContestoTls.fidatoDellaCa(Path.of(caPath)))
+                    .connectTimeout(Duration.ofSeconds(2))
+                    .build();
         } catch (Exception e) {
-            // Senza certificati generati (profilo di default, tutto in chiaro sulla 8781)
-            // la stazione deve comunque partire: si usa il client HTTP standard.
-            // Prima qui volava una IllegalStateException e il bean non si sarebbe
-            // nemmeno costruito, bloccando l'avvio del nodo.
-            LOG.warnf("⚠️ CA TLS della Centrale non caricata (%s): uso il client HTTP in chiaro. Dettaglio: %s",
-                    caPath, e.getMessage());
-            client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+            // Senza certificati generati (profilo di default, API in chiaro) la stazione deve
+            // comunque partire: si usa il client HTTP standard.
+            LOG.warning(String.format("⚠️ CA del progetto non caricata (%s): uso il client HTTP senza la CA. Dettaglio: %s",
+                    caPath, e.getMessage()));
+            client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
         }
     }
 

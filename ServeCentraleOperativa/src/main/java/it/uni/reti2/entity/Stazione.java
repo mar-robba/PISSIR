@@ -1,82 +1,64 @@
 package it.uni.reti2.entity;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Transient;
 import java.time.Instant;
 
 /**
- * Entità JPA che rappresenta una <strong>stazione ferroviaria</strong> nel sistema centrale.
+ * Una <strong>stazione ferroviaria</strong> come la vede la Centrale.
  *
- * <p>Mappa la tabella {@code Stazione} dello schema centrale. Ogni stazione è identificata
+ * <p>I campi persistiti sono le colonne della tabella {@code Stazione}. Ogni stazione è identificata
  * da un ID univoco (es. "S1") e possiede attributi persistiti come nome e tipo
  * (capolinea/partenza/normale).</p>
  *
- * <h3>Campi in-memory (@Transient)</h3>
+ * <h3>Campi in-memory (non sono colonne)</h3>
  * <p>Oltre ai dati persistiti, la classe mantiene in memoria informazioni
  * <em>volatili</em> come lo stato operativo, le coordinate GPS, il numero di binari
  * e il timestamp dell'ultimo heartbeat. Questi dati vengono aggiornati in tempo reale
- * da {@code MonitoraggioStazioni} quando arriva un heartbeat MQTT dalla stazione edge,
+ * da {@code AutomaStazione} (e da {@code GestoreEventi} per l'istante del battito),
  * e letti da {@code RestApiGateway} e {@code TrafficLogicEngine} per alimentare
  * le API REST e la cache di sistema.</p>
  *
- * @see it.uni.reti2.elaboration.MonitoraggioStazioni#registraHeartbeat
+ * @see it.uni.reti2.elaboration.AutomaStazione
  * @see it.uni.reti2.elaboration.TrafficLogicEngine
  */
-@Entity
-@Table(name = "Stazione")
-public class Stazione extends PanacheEntityBase {
+public class Stazione {
 
     /** Identificativo univoco della stazione (es. "S1", "S2"). PK nel DB. */
-    @Id
-    @Column(name = "id_stazione", length = 50)
     public String id;
 
     /** Nome leggibile della stazione (es. "Milano Centrale", "Bologna Centrale"). */
-    @Column(name = "nome", nullable = false, length = 100)
     public String nome;
 
     /**
      * Classificazione funzionale della stazione nella rete ferroviaria.
      * Valori ammessi dal CHECK nel DDL: {@code 'capolinea'}, {@code 'partenza'}, {@code 'normale'}.
      */
-    @Column(name = "tipoCapolineaPartenzaoNormale", length = 50)
     public String tipoCapolineaPartenzaoNormale;
 
     /** Latitudine GPS della stazione, usata per il rendering sulla mappa. Persistita in DB. */
-    @Column(name = "latitudine")
     public Double latitudine = 0.0;
 
     /** Longitudine GPS della stazione, usata per il rendering sulla mappa. Persistita in DB. */
-    @Column(name = "longitudine")
     public Double longitudine = 0.0;
 
     /** Numero di binari disponibili nella stazione. Persistito in DB. */
-    @Column(name = "binari")
     public Integer binari = 1;
 
     // ──────────────────────────────────────────────────────────────
-    // Campi volatili / in-memory: NON persistiti su schema.sql.
-    // Aggiornati dal ciclo di heartbeat MQTT e dalla cache
-    // TrafficLogicEngine per fornire lo stato real-time al frontend.
+    // Campi volatili / in-memory: NON sono colonne di schema.sql.
+    // Li aggiornano gli automi a ogni evento (heartbeat, guasti, watchdog)
+    // e vivono nella cache TrafficLogicEngine.
     // ──────────────────────────────────────────────────────────────
 
     /** Stato operativo corrente (es. "ONLINE", "GUASTA", "MANUTENZIONE", "OFFLINE"). */
-    @Transient
     public String stato = "OFFLINE";
 
     /** Timestamp dell'ultimo segnale di heartbeat ricevuto dalla stazione. */
-    @Transient
     public Instant ultimoHeartbeat;
 
     /** Conteggio dei treni attualmente presenti in stazione. */
-    @Transient
     public int treniInStazione;
 
-    /** Costruttore vuoto richiesto da JPA. */
+    /** Stazione vuota: la riempie il repository leggendo la riga. */
     public Stazione() {}
 
     /**

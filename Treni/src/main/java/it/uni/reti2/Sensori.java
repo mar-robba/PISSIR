@@ -1,9 +1,8 @@
 package it.uni.reti2;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.enterprise.context.ApplicationScoped;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.IOException;
 import java.net.URI;
@@ -24,17 +23,20 @@ import java.util.Scanner;
  * il convoglio andare in EMERGENZA e la Centrale accorgersene, oppure si forza un
  * transito senza aspettare che il treno arrivi davvero in stazione.</p>
  */
-@ApplicationScoped
 public class Sensori {
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final ObjectMapper mapper = new ObjectMapper();
+    /**
+     * Client HTTP per le API del treno. Sotto profilo tls le API sono in HTTPS, e il main
+     * assegna qui il client di SecureHttpClient, che si fida della CA del progetto.
+     */
+    HttpClient httpClient;
 
-    @ConfigProperty(name = "treno.id", defaultValue = "TRN001")
+    /** ID e porta del treno, assegnati dal main. */
     String trenoId;
-
-    @ConfigProperty(name = "quarkus.http.port", defaultValue = "8082")
     int httpPort;
+
+    /** true sotto profilo tls: le API si chiamano in https://. */
+    boolean https;
 
     /** Avvia il menu e resta in ascolto finché l'utente non sceglie di uscire. */
     public void avviaMenu() {
@@ -81,30 +83,30 @@ public class Sensori {
         }
 
         try {
-            JsonNode json = mapper.readTree(risposta);
+            JsonObject json = JsonParser.parseString(risposta).getAsJsonObject();
             System.out.printf("Treno %s -> stato %s (fase %s, direzione %s)%n",
-                    json.path("trenoId").asText(), json.path("stato").asText(),
-                    json.path("faseViaggio").asText(), json.path("direzione").asText());
+                    CampiJson.testo(json, "trenoId", ""), CampiJson.testo(json, "stato", ""),
+                    CampiJson.testo(json, "faseViaggio", ""), CampiJson.testo(json, "direzione", ""));
             System.out.printf("%-14s %-14s %-10s %-10s %s%n",
                     "STAZIONE", "PROSSIMA", "PROGRESSO", "VELOCITA", "PASSEGGERI");
             System.out.printf("%-14s %-14s %-10s %-10s %s%n",
-                    vuotoSeAssente(json.path("stazioneCorrente").asText()),
-                    vuotoSeAssente(json.path("prossimaStazione").asText()),
-                    String.format("%.0f%%", json.path("progressPercent").asDouble()),
-                    String.format("%.1f km/h", json.path("velocita").asDouble()),
-                    json.path("passeggeri").asText());
+                    vuotoSeAssente(CampiJson.testo(json, "stazioneCorrente", "")),
+                    vuotoSeAssente(CampiJson.testo(json, "prossimaStazione", "")),
+                    String.format("%.0f%%", CampiJson.decimale(json, "progressPercent", 0)),
+                    String.format("%.1f km/h", CampiJson.decimale(json, "velocita", 0)),
+                    CampiJson.testo(json, "passeggeri", ""));
             System.out.printf("Posizione: %s, %s%n",
-                    json.path("latitudine").asText(), json.path("longitudine").asText());
+                    CampiJson.testo(json, "latitudine", ""), CampiJson.testo(json, "longitudine", ""));
 
             // Il ritardo non lo conta il treno: è l'ultimo valore arrivato dalla Centrale
             System.out.printf("Ritardo comunicato dalla Centrale: %s min%s%n",
-                    json.path("ritardoMinuti").asText(),
-                    json.path("ritardoRilevatoA").asText().isEmpty()
+                    CampiJson.testo(json, "ritardoMinuti", ""),
+                    CampiJson.testo(json, "ritardoRilevatoA", "").isEmpty()
                             ? ""
-                            : " (rilevato a " + json.path("ritardoRilevatoA").asText()
-                              + " il " + json.path("ritardoAggiornatoIl").asText() + ")");
+                            : " (rilevato a " + CampiJson.testo(json, "ritardoRilevatoA", "")
+                              + " il " + CampiJson.testo(json, "ritardoAggiornatoIl", "") + ")");
 
-            String bloccante = json.path("stazioneBloccante").asText();
+            String bloccante = CampiJson.testo(json, "stazioneBloccante", "");
             if (!bloccante.isEmpty()) {
                 System.out.println("⚠️  Fermo per la stazione " + bloccante);
             }
@@ -122,17 +124,17 @@ public class Sensori {
         }
 
         try {
-            JsonNode json = mapper.readTree(risposta);
-            if (!json.path("itinerarioCaricato").asBoolean()) {
+            JsonObject json = JsonParser.parseString(risposta).getAsJsonObject();
+            if (!CampiJson.booleano(json, "itinerarioCaricato", false)) {
                 System.out.println("Nessun itinerario caricato: il treno non ha ancora una tratta.");
                 return;
             }
-            System.out.println("Itinerario " + vuotoSeAssente(json.path("itinerarioId").asText())
-                    + " (indice stazione corrente: " + json.path("indiceStazione").asText() + ")");
+            System.out.println("Itinerario " + vuotoSeAssente(CampiJson.testo(json, "itinerarioId", ""))
+                    + " (indice stazione corrente: " + CampiJson.testo(json, "indiceStazione", "") + ")");
             int posizione = 0;
-            for (JsonNode stazione : json.path("stazioni")) {
-                boolean qui = posizione == json.path("indiceStazione").asInt();
-                System.out.printf("  %s %d) %s%n", qui ? "->" : "  ", posizione, stazione.asText());
+            for (JsonElement stazione : CampiJson.lista(json, "stazioni")) {
+                boolean qui = posizione == CampiJson.intero(json, "indiceStazione", 0);
+                System.out.printf("  %s %d) %s%n", qui ? "->" : "  ", posizione, stazione.getAsString());
                 posizione++;
             }
         } catch (Exception e) {
@@ -230,7 +232,7 @@ public class Sensori {
     }
 
     private String indirizzo(String path) {
-        return "http://localhost:" + httpPort + path;
+        return (https ? "https" : "http") + "://localhost:" + httpPort + path;
     }
 
     /**

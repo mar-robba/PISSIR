@@ -1,20 +1,13 @@
 package it.uni.reti2.gateway;
 
-import io.quarkus.security.identity.SecurityIdentity;
-import jakarta.annotation.Priority;
-import jakarta.inject.Inject;
-import jakarta.ws.rs.Priorities;
-import jakarta.ws.rs.container.ContainerRequestContext;
-import jakarta.ws.rs.container.ContainerRequestFilter;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.ext.Provider;
-import org.jboss.logging.Logger;
+import io.javalin.http.Context;
+import org.pac4j.core.profile.UserProfile;
 
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
- * Filtro JAX-RS che protegge le API della Centrale.
+ * Il filtro che protegge le API della Centrale: un before-handler di Javalin su /api/*.
  *
  * <p>Il PDF chiede due tipologie di utenti con permessi diversi. Prima la distinzione
  * era solo grafica: nessun endpoint controllava nulla e chiunque poteva cancellare un
@@ -24,10 +17,9 @@ import java.util.Map;
  * <p>Attenzione a dove finisce la responsabilita' di ciascun pezzo, perche' con
  * l'arrivo di Keycloak il filtro fa meta' del lavoro di prima:</p>
  * <ul>
- *   <li>chi il token e' VALIDO lo stabilisce l'estensione {@code quarkus-oidc}, che
- *       ne verifica firma, scadenza, emittente e audience con le chiavi pubbliche
- *       del realm. Un token scaduto o taroccato viene bloccato prima ancora di
- *       arrivare qui;</li>
+ *   <li>chi il token e' VALIDO lo stabilisce {@link SicurezzaKeycloak} (pac4j), che ne
+ *       verifica firma, scadenza, emittente e audience con le chiavi pubbliche del
+ *       realm. Un token scaduto o taroccato qui arriva come un "no";</li>
  *   <li>questo filtro decide soltanto CHI puo' fare COSA, leggendo i ruoli che
  *       Keycloak ha scritto nel token ({@code realm_access.roles}).</li>
  * </ul>
@@ -42,11 +34,9 @@ import java.util.Map;
  *       riservate all'amministratore.</li>
  * </ul>
  */
-@Provider
-@Priority(Priorities.AUTHENTICATION)
-public class FiltroAutorizzazione implements ContainerRequestFilter {
+public class FiltroAutorizzazione {
 
-    private static final Logger LOG = Logger.getLogger(FiltroAutorizzazione.class);
+    private static final Logger LOG = Logger.getLogger(FiltroAutorizzazione.class.getName());
 
     /** Ruolo di realm di chi può fare tutto, comprese le CRUD di stazioni/treni/tratte. */
     public static final String RUOLO_AMMINISTRATORE = "amministratore";
@@ -55,16 +45,22 @@ public class FiltroAutorizzazione implements ContainerRequestFilter {
     public static final String RUOLO_TECNICO = "tecnico";
 
     /**
-     * Identita' costruita da quarkus-oidc a partire dal token.
-     * E' "anonima" quando la richiesta non porta nessun Authorization header.
+     * Nome dell'attributo della richiesta in cui il filtro lascia il profilo dell'operatore:
+     * lo legge AuthController per GET /api/auth/me.
      */
-    @Inject
-    SecurityIdentity identita;
+    public static final String ATTRIBUTO_PROFILO = "profiloOperatore";
 
-    @Override
-    public void filter(ContainerRequestContext richiesta) {
-        String metodo = richiesta.getMethod();
-        String percorso = normalizza(richiesta.getUriInfo().getPath());
+    /** La verifica del token (pac4j). */
+    public SicurezzaKeycloak sicurezza;
+
+    /**
+     * Il controllo, fatto prima di ogni richiesta sotto /api. Se la richiesta va rifiutata
+     * scrive la risposta (401 o 403, con il motivo) e ferma gli handler successivi, cosi'
+     * l'endpoint non viene nemmeno chiamato.
+     */
+    public void filtra(Context ctx) {
+        String metodo = ctx.method().name();
+        String percorso = normalizza(ctx.path());
 
         // La preflight del browser non porta header applicativi: va lasciata passare,
         // altrimenti il CORS fallisce prima ancora della chiamata vera.
@@ -80,29 +76,39 @@ public class FiltroAutorizzazione implements ContainerRequestFilter {
             return;
         }
 
-        if (identita == null || identita.isAnonymous()) {
-            LOG.warnf("🔒 %s /%s rifiutata: token assente o non valido", metodo, percorso);
-            richiesta.abortWith(errore(Response.Status.UNAUTHORIZED,
-                    "Autenticazione richiesta: effettuare il login"));
+        UserProfile profilo = sicurezza.autentica(ctx) ? sicurezza.profilo(ctx).orElse(null) : null;
+        if (profilo == null) {
+            LOG.warning(String.format("🔒 %s /%s rifiutata: token assente o non valido", metodo, percorso));
+            rifiuta(ctx, 401, "Autenticazione richiesta: effettuare il login");
             return;
         }
 
         // Nessun ruolo del progetto nel token: l'utente esiste in Keycloak ma non e'
         // stato abilitato a questa applicazione, quindi non deve vedere niente.
-        if (!identita.hasRole(RUOLO_AMMINISTRATORE) && !identita.hasRole(RUOLO_TECNICO)) {
-            LOG.warnf("🔒 %s /%s rifiutata: l'utente %s non ha nessun ruolo del realm railway",
-                    metodo, percorso, identita.getPrincipal().getName());
-            richiesta.abortWith(errore(Response.Status.FORBIDDEN,
-                    "Utente senza ruoli abilitati sulla Centrale Operativa"));
+        if (!profilo.getRoles().contains(RUOLO_AMMINISTRATORE) && !profilo.getRoles().contains(RUOLO_TECNICO)) {
+            LOG.warning(String.format("🔒 %s /%s rifiutata: l'utente %s non ha nessun ruolo del realm railway",
+                    metodo, percorso, nomeUtente(profilo)));
+            rifiuta(ctx, 403, "Utente senza ruoli abilitati sulla Centrale Operativa");
             return;
         }
 
-        if (richiedeAmministratore(metodo, percorso) && !identita.hasRole(RUOLO_AMMINISTRATORE)) {
-            LOG.warnf("🔒 %s /%s rifiutata: l'utente %s è tecnico, serve l'amministratore",
-                    metodo, percorso, identita.getPrincipal().getName());
-            richiesta.abortWith(errore(Response.Status.FORBIDDEN,
-                    "Operazione riservata all'amministratore"));
+        if (richiedeAmministratore(metodo, percorso) && !profilo.getRoles().contains(RUOLO_AMMINISTRATORE)) {
+            LOG.warning(String.format("🔒 %s /%s rifiutata: l'utente %s è tecnico, serve l'amministratore",
+                    metodo, percorso, nomeUtente(profilo)));
+            rifiuta(ctx, 403, "Operazione riservata all'amministratore");
+            return;
         }
+        ctx.attribute(ATTRIBUTO_PROFILO, profilo);
+    }
+
+    /**
+     * Il nome con cui l'utente ha fatto il login (mat001). E' il claim preferred_username di
+     * Keycloak, lo stesso che quarkus-oidc usava come nome del principal; se manca, l'id del
+     * profilo (il "sub" del token).
+     */
+    public static String nomeUtente(UserProfile profilo) {
+        Object nome = profilo.getAttribute("preferred_username");
+        return nome != null ? nome.toString() : profilo.getId();
     }
 
     /**
@@ -142,11 +148,12 @@ public class FiltroAutorizzazione implements ContainerRequestFilter {
         return percorso.startsWith("/") ? percorso.substring(1) : percorso;
     }
 
-    /** Costruisce la risposta di rifiuto nello stesso formato usato dagli altri endpoint. */
-    private Response errore(Response.Status stato, String messaggio) {
-        return Response.status(stato)
-                .type(MediaType.APPLICATION_JSON)
-                .entity(Map.of("errore", messaggio))
-                .build();
+    /**
+     * Scrive la risposta di rifiuto nello stesso formato usato dagli altri endpoint e salta
+     * gli handler che restano, cioe' l'endpoint vero e proprio.
+     */
+    private void rifiuta(Context ctx, int stato, String messaggio) {
+        ctx.status(stato).json(Map.of("errore", messaggio));
+        ctx.skipRemainingHandlers();
     }
 }

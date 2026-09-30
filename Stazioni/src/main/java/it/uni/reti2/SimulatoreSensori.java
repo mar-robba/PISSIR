@@ -1,12 +1,5 @@
 package it.uni.reti2;
 
-import io.quarkus.runtime.StartupEvent;
-import io.quarkus.scheduler.Scheduled;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -16,6 +9,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * Simulatore dei sensori di binario della stazione.
@@ -29,64 +23,52 @@ import java.util.Map;
  * farebbe l'elettronica vera, cioè parla con la stazione via REST (è la scelta di progetto
  * per i sensori: sensori ↔ nodo in REST, nodo ↔ Centrale in MQTT). Manda il keepalive su
  * {@code POST /stazione/sensore/heartbeat} e segnala i transiti su
- * {@code POST /stazione/sensore/treno}. Le chiamate sono asincrone perché il rilevamento
- * arriva dal thread del connettore MQTT e non deve restare bloccato ad aspettare l'HTTP.</p>
+ * {@code POST /stazione/sensore/treno}, in HTTPS sotto profilo tls. Le chiamate sono
+ * asincrone perché il rilevamento arriva dal thread di Paho e non deve restare bloccato ad
+ * aspettare l'HTTP.</p>
  *
  * <p>Spegnere un sensore dalla CLI vuol dire simularne il <b>fail-stop</b>: smette di battere
  * e smette anche di rilevare i treni, perché è morto tutto il dispositivo. La stazione se ne
- * accorge da sola con {@link MonitorSensori}, che è il pezzo che sta dall'altra parte del filo
- * e non sa nulla di questa classe (deve funzionare identico con i sensori veri).</p>
+ * accorge da sola con AutomaSensori e il giro di controllo del gestore degli eventi, che
+ * stanno dall'altra parte del filo e non sanno nulla di questa classe (devono funzionare
+ * identici con i sensori veri).</p>
  */
-@ApplicationScoped
 public class SimulatoreSensori {
 
-    private static final Logger LOG = Logger.getLogger(SimulatoreSensori.class);
+    private static final Logger LOG = Logger.getLogger(SimulatoreSensori.class.getName());
 
-    /**
-     * Id della stazione a cui i sensori appartengono: entra nel loro identificativo.
-     *
-     * <p>Si legge dalla configurazione e NON da {@code dbLocale.stazioneId}: quel campo
-     * viene valorizzato in {@code main.run()}, cioè dopo che Quarkus è partito, mentre i
-     * sensori si creano qui allo StartupEvent, che è prima. Leggendolo da lì i dispositivi
-     * nascerebbero chiamati "null-BIN1-IN". La property invece è già a posto: l'id passato
-     * come argomento viene messo in {@code System.setProperty("stazione.id", ...)} prima
-     * ancora di far partire Quarkus.</p>
-     */
-    @ConfigProperty(name = "stazione.id", defaultValue = "S1")
+    /** Id della stazione a cui i sensori appartengono: entra nel loro identificativo. Assegnato dal main. */
     String stazioneId;
 
-    /**
-     * Porta su cui la stazione espone le proprie API: è lì che i sensori bussano.
-     * Va letta dalla configurazione perché lo script di avvio ne assegna una diversa
-     * a ogni istanza (QUARKUS_HTTP_PORT).
-     */
-    @ConfigProperty(name = "quarkus.http.port", defaultValue = "8081")
-    int httpPort;
-
-    /** Numero del binario sorvegliato: per ora ce n'è uno solo. */
-    @ConfigProperty(name = "stazione.binario", defaultValue = "1")
+    /** Numero del binario sorvegliato: per ora ce n'è uno solo (stazione.binario). */
     int binario;
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(2))
-            .build();
+    /**
+     * Indirizzo delle API della stazione, a cui i sensori bussano: http://localhost:porta in
+     * chiaro, https:// sotto profilo tls. La porta la sceglie avvioStazioni.sh, una diversa
+     * per ogni istanza, quindi la passa il main.
+     */
+    String indirizzoApi;
+
+    /** Il client delle chiamate: si fida della CA del progetto (vedi SecureHttpClient). */
+    HttpClient httpClient;
 
     /**
      * I dispositivi simulati, in ordine di creazione (prima l'ingresso, poi l'uscita):
      * la CLI li stampa in quest'ordine e il numeretto con cui si scelgono è la posizione.
+     * La si riempie una volta sola, in {@link #creaSensori()}, prima che partano gli altri
+     * thread: dopo si legge soltanto.
      */
     private final Map<String, SensoreBinario> sensori = new LinkedHashMap<>();
 
     /**
-     * Accende i due sensori del binario all'avvio del nodo.
-     * L'id con cui si chiamano i dispositivi arriva dalla configurazione (vedi il campo
-     * {@link #stazioneId}), non dallo stato del nodo: qui siamo ancora prima di
-     * {@code main.run()}.
+     * Accende i due sensori del binario. Lo chiama il main all'avvio, prima di far partire
+     * l'orologio che li fa battere.
      */
-    void avvio(@Observes StartupEvent evento) {
+    public void creaSensori() {
         creaSensore(SensoreBinario.Tipo.INGRESSO);
         creaSensore(SensoreBinario.Tipo.USCITA);
-        LOG.infof("🛰️ Simulatore sensori avviato sul binario %d: %s", binario, sensori.keySet());
+        LOG.info(String.format("🛰️ Simulatore sensori avviato sul binario %d: %s", binario, sensori.keySet()));
     }
 
     private void creaSensore(SensoreBinario.Tipo tipo) {
@@ -95,13 +77,11 @@ public class SimulatoreSensori {
     }
 
     /**
-     * Battito periodico di tutti i sensori accesi. Il periodo sta in configurazione
-     * ({@code sensori.heartbeat.periodo}) e deve restare parecchio più corto del timeout
-     * di {@link MonitorSensori}, se no la stazione dichiarerebbe guasto un sensore sano
-     * solo perché non ha ancora avuto il tempo di battere.
+     * Battito di tutti i sensori accesi: lo chiama l'Orologio ogni sensori.heartbeat.secondi.
+     * Il periodo deve restare parecchio più corto del timeout dei sensori, se no la stazione
+     * dichiarerebbe guasto un sensore sano solo perché non ha ancora avuto il tempo di battere.
      */
-    @Scheduled(every = "{sensori.heartbeat.periodo}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    void battito() {
+    public void battito() {
         for (SensoreBinario sensore : sensori.values()) {
             if (!sensore.isAttivo()) {
                 // Fail-stop simulato: il dispositivo è "morto", non manda niente.
@@ -130,17 +110,17 @@ public class SimulatoreSensori {
                 continue;
             }
             if (!sensore.isAttivo()) {
-                LOG.warnf("🚫 Sensore %s guasto: il passaggio in %s del treno %s NON viene rilevato",
-                        sensore.getId(), tipo, trenoId);
+                LOG.warning(String.format("🚫 Sensore %s guasto: il passaggio in %s del treno %s NON viene rilevato",
+                        sensore.getId(), tipo, trenoId));
                 return false;
             }
-            LOG.infof("🛰️ Sensore %s: rilevato il treno %s in %s", sensore.getId(), trenoId, tipo);
+            LOG.info(String.format("🛰️ Sensore %s: rilevato il treno %s in %s", sensore.getId(), trenoId, tipo));
             String payload = String.format("{\"trenoId\":\"%s\",\"tipo\":\"%s\",\"sensoreId\":\"%s\"}",
                     trenoId, tipo, sensore.getId());
             inviaAllaStazione("/stazione/sensore/treno", payload);
             return true;
         }
-        LOG.warnf("Nessun sensore competente per un transito di tipo '%s'", tipo);
+        LOG.warning(String.format("Nessun sensore competente per un transito di tipo '%s'", tipo));
         return false;
     }
 
@@ -185,14 +165,14 @@ public class SimulatoreSensori {
             return false;
         }
         sensore.ferma();
-        LOG.warnf("🔻 Sensore %s SPENTO (fail-stop simulato): la stazione se ne accorgerà allo scadere del timeout",
-                sensore.getId());
+        LOG.warning(String.format("🔻 Sensore %s SPENTO (fail-stop simulato): la stazione se ne accorgerà allo scadere del timeout",
+                sensore.getId()));
         return true;
     }
 
     /**
      * Rimette in funzione un sensore fermato: il primo battito che riparte fa tornare
-     * operativa la stazione (se non ci sono altri sensori muti).
+     * operativa la stazione (se non ci sono altri sensori muti o altri guasti aperti).
      *
      * @return false se l'id non corrisponde a nessun sensore.
      */
@@ -202,17 +182,17 @@ public class SimulatoreSensori {
             return false;
         }
         sensore.riprendi();
-        LOG.infof("🔺 Sensore %s RIACCESO: riprende a mandare il keepalive", sensore.getId());
+        LOG.info(String.format("🔺 Sensore %s RIACCESO: riprende a mandare il keepalive", sensore.getId()));
         return true;
     }
 
     /**
-     * POST verso le API della stazione, in chiaro su localhost e senza aspettare la risposta:
-     * il sensore è un dispositivo di campo, non deve rallentare né lo scheduler né il thread
-     * MQTT da cui arriva il rilevamento. L'esito interessa solo per il log.
+     * POST verso le API della stazione, su localhost e senza aspettare la risposta: il
+     * sensore è un dispositivo di campo, non deve rallentare né l'orologio né il thread di
+     * Paho da cui arriva il rilevamento. L'esito interessa solo per il log.
      */
     private void inviaAllaStazione(String path, String payload) {
-        HttpRequest richiesta = HttpRequest.newBuilder(URI.create("http://localhost:" + httpPort + path))
+        HttpRequest richiesta = HttpRequest.newBuilder(URI.create(indirizzoApi + path))
                 .header("Content-Type", "application/json")
                 .timeout(Duration.ofSeconds(3))
                 .POST(HttpRequest.BodyPublishers.ofString(payload))
@@ -221,13 +201,13 @@ public class SimulatoreSensori {
         httpClient.sendAsync(richiesta, HttpResponse.BodyHandlers.ofString())
                 .thenAccept(risposta -> {
                     if (risposta.statusCode() < 200 || risposta.statusCode() >= 300) {
-                        LOG.warnf("Sensore: chiamata %s rifiutata (HTTP %d): %s",
-                                path, risposta.statusCode(), risposta.body());
+                        LOG.warning(String.format("Sensore: chiamata %s rifiutata (HTTP %d): %s",
+                                path, risposta.statusCode(), risposta.body()));
                     }
                 })
                 .exceptionally(errore -> {
                     // La stazione non risponde: per il sensore è come parlare nel vuoto.
-                    LOG.warnf("Sensore: stazione irraggiungibile su %s (%s)", path, errore.getMessage());
+                    LOG.warning(String.format("Sensore: stazione irraggiungibile su %s (%s)", path, errore.getMessage()));
                     return null;
                 });
     }

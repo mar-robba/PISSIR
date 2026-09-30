@@ -49,9 +49,15 @@ CREATE TABLE IF NOT EXISTS Tratte (
     stazioneArrivo   TEXT NOT NULL
 );
 
--- I guasti segnalati da questo nodo. id_Guasto e' INTEGER PRIMARY KEY, che in
--- SQLite e' un alias di rowid: se non lo si passa lo assegna lui in modo
--- progressivo, ed e' una numerazione LOCALE (la Centrale ha la sua).
+-- I guasti per cui questo nodo e' GUASTO: quelli che segnala lui (sensori muti,
+-- avarie dei sottosistemi locali) e quello che gli dichiara la Centrale per un
+-- convoglio guasto sui binari (RF02.1.2.2.1). L'allarme di un treno trattenuto
+-- non apre una riga: e' la conseguenza di un guasto gia' aperto, non un guasto
+-- nuovo. Al riavvio e' da qui che si capisce se la stazione era guasta per i soli
+-- sensori, e quindi puo' rientrare da sola (vedi AutomaStatoStazione).
+-- id_Guasto e' INTEGER PRIMARY KEY, che in SQLite e' un alias di rowid: se non lo
+-- si passa lo assegna lui in modo progressivo, ed e' una numerazione LOCALE (la
+-- Centrale ha la sua).
 CREATE TABLE IF NOT EXISTS Guasto_Locale_Momentaneo (
     id_Guasto        INTEGER PRIMARY KEY,
     statoRisoltoONo  INTEGER,
@@ -79,9 +85,11 @@ CREATE TABLE IF NOT EXISTS Treno (
     tempoPartenza TEXT
 );
 
--- La coda store and forward: gli eventi prodotti mentre la Centrale non era
--- raggiungibile, da rispedire in blocco al ritorno della connessione. L'ordine
--- FIFO e' dato da id_Evento crescente (vedi LocalBuffer).
+-- La coda store and forward: ogni transito e ogni allarme per la Centrale ci
+-- passa, e la riga si cancella solo quando il broker l'ha preso. Mentre la
+-- Centrale non e' raggiungibile le righe si accumulano, e al ritorno della
+-- connessione ripartono in blocco. L'ordine FIFO e' dato da id_Evento crescente
+-- (vedi LocalBuffer e ConsumatoreBuffer).
 CREATE TABLE IF NOT EXISTS bufferChache (
     id_Evento INTEGER PRIMARY KEY,
     tipo      TEXT,                      -- il canale di destinazione: "transit" oppure "alert"

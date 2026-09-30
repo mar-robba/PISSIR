@@ -1,8 +1,5 @@
 package it.uni.reti2;
 
-import jakarta.enterprise.context.ApplicationScoped;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,37 +9,56 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Questa classe rappresenta lo stato locale e la persistenza in memoria del singolo nodo Treno.
- * Essendo marcata con {@link ApplicationScoped}, esiste una singola istanza (singleton)
- * condivisa per l'intera applicazione del treno.
+ * Il main ne crea una sola istanza e la passa a tutte le classi che ne hanno bisogno, quindi
+ * è condivisa dall'intera applicazione del treno.
  * Funge da "Database in-memory" (State store) per mantenere le informazioni operative del convoglio.
  */
-@ApplicationScoped
 public class TrainDB {
 
     /**
      * Identificativo univoco del treno.
-     * Viene iniettato dalla configurazione (es. application.properties o variabili d'ambiente).
-     * Il valore di default è "REG-1234" se non specificato altrimenti.
+     * Lo assegna il main: è il primo argomento della riga di comando, oppure la property
+     * treno.id di application.properties se l'argomento manca.
      */
-                                                      // ard coded quando vorro istanzializzare più processi
-                                                        // dovra essere una variabile del vettore di imput arg etc
-    @ConfigProperty(name = "treno.id", defaultValue = "TRN001")
     public String trenoId;
 
     public boolean trenoRiconosciuto = false;
 
     /**
-     * Stato corrente del treno.
-     * Valori possibili previsti dalla logica di business:
-     * - IN_VIAGGIO: il treno sta procedendo regolarmente.
-     * - FERMO: il treno è temporaneamente fermo (es. in stazione).
-     * - EMERGENZA: è stato rilevato un guasto o un'emergenza.
-     * - SOPPRESSO: la corsa del treno è stata cancellata.
-     * - CAPOLINEA: il convoglio è arrivato all'estremo che chiude l'itinerario e la corsa
-     *   è finita. Non è né un guasto né una soppressione: il treno è a posto, il servizio
-     *   no. Ci si esce solo se l'amministratore assegna un itinerario diverso.
+     * Condizione del convoglio, cioè COME sta (lo stato dell'AutomaCondizione):
+     * - REGOLARE: il treno è in servizio e può muoversi;
+     * - EMERGENZA: un sensore di bordo ha rilevato un'avaria, il convoglio resta dov'è
+     *   finché la Centrale non la dichiara risolta;
+     * - SOPPRESSO: la corsa è stata cancellata, ed è definitivo.
+     *
+     * <p>Dove si trova il convoglio non sta qui ma in {@link #faseViaggio}: le due cose
+     * cambiano per cause diverse e un treno in emergenza resta nella fase in cui era, così
+     * quando l'emergenza rientra riprende esattamente da lì.</p>
      */
-    public String stato = "FERMO";
+    public String condizione = "REGOLARE";
+
+    /**
+     * Lo stato che il convoglio dichiara fuori (telemetria e REST): FERMO, IN_VIAGGIO,
+     * EMERGENZA, SOPPRESSO o CAPOLINEA, che sono i valori che la Centrale si aspetta.
+     *
+     * <p>Non è un campo ma un calcolo: EMERGENZA e SOPPRESSO vengono dalla condizione, che
+     * vince su tutto, e il resto si legge dalla fase del viaggio. Tenerlo in una variabile
+     * a parte voleva dire scriverlo insieme alla fase in ogni punto del motore, e dove una
+     * delle due scritture mancava (o cancellava un'EMERGENZA) le due copie non erano più
+     * d'accordo.</p>
+     *
+     * @return Lo stato del convoglio.
+     */
+    public String stato() {
+        if (!"REGOLARE".equals(condizione)) {
+            return condizione; // EMERGENZA o SOPPRESSO
+        }
+        return switch (faseViaggio) {
+            case "IN_VIAGGIO" -> "IN_VIAGGIO";
+            case "FERMO_CAPOLINEA" -> "CAPOLINEA";
+            default -> "FERMO"; // in sosta, trattenuto o senza un percorso
+        };
+    }
 
     /**
      * Posizione geografica attuale del convoglio (Latitudine).
@@ -84,14 +100,16 @@ public class TrainDB {
     // ===============================================================
 
     /**
-     * Fase corrente della macchina a stati del viaggio.
-     * Valori possibili: IN_STAZIONE, IN_VIAGGIO, BLOCCATO_GUASTO_STAZIONE (la stazione
-     * davanti non è attraversabile: guasta oppure con la squadra di manutenzione al lavoro),
-     * SENZA_ITINERARIO (nessun percorso assegnato: il convoglio è fermo e aspetta),
-     * FERMO_CAPOLINEA (corsa finita all'estremo marcato dell'itinerario),
-     * TERMINATO.
+     * Fase del viaggio, cioè DOVE si trova il convoglio (lo stato dell'AutomaViaggio):
+     * - SENZA_ITINERARIO: nessun percorso assegnato, o non ancora partito: fermo e aspetta;
+     * - IN_STAZIONE: in sosta al binario;
+     * - IN_VIAGGIO: in marcia fra due tappe;
+     * - BLOCCATO_IN_STAZIONE: trattenuto al binario perché la stazione in cui si trova o
+     *   la prossima non si può attraversare (guasta, o con la squadra di manutenzione);
+     * - BLOCCATO_IN_TRATTA: stessa cosa, ma fermo sul binario a metà tratta;
+     * - FERMO_CAPOLINEA: corsa finita all'estremo marcato dell'itinerario.
      */
-    public String faseViaggio = "IN_STAZIONE";
+    public String faseViaggio = "SENZA_ITINERARIO";
 
     /**
      * Direzione di percorrenza dell'itinerario: "andata" (indici crescenti)
@@ -196,7 +214,11 @@ public class TrainDB {
     /**
      * Insieme delle stazioni attualmente note come guaste (alimentato dagli
      * alert GUASTO/RESOLVED ricevuti sul canale railway/alerts).
-     * Set concorrente perché scritto dal thread MQTT e letto dal tick del motore.
+     *
+     * <p>Lo scrive AutomaStazioniNote e lo leggono le guardie di AutomaViaggio, sempre dentro
+     * GestoreEventi, quindi un evento alla volta. Resta un set concorrente dai tempi in cui lo
+     * scriveva direttamente il thread MQTT mentre il tick lo leggeva: oggi basterebbe anche
+     * un set normale.</p>
      */
     public Set<String> stazioniGuaste = ConcurrentHashMap.newKeySet();
 
@@ -206,8 +228,8 @@ public class TrainDB {
      *
      * <p>Sta separato da {@link #stazioniGuaste} perché le due cose sono indipendenti: una
      * stazione può avere il guasto risolto e i tecnici ancora sui binari, e in quel caso il
-     * RESOLVED non deve far ripartire nessuno. Mappa concorrente per lo stesso motivo del
-     * set: la scrive il thread MQTT, la legge il tick del motore.</p>
+     * RESOLVED non deve far ripartire nessuno. Chi la scrive e chi la legge è lo stesso del
+     * set qui sopra.</p>
      */
     public Map<String, String> statoStazioni = new ConcurrentHashMap<>();
 
@@ -233,7 +255,7 @@ public class TrainDB {
     /**
      * Dice se uno stato dichiarato dalla Centrale chiude i binari.
      *
-     * <p>Sta separato da {@link #stazioneImpercorribile} perché rispondono a due domande
+     * <p>Sta separato da {@link #stazioneImpercorribile(String)} perché rispondono a due domande
      * diverse: qui si guarda il solo stato appena arrivato, là si mette insieme tutto
      * quello che il treno sa di quella stazione. Serve quando l'alert dichiara la stazione
      * agibile e il convoglio ha ancora in memoria il guasto di prima: con la domanda
@@ -242,6 +264,16 @@ public class TrainDB {
      */
     public static boolean statoImpercorribile(String stato) {
         return "GUASTA".equalsIgnoreCase(stato) || "MANUTENZIONE".equalsIgnoreCase(stato);
+    }
+
+    /**
+     * Dice se uno stato dichiarato dalla Centrale riapre i binari. Lo fa solo ONLINE, ed è
+     * l'unico permesso che un convoglio trattenuto ha di rimettersi in moto: OFFLINE non
+     * basta (è una stazione che tace, non una stazione riaperta) e la chiusura di un
+     * allarme nemmeno, perché parla del guasto e non dei binari.
+     */
+    public static boolean statoAgibile(String stato) {
+        return "ONLINE".equalsIgnoreCase(stato);
     }
 
     /**

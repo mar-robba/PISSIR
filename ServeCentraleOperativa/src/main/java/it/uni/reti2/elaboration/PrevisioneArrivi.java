@@ -1,14 +1,9 @@
 package it.uni.reti2.elaboration;
 
-import io.quarkus.narayana.jta.QuarkusTransaction;
 import it.uni.reti2.entity.ItinerarioTratta;
 import it.uni.reti2.entity.StatiCanonici;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.persistence.RailwayRepository;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -18,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 /**
  * Il "Processing" che il testo del progetto assegna alla Centrale Operativa:
@@ -51,10 +47,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>{@link #durataReale(double)} e {@link #minutiDiServizio(Duration)} sono le due
  * conversioni, e sono l'unico punto in cui il fattore di accelerazione compare.</p>
  */
-@ApplicationScoped
 public class PrevisioneArrivi {
 
-    private static final Logger LOG = Logger.getLogger(PrevisioneArrivi.class);
+    private static final Logger LOG = Logger.getLogger(PrevisioneArrivi.class.getName());
 
     /**
      * Il quanto di campionamento del convoglio: la sua macchina a stati gira una volta al
@@ -79,20 +74,16 @@ public class PrevisioneArrivi {
      * Non e' una duplicazione della configurazione della flotta: e' l'orario di servizio,
      * che in un impianto vero e' la Centrale a tenere e i treni a rispettare.
      */
-    @ConfigProperty(name = "viaggio.fattore.accelerazione", defaultValue = "100")
-    double fattoreAccelerazione;
+    public double fattoreAccelerazione = 100; // viaggio.fattore.accelerazione
 
     /** Sosta prevista in ogni fermata intermedia, in secondi reali (come sopra). */
-    @ConfigProperty(name = "viaggio.sosta.secondi", defaultValue = "2")
-    long sostaSecondi;
+    public long sostaSecondi = 2; // viaggio.sosta.secondi
 
     /** Unico punto da cui questa classe legge il database. */
-    @Inject
-    RailwayRepository repository;
+    public RailwayRepository repository;
 
     /** La fotografia in RAM dei convogli: le previsioni si fanno su quella. */
-    @Inject
-    TrafficLogicEngine statoRete;
+    public TrafficLogicEngine statoRete;
 
     /**
      * Percorso di ogni itinerario, memorizzato alla prima richiesta.
@@ -324,8 +315,8 @@ public class PrevisioneArrivi {
                 : tappe.get(prossimo).minutiVersoProssima();
         Instant previsto = quandoEUscito.plus(durataReale(percorrenza));
         tabellaDiMarcia.put(treno.id, new Marcia(tappe.get(prossimo).stazioneId(), previsto));
-        LOG.debugf("⏱️ %s parte da %s: arrivo previsto a %s fra %d minuti di servizio",
-                treno.id, stazionePartenza, tappe.get(prossimo).stazioneId(), percorrenza);
+        LOG.fine(String.format("⏱️ %s parte da %s: arrivo previsto a %s fra %d minuti di servizio",
+                treno.id, stazionePartenza, tappe.get(prossimo).stazioneId(), percorrenza));
     }
 
     /**
@@ -362,8 +353,8 @@ public class PrevisioneArrivi {
         }
         int prima = treno.ritardo;
         treno.ritardo = Math.max(0, treno.ritardo + arrotonda(scarto));
-        LOG.infof("⏱️ %s arrivato a %s con %+d minuti sull'orario: ritardo da %d a %d",
-                treno.id, stazioneRaggiunta, arrotonda(scarto), prima, treno.ritardo);
+        LOG.info(String.format("⏱️ %s arrivato a %s con %+d minuti sull'orario: ritardo da %d a %d",
+                treno.id, stazioneRaggiunta, arrotonda(scarto), prima, treno.ritardo));
         return treno.ritardo != prima;
     }
 
@@ -399,8 +390,8 @@ public class PrevisioneArrivi {
         }
         int prima = treno.ritardo;
         treno.ritardo = Math.max(0, treno.ritardo + arrotonda(eccesso));
-        LOG.infof("⏱️ %s trattenuto in %s per %d minuti oltre la sosta: ritardo da %d a %d",
-                treno.id, stazione, arrotonda(eccesso), prima, treno.ritardo);
+        LOG.info(String.format("⏱️ %s trattenuto in %s per %d minuti oltre la sosta: ritardo da %d a %d",
+                treno.id, stazione, arrotonda(eccesso), prima, treno.ritardo));
     }
 
     /** Il convoglio non c'e' piu' (eliminato o soppresso): via il suo orario e la sua sosta. */
@@ -436,25 +427,22 @@ public class PrevisioneArrivi {
      * di ogni tratta porta il tempo verso la fermata dopo, e in coda si aggiunge l'arrivo
      * dell'ultima con tempo zero.
      *
-     * <p>La transazione si apre qui perche' le tratte si leggono in modo pigro e questo
-     * metodo viene chiamato anche dal consumer MQTT, che una sessione JPA aperta non ce
-     * l'ha; se invece il chiamante e' un endpoint REST gia' transazionale ci si accoda
-     * alla sua ({@code joiningExisting}).</p>
+     * <p>Il repository legge le tratte con le loro stazioni gia' dentro, quindi qui non
+     * serve nessuna transazione: se il chiamante ne ha una aperta la lettura usa la sua
+     * connessione, altrimenti se ne apre una apposta.</p>
      */
     private List<Tappa> leggiPercorso(String itinerarioId) {
-        return QuarkusTransaction.joiningExisting().call(() -> {
-            List<ItinerarioTratta> tratte = repository.tratteOrdinateDi(itinerarioId);
-            List<Tappa> tappe = new ArrayList<>();
-            for (ItinerarioTratta riga : tratte) {
-                Integer minuti = riga.tratta.tempoPercorrenzaMinuti;
-                tappe.add(new Tappa(riga.tratta.stazionePartenza.id,
-                        Math.max(1, minuti != null ? minuti : MINUTI_TRATTA_PREDEFINITI)));
-            }
-            if (!tratte.isEmpty()) {
-                tappe.add(new Tappa(tratte.get(tratte.size() - 1).tratta.stazioneArrivo.id, 0));
-            }
-            return tappe;
-        });
+        List<ItinerarioTratta> tratte = repository.tratteOrdinateDi(itinerarioId);
+        List<Tappa> tappe = new ArrayList<>();
+        for (ItinerarioTratta riga : tratte) {
+            Integer minuti = riga.tratta.tempoPercorrenzaMinuti;
+            tappe.add(new Tappa(riga.tratta.stazionePartenza.id,
+                    Math.max(1, minuti != null ? minuti : MINUTI_TRATTA_PREDEFINITI)));
+        }
+        if (!tratte.isEmpty()) {
+            tappe.add(new Tappa(tratte.get(tratte.size() - 1).tratta.stazioneArrivo.id, 0));
+        }
+        return tappe;
     }
 
     /** Posizione di una stazione nel percorso, -1 se quell'itinerario non la tocca. */

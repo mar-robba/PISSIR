@@ -1,17 +1,10 @@
 package it.uni.reti2.gateway;
 
-import io.quarkus.security.identity.SecurityIdentity;
+import io.javalin.http.Context;
 import it.uni.reti2.entity.Utente;
 import it.uni.reti2.persistence.RailwayRepository;
-import jakarta.inject.Inject;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import org.eclipse.microprofile.jwt.JsonWebToken;
+import org.pac4j.core.profile.UserProfile;
 
-import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,7 +15,7 @@ import java.util.Map;
  * con la colonna della tabella Utenti e il {@code /logout} che buttava via il token:
  * con il passaggio a Keycloak sono spariti tutti e due. Le credenziali le verifica
  * Keycloak, il logout si fa sul suo endpoint di fine sessione, e la Centrale riceve
- * soltanto un JWT firmato di cui controlla la firma (vedi {@code quarkus.oidc.*}).</p>
+ * soltanto un JWT firmato di cui controlla la firma (vedi {@link SicurezzaKeycloak}).</p>
  *
  * <p>Resta un solo endpoint, {@code GET /api/auth/me}: la web app lo chiama appena
  * ottenuto il token per sapere chi e' l'utente e cosa puo' fare. Il payload e' lo
@@ -31,51 +24,45 @@ import java.util.Map;
  * dal token e per meta' dalla tabella Utenti, che e' rimasta come anagrafica degli
  * operatori (i guasti hanno una chiave esterna verso di lei).</p>
  */
-@Path("/api/auth")
-@Produces(MediaType.APPLICATION_JSON)
 public class AuthController {
 
-    /** Identita' ricavata dal token: contiene username e ruoli di realm. */
-    @Inject
-    SecurityIdentity identita;
-
     /** Unico punto da cui questa classe legge l'anagrafica degli operatori. */
-    @Inject
-    RailwayRepository repository;
+    public RailwayRepository repository;
 
     /**
-     * Restituisce il profilo dell'utente che ha presentato il token.
+     * GET /api/auth/me: restituisce il profilo dell'utente che ha presentato il token.
      *
-     * @return 200 con il profilo, 401 se la chiamata arriva senza token valido.
+     * <p>Il token l'ha gia' controllato FiltroAutorizzazione, che lascia il profilo pac4j fra
+     * gli attributi della richiesta: qui lo si rilegge e basta.</p>
+     *
+     * <p>Risponde 200 con il profilo, 401 se la chiamata arriva senza token valido.</p>
      */
-    @GET
-    @Path("/me")
-    public Response profilo() {
-        if (identita == null || identita.isAnonymous()) {
-            return Response.status(Response.Status.UNAUTHORIZED)
-                    .entity(Map.of("errore", "Autenticazione richiesta: effettuare il login"))
-                    .build();
+    public void profilo(Context ctx) {
+        UserProfile identita = ctx.attribute(FiltroAutorizzazione.ATTRIBUTO_PROFILO);
+        if (identita == null) {
+            ctx.status(401).json(Map.of("errore", "Autenticazione richiesta: effettuare il login"));
+            return;
         }
 
         // Keycloak salva gli username in minuscolo (mat001), mentre in tutto il resto
         // del sistema l'operatore e' identificato dalla matricola (MAT001). Il claim
         // "matricola" arriva dal protocol mapper del realm; se qualcuno crea un utente
         // a mano dalla console senza quell'attributo si ripiega sullo username.
-        String matricola = claimTestuale("matricola");
+        String matricola = claimTestuale(identita, "matricola");
         if (matricola == null || matricola.isBlank()) {
-            matricola = identita.getPrincipal().getName().toUpperCase();
+            matricola = FiltroAutorizzazione.nomeUtente(identita).toUpperCase();
         }
 
         // Riga di anagrafica corrispondente: serve per restituire lo stesso id_utente
         // (U1, U2, ...) usato dalle chiavi esterne dei guasti.
         Utente utente = repository.trovaUtentePerMatricola(matricola);
 
-        String nome = utente != null ? utente.nome : claimTestuale("given_name");
-        String cognome = utente != null ? utente.cognome : claimTestuale("family_name");
+        String nome = utente != null ? utente.nome : claimTestuale(identita, "given_name");
+        String cognome = utente != null ? utente.cognome : claimTestuale(identita, "family_name");
 
         // Il ruolo applicativo non si deduce piu' dalla colonna "tipo" del database:
         // e' il ruolo di realm che Keycloak ha messo dentro il token.
-        String ruolo = identita.hasRole(FiltroAutorizzazione.RUOLO_AMMINISTRATORE)
+        String ruolo = identita.getRoles().contains(FiltroAutorizzazione.RUOLO_AMMINISTRATORE)
                 ? FiltroAutorizzazione.RUOLO_AMMINISTRATORE
                 : FiltroAutorizzazione.RUOLO_TECNICO;
 
@@ -86,27 +73,18 @@ public class AuthController {
         profilo.put("displayName", componiNomeCompleto(nome, cognome, matricola));
         profilo.put("avatarInitials", iniziali(nome, cognome, matricola));
 
-        return Response.ok(profilo).build();
+        ctx.json(profilo);
     }
 
     /**
-     * Legge un claim di testo dal token.
-     *
-     * <p>Il principal e' un {@link JsonWebToken} solo quando l'identita' arriva
-     * davvero da Keycloak: nei test viene simulata con {@code @TestSecurity} e il
-     * principal e' un oggetto qualsiasi, quindi il controllo di tipo serve per non
-     * far esplodere i test.</p>
+     * Legge un claim di testo dal token: pac4j li mette tutti fra gli attributi del profilo.
      *
      * @param nomeClaim Nome del claim dentro il JWT.
      * @return Il valore del claim, oppure null se assente.
      */
-    private String claimTestuale(String nomeClaim) {
-        Principal principal = identita.getPrincipal();
-        if (principal instanceof JsonWebToken jwt) {
-            Object valore = jwt.getClaim(nomeClaim);
-            return valore != null ? valore.toString() : null;
-        }
-        return null;
+    private String claimTestuale(UserProfile identita, String nomeClaim) {
+        Object valore = identita.getAttribute(nomeClaim);
+        return valore != null ? valore.toString() : null;
     }
 
     /** "Mario Rossi", oppure la matricola se l'anagrafica non ha nome e cognome. */

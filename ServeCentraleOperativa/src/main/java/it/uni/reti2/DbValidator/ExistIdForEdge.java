@@ -1,72 +1,54 @@
 package it.uni.reti2.DbValidator;
 
-import io.quarkus.narayana.jta.QuarkusTransaction;
-import io.smallrye.common.annotation.Blocking;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import it.uni.reti2.entity.Treno;
+import com.google.gson.JsonObject;
+import it.uni.reti2.gateway.Json;
+import it.uni.reti2.ingestion.ClientMqtt;
+import it.uni.reti2.ingestion.CodaPubblicazioni;
 import it.uni.reti2.persistence.RailwayRepository;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
-import org.eclipse.microprofile.reactive.messaging.Incoming;
-import org.eclipse.microprofile.reactive.messaging.Message;
-import org.eclipse.microprofile.reactive.messaging.Metadata;
-import io.smallrye.reactive.messaging.mqtt.SendingMqttMessageMetadata;
-import io.netty.handler.codec.mqtt.MqttQoS;
 
-import java.util.concurrent.CompletionStage;
-
-@ApplicationScoped
+/**
+ * Risponde alla domanda che il nodo Treno fa all'avvio: "il mio ID esiste nel database
+ * centrale?". Ascolta sul topic railway/train/{id}/validation, interroga la tabella Treni e
+ * risponde su railway/train/{id}/validation-response con l'esito.
+ *
+ * <p>È una domanda e una risposta, non un evento: non cambia lo stato di niente, quindi non
+ * passa dal GestoreEventi.</p>
+ */
 public class ExistIdForEdge {
 
-    @Inject
-    ObjectMapper mapper;
+    /** Le richieste di tutti i treni: il + è l'id del convoglio. */
+    public static final String TOPIC_RICHIESTE = "railway/train/+/validation";
 
     /** Unico punto da cui questa classe interroga il database. */
-    @Inject
-    RailwayRepository repository;
+    public RailwayRepository repository;
 
-    // 1. Iniettiamo l'Emitter per inviare il messaggio di risposta
-    @Inject
-    @Channel("validation-response") // Nome del canale di uscita configurato in application.properties
-            Emitter<String> validationEmitter;
+    /** Dove si mette la risposta (la pubblica il thread della coda, non quello di Paho). */
+    public CodaPubblicazioni coda;
 
-    /**
-     * Il corpo è tutto dentro un try/catch e il messaggio viene comunque confermato:
-     * prima bastava un payload non-JSON pubblicato su railway/train/+/validation per
-     * far terminare in errore il canale reattivo, e da quel momento la Centrale non
-     * validava più nessun treno finché non veniva riavviata.
-     * La lettura sul DB gira in una transazione aperta DENTRO il try (e non con
-     * @Transactional sul metodo, il cui commit sarebbe stato fuori dal try).
-     */
-    @Incoming("validation-in")
-    @Blocking
-    public CompletionStage<Void> interrogaIlDPerValidazione(Message<byte[]> messaggio) {
-        // 2. Correzione: estrazione reale dei byte del payload
-        String payload = new String(messaggio.getPayload());
+    /** Si mette in ascolto sulle richieste di validazione dei treni. */
+    public void sottoscrivi(ClientMqtt client) {
+        client.ascolta(TOPIC_RICHIESTE, 0, this::interrogaIlDPerValidazione);
+    }
+
+    public void interrogaIlDPerValidazione(String payload) {
         try {
-            JsonNode root = mapper.readTree(payload);
+            JsonObject root = Json.oggetto(payload);
 
-            String trenoId = root.has("trenoId") ? root.get("trenoId").asText() : null;
+            String trenoId = root.has("trenoId") ? root.get("trenoId").getAsString() : null;
 
             if (trenoId != null) {
-                // Check sul DB: la query sta nel repository, qui resta solo la transazione
-                boolean esiste = QuarkusTransaction.requiringNew().call(() -> repository.esisteTreno(trenoId));
+                // Check sul DB: la query sta nel repository
+                boolean esiste = repository.esisteTreno(trenoId);
 
-                // 3. Creiamo la risposta aggiungendo la conferma dell'esistenza a DB
-                ObjectNode responseNode = root.deepCopy();
-                responseNode.put("esisteNelDb", esiste);
-                responseNode.put("ESISTE", esiste);
+                // Creiamo la risposta aggiungendo la conferma dell'esistenza a DB
+                JsonObject responseNode = root.deepCopy();
+                responseNode.addProperty("esisteNelDb", esiste);
+                responseNode.addProperty("ESISTE", esiste);
 
-                // 4. Pubblichiamo il messaggio sul canale di risposta con il topic dinamico
+                // Pubblichiamo il messaggio sul topic di risposta del treno (QoS 0: se si
+                // perde, il treno ripete la domanda)
                 String targetTopic = "railway/train/" + trenoId + "/validation-response";
-                SendingMqttMessageMetadata metadata = new SendingMqttMessageMetadata(targetTopic, MqttQoS.AT_MOST_ONCE, false);
-                Message<String> mqttMsg = Message.of(responseNode.toString(), Metadata.of(metadata));
-                validationEmitter.send(mqttMsg);
+                coda.metti(targetTopic, responseNode.toString(), 0);
 
                 System.out.println("Elaborato treno: " + trenoId + " | Esiste a DB: " + esiste);
             } else {
@@ -75,8 +57,5 @@ public class ExistIdForEdge {
         } catch (Exception e) {
             System.err.println("Richiesta di validazione treno non elaborabile (" + e.getMessage() + "): " + payload);
         }
-
-        // 5. Confermiamo (ACK) la ricezione del messaggio in modo reattivo
-        return messaggio.ack();
     }
 }

@@ -2,9 +2,15 @@
 -- SCHEMA DEL DATABASE CENTRALE
 -- Monitoraggio e Gestione del Traffico Ferroviario
 -- ================================================================
+-- La Centrale esegue questo file a ogni avvio (Database.creaTabelleMancanti): ogni
+-- istruzione e' un CREATE ... IF NOT EXISTS, quindi su un database gia' popolato non
+-- cambia niente e su uno vuoto crea tutte le tabelle. Prima le creava Hibernate dalle
+-- entita' al primo avvio.
+-- Siccome lo legge la Centrale, ogni istruzione finisce con il punto e virgola a fine
+-- riga (e' da li' che capisce dove finisce un'istruzione).
 
 -- --- Stazioni ---
-CREATE TABLE Stazione (
+CREATE TABLE IF NOT EXISTS Stazione (
     id_stazione                  VARCHAR(50) PRIMARY KEY,
     nome                         VARCHAR(100) NOT NULL,
     tipoCapolineaPartenzaoNormale VARCHAR(50)
@@ -16,7 +22,7 @@ CREATE TABLE Stazione (
 );
 
 -- --- Tratte ---
-CREATE TABLE Tratte (
+CREATE TABLE IF NOT EXISTS Tratte (
     id_Tratta          VARCHAR(50) PRIMARY KEY,
     StazionePartenzaFK VARCHAR(50) NOT NULL,
     StazioneArrivoFK   VARCHAR(50) NOT NULL,
@@ -29,7 +35,7 @@ CREATE TABLE Tratte (
 -- Solo anagrafica: credenziali e ruoli stanno in Keycloak (realm "railway"), il
 -- database centrale non conserva nessuna password. La matricola e' il campo che
 -- lega la riga all'utente Keycloak (claim "matricola" del token).
-CREATE TABLE Utenti (
+CREATE TABLE IF NOT EXISTS Utenti (
     id_utente  VARCHAR(50) PRIMARY KEY,
     tipo       VARCHAR(50) NOT NULL,   -- es. 'operatore','tecnico','admin'
     nome       VARCHAR(100) NOT NULL,
@@ -48,7 +54,7 @@ CREATE TABLE Utenti (
 -- NON e' la stessa cosa di Stazione.tipoCapolineaPartenzaoNormale, che descrive la
 -- stazione in se': la stessa stazione puo' chiudere un itinerario ed essere una fermata
 -- intermedia di un altro, quindi il dato appartiene all'itinerario e non alla stazione.
-CREATE TABLE Itinerari (
+CREATE TABLE IF NOT EXISTS Itinerari (
     id_itinerario VARCHAR(50) PRIMARY KEY,
     capolinea     VARCHAR(50),                -- ESTENSIONE: estremo che termina la corsa
     FOREIGN KEY (capolinea) REFERENCES Stazione(id_stazione)
@@ -59,7 +65,7 @@ CREATE TABLE Itinerari (
 -- digita nel campo "Convoglio" dell'interfaccia. Non esiste una colonna "nome" separata:
 -- il nome coincide con la chiave primaria, quindi e' univoco per costruzione e immutabile
 -- (per rinominare un convoglio si elimina il treno e si ricrea).
-CREATE TABLE Treni (
+CREATE TABLE IF NOT EXISTS Treni (
     id_convoglio                    VARCHAR(50) PRIMARY KEY,
     stato                           VARCHAR(30) NOT NULL
         CHECK (stato IN ('attivo','fermo','rotto','in manutenzione','capolinea')),
@@ -73,7 +79,7 @@ CREATE TABLE Treni (
 
 -- Tabella associativa N:M Itinerari <-> Tratte
 -- Un itinerario e' composto da piu' tratte ordinate
-CREATE TABLE Itinerario_Tratta (
+CREATE TABLE IF NOT EXISTS Itinerario_Tratta (
     id_itinerario VARCHAR(50) NOT NULL,
     id_Tratta     VARCHAR(50) NOT NULL,
     ordine        INT NOT NULL,   -- posizione della tratta nell'itinerario
@@ -83,7 +89,7 @@ CREATE TABLE Itinerario_Tratta (
 );
 
 -- --- Transiti ---
-CREATE TABLE Transiti (
+CREATE TABLE IF NOT EXISTS Transiti (
     id_transito    VARCHAR(50) PRIMARY KEY,
     id_stazione    VARCHAR(50) NOT NULL,
     id_convoglio   VARCHAR(50) NOT NULL,
@@ -98,7 +104,7 @@ CREATE TABLE Transiti (
 );
 
 -- --- Guasti Pervenuti da Treni o Stazioni ---
-CREATE TABLE Guasti_Pervenuti_da_treni_o_Staz (
+CREATE TABLE IF NOT EXISTS Guasti_Pervenuti_da_treni_o_Staz (
     id_Guasto                    VARCHAR(50) PRIMARY KEY,
     Stato_RisoltoONO             BOOLEAN NOT NULL DEFAULT FALSE,
     OperatoreCheSeNeStaOccupandoFK VARCHAR(50),
@@ -115,21 +121,23 @@ CREATE TABLE Guasti_Pervenuti_da_treni_o_Staz (
 );
 
 -- --- Eventi delle Stazioni (audit log) ---
--- Tabella usata dall'entita' EventoStazione: non era prevista dallo schema iniziale
--- e in esecuzione la crea Hibernate (quarkus.hibernate-orm.database.generation=update).
--- E' riportata qui perche' questo file e' il DDL di riferimento allegato alla relazione.
+-- Tabella della classe EventoStazione: non era prevista dallo schema iniziale.
 -- E' gia' una tabella di storico: nessuna FK, e il nome della stazione congelato dentro
 -- la riga (vedi la regola degli storici piu' sotto). I nomi delle colonne sono quelli
--- che genera Hibernate dai campi dell'entita', cioe' tutti attaccati e minuscoli: la
--- tabella non nasce da questo file, quindi qui va scritta com'e' davvero.
-CREATE TABLE eventi_stazioni (
-    id           BIGINT PRIMARY KEY,   -- generato da Hibernate (sequenza dedicata)
+-- che generava Hibernate dai campi dell'entita', cioe' tutti attaccati e minuscoli: i
+-- database creati prima di questo file li hanno cosi', e le query della Centrale pure.
+-- L'id lo prende la Centrale dalla sequenza qui sotto, che e' quella che usava
+-- Hibernate (con passo 50: le righe gia' scritte hanno numeri piu' bassi).
+CREATE SEQUENCE IF NOT EXISTS eventi_stazioni_seq START WITH 1 INCREMENT BY 50;
+
+CREATE TABLE IF NOT EXISTS eventi_stazioni (
+    id           BIGINT PRIMARY KEY,   -- preso dalla sequenza eventi_stazioni_seq
     stazioneid   VARCHAR(255),         -- riferimento logico a Stazione(id_stazione), NON vincolato
     nomestazione VARCHAR(255),         -- nome della stazione al momento dell'evento
     stato        VARCHAR(255),         -- stato della stazione al momento dell'evento
     tipoevento   VARCHAR(255),         -- es. 'HEARTBEAT_LOST', 'GUASTO', 'MANUTENZIONE'
     descrizione  VARCHAR(255),
-    timestamp    TIMESTAMP
+    "timestamp"  TIMESTAMP             -- fra virgolette: in H2 e' una parola riservata
 );
 
 -- ================================================================
@@ -160,7 +168,7 @@ CREATE TABLE eventi_stazioni (
 -- e le due righe nascono e muoiono insieme.
 
 -- --- Storico Transiti ---
-CREATE TABLE Storico_Transiti (
+CREATE TABLE IF NOT EXISTS Storico_Transiti (
     id_storico_transito BIGSERIAL PRIMARY KEY,
     id_transito         VARCHAR(50) NOT NULL,  -- riferimento logico alla riga di Transiti
     id_stazione         VARCHAR(50) NOT NULL,  -- riferimento logico, NIENTE FK
@@ -178,7 +186,7 @@ CREATE TABLE Storico_Transiti (
 -- La riga nasce all'apertura del guasto e viene completata con ts_chiusura alla
 -- risoluzione. Porta dentro tutta la descrizione dell'allarme, percio' resta leggibile
 -- anche quando la riga viva viene archiviata.
-CREATE TABLE Storico_Guasti (
+CREATE TABLE IF NOT EXISTS Storico_Guasti (
     id_storico_guasto   BIGSERIAL PRIMARY KEY,
     id_Guasto           VARCHAR(50) NOT NULL,  -- riferimento logico, NIENTE FK
     tipo                VARCHAR(50),   -- stazione_guasta / treno_fermo / sensore_offline
@@ -199,7 +207,7 @@ CREATE TABLE Storico_Guasti (
 -- --- Storico Stato Treni ---
 -- Una riga per ogni CAMBIO di stato (non per ogni frame di telemetria): e' la regola di
 -- registrazione di RF02.7. stato_precedente serve a leggere la riga come un cambiamento.
-CREATE TABLE Storico_Stato_Treni (
+CREATE TABLE IF NOT EXISTS Storico_Stato_Treni (
     id_storico_treno                BIGSERIAL PRIMARY KEY,
     id_convoglio                    VARCHAR(50) NOT NULL,  -- riferimento logico = nome del convoglio
     stato                           VARCHAR(30) NOT NULL,
@@ -211,7 +219,7 @@ CREATE TABLE Storico_Stato_Treni (
 );
 
 -- --- Storico Stato Stazioni ---
-CREATE TABLE Storico_Stato_Stazioni (
+CREATE TABLE IF NOT EXISTS Storico_Stato_Stazioni (
     id_storico_stazione BIGSERIAL PRIMARY KEY,
     id_stazione         VARCHAR(50) NOT NULL,   -- riferimento logico, NIENTE FK
     nome                VARCHAR(100) NOT NULL,  -- nome che la stazione aveva allora
@@ -226,7 +234,7 @@ CREATE TABLE Storico_Stato_Stazioni (
 -- L'itinerario nel modello corrente e' solo un id: il percorso vero sta nella tabella
 -- associativa, che l'amministratore puo' riscrivere quando vuole. Percio' qui si copia
 -- anche il percorso, in chiaro e (tratta per tratta) in Storico_Itinerari_Tratte.
-CREATE TABLE Storico_Itinerari (
+CREATE TABLE IF NOT EXISTS Storico_Itinerari (
     id_storico_itinerario BIGSERIAL PRIMARY KEY,
     id_itinerario         VARCHAR(50) NOT NULL,  -- riferimento logico, NIENTE FK
     id_convoglio          VARCHAR(50) NOT NULL,
@@ -240,7 +248,7 @@ CREATE TABLE Storico_Itinerari (
 -- --- Storico delle tratte di un itinerario percorso ---
 -- Sta a Storico_Itinerari come Itinerario_Tratta sta a Itinerari. E' l'unica tabella
 -- con una chiave esterna, e punta a un altro storico: le due righe si scrivono insieme.
-CREATE TABLE Storico_Itinerari_Tratte (
+CREATE TABLE IF NOT EXISTS Storico_Itinerari_Tratte (
     id_storico_itinerario_tratta BIGSERIAL PRIMARY KEY,
     id_storico_itinerario        BIGINT NOT NULL,   -- riga padre nello storico
     ordine                       INT NOT NULL,      -- posizione della tratta nel percorso
@@ -258,7 +266,7 @@ CREATE TABLE Storico_Itinerari_Tratte (
 -- --- Storico Assegnazione Operatori a Guasti ---
 -- Chi ha preso in carico l'allarme: senza questa tabella, di un guasto chiuso resta
 -- solo il fatto che e' stato chiuso.
-CREATE TABLE Storico_Assegnazioni_Guasti (
+CREATE TABLE IF NOT EXISTS Storico_Assegnazioni_Guasti (
     id_storico_assegnazione BIGSERIAL PRIMARY KEY,
     id_Guasto               VARCHAR(50) NOT NULL,  -- riferimento logico, NIENTE FK
     tipo_guasto             VARCHAR(50),
@@ -277,7 +285,7 @@ CREATE TABLE Storico_Assegnazioni_Guasti (
 -- --- Storico Interventi di Manutenzione (invio della squadra a una stazione) ---
 -- L'altra faccia delle "assegnazioni degli operatori" di RF02.7: il comando "Invia
 -- Operatori" (RF01.4.1) finora passava solo da MQTT e WebSocket e non lasciava traccia.
-CREATE TABLE Storico_Interventi_Manutenzione (
+CREATE TABLE IF NOT EXISTS Storico_Interventi_Manutenzione (
     id_storico_intervento BIGSERIAL PRIMARY KEY,
     id_stazione           VARCHAR(50) NOT NULL,  -- riferimento logico, NIENTE FK
     nome_stazione         VARCHAR(100),

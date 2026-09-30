@@ -1,45 +1,46 @@
 package it.uni.reti2.gateway;
 
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.websocket.OnClose;
-import jakarta.websocket.OnError;
-import jakarta.websocket.OnOpen;
-import jakarta.websocket.Session;
-import jakarta.websocket.server.ServerEndpoint;
-import org.jboss.logging.Logger;
+import io.javalin.websocket.WsCloseContext;
+import io.javalin.websocket.WsConnectContext;
+import io.javalin.websocket.WsContext;
+import io.javalin.websocket.WsErrorContext;
+import org.eclipse.jetty.websocket.api.WriteCallback;
 
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- * Controller WebSocket per la comunicazione in tempo reale bidirezionale
- * tra il Server Centrale e l'interfaccia utente web (Frontend).
- * Quando arrivano eventi dal broker MQTT (es. telemetria, allarmi), 
+ * La WebSocket /ws/realtime per la comunicazione in tempo reale tra il Server Centrale e
+ * l'interfaccia utente web (Frontend).
+ * Quando arrivano eventi dal broker MQTT (es. telemetria, allarmi),
  * vengono inoltrati ai client connessi tramite questa classe.
+ *
+ * <p>L'indirizzo lo registra ServerRest con {@code app.ws(...)}, e Javalin chiama i tre
+ * metodi {@link #onOpen}, {@link #onClose} e {@link #onError} quando una pagina si collega,
+ * se ne va o perde il collegamento.</p>
  */
-@ServerEndpoint("/ws/realtime")
-@ApplicationScoped
 public class RealtimeWebSocket {
 
-    private static final Logger LOG = Logger.getLogger(RealtimeWebSocket.class);
+    private static final Logger LOG = Logger.getLogger(RealtimeWebSocket.class.getName());
 
     /**
      * Mantiene traccia di tutte le sessioni WebSocket attive.
      * Si usa una struttura thread-safe (ConcurrentHashMap) poichè le connessioni
      * e disconnessioni possono avvenire in parallelo da diversi thread.
      */
-    private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<WsContext> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     /**
      * Callback invocata all'apertura di una nuova connessione da parte del client.
      *
-     * @param session L'oggetto Session generato dall'engine WebSocket.
+     * @param session Il contesto della connessione creato da Javalin.
      */
-    @OnOpen
-    public void onOpen(Session session) {
+    public void onOpen(WsConnectContext session) {
         sessions.add(session);
-        LOG.infof("🔌 [WebSocket] Nuova connessione: %s", session.getId());
+        LOG.info(String.format("🔌 [WebSocket] Nuova connessione: %s", session.sessionId()));
     }
 
     /**
@@ -47,36 +48,39 @@ public class RealtimeWebSocket {
      *
      * @param session La sessione terminata.
      */
-    @OnClose
-    public void onClose(Session session) {
+    public void onClose(WsCloseContext session) {
         sessions.remove(session);
-        LOG.infof("🔌 [WebSocket] Connessione chiusa: %s", session.getId());
+        LOG.info(String.format("🔌 [WebSocket] Connessione chiusa: %s", session.sessionId()));
     }
 
     /**
      * Callback invocata in caso di errori a livello di protocollo o di rete.
      *
      * @param session La sessione interessata.
-     * @param throwable L'eccezione lanciata.
      */
-    @OnError
-    public void onError(Session session, Throwable throwable) {
+    public void onError(WsErrorContext session) {
         sessions.remove(session);
-        LOG.errorf(throwable, "🔌 [WebSocket] Errore sulla sessione: %s", session.getId());
+        LOG.log(Level.SEVERE, String.format("🔌 [WebSocket] Errore sulla sessione: %s", session.sessionId()),
+                session.error());
     }
 
     /**
      * Invia un messaggio di testo (solitamente un payload JSON) a tutti i client
      * attualmente connessi alla WebSocket.
-     * 
+     *
      * @param message Il contenuto del messaggio da trasmettere in broadcast.
      */
     public void broadcast(String message) {
         sessions.forEach(s -> {
-            // Invio asincrono per non bloccare il thread principale durante la trasmissione
-            s.getAsyncRemote().sendObject(message, result -> {
-                if (result.getException() != null) {
-                    LOG.error("Errore invio messaggio WebSocket alla sessione " + s.getId(), result.getException());
+            if (!s.session.isOpen()) {
+                return;
+            }
+            // Invio asincrono per non bloccare il thread principale durante la trasmissione:
+            // Jetty accoda il messaggio e chiama la callback quando l'ha spedito
+            s.session.getRemote().sendString(message, new WriteCallback() {
+                @Override
+                public void writeFailed(Throwable errore) {
+                    LOG.log(Level.SEVERE, "Errore invio messaggio WebSocket alla sessione " + s.sessionId(), errore);
                 }
             });
         });

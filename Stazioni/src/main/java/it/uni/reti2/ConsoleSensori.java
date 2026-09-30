@@ -1,9 +1,8 @@
 package it.uni.reti2;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.enterprise.context.ApplicationScoped;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.IOException;
 import java.net.URI;
@@ -23,17 +22,16 @@ import java.util.Scanner;
  * un sensore, si aspetta il timeout e si guarda la stazione diventare GUASTA (e i treni
  * fermarsi); si riaccende e si guarda tornare tutto operativo.</p>
  */
-@ApplicationScoped
 public class ConsoleSensori {
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final ObjectMapper mapper = new ObjectMapper();
-
-    @ConfigProperty(name = "stazione.id", defaultValue = "S1")
+    /** Id della stazione: per il titolo del menu e per il nome del file di log. Assegnato dal main. */
     String stazioneId;
 
-    @ConfigProperty(name = "quarkus.http.port", defaultValue = "8081")
-    int httpPort;
+    /** Indirizzo delle API della stazione (http o https), lo stesso dei sensori simulati. */
+    String indirizzoApi;
+
+    /** Il client delle chiamate: si fida della CA del progetto (vedi SecureHttpClient). */
+    HttpClient httpClient;
 
     /** Avvia il menu e resta in ascolto finché l'utente non sceglie di uscire. */
     public void avviaMenu() {
@@ -81,18 +79,19 @@ public class ConsoleSensori {
         }
 
         try {
-            JsonNode json = mapper.readTree(risposta);
+            JsonObject json = JsonParser.parseString(risposta).getAsJsonObject();
             System.out.printf("Stazione %s -> stato %s (guasta per i sensori: %s)%n",
-                    json.path("stazioneId").asText(), json.path("stato").asText(),
-                    json.path("guastoDaSensori").asText());
+                    CampiJson.testo(json, "stazioneId", ""), CampiJson.testo(json, "stato", ""),
+                    CampiJson.testo(json, "guastoDaSensori", ""));
             System.out.printf("%-16s %-10s %-8s %-8s %s%n", "SENSORE", "TIPO", "ACCESO", "GUASTO", "ULTIMO BATTITO");
-            for (JsonNode sensore : json.path("sensori")) {
+            for (JsonElement elemento : CampiJson.lista(json, "sensori")) {
+                JsonObject sensore = elemento.getAsJsonObject();
                 System.out.printf("%-16s %-10s %-8s %-8s %s%n",
-                        sensore.path("sensoreId").asText(),
-                        sensore.path("tipo").asText(),
-                        sensore.path("acceso").asText(),
-                        sensore.path("guasto").asText(),
-                        sensore.path("ultimoBattito").asText());
+                        CampiJson.testo(sensore, "sensoreId", ""),
+                        CampiJson.testo(sensore, "tipo", ""),
+                        CampiJson.testo(sensore, "acceso", ""),
+                        CampiJson.testo(sensore, "guasto", ""),
+                        CampiJson.testo(sensore, "ultimoBattito", ""));
             }
         } catch (Exception e) {
             // Se il JSON non si legge si stampa comunque la risposta grezza: meglio di niente
@@ -183,20 +182,16 @@ public class ConsoleSensori {
     }
 
     private String inviaGet(String path) {
-        HttpRequest richiesta = HttpRequest.newBuilder(URI.create(indirizzo(path))).GET().build();
+        HttpRequest richiesta = HttpRequest.newBuilder(URI.create(indirizzoApi + path)).GET().build();
         return esegui(richiesta, false);
     }
 
     private String inviaPost(String path, String body) {
-        HttpRequest richiesta = HttpRequest.newBuilder(URI.create(indirizzo(path)))
+        HttpRequest richiesta = HttpRequest.newBuilder(URI.create(indirizzoApi + path))
                 .header("Content-Type", "application/json")
                 .POST(body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body))
                 .build();
         return esegui(richiesta, true);
-    }
-
-    private String indirizzo(String path) {
-        return "http://localhost:" + httpPort + path;
     }
 
     /**

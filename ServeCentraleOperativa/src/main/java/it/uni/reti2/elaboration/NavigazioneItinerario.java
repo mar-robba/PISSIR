@@ -3,8 +3,6 @@ package it.uni.reti2.elaboration;
 import it.uni.reti2.entity.ItinerarioTratta;
 import it.uni.reti2.entity.Tratta;
 import it.uni.reti2.persistence.RailwayRepository;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 import java.util.List;
 
@@ -23,14 +21,12 @@ import java.util.List;
  * scambiare i ruoli di stazione di partenza e di arrivo. E' l'unica sottigliezza di
  * questa classe, ed e' il motivo per cui vale la pena averla.</p>
  *
- * <p>Tutti i metodi leggono dal database, quindi <b>vanno chiamati dentro una
- * transazione gia' aperta</b>: senza non c'e' nessuna sessione JPA attiva.</p>
+ * <p>Tutti i metodi leggono dal database: dentro una transazione usano la sua connessione,
+ * fuori ne aprono una apposta (vedi {@code Database}).</p>
  */
-@ApplicationScoped
 public class NavigazioneItinerario {
 
-    @Inject
-    RailwayRepository repository;
+    public RailwayRepository repository;
 
     /** Dati che servono alla cache in RAM dopo un passaggio in stazione. */
     public record Posizione(String prossimaStazione, Tratta trattaCorrente) {

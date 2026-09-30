@@ -1,6 +1,6 @@
 package it.uni.reti2.ingestion.payload;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonObject;
 import it.uni.reti2.entity.StatiCanonici;
 
 /**
@@ -26,7 +26,7 @@ public record TelemetriaMsg(
         String prossimaStazione,
         String direzione) {
 
-    public static TelemetriaMsg da(JsonNode root) {
+    public static TelemetriaMsg da(JsonObject root) {
         return new TelemetriaMsg(
                 Payload.testo(root, "trenoId", "N/A"),
                 StatiCanonici.trenoDalCampo(Payload.testo(root, "stato", "UNKNOWN")),

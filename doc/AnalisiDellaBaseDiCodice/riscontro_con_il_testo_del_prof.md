@@ -36,7 +36,7 @@ serve a rispondere alla domanda "che cosa chiede il prof che io non ho fatto".
 | 1.4 | il treno riceve guasti *o ritardi* dalla centrale | **fatto**: alert `RITARDO` con target il convoglio, pubblicato quando la misura cambia | `IngestionService.pubblicaRitardoSuMqtt`, `TrainGateway.riceviAlert` |
 | 1.5 | keepalive dei sensori verso la stazione | **fatto**: i due sensori di binario sono simulati come dispositivi a se`, battono da soli e si spengono dalla CLI | `SimulatoreSensori.java`, `MonitorSensori.java`, `ConsoleSensori.java` |
 | 1.6 | guasto a una particolare via della stazione | **fatto**: tipo `binario_guasto`, dichiarato da chi lo segnala | `StationIngestion./sensore/guasto`, `ConsoleSensori.java:150` |
-| 1.7 | il treno puo` entrare in stazione senza uscirvi (capolinea) | **fatto** il 24 agosto 2026: l'itinerario puo` marcare un estremo come capolinea, e chi ci arriva chiude la corsa | `Itinerario.capolineaId`, `TrainJourneyEngine.java:752` |
+| 1.7 | il treno puo` entrare in stazione senza uscirvi (capolinea) | **fatto** il 24 agosto 2026: l'itinerario puo` marcare un estremo come capolinea, e chi ci arriva chiude la corsa | `Itinerario.capolineaId`, `AutomaViaggio.fermataDiArrivo()` |
 | 1.8 | *"la stazione resta inutilizzabile per tutta la durata dell'intervento"* | **fatto** il 24 agosto 2026: l'alert `STATO_STAZIONE` dice ai convogli in che stato e` la stazione, e per loro MANUTENZIONE e GUASTA sono lo stesso blocco | `PubblicatoreAlert.pubblicaStatoStazione`, `TrainDB.stazioneImpercorribile` |
 | 2.1 | guasti alle linee (alle tratte fra due stazioni) | non esistono: la sorgente di un guasto e` solo una stazione o un treno | `Guasto.sorgenteTipo` |
 | — | resto della consegna (ingestion, caching locale, heartbeat stazione, T_fer/T_sil, guasto permanente, prossima stazione in entrambe le varianti, storico, ruoli tecnico/amministratore, REST+webapp, OAuth2, TLS) | coperto | — |
@@ -250,7 +250,7 @@ ritorno. Il capolinea viaggia verso il treno nella stessa risposta dell'itinerar
 
 Arrivandoci il convoglio pubblica l'ENTRATA — in quella stazione ci e` entrato davvero — e poi si
 ferma: stato `CAPOLINEA`, fase `FERMO_CAPOLINEA`, velocita` e passeggeri a zero, nessuna prossima
-fermata (`TrainJourneyEngine.java:752`). Quel transito resta aperto per sempre, ed e` esattamente il
+fermata (`AutomaViaggio.fermataDiArrivo()`). Quel transito resta aperto per sempre, ed e` esattamente il
 caso "entra senza uscire" che il PDF nomina. Lo stato nuovo e` stato aggiunto anche al CHECK di
 `Treni.stato` in Centrale (serve la migrazione `migrazione_capolinea.sql` su un database gia` in
 uso), le previsioni di arrivo saltano i convogli a fine corsa e la dashboard li mostra come servizio
@@ -258,9 +258,9 @@ concluso, non come guasto.
 
 Se ne esce solo assegnando al treno un itinerario diverso, oppure togliendo il capolinea da quello
 che ha: la modifica arriva via `ITINERARIO_AGGIORNATO` e il twin si riaggancia
-(`TrainJourneyEngine.java:365`). Un convoglio a fine corsa viene riagganciato **sempre**, anche se le
+(`GestoreEventi.suItinerarioCaricato()`, ramo `FERMO_CAPOLINEA`). Un convoglio a fine corsa viene riagganciato **sempre**, anche se le
 fermate non sono cambiate, perche' quella e` l'unica strada che ha per ripartire; se pero` il
-capolinea e` ancora la stazione in cui sta, resta fermo (`TrainJourneyEngine.java:491`), se no
+capolinea e` ancora la stazione in cui sta, resta fermo (`AutomaViaggio.fermataDiRiaggancio()`), se no
 bastava agganciare un altro treno alla tratta per farlo ripartire.
 
 Il caso opposto era gia` coperto: alla prima partenza viene pubblicata solo l'USCITA, senza ENTRATA
@@ -349,7 +349,7 @@ Due righe di quel documento sono superate dai fatti:
 
 - **RF02.5.2** (il convoglio ricomincia dal capolinea dopo la modifica dell'itinerario) e` stato
   implementato: il riaggancio nella posizione corrente sta in
-  `TrainJourneyEngine.java:329-455`.
+  `GestoreEventi.suItinerarioCaricato()` e `AutomaViaggio.fermataDiRiaggancio()`.
 - **RF02.1.1.2.3** (il convoglio avviato dopo l'allarme non sa che la stazione e` guasta) e` stato
   chiuso per davvero il 24 agosto: lo stato di ogni fermata arriva dentro l'itinerario che il treno
   scarica all'avvio (sezione 1.8). Restano anche le due reti di sicurezza che c'erano gia`: la

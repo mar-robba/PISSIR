@@ -1,31 +1,25 @@
 package it.uni.reti2;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
-import org.eclipse.microprofile.reactive.messaging.Incoming;
-import org.eclipse.microprofile.reactive.messaging.Message;
-import org.jboss.logging.Logger;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.CompletionStage;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Verifica che l'ID della stazione sia valido tramite messaggistica MQTT:
  * stesso pattern richiesta/risposta asincrona usato da TrainDatabaseValidator
  * per il treno (topic railway/station/{id}/validation e .../validation-response,
  * gestiti lato Centrale da ExistIdForEdgeStazione).
+ *
+ * <p>La risposta la riceve {@link #gestisciRispostaValidazione}, che il main registra presso
+ * ClientMqtt come destinatario di railway/station/+/validation-response.</p>
  */
-@ApplicationScoped
 public class StationDatabaseValidator {
 
-    private static final Logger LOG = Logger.getLogger(StationDatabaseValidator.class);
+    private static final Logger LOG = Logger.getLogger(StationDatabaseValidator.class.getName());
     private static final long RETRY_SECONDI = 15;
 
     /** Risultato della verifica dell'ID nel database centrale. */
@@ -38,16 +32,11 @@ public class StationDatabaseValidator {
         RIPROVA
     }
 
-    @Inject
+    /** Stato del nodo: l'id da verificare e il flag stazioneRiconosciuta. Assegnato dal main. */
     DBLocale dbLocale;
 
-    @Inject
-    ObjectMapper mapper;
-
-    // Emitter per l'invio della richiesta di verifica via MQTT
-    @Inject
-    @Channel("validation-request-out")
-    Emitter<String> validationEmitter;
+    /** Con che cosa si pubblica la richiesta di verifica. */
+    ClientMqtt clientMqtt;
 
     private Instant ultimoTentativo = Instant.EPOCH;
     private volatile EsitoVerifica esitoCorrente = EsitoVerifica.RIPROVA;
@@ -73,7 +62,7 @@ public class StationDatabaseValidator {
 
         String idStazione = dbLocale.stazioneId == null ? "" : dbLocale.stazioneId.trim();
         if (idStazione.isEmpty()) {
-            LOG.error("Impossibile verificare il processo: ID della stazione vuoto");
+            LOG.severe("Impossibile verificare il processo: ID della stazione vuoto");
             return EsitoVerifica.RIPROVA;
         }
 
@@ -83,48 +72,53 @@ public class StationDatabaseValidator {
         return EsitoVerifica.RIPROVA;
     }
 
+    /**
+     * Pubblica la domanda. Va direttamente al broker, a QoS 0 e senza passare dal
+     * LocalBuffer: non è un evento da consegnare per forza, se si perde il main la ripete
+     * fra {@value #RETRY_SECONDI} secondi.
+     */
     private void inviaRichiestaValidazione(String idStazione) {
         try {
-            ObjectNode payloadJson = mapper.createObjectNode();
-            payloadJson.put("stazioneId", idStazione);
+            JsonObject payloadJson = new JsonObject();
+            payloadJson.addProperty("stazioneId", idStazione);
 
-            validationEmitter.send(payloadJson.toString());
-            LOG.infof("📩 Richiesta di validazione inviata per la stazione: %s", idStazione);
+            clientMqtt.pubblica("railway/station/" + idStazione + "/validation", payloadJson.toString(), 0);
+            LOG.info(String.format("📩 Richiesta di validazione inviata per la stazione: %s", idStazione));
         } catch (Exception e) {
-            LOG.warnf("Errore durante l'invio della richiesta MQTT per ID '%s'; riprovo tra %ds: %s",
-                    idStazione, RETRY_SECONDI, e.getMessage());
+            LOG.warning(String.format("Errore durante l'invio della richiesta MQTT per ID '%s'; riprovo tra %ds: %s",
+                    idStazione, RETRY_SECONDI, e.getMessage()));
         }
     }
 
     /**
-     * Ascolta in modo asincrono la risposta dal server centrale sul canale di validation response.
+     * Ascolta in modo asincrono la risposta dal server centrale sul canale di validation
+     * response (gira sul thread di Paho).
+     *
+     * @param payload Il contenuto della risposta (JSON).
      */
-    @Incoming("validation-response-in")
-    public CompletionStage<Void> gestisciRispostaValidazione(Message<byte[]> messaggio) {
+    public void gestisciRispostaValidazione(String payload) {
         try {
-            String payload = new String(messaggio.getPayload());
-            JsonNode root = mapper.readTree(payload);
+            JsonObject root = JsonParser.parseString(payload).getAsJsonObject();
 
-            String stazioneIdRisposta = root.has("stazioneId") ? root.get("stazioneId").asText() : null;
+            String stazioneIdRisposta = CampiJson.testo(root, "stazioneId", null);
             String stazioneIdCorrente = dbLocale.stazioneId != null ? dbLocale.stazioneId.trim() : "";
 
-            // Verifica che la risposta appartenga a questa specifica stazione
+            // Verifica che la risposta appartenga a questa specifica stazione: il topic ha la
+            // wildcard, quindi arrivano anche le risposte destinate alle altre
             if (stazioneIdRisposta != null && stazioneIdRisposta.equals(stazioneIdCorrente)) {
-                boolean esiste = root.has("esisteNelDb") && root.get("esisteNelDb").asBoolean();
+                boolean esiste = CampiJson.booleano(root, "esisteNelDb", false);
 
                 if (esiste) {
                     dbLocale.stazioneRiconosciuta = true;
                     this.esitoCorrente = EsitoVerifica.VALIDATO;
-                    LOG.infof("🚉 Processo associato con successo alla chiave primaria del database: %s", stazioneIdRisposta);
+                    LOG.info(String.format("🚉 Processo associato con successo alla chiave primaria del database: %s", stazioneIdRisposta));
                 } else {
                     this.esitoCorrente = EsitoVerifica.ID_NON_PRESENTE;
-                    LOG.errorf("❌ L'ID '%s' non è presente nel database centrale: la stazione non è registrata.", stazioneIdRisposta);
+                    LOG.severe(String.format("❌ L'ID '%s' non è presente nel database centrale: la stazione non è registrata.", stazioneIdRisposta));
                 }
             }
-        } catch (JsonProcessingException e) {
-            LOG.error("Errore nel parsing del messaggio di risposta di validazione MQTT", e);
+        } catch (Exception e) {
+            LOG.log(Level.SEVERE, "Errore nel parsing del messaggio di risposta di validazione MQTT", e);
         }
-
-        return messaggio.ack();
     }
 }

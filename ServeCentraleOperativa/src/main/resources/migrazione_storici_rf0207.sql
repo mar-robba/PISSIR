@@ -8,6 +8,11 @@
 --
 -- Poi va riavviata la Centrale, perche' le entita' sono cambiate.
 --
+-- NOTA (30/09/2026): la Centrale non usa piu' Hibernate. All'avvio esegue schema.sql, che
+-- crea le tabelle che mancano ma NON aggiunge colonne a tabelle che esistono gia'. Il
+-- "PERCHE' SERVE" qui sotto racconta la situazione di quando il file e' nato; oggi vale a
+-- maggior ragione: su un database vecchio le colonne nuove le aggiunge solo questo file.
+--
 -- PERCHE' SERVE: la Centrale gira con quarkus.hibernate-orm.database.generation=update.
 -- In quella modalita' Hibernate AGGIUNGE da solo le colonne e le tabelle nuove, ma non
 -- toglie mai un vincolo gia' esistente e non rinomina niente. Le chiavi esterne degli

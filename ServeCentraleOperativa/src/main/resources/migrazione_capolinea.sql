@@ -8,6 +8,11 @@
 --
 -- Poi va riavviata la Centrale, perche' le entita' sono cambiate.
 --
+-- NOTA (30/09/2026): la Centrale non usa piu' Hibernate. All'avvio esegue schema.sql, che
+-- crea le tabelle che mancano ma NON aggiunge colonne a tabelle che esistono gia'. Il
+-- "PERCHE' SERVE" qui sotto racconta la situazione di quando il file e' nato; oggi vale a
+-- maggior ragione: su un database vecchio le colonne nuove le aggiunge solo questo file.
+--
 -- PERCHE' SERVE: la colonna nuova (Itinerari.capolinea) la aggiunge da sola Hibernate,
 -- che gira con quarkus.hibernate-orm.database.generation=update. Il vincolo CHECK sulla
 -- colonna Treni.stato no: in quella modalita' Hibernate non tocca mai un vincolo gia'

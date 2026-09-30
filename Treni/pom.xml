@@ -4,56 +4,59 @@
     <groupId>it.uni.reti2</groupId>
     <artifactId>treno</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <packaging>quarkus</packaging>
+    <packaging>jar</packaging>
 
+    <!--
+        Il nodo Treno non usa Quarkus: e' un programma Java normale, con un main che crea gli
+        oggetti e li collega a mano. Le librerie sono quelle del materiale del corso:
+        - Javalin per il server REST (piu' il suo plugin SSL per l'HTTPS sotto profilo tls);
+        - Eclipse Paho per MQTT;
+        - Gson per leggere e scrivere il JSON.
+        I log sono quelli del JDK (java.util.logging); slf4j-jdk14 serve solo a far finire li'
+        anche i log di Javalin e di Jetty, che scrivono su SLF4J.
+    -->
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-        <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus.platform.version>3.37.3</quarkus.platform.version>
-        <skipITs>true</skipITs>
+        <javalin.version>6.7.0</javalin.version>
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>${quarkus.platform.group-id}</groupId>
-                <artifactId>${quarkus.platform.artifact-id}</artifactId>
-                <version>${quarkus.platform.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
+        <!-- Server REST: gli endpoint /treno/... -->
         <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-messaging-mqtt</artifactId>
+            <groupId>io.javalin</groupId>
+            <artifactId>javalin</artifactId>
+            <version>${javalin.version}</version>
         </dependency>
+        <!-- HTTPS del server REST sotto profilo tls (certificato e chiave in formato PEM) -->
         <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-jackson</artifactId>
+            <groupId>io.javalin.community.ssl</groupId>
+            <artifactId>ssl-plugin</artifactId>
+            <version>${javalin.version}</version>
         </dependency>
+        <!-- Client MQTT verso il broker Mosquitto -->
         <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-arc</artifactId>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+            <version>1.2.5</version>
         </dependency>
+        <!-- JSON: alert in ingresso, itinerario della Centrale, risposte REST -->
         <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-scheduler</artifactId>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.14.0</version>
         </dependency>
-        
+        <!-- I log di Javalin/Jetty (SLF4J) finiscono in java.util.logging insieme ai nostri -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>2.0.17</version>
+        </dependency>
+
         <!-- Test dependencies -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5</artifactId>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -63,13 +66,9 @@
     </dependencies>
 
     <build>
+        <!-- target/treno.jar: si lancia con java -jar target/treno.jar <ID_TRENO> -->
+        <finalName>treno</finalName>
         <plugins>
-            <plugin>
-                <groupId>${quarkus.platform.group-id}</groupId>
-                <artifactId>quarkus-maven-plugin</artifactId>
-                <version>${quarkus.platform.version}</version>
-                <extensions>true</extensions>
-            </plugin>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
@@ -77,29 +76,47 @@
                     <parameters>true</parameters>
                 </configuration>
             </plugin>
-            <!-- Plugin per creare JAR eseguibile -->
+            <!--
+                JAR eseguibile con dentro tutte le librerie (un solo file da lanciare, come il
+                quarkus-run.jar di prima). Il ServicesResourceTransformer unisce i file
+                META-INF/services delle librerie invece di tenerne uno a caso: e' da li' che
+                SLF4J e Jetty trovano le loro implementazioni.
+            -->
             <plugin>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.3.0</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>it.uni.reti2.main</mainClass>
-                            <addClasspath>true</addClasspath>
-                        </manifest>
-                    </archive>
-                </configuration>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>it.uni.reti2.main</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <!-- le firme dei jar originali non valgono piu' dentro il jar unico -->
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
-                <configuration>
-                    <argLine>@{argLine}</argLine>
-                    <systemPropertyVariables>
-                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                        <maven.home>${maven.home}</maven.home>
-                    </systemPropertyVariables>
-                </configuration>
             </plugin>
         </plugins>
     </build>

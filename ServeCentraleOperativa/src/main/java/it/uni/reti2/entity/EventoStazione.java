@@ -1,12 +1,9 @@
 package it.uni.reti2.entity;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntity;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
 /**
- * Entità JPA per la persistenza degli eventi relativi alle stazioni ferroviarie.
+ * Una riga della tabella {@code eventi_stazioni}: un evento relativo a una stazione.
  *
  * <p>Questa tabella funge da <strong>audit log</strong>: ogni riga rappresenta un cambio
  * di stato o un'azione significativa che ha coinvolto una stazione (es. guasto rilevato,
@@ -14,14 +11,13 @@ import java.time.LocalDateTime;
  * {@code Storico_Stato_Stazioni} e {@code Storico_Guasti} perché cattura eventi
  * di livello più granulare e libero nel formato.</p>
  *
- * <p>Estende {@link PanacheEntity} che fornisce un ID auto-generato di tipo {@code Long}
- * e le operazioni CRUD out-of-the-box (Active Record pattern di Panache).</p>
+ * <p>L'id è un numero che il repository prende dalla sequenza {@code eventi_stazioni_seq},
+ * la stessa che usava Hibernate quando le righe le scriveva lui: quelle già presenti hanno
+ * numeri più bassi, quindi le nuove non si scontrano.</p>
  *
  * @see it.uni.reti2.entity.StoricoStatoStazione
  */
-@Entity
-@Table(name = "eventi_stazioni")
-public class EventoStazione extends PanacheEntity {
+public class EventoStazione {
 
     /**
      * Identificativo della stazione coinvolta dall'evento (riferimento logico, non

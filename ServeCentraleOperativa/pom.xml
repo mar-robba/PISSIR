@@ -5,96 +5,97 @@
     <groupId>it.uni.reti2</groupId>
     <artifactId>serve-centrale-operativa</artifactId>
     <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
 
+    <!--
+        La Centrale Operativa non usa Quarkus: e' un programma Java normale, con un main che crea
+        gli oggetti e li collega a mano, come il nodo Treno. Le librerie sono quelle del materiale
+        del corso:
+        - Javalin per le API REST e la WebSocket verso la web app (piu' il plugin SSL per l'HTTPS
+          sotto profilo tls);
+        - javalin-pac4j + pac4j-jwt per verificare i token di Keycloak (OAuth 2.0);
+        - Eclipse Paho per MQTT;
+        - Gson per il JSON;
+        - JDBC per il database, con il driver di PostgreSQL (H2 solo nei test).
+        I log sono quelli del JDK (java.util.logging); slf4j-jdk14 serve a far finire li' anche
+        quelli di Javalin, Jetty e pac4j, che scrivono su SLF4J.
+    -->
     <properties>
+        <!--
+            source/target e non release: il JDK 25 installato non ha ct.sym (il file che serve all'opzione
+            release di javac), e il compilatore gira dentro Maven usando il modulo jdk.compiler.
+        -->
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-        <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus.platform.version>3.37.3</quarkus.platform.version>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <javalin.version>6.7.0</javalin.version>
+        <!--
+            javalin-pac4j 7.0.0 e' l'ultima versione per Jetty 11: la 8 vuole Javalin 7. Con
+            Javalin 6 funziona perche' usa solo Context, Handler e JavalinServletContext.getTasks(),
+            che fra la 5 e la 6 non sono cambiati. pac4j resta sulla stessa versione della 7.0.0.
+        -->
+        <pac4j.version>6.0.4.1</pac4j.version>
+        <surefire-plugin.version>3.5.6</surefire-plugin.version>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>${quarkus.platform.group-id}</groupId>
-                <artifactId>${quarkus.platform.artifact-id}</artifactId>
-                <version>${quarkus.platform.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
-        <!-- Quarkus Core & Web -->
+        <!-- API REST /api/... e WebSocket /ws/realtime -->
         <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest</artifactId>
+            <groupId>io.javalin</groupId>
+            <artifactId>javalin</artifactId>
+            <version>${javalin.version}</version>
         </dependency>
+        <!-- HTTPS sotto profilo tls (certificato e chiave in formato PEM) -->
         <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-jackson</artifactId>
+            <groupId>io.javalin.community.ssl</groupId>
+            <artifactId>ssl-plugin</artifactId>
+            <version>${javalin.version}</version>
+        </dependency>
+        <!-- OAuth 2.0: il token Bearer di Keycloak si verifica con pac4j dentro Javalin -->
+        <dependency>
+            <groupId>org.pac4j</groupId>
+            <artifactId>javalin-pac4j</artifactId>
+            <version>7.0.0</version>
+        </dependency>
+        <!-- DirectBearerAuthClient: prende il token dall'header Authorization -->
+        <dependency>
+            <groupId>org.pac4j</groupId>
+            <artifactId>pac4j-http</artifactId>
+            <version>${pac4j.version}</version>
+        </dependency>
+        <!-- JwtAuthenticator: controlla firma e scadenza del token con le chiavi del realm -->
+        <dependency>
+            <groupId>org.pac4j</groupId>
+            <artifactId>pac4j-jwt</artifactId>
+            <version>${pac4j.version}</version>
+        </dependency>
+        <!-- Client MQTT verso il broker Mosquitto -->
+        <dependency>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+            <version>1.2.5</version>
+        </dependency>
+        <!-- JSON: payload MQTT, corpi REST, eventi WebSocket -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.14.0</version>
+        </dependency>
+        <!-- Driver JDBC del database della Centrale -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.13</version>
+        </dependency>
+        <!-- I log di Javalin/Jetty/pac4j (SLF4J) finiscono in java.util.logging insieme ai nostri -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>2.0.17</version>
         </dependency>
 
-        <!-- Quarkus MQTT (SmallRye Reactive Messaging) -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-messaging-mqtt</artifactId>
-        </dependency>
-
-        <!--
-            OIDC: e' l'estensione che valida i token JWT firmati da Keycloak.
-            Sostituisce il vecchio login fatto in casa (AuthController + SessioniAttive):
-            la Centrale non conosce piu' nessuna password, controlla solo la firma
-            del token e ne legge i ruoli.
-        -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-oidc</artifactId>
-        </dependency>
-
-        <!-- Quarkus Hibernate ORM & Panache (PostgreSQL) -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-hibernate-orm-panache</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-jdbc-postgresql</artifactId>
-        </dependency>
-
-        <!-- WebSockets and Scheduler -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-websockets</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-scheduler</artifactId>
-        </dependency>
-        
-        <!-- Test dependencies -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <!--
-            Database dei test: H2 in memoria, nato e distrutto insieme alla singola
-            esecuzione. Prima non c'era nessun override e i test usavano lo stesso
-            jdbc:postgresql://localhost:5432/railway dell'esecuzione normale, quindi
-            creavano stazioni, tratte e treni di prova nel database di lavoro (e ce li
-            lasciavano se un test in mezzo falliva prima della pulizia). In piu' senza
-            Postgres acceso "./mvnw test" non partiva nemmeno, il che rendeva vano il
-            motivo per cui i test erano stati scritti senza Keycloak.
-        -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-jdbc-h2</artifactId>
-            <scope>test</scope>
-        </dependency>
+        <!-- Test: JUnit, e H2 in memoria al posto di PostgreSQL -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -102,57 +103,65 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.rest-assured</groupId>
-            <artifactId>rest-assured</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <!--
-            Permette di simulare un utente autenticato nei test (@TestSecurity) senza
-            dover tenere acceso Keycloak mentre girano i test.
-        -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-test-security</artifactId>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>2.3.232</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
+        <!-- target/centrale.jar: si lancia con java -jar target/centrale.jar -->
+        <finalName>centrale</finalName>
         <plugins>
-            <!-- Quarkus Maven Plugin -->
             <plugin>
-                <groupId>io.quarkus</groupId>
-                <artifactId>quarkus-maven-plugin</artifactId>
-                <version>${quarkus.platform.version}</version>
-                <extensions>true</extensions>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>build</goal>
-                            <goal>generate-code</goal>
-                            <goal>generate-code-tests</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <!-- Maven Compiler Plugin -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                    <source>25</source>
-                    <target>25</target>
+                    <parameters>true</parameters>
                 </configuration>
             </plugin>
-            <!-- Surefire plugin for running JUnit 5 tests -->
+            <!--
+                JAR eseguibile con dentro tutte le librerie (un solo file da lanciare, come il
+                quarkus-run.jar di prima). Il ServicesResourceTransformer unisce i file
+                META-INF/services delle librerie invece di tenerne uno a caso: e' da li' che
+                SLF4J, Jetty e il driver JDBC trovano le loro implementazioni.
+            -->
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>it.uni.reti2.main</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <!-- le firme dei jar originali non valgono piu' dentro il jar unico -->
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.1.2</version>
-                <configuration>
-                    <useModulePath>false</useModulePath>
-                </configuration>
+                <version>${surefire-plugin.version}</version>
             </plugin>
         </plugins>
     </build>

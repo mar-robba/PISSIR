@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * arrivare ed e' aggiornata. Comporre le due cose alla lettera produceva corse fra
  * stazioni che nessun binario collega (Milano - Berlino).</p>
  *
- * <p>Nessun {@code @QuarkusTest}: la classe sotto esame e' fatta di sole funzioni pure
- * sui campi gia' presenti in cache, quindi non serve avviare il contesto.</p>
+ * <p>Non serve accendere la Centrale: la classe sotto esame e' fatta di sole funzioni pure
+ * sui campi gia' presenti in cache.</p>
  */
 class PosizioneConvoglioTest {
 

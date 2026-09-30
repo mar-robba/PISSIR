@@ -1,20 +1,16 @@
 package it.uni.reti2.ingestion;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import it.uni.reti2.entity.Guasto;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.ingestion.payload.AlertMsg;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
-import org.eclipse.microprofile.reactive.messaging.Message;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 /**
  * Prova il formato dei messaggi che la Centrale pubblica sul topic condiviso
@@ -26,8 +22,8 @@ import java.util.concurrent.CompletionStage;
  * qui cambia un nome, a bordo il ritardo resta a zero senza che nessuno se ne accorga,
  * perche' un alert non riconosciuto viene semplicemente ignorato.</p>
  *
- * <p>Non e' un @QuarkusTest: il pubblicatore viene costruito a mano con un emitter finto,
- * cosi' il test non pubblica niente sul broker vero. Prima per arrivare a questi tre
+ * <p>Non serve accendere la Centrale: il pubblicatore viene costruito a mano con una coda
+ * finta, cosi' il test non pubblica niente sul broker vero. Prima per arrivare a questi tre
  * metodi bisognava istanziare l'intero servizio di ingestione.</p>
  */
 public class AlertRitardoTest {
@@ -39,8 +35,7 @@ public class AlertRitardoTest {
     public void preparaLaCentrale() {
         pubblicati = new ArrayList<>();
         pubblicatore = new PubblicatoreAlert();
-        pubblicatore.mapper = new ObjectMapper();
-        pubblicatore.alertsEmitter = new EmitterFinto(pubblicati);
+        pubblicatore.coda = new CodaFinta(pubblicati);
     }
 
     /** L'alert dell'ingresso in ritardo porta target, minuti, variazione e causa "in linea". */
@@ -53,16 +48,16 @@ public class AlertRitardoTest {
         pubblicatore.pubblicaRitardo(treno, "S2", 4, true);
 
         Assertions.assertEquals(1, pubblicati.size(), "doveva partire un alert solo");
-        JsonNode alert = new ObjectMapper().readTree(pubblicati.get(0));
-        Assertions.assertEquals("RITARDO", alert.path("tipoEvento").asText());
-        Assertions.assertEquals("TRN001", alert.path("target").asText(), "il destinatario e' il convoglio");
-        Assertions.assertEquals("S2", alert.path("sorgenteId").asText(), "la misura e' del passaggio a S2");
-        Assertions.assertEquals(7, alert.path("ritardoMinuti").asInt());
-        Assertions.assertEquals(4, alert.path("variazioneMinuti").asInt());
-        Assertions.assertEquals(PubblicatoreAlert.CAUSA_RITARDO_IN_LINEA, alert.path("causa").asText());
-        Assertions.assertEquals("WARNING", alert.path("severita").asText());
+        JsonObject alert = JsonParser.parseString(pubblicati.get(0)).getAsJsonObject();
+        Assertions.assertEquals("RITARDO", alert.get("tipoEvento").getAsString());
+        Assertions.assertEquals("TRN001", alert.get("target").getAsString(), "il destinatario e' il convoglio");
+        Assertions.assertEquals("S2", alert.get("sorgenteId").getAsString(), "la misura e' del passaggio a S2");
+        Assertions.assertEquals(7, alert.get("ritardoMinuti").getAsInt());
+        Assertions.assertEquals(4, alert.get("variazioneMinuti").getAsInt());
+        Assertions.assertEquals(PubblicatoreAlert.CAUSA_RITARDO_IN_LINEA, alert.get("causa").getAsString());
+        Assertions.assertEquals("WARNING", alert.get("severita").getAsString());
         // Senza il marcatore la Centrale si riascolterebbe da sola sul topic condiviso.
-        Assertions.assertEquals(AlertMsg.ORIGINE_CENTRALE, alert.path("origine").asText());
+        Assertions.assertEquals(AlertMsg.ORIGINE_CENTRALE, alert.get("origine").getAsString());
     }
 
     /** L'uscita tardiva dichiara l'altra causa: il tempo perso fermi in banchina. */
@@ -74,8 +69,8 @@ public class AlertRitardoTest {
 
         pubblicatore.pubblicaRitardo(treno, "S2", 12, false);
 
-        JsonNode alert = new ObjectMapper().readTree(pubblicati.get(0));
-        Assertions.assertEquals(PubblicatoreAlert.CAUSA_SOSTA_PROLUNGATA, alert.path("causa").asText());
+        JsonObject alert = JsonParser.parseString(pubblicati.get(0)).getAsJsonObject();
+        Assertions.assertEquals(PubblicatoreAlert.CAUSA_SOSTA_PROLUNGATA, alert.get("causa").getAsString());
     }
 
     /** Un convoglio tornato in orario non e' un allarme: la severita' scende a INFO. */
@@ -87,10 +82,10 @@ public class AlertRitardoTest {
 
         pubblicatore.pubblicaRitardo(treno, "S3", -5, true);
 
-        JsonNode alert = new ObjectMapper().readTree(pubblicati.get(0));
-        Assertions.assertEquals("INFO", alert.path("severita").asText());
-        Assertions.assertEquals(0, alert.path("ritardoMinuti").asInt());
-        Assertions.assertEquals(-5, alert.path("variazioneMinuti").asInt());
+        JsonObject alert = JsonParser.parseString(pubblicati.get(0)).getAsJsonObject();
+        Assertions.assertEquals("INFO", alert.get("severita").getAsString());
+        Assertions.assertEquals(0, alert.get("ritardoMinuti").getAsInt());
+        Assertions.assertEquals(-5, alert.get("variazioneMinuti").getAsInt());
     }
 
     /**
@@ -111,49 +106,25 @@ public class AlertRitardoTest {
 
         pubblicatore.pubblicaRisoluzione(guasto);
 
-        JsonNode alert = new ObjectMapper().readTree(pubblicati.get(0));
-        Assertions.assertEquals("RESOLVED", alert.path("tipoEvento").asText());
-        Assertions.assertEquals(AlertMsg.ORIGINE_CENTRALE, alert.path("origine").asText(),
+        JsonObject alert = JsonParser.parseString(pubblicati.get(0)).getAsJsonObject();
+        Assertions.assertEquals("RESOLVED", alert.get("tipoEvento").getAsString());
+        Assertions.assertEquals(AlertMsg.ORIGINE_CENTRALE, alert.get("origine").getAsString(),
                 "senza il marcatore la Centrale si riascolta da sola");
-        Assertions.assertEquals("S2", alert.path("sorgenteId").asText());
-        Assertions.assertEquals("alert-1", alert.path("guastoId").asText());
+        Assertions.assertEquals("S2", alert.get("sorgenteId").getAsString());
+        Assertions.assertEquals("alert-1", alert.get("guastoId").getAsString());
     }
 
-    /** Emitter che invece di pubblicare sul broker tiene da parte i payload. */
-    private static final class EmitterFinto implements Emitter<String> {
+    /** Coda che invece di pubblicare sul broker tiene da parte i payload. */
+    private static final class CodaFinta extends CodaPubblicazioni {
         private final List<String> raccolti;
 
-        private EmitterFinto(List<String> raccolti) {
+        private CodaFinta(List<String> raccolti) {
             this.raccolti = raccolti;
         }
 
         @Override
-        public CompletionStage<Void> send(String msg) {
-            raccolti.add(msg);
-            return CompletableFuture.completedFuture(null);
-        }
-
-        @Override
-        public <M extends Message<? extends String>> void send(M msg) {
-            raccolti.add(msg.getPayload());
-        }
-
-        @Override
-        public void complete() {
-        }
-
-        @Override
-        public void error(Exception e) {
-        }
-
-        @Override
-        public boolean isCancelled() {
-            return false;
-        }
-
-        @Override
-        public boolean hasRequests() {
-            return true;
+        public void metti(String topic, String payload, int qos) {
+            raccolti.add(payload);
         }
     }
 }

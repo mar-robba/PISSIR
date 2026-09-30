@@ -1,13 +1,11 @@
 package it.uni.reti2.entity;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
-import jakarta.persistence.*;
 import java.time.Instant;
 
 /**
- * Entità JPA per lo <strong>storico degli stati dei treni</strong>.
+ * Una riga dello <strong>storico degli stati dei treni</strong>.
  *
- * <p>Mappa la tabella {@code Storico_Stato_Treni}. Ogni record cattura
+ * <p>Corrisponde alla tabella {@code Storico_Stato_Treni}. Ogni record cattura
  * lo stato operativo di un convoglio in un dato istante: stato (attivo, fermo, rotto, ecc.),
  * itinerario corrente e posizione attuale lungo la tratta.</p>
  *
@@ -21,47 +19,35 @@ import java.time.Instant;
  * quel convoglio viene eliminato dalla flotta.</p>
  *
  * @see it.uni.reti2.entity.Treno
- * @see it.uni.reti2.elaboration.MonitoraggioTreni#registraTelemetria
+ * @see it.uni.reti2.elaboration.GestoreEventi
  */
-@Entity
-@Table(name = "Storico_Stato_Treni")
-public class StoricoStatoTreno extends PanacheEntityBase {
+public class StoricoStatoTreno {
 
     /** Chiave primaria auto-incrementale. */
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_storico_treno")
     public Long id;
 
     /**
      * Identificativo del convoglio di cui si sta storicizzando lo stato (riferimento
      * logico). È anche il nome del convoglio, quindi non serve una colonna in più.
      */
-    @Column(name = "id_convoglio", nullable = false, length = 50)
     public String trenoId;
 
     /** Stato del treno al momento della storicizzazione (es. "attivo", "fermo", "rotto"). */
-    @Column(name = "stato", nullable = false, length = 30)
     public String stato;
 
     /** Stato da cui il convoglio proviene (null alla prima riga scritta per quel treno). */
-    @Column(name = "stato_precedente", length = 30)
     public String statoPrecedente;
 
     /** ID dell'itinerario corrente (denormalizzato per query storiche rapide). */
-    @Column(name = "itinerario", length = 50)
     public String itinerarioId;
 
     /** ID della tratta o stazione in cui si trovava il treno (denormalizzato). */
-    @Column(name = "PosizioneAttualeTrattaOStazione", length = 50)
     public String posizioneId;
 
     /** Descrizione leggibile della posizione ("Milano Centrale -> Bologna Centrale"). */
-    @Column(name = "descrizione_posizione", length = 255)
     public String descrizionePosizione;
 
     /** Timestamp di inserimento del record nello storico. */
-    @Column(name = "ts_storicizzazione", nullable = false)
     public Instant tsStoricizzazione = Instant.now();
 
     /**

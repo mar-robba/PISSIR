@@ -1,9 +1,6 @@
 package it.uni.reti2;
 
-import jakarta.inject.Inject;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import io.javalin.http.Context;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,67 +12,65 @@ import java.util.Map;
  * Tramite queste API, altri sistemi (es. il portale di manutenzione locale a bordo, 
  * i sistemi di diagnostica, o la Centrale Operativa se accessibile direttamente via HTTP) 
  * possono interrogare o comandare le funzionalità del treno.
+ *
+ * <p>Ogni metodo è un gestore di Javalin: riceve il Context della richiesta (da cui si
+ * legge il corpo) e ci scrive la risposta. Quale indirizzo porta a quale metodo lo dice la
+ * tabella delle rotte in ServerRest.</p>
  */
-
-@Path("/treno")
-@Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
 public class TrainIngestion {
 
-    /**
-     * 
-     * come avvengono davvero le ingnezioni è grande mistero 
-     */
-    @Inject
+    /** Stato del treno: assegnato dal main, come gli altri campi qui sotto. */
     TrainDB trainDB;
 
     /**
-     * Riferimento al Gateway per l'invio reattivo di messaggi ed eventi asincroni (guasti, passaggi).
+     * Il gestore degli eventi del treno: il guasto segnalato dal sensore di bordo diventa
+     * un evento per lui, come gli alert del gateway.
      */
-    @Inject
-    TrainGateway trainGateway;
+    GestoreEventi gestore;
+
+    /**
+     * Pubblica i passaggi in stazione verso i sensori di binario, gli stessi che manda il
+     * gestore degli eventi quando il treno parte o arriva.
+     */
+    PubblicatorePassaggi pubblicatorePassaggi;
 
     /**
      * Endpoint per ottenere le informazioni generali e operative in tempo reale.
-     * @return Una Response contenente un oggetto JSON con id, stato, coordinate e velocità.
+     * Risponde con un oggetto JSON con id, stato, coordinate e velocità.
      */
-    @GET
-    @Path("/info")
-    public Response info() {
-        return Response.ok(Map.of(
+    public void info(Context ctx) {
+        ctx.json(Map.of(
             "trenoId", trainDB.trenoId,
-            "stato", trainDB.stato,
+            "stato", trainDB.stato(),
             "latitudine", trainDB.latitudine,
             "longitudine", trainDB.longitudine,
             "velocita", trainDB.velocita
-        )).build();
+        ));
     }
 
     /**
      * Alias dell'endpoint '/info' orientato specificamente per interrogare lo stato.
-     * @return Informazioni simili all'endpoint '/info'.
+     * Risponde come l'endpoint '/info'.
      */
-    @GET
-    @Path("/stato")
-    public Response getStato() {
-        return info(); // Riutilizza la logica di info() per coerenza
+    public void getStato(Context ctx) {
+        info(ctx); // Riutilizza la logica di info() per coerenza
     }
 
     /**
      * Endpoint per interrogare lo stato completo del digital twin del viaggio:
-     * fase della macchina a stati, direzione, indice della stazione, progresso
-     * sulla tratta, passeggeri e itinerario caricato. Il ritardo compare, ma non e'
-     * un conto fatto qui: e' l'ultimo valore che la Centrale ha comunicato al
-     * convoglio con l'alert RITARDO, con la stazione e l'ora della misura.
-     * @return Response con la fotografia completa del viaggio simulato.
+     * lo stato dichiarato alla Centrale, la condizione e la fase dei due automi da cui
+     * si calcola, direzione, indice della stazione, progresso sulla tratta, passeggeri e
+     * itinerario caricato. Il ritardo compare, ma non e' un conto fatto qui: e' l'ultimo
+     * valore che la Centrale ha comunicato al convoglio con l'alert RITARDO, con la
+     * stazione e l'ora della misura.
+     * Risponde con la fotografia completa del viaggio simulato.
      */
-    @GET
-    @Path("/viaggio")
-    public Response getViaggio() {
+    public void getViaggio(Context ctx) {
         // LinkedHashMap perché Map.of non accetta valori null e non mantiene l'ordine
         Map<String, Object> viaggio = new LinkedHashMap<>();
         viaggio.put("trenoId", trainDB.trenoId);
-        viaggio.put("stato", trainDB.stato);
+        viaggio.put("stato", trainDB.stato());
+        viaggio.put("condizione", trainDB.condizione);
         viaggio.put("faseViaggio", trainDB.faseViaggio);
         viaggio.put("direzione", trainDB.direzione);
         viaggio.put("indiceStazione", trainDB.indiceStazione);
@@ -94,25 +89,23 @@ public class TrainIngestion {
         viaggio.put("latitudine", trainDB.latitudine);
         viaggio.put("longitudine", trainDB.longitudine);
         viaggio.put("velocita", trainDB.velocita);
-        return Response.ok(viaggio).build();
+        ctx.json(viaggio);
     }
 
     /**
      * Endpoint per recuperare i dettagli della tratta in cui si trova attualmente il treno.
      * Utile per i display informativi ai passeggeri (PIS - Passenger Information System).
-     * @return Response con l'elenco delle stazioni e le informazioni di transito.
+     * Risponde con l'elenco delle stazioni e le informazioni di transito.
      */
-    @GET
-    @Path("/tratta")
-    public Response getTratta() {
-        return Response.ok(Map.of(
+    public void getTratta(Context ctx) {
+        ctx.json(Map.of(
             "stazioniTratta", trainDB.stazioniTratta,
             "stazioneCorrente", trainDB.stazioneCorrente != null ? trainDB.stazioneCorrente : "",
             "prossimaStazione", trainDB.prossimaStazione != null ? trainDB.prossimaStazione : "",
             // Il ritardo comunicato dalla Centrale: su un display di bordo e' l'unica
             // informazione che i passeggeri guardano davvero.
             "ritardoMinuti", trainDB.ritardoMinuti
-        )).build();
+        ));
     }
 
     /**
@@ -120,12 +113,11 @@ public class TrainIngestion {
      * Viene chiamato quando il convoglio riceve un aggiornamento sull'itinerario, 
      * ad esempio in seguito ad una riprogrammazione del traffico da parte della Centrale.
      *
-     * @param body Payload JSON contenente eventualmente le liste "stazioni" e la stringa "prossimaStazione".
-     * @return Lo stato aggiornato della tratta chiamando getTratta().
+     * Il corpo JSON contiene eventualmente la lista "stazioni" e la stringa "prossimaStazione".
+     * Risponde con lo stato aggiornato della tratta chiamando getTratta().
      */
-    @POST
-    @Path("/tratta")
-    public Response setTratta(Map<String, Object> body) {
+    public void setTratta(Context ctx) {
+        Map<String, Object> body = ctx.bodyAsClass(Map.class);
         if (body.containsKey("stazioni")) {
             // Unchecked cast. In un ambiente di produzione andrebbe validato attentamente
             trainDB.stazioniTratta = (List<String>) body.get("stazioni");
@@ -134,50 +126,52 @@ public class TrainIngestion {
             trainDB.prossimaStazione = (String) body.get("prossimaStazione");
         }
         // Restituisce l'output standard per confermare l'aggiornamento
-        return getTratta();
+        getTratta(ctx);
     }
 
     /**
      * Endpoint per forzare, magari tramite il computer di bordo, un evento di guasto rilevato
      * dai sensori diagnostici del treno (freni, motori, porte, ecc.).
      *
-     * @param body Mappa contenente la "descrizione" del guasto.
-     * @return Una Response di conferma invio e arresto treno.
+     * Il corpo JSON contiene la "descrizione" del guasto. Risponde con una conferma
+     * dell'invio e con lo stato in cui è finito il treno.
      */
-    @POST
-    @Path("/sensore/guasto")
-    public Response rilevaGuasto(Map<String, String> body) {
+    public void rilevaGuasto(Context ctx) {
+        Map<String, Object> body = ctx.bodyAsClass(Map.class);
         // Se non viene specificata una descrizione, usa un placeholder generico
-        String desc = body.getOrDefault("descrizione", "Guasto generico treno");
-        
-        // Delega al gateway l'invio asincrono in Centrale e l'arresto logico del treno
-        String severita = "CRITICAL";
-        trainGateway.inviaGuasto(desc, severita);
-        
-        return Response.ok(Map.of("success", true, "messaggio", "Guasto inviato. Treno in EMERGENZA.")).build();
+        String desc = (String) body.getOrDefault("descrizione", "Guasto generico treno");
+
+        // L'avaria diventa un evento: l'arresto del treno (EMERGENZA) e l'invio dell'alert
+        // alla Centrale li fa il gestore degli eventi
+        gestore.gestisci(EventoTreno.guastoDiBordo(desc));
+
+        // Di solito EMERGENZA; un treno gia' soppresso resta soppresso
+        ctx.json(Map.of("success", true, "messaggio", "Guasto inviato. Treno in " + trainDB.stato() + "."));
     }
 
     /**
-     * Endpoint per scatenare artificialmente o tramite rilevatori l'evento di entrata o uscita 
+     * Endpoint per scatenare artificialmente o tramite rilevatori l'evento di entrata o uscita
      * da una determinata stazione (passaggio ai segnali/boelis di stazione).
+     * Pubblica soltanto il messaggio per i sensori di binario: il viaggio simulato del
+     * treno non si sposta, perché la posizione la scrive solo il suo automa.
      *
-     * @param body Mappa JSON contenente "stazioneId" e "tipo" (ENTRATA/USCITA).
-     * @return Response HTTP di avvenuta operazione o Bad Request se parametri mancanti.
+     * Il corpo JSON contiene "stazioneId" e "tipo" (ENTRATA/USCITA). Risponde con la conferma
+     * dell'operazione, o con Bad Request se mancano dei parametri.
      */
-    @POST
-    @Path("/sensore/passaggio")
-    public Response rilevaPassaggio(Map<String, String> body) {
-        String stazioneId = body.get("stazioneId");
-        String tipo = body.get("tipo"); // ENTRATA o USCITA
+    public void rilevaPassaggio(Context ctx) {
+        Map<String, Object> body = ctx.bodyAsClass(Map.class);
+        String stazioneId = (String) body.get("stazioneId");
+        String tipo = (String) body.get("tipo"); // ENTRATA o USCITA
         
         // Validazione stringente dei parametri di ingresso
         if (stazioneId == null || tipo == null) {
-            return Response.status(400).entity("stazioneId e tipo sono obbligatori").build();
+            ctx.status(400).result("stazioneId e tipo sono obbligatori");
+            return;
         }
         
-        // Delega al gateway per inoltrare l'evento di passaggio alla Centrale
-        trainGateway.notificaPassaggioStazione(stazioneId, tipo);
+        // Delega al pubblicatore per inoltrare l'evento di passaggio ai sensori di binario
+        pubblicatorePassaggi.notificaPassaggioStazione(stazioneId, tipo);
         
-        return Response.ok(Map.of("success", true, "messaggio", "Notifica passaggio inviata")).build();
+        ctx.json(Map.of("success", true, "messaggio", "Notifica passaggio inviata"));
     }
 }

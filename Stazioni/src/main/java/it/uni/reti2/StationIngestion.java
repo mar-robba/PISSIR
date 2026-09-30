@@ -1,10 +1,10 @@
 package it.uni.reti2;
 
-import it.uni.reti2.DBLocale;
-import jakarta.inject.Inject;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
+import io.javalin.http.Context;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -15,101 +15,93 @@ import java.util.stream.Collectors;
 
 /**
  * Controller REST che espone le API del nodo Edge Stazione.
- * Queste interfacce permettono l'interrogazione dello stato locale e 
- * l'invocazione di eventi diagnostici / simulati, per esempio da parte 
+ * Queste interfacce permettono l'interrogazione dello stato locale e
+ * l'invocazione di eventi diagnostici / simulati, per esempio da parte
  * dei sensori RFID/boelis posizionati lungo i binari, o da terminali di manutenzione.
+ *
+ * <p>È un generatore di eventi: quello che dichiarano i sensori (un keepalive, un transito,
+ * un guasto) e le due leve della demo sul collegamento con la Centrale diventano un
+ * EventoStazione per GestoreEventi. Le GET invece leggono lo stato e basta.</p>
+ *
+ * <p>Ogni metodo è un gestore di Javalin: riceve il Context della richiesta (da cui si
+ * legge il corpo) e ci scrive la risposta. Quale indirizzo porta a quale metodo lo dice la
+ * tabella delle rotte in ServerRest.</p>
  */
-@Path("/stazione")
-@Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
 public class StationIngestion {
 
-    @Inject
+    /** Stato del nodo: assegnato dal main, come gli altri campi qui sotto. */
     DBLocale dbLocale;
 
-    @Inject
+    /** La coda verso la Centrale, per GET /buffer e GET /persistenza. */
     LocalBuffer localBuffer;
 
-    @Inject
-    StationGateway stationGateway;
-
-    @Inject
+    /** Il db locale, per GET /persistenza. */
     PersistenzaLocale persistenza;
 
-    /** Sorveglianza dei keepalive: è lui a tenere il conto dei battiti dei sensori. */
-    @Inject
-    MonitorSensori monitorSensori;
+    /** Dove vanno gli eventi dichiarati dai sensori. */
+    GestoreEventi gestore;
 
     /** I due sensori simulati del binario: si accendono e si spengono per le prove. */
-    @Inject
     SimulatoreSensori simulatoreSensori;
 
     /**
      * Recupera le informazioni operative della stazione.
-     *
-     * @return Response HTTP contenente stato e flag di connettività in formato JSON.
+     * Risponde con stato e flag di connettività in formato JSON.
      */
-    @GET
-    @Path("/info")
-    public Response info() {
-        return Response.ok(Map.of(
+    public void info(Context ctx) {
+        ctx.json(Map.of(
             "stazioneId", dbLocale.stazioneId,
             "stato", dbLocale.getStato(),
             "connessioneCentrale", dbLocale.connessioneCentrale
-        )).build();
+        ));
     }
 
     /**
      * Alias endpoint per convenienza operativa, identico a /info.
      */
-    @GET
-    @Path("/stato")
-    public Response getStato() {
-        return info();
+    public void getStato(Context ctx) {
+        info(ctx);
     }
 
     /**
      * Consente l'ispezione della coda locale per scopi di debugging.
-     * È utile per vedere quali eventi non sono ancora stati inviati in caso di offline.
-     *
-     * @return Response con dimensione e contenuto degli eventi in coda.
+     * È utile per vedere quali eventi non sono ancora stati consegnati alla Centrale:
+     * a collegamento attivo di solito è vuota, perché il consumatore la svuota subito.
+     * Risponde con dimensione e contenuto degli eventi in coda.
      */
-    @GET
-    @Path("/buffer")
-    public Response getBuffer() {
-        return Response.ok(Map.of(
+    public void getBuffer(Context ctx) {
+        ctx.json(Map.of(
             "dimensione", localBuffer.size(),
             "eventi", localBuffer.getBuffer()
-        )).build();
+        ));
     }
 
     /**
-     * Simula il segnale di un sensore di binario che rileva il transito di un convoglio.
+     * Il segnale di un sensore di binario che rileva il transito di un convoglio.
      * Può essere chiamato dai veri attuatori/sensori fisici per iniettare l'evento nel sistema.
-     *
-     * @param dati Payload contenente "trenoId" e il "tipo" di transito (ENTRATA o USCITA).
-     * @return Response HTTP sull'esito dell'operazione.
+     * Il corpo contiene "trenoId" e il "tipo" di transito (ENTRATA o USCITA).
      */
-    @POST
-    @Path("/sensore/treno")
-    public Response rilevaTransitoTreno(Map<String, String> dati) {
-        String trenoId = dati.get("trenoId");
-        String tipo = dati.get("tipo"); // ENTRATA o USCITA
-        
+    public void rilevaTransitoTreno(Context ctx) {
+        JsonObject dati = corpo(ctx);
+        String trenoId = CampiJson.testo(dati, "trenoId", null);
+        String tipo = CampiJson.testo(dati, "tipo", null); // ENTRATA o USCITA
+
         // Verifica dei campi mandatori
         if (trenoId == null || tipo == null) {
-            return Response.status(400).entity("trenoId e tipo sono obbligatori").build();
+            ctx.status(400).result("trenoId e tipo sono obbligatori");
+            return;
         }
 
         if (!"ENTRATA".equals(tipo) && !"USCITA".equals(tipo)) {
-            return Response.status(400).entity("tipo deve essere ENTRATA o USCITA").build();
+            ctx.status(400).result("tipo deve essere ENTRATA o USCITA");
+            return;
         }
 
         // Registrazione del transito: fotografia dei binari, notifica alla Centrale e,
         // se la stazione è guasta, alert che trattiene il convoglio appena entrato.
-        stationGateway.registraTransitoRilevato(trenoId, tipo);
+        gestore.gestisci(EventoStazione.transito(trenoId, tipo));
 
-        return Response.ok(Map.of("success", true, "messaggio", "Transito rilevato")).build();
+        ctx.json(Map.of("success", true, "messaggio", "Transito rilevato"));
     }
 
     /**
@@ -120,54 +112,43 @@ public class StationIngestion {
      * ({@code stazione_guasta}, il default se il campo manca) da un guasto di un singolo
      * binario/scambio ({@code binario_guasto}). Chi chiama sa che cosa si è rotto, quindi
      * lo dichiara qui invece di lasciare che la Centrale lo indovini: la classificazione
-     * finale comunque la valida la Centrale.</p>
-     *
-     * @param dati Mappa con "descrizione" (facoltativa) e "tipoGuasto" (facoltativo) del guasto.
-     * @return Conferma ricezione.
+     * finale comunque la valida la Centrale. L'altro campo facoltativo è "descrizione".</p>
      */
-    @POST
-    @Path("/sensore/guasto")
-    public Response rilevaGuasto(Map<String, String> dati) {
-        String descrizione = dati.getOrDefault("descrizione", "Guasto generico sensore");
-        String tipoGuasto = dati.get("tipoGuasto");
-        // Delega al gateway la notifica immediata alla Centrale Operativa
-        stationGateway.inviaGuasto(descrizione, "CRITICAL", tipoGuasto);
-        return Response.ok(Map.of("success", true, "messaggio", "Guasto inviato e stato aggiornato a GUASTA")).build();
+    public void rilevaGuasto(Context ctx) {
+        JsonObject dati = corpo(ctx);
+        String descrizione = CampiJson.testo(dati, "descrizione", "Guasto generico sensore");
+        String tipoGuasto = CampiJson.testo(dati, "tipoGuasto", null);
+        // Il gestore porta la stazione a GUASTA e accoda l'allarme per la Centrale Operativa
+        gestore.gestisci(EventoStazione.guastoRilevato(descrizione, tipoGuasto));
+        ctx.json(Map.of("success", true, "messaggio", "Guasto inviato e stato aggiornato a GUASTA"));
     }
 
     /**
-     * Riceve il segnale di keepalive periodico di un sensore di binario.
-     * Aggiorna la mappa locale sensore -> ultimo battito; se un sensore smette
-     * di chiamare questo endpoint verrà segnalato come guasto dal controllo periodico.
-     *
-     * @param dati Payload contenente "sensoreId".
-     * @return Conferma ricezione del battito.
+     * Riceve il segnale di keepalive periodico di un sensore di binario (corpo con
+     * "sensoreId"). Se un sensore smette di chiamare questo endpoint verrà segnalato come
+     * guasto dal giro di controllo periodico.
      */
-    @POST
-    @Path("/sensore/heartbeat")
-    public Response heartbeatSensore(Map<String, String> dati) {
-        String sensoreId = dati.get("sensoreId");
+    public void heartbeatSensore(Context ctx) {
+        JsonObject dati = corpo(ctx);
+        String sensoreId = CampiJson.testo(dati, "sensoreId", null);
 
         // Verifica del campo mandatorio
         if (sensoreId == null || sensoreId.isBlank()) {
-            return Response.status(400).entity("sensoreId è obbligatorio").build();
+            ctx.status(400).result("sensoreId è obbligatorio");
+            return;
         }
 
-        // Il battito lo prende in carico il monitor: aggiorna l'orologio del sensore e,
-        // se quel sensore era dato per fermo, fa tornare operativa la stazione.
-        monitorSensori.registraBattito(sensoreId);
-        return Response.ok(Map.of("success", true, "messaggio", "Keepalive registrato per " + sensoreId)).build();
+        // Il battito aggiorna l'orologio del sensore e, se quel sensore era dato per fermo,
+        // può far tornare operativa la stazione: lo decide il gestore.
+        gestore.gestisci(EventoStazione.battito(sensoreId));
+        ctx.json(Map.of("success", true, "messaggio", "Keepalive registrato per " + sensoreId));
     }
 
     /**
      * Elenco dei sensori di binario con il loro stato di salute visto dalla stazione.
      * È quello che la CLI stampa prima di chiedere su quale sensore intervenire.
-     *
-     * @return Response JSON con un elemento per sensore.
      */
-    @GET
-    @Path("/sensori")
-    public Response getSensori() {
+    public void getSensori(Context ctx) {
         List<Map<String, String>> elenco = new ArrayList<>();
         for (SensoreBinario sensore : simulatoreSensori.elenco()) {
             Instant ultimoBattito = dbLocale.sensoriUltimoBattito.get(sensore.getId());
@@ -187,90 +168,72 @@ public class StationIngestion {
         risposta.put("stato", dbLocale.getStato());
         risposta.put("guastoDaSensori", dbLocale.guastoDaSensori);
         risposta.put("sensori", elenco);
-        return Response.ok(risposta).build();
+        ctx.json(risposta);
     }
 
     /**
      * Spegne un sensore simulato: da qui in poi non manda più il keepalive e non rileva
      * più i treni (fail-stop del dispositivo). Serve alle prove: passato il timeout la
-     * stazione deve dichiararsi GUASTA da sola.
-     *
-     * @param sensoreId Id del sensore, anche solo "IN" o "OUT".
-     * @return Conferma dello spegnimento.
+     * stazione deve dichiararsi GUASTA da sola. L'id nel percorso può essere anche solo
+     * "IN" o "OUT".
      */
-    @POST
-    @Path("/sensori/{sensoreId}/stop")
-    public Response fermaSensore(@PathParam("sensoreId") String sensoreId) {
+    public void fermaSensore(Context ctx) {
+        String sensoreId = ctx.pathParam("sensoreId");
         if (!simulatoreSensori.ferma(sensoreId)) {
-            return Response.status(404).entity("Sensore non trovato: " + sensoreId).build();
+            ctx.status(404).result("Sensore non trovato: " + sensoreId);
+            return;
         }
-        return Response.ok(Map.of("success", true,
-                "messaggio", "Sensore " + sensoreId + " spento: smette di inviare l'heartbeat")).build();
+        ctx.json(Map.of("success", true,
+                "messaggio", "Sensore " + sensoreId + " spento: smette di inviare l'heartbeat"));
     }
 
     /**
      * Riaccende un sensore simulato: col primo keepalive che riparte la stazione torna
-     * operativa, sempre che non ci siano altri sensori muti.
-     *
-     * @param sensoreId Id del sensore, anche solo "IN" o "OUT".
-     * @return Conferma della riaccensione.
+     * operativa, sempre che non ci siano altri sensori muti o altri guasti aperti.
      */
-    @POST
-    @Path("/sensori/{sensoreId}/start")
-    public Response riavviaSensore(@PathParam("sensoreId") String sensoreId) {
+    public void riavviaSensore(Context ctx) {
+        String sensoreId = ctx.pathParam("sensoreId");
         if (!simulatoreSensori.riprendi(sensoreId)) {
-            return Response.status(404).entity("Sensore non trovato: " + sensoreId).build();
+            ctx.status(404).result("Sensore non trovato: " + sensoreId);
+            return;
         }
-        return Response.ok(Map.of("success", true,
-                "messaggio", "Sensore " + sensoreId + " riacceso: riprende a inviare l'heartbeat")).build();
+        ctx.json(Map.of("success", true,
+                "messaggio", "Sensore " + sensoreId + " riacceso: riprende a inviare l'heartbeat"));
     }
 
     /**
      * Simula la caduta della connessione verso la Centrale Operativa.
-     * Da questo momento gli eventi vengono accodati nel buffer locale
+     * Da questo momento gli eventi restano nel buffer locale
      * e l'heartbeat non viene più emesso (demo del meccanismo di caching).
-     *
-     * @return Conferma del cambio di modalità.
      */
-    @POST
-    @Path("/rete/offline")
-    public Response reteOffline() {
-        dbLocale.connessioneCentrale = false;
-        return Response.ok(Map.of("success", true, "messaggio", "Connessione verso la Centrale disattivata (simulazione)")).build();
+    public void reteOffline(Context ctx) {
+        gestore.gestisci(EventoStazione.di(EventoStazione.Tipo.RETE_GIU));
+        ctx.json(Map.of("success", true, "messaggio", "Connessione verso la Centrale disattivata (simulazione)"));
     }
 
     /**
      * Simula il ripristino della connessione verso la Centrale Operativa.
-     * Oltre a riattivare il flag esegue subito il flush del buffer locale,
-     * reinviando tutti gli eventi accodati durante l'offline.
-     *
-     * @return Conferma del cambio di modalità.
+     * Gli eventi accodati durante l'offline ripartono da soli, in ordine: li manda il
+     * consumatore del buffer appena vede il collegamento di nuovo attivo, quindi la risposta
+     * torna subito, senza aspettare che la coda sia vuota.
      */
-    @POST
-    @Path("/rete/online")
-    public Response reteOnline() {
-        dbLocale.connessioneCentrale = true;
-        // Flush immediato: gli eventi accumulati partono subito verso la Centrale
-        stationGateway.flush();
-        return Response.ok(Map.of("success", true, "messaggio", "Connessione ripristinata, buffer svuotato")).build();
+    public void reteOnline(Context ctx) {
+        gestore.gestisci(EventoStazione.di(EventoStazione.Tipo.RETE_SU));
+        ctx.json(Map.of("success", true, "messaggio", "Connessione ripristinata: gli eventi nel buffer ripartono verso la Centrale"));
     }
 
     /**
      * Restituisce l'elenco dei treni fisicamente presenti in stazione,
      * con l'istante di ingresso di ciascuno.
-     *
-     * @return Response JSON con la lista dei treni presenti.
      */
-    @GET
-    @Path("/treni")
-    public Response getTreniPresenti() {
+    public void getTreniPresenti(Context ctx) {
         List<Map<String, String>> treni = dbLocale.getTreniPresenti().entrySet().stream()
                 .map(e -> Map.of(
                         "trenoId", e.getKey(),
                         "dentroDa", e.getValue().toString()))
                 .collect(Collectors.toList());
 
-        return Response.ok(Map.of("treniPresenti", treni)).build();
+        ctx.json(Map.of("treniPresenti", treni));
     }
 
     /**
@@ -278,12 +241,8 @@ public class StationIngestion {
      * se le scritture stanno davvero andando su disco e cosa c'è dentro adesso.
      * Serve per la dimostrazione del meccanismo: si guarda questa risposta, si ammazza
      * il processo, lo si riavvia e la si riguarda per vedere che i numeri sono gli stessi.
-     *
-     * @return Response JSON con lo stato della persistenza locale.
      */
-    @GET
-    @Path("/persistenza")
-    public Response getPersistenza() {
+    public void getPersistenza(Context ctx) {
         Map<String, Object> risposta = new LinkedHashMap<>();
         risposta.put("attiva", persistenza.isAttiva());
         risposta.put("file", persistenza.getPercorsoDb());
@@ -293,6 +252,23 @@ public class StationIngestion {
         risposta.put("guastiLocaliAperti", persistenza.contaGuastiAperti());
         risposta.put("treniPresenti", dbLocale.getTreniPresenti().size());
         risposta.put("eventiInCoda", localBuffer.size());
-        return Response.ok(risposta).build();
+        ctx.json(risposta);
+    }
+
+    /**
+     * Il corpo della richiesta come oggetto JSON. Un corpo vuoto vale come oggetto vuoto (i
+     * campi mancanti li controlla ogni endpoint); un corpo che non è un oggetto JSON fa
+     * rispondere 400, con il gestore di JsonParseException registrato in ServerRest.
+     */
+    private static JsonObject corpo(Context ctx) {
+        String testo = ctx.body();
+        if (testo == null || testo.isBlank()) {
+            return new JsonObject();
+        }
+        JsonElement elemento = JsonParser.parseString(testo);
+        if (!elemento.isJsonObject()) {
+            throw new JsonParseException("il corpo non e' un oggetto JSON");
+        }
+        return elemento.getAsJsonObject();
     }
 }

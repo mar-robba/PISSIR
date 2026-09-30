@@ -1,18 +1,16 @@
 package it.uni.reti2.entity;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
-import jakarta.persistence.*;
 import java.time.Instant;
 
 /**
- * Entità JPA per lo <strong>storico dei guasti</strong>.
+ * Una riga dello <strong>storico dei guasti</strong>.
  *
- * <p>Mappa la tabella {@code Storico_Guasti}. Registra una copia storica
+ * <p>Corrisponde alla tabella {@code Storico_Guasti}. Registra una copia storica
  * dell'evoluzione di ogni guasto nel tempo: apertura, eventuale chiusura,
  * operatore assegnato e stato di risoluzione.</p>
  *
  * <p>A differenza della tabella live {@code Guasti_Pervenuti_da_treni_o_Staz}
- * (entità {@link Guasto}), questa tabella sopravvive al guasto: la riga viene
+ * (classe {@link Guasto}), questa tabella sopravvive al guasto: la riga viene
  * inserita quando il guasto viene segnalato e completata con il timestamp di
  * chiusura al momento della risoluzione.</p>
  *
@@ -24,72 +22,53 @@ import java.time.Instant;
  * se ne era occupato non lavora più in centrale.</p>
  *
  * @see it.uni.reti2.entity.Guasto
- * @see it.uni.reti2.elaboration.GuastiService
+ * @see it.uni.reti2.elaboration.GestoreEventi
  */
-@Entity
-@Table(name = "Storico_Guasti")
-public class StoricoGuasto extends PanacheEntityBase {
+public class StoricoGuasto {
 
     /** Chiave primaria auto-incrementale. */
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_storico_guasto")
     public Long id;
 
     /** Identificativo del guasto nella tabella live (riferimento logico). */
-    @Column(name = "id_Guasto", nullable = false, length = 50)
     public String guastoId;
 
     /** Tipologia del guasto (stazione_guasta / treno_fermo / sensore_offline). */
-    @Column(name = "tipo", length = 50)
     public String tipo;
 
     /** Gravità dichiarata dalla sorgente (CRITICAL / WARNING / INFO). */
-    @Column(name = "severita", length = 20)
     public String severita;
 
     /** Tipo della sorgente che ha generato l'allarme ("STAZIONE" o "TRENO"). */
-    @Column(name = "sorgenteTipo", length = 20)
     public String sorgenteTipo;
 
     /** Identificativo della sorgente (riferimento logico verso stazione o convoglio). */
-    @Column(name = "sorgenteId", length = 50)
     public String sorgenteId;
 
     /** Nome della sorgente al momento del guasto: per il convoglio coincide con l'id. */
-    @Column(name = "nome_sorgente", length = 100)
     public String nomeSorgente;
 
     /** Messaggio di dettaglio così come è arrivato dalla sorgente. */
-    @Column(name = "messaggio", length = 500)
     public String messaggio;
 
     /** Stato di risoluzione al momento della storicizzazione. */
-    @Column(name = "Stato_RisoltoONO", nullable = false)
     public boolean risolto;
 
     /** Identificativo dell'operatore responsabile (null se non ancora assegnato). */
-    @Column(name = "id_operatore", length = 50)
     public String operatoreId;
 
     /** Nome e cognome dell'operatore, congelati qui dentro. */
-    @Column(name = "nome_operatore", length = 255)
     public String nomeOperatore;
 
     /** Matricola dell'operatore: è il codice con cui viene identificato in Keycloak. */
-    @Column(name = "matricola_operatore", length = 50)
     public String matricolaOperatore;
 
     /** Timestamp di apertura/segnalazione del guasto. */
-    @Column(name = "ts_apertura", nullable = false)
     public Instant tsApertura;
 
     /** Timestamp di chiusura/risoluzione (null se ancora aperto). */
-    @Column(name = "ts_chiusura")
     public Instant tsChiusura;
 
     /** Timestamp di inserimento del record nello storico. */
-    @Column(name = "ts_storicizzazione", nullable = false)
     public Instant tsStoricizzazione = Instant.now();
 
     /**

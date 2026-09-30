@@ -1,23 +1,20 @@
 package it.uni.reti2.elaboration;
 
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.security.TestSecurity;
-import io.restassured.http.ContentType;
+import it.uni.reti2.CentraleDiProva;
 import it.uni.reti2.entity.Treno;
-import jakarta.inject.Inject;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.hasItem;
 
 /**
  * Prova il "Processing" della Centrale: previsioni di arrivo e calcolo dei ritardi.
@@ -31,7 +28,7 @@ import static org.hamcrest.Matchers.hasItem;
  * 2 &times; 100 / 60 = 3,33 minuti di servizio. Sono scritti espliciti nei commenti
  * perche' un'asserzione che non si sa da dove esce non serve a niente.</p>
  */
-@QuarkusTest
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class PrevisioneArriviTest {
 
@@ -47,11 +44,21 @@ public class PrevisioneArriviTest {
     /** Quanti secondi reali dura un minuto di orario con il fattore 100 configurato. */
     private static final double SECONDI_PER_MINUTO = 0.6;
 
-    @Inject
-    PrevisioneArrivi previsioni;
+    private CentraleDiProva centrale;
+    private PrevisioneArrivi previsioni;
+    private TrafficLogicEngine statoRete;
 
-    @Inject
-    TrafficLogicEngine statoRete;
+    @BeforeAll
+    void accendi() throws Exception {
+        centrale = CentraleDiProva.avvia();
+        previsioni = centrale.previsioni;
+        statoRete = centrale.statoRete;
+    }
+
+    @AfterAll
+    void spegni() throws Exception {
+        centrale.close();
+    }
 
     // ──────────────────────────────────────────────────────────────
     // PREPARAZIONE
@@ -59,8 +66,7 @@ public class PrevisioneArriviTest {
 
     @Test
     @Order(1)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void preparaLaLinea() {
+    public void preparaLaLinea() throws Exception {
         creaStazione(STAZ_A, "Prev Alfa " + SUFFISSO);
         creaStazione(STAZ_B, "Prev Bravo " + SUFFISSO);
         creaStazione(STAZ_C, "Prev Charlie " + SUFFISSO);
@@ -74,16 +80,12 @@ public class PrevisioneArriviTest {
                     "travelTimes": [10, 20]
                 }
                 """.formatted(ITINERARIO, STAZ_A, STAZ_B, STAZ_C);
-        given().contentType(ContentType.JSON).body(itinerario)
-        .when().post("/api/tratte")
-        .then().statusCode(201);
+        Assertions.assertEquals(201, centrale.post("/api/tratte", itinerario, centrale.admin()).stato());
 
         String treno = """
                 {"id": "%s", "itinerario": {"id": "%s"}}
                 """.formatted(TRENO, ITINERARIO);
-        given().contentType(ContentType.JSON).body(treno)
-        .when().post("/api/treni")
-        .then().statusCode(201);
+        Assertions.assertEquals(201, centrale.post("/api/treni", treno, centrale.admin()).stato());
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -238,18 +240,15 @@ public class PrevisioneArriviTest {
     /** Lo stesso elenco passando dall'API REST che usa la pagina Stazioni. */
     @Test
     @Order(10)
-    @TestSecurity(user = "mat001", roles = {"tecnico"})
-    public void lEndpointDeiTreniAttesiRisponde() {
+    public void lEndpointDeiTreniAttesiRisponde() throws Exception {
         inStazione(STAZ_A, STAZ_B);
 
-        given()
-        .when().get("/api/stazioni/" + STAZ_C + "/treni-attesi")
-        .then().statusCode(200)
-            .body("trenoId", hasItem(TRENO));
+        CentraleDiProva.Risposta attesi = centrale.get("/api/stazioni/" + STAZ_C + "/treni-attesi", centrale.tecnico());
+        Assertions.assertEquals(200, attesi.stato());
+        Assertions.assertTrue(attesi.corpo().contains("\"trenoId\":\"" + TRENO + "\""));
 
-        given()
-        .when().get("/api/stazioni/NON_ESISTE_" + SUFFISSO + "/treni-attesi")
-        .then().statusCode(404);
+        Assertions.assertEquals(404, centrale.get("/api/stazioni/NON_ESISTE_" + SUFFISSO + "/treni-attesi",
+                centrale.tecnico()).stato());
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -258,15 +257,12 @@ public class PrevisioneArriviTest {
 
     @Test
     @Order(11)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void smontaLaLinea() {
-        given().when().delete("/api/treni/" + TRENO).then().statusCode(204);
-        given().when().delete("/api/tratte/" + ITINERARIO).then().statusCode(204);
-        given().when().delete("/api/tratte-elementari/" + TRATTA_BC).then().statusCode(204);
-        given().when().delete("/api/tratte-elementari/" + TRATTA_AB).then().statusCode(204);
-        given().when().delete("/api/stazioni/" + STAZ_C).then().statusCode(204);
-        given().when().delete("/api/stazioni/" + STAZ_B).then().statusCode(204);
-        given().when().delete("/api/stazioni/" + STAZ_A).then().statusCode(204);
+    public void smontaLaLinea() throws Exception {
+        for (String percorso : new String[]{"/api/treni/" + TRENO, "/api/tratte/" + ITINERARIO,
+                "/api/tratte-elementari/" + TRATTA_BC, "/api/tratte-elementari/" + TRATTA_AB,
+                "/api/stazioni/" + STAZ_C, "/api/stazioni/" + STAZ_B, "/api/stazioni/" + STAZ_A}) {
+            Assertions.assertEquals(204, centrale.delete(percorso, centrale.admin()).stato(), percorso);
+        }
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -315,7 +311,7 @@ public class PrevisioneArriviTest {
         return Math.round(minutiDiServizio * SECONDI_PER_MINUTO * 1000);
     }
 
-    private static void creaStazione(String id, String nome) {
+    private void creaStazione(String id, String nome) throws Exception {
         String corpo = """
                 {
                     "id": "%s",
@@ -326,12 +322,10 @@ public class PrevisioneArriviTest {
                     "binari": 2
                 }
                 """.formatted(id, nome);
-        given().contentType(ContentType.JSON).body(corpo)
-        .when().post("/api/stazioni")
-        .then().statusCode(201);
+        Assertions.assertEquals(201, centrale.post("/api/stazioni", corpo, centrale.admin()).stato());
     }
 
-    private static void creaTratta(String id, String partenza, String arrivo, int minuti) {
+    private void creaTratta(String id, String partenza, String arrivo, int minuti) throws Exception {
         String corpo = """
                 {
                     "id": "%s",
@@ -340,8 +334,6 @@ public class PrevisioneArriviTest {
                     "tempoPercorrenzaMinuti": %d
                 }
                 """.formatted(id, partenza, arrivo, minuti);
-        given().contentType(ContentType.JSON).body(corpo)
-        .when().post("/api/tratte-elementari")
-        .then().statusCode(201);
+        Assertions.assertEquals(201, centrale.post("/api/tratte-elementari", corpo, centrale.admin()).stato());
     }
 }

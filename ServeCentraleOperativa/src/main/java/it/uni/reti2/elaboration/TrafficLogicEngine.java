@@ -6,50 +6,44 @@ import it.uni.reti2.entity.Stazione;
 import it.uni.reti2.entity.StoricoStatoStazione;
 import it.uni.reti2.entity.Treno;
 import it.uni.reti2.persistence.RailwayRepository;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import jakarta.enterprise.event.Observes;
-import jakarta.transaction.Transactional;
-import io.quarkus.runtime.StartupEvent;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 /*
  Dove si scrive sul database, e perché non qui.
 
- Questa classe è una cache in RAM: la riempie all'avvio leggendo dal database e poi la
- tengono aggiornata i servizi di monitoraggio. Le API REST la leggono per non
- ripassare dal database a ogni richiesta.
+ Questa classe è una cache in RAM: la riempie all'avvio leggendo dal database (carica(),
+ chiamato dal main) e poi la tengono aggiornata gli automi. Le API REST la leggono per non
+ ripassare dal database a ogni richiesta. È lo stato della Centrale, come il TrainDB lo è
+ del treno.
 
- Da quando esiste RailwayRepository ogni lettura e ogni scrittura passa da lì: nessuna
- classe chiama più findById, list o persist sulle entità. I punti in cui il database
- cambia davvero restano due:
-   - i servizi di monitoraggio (MonitoraggioTreni, MonitoraggioStazioni, TransitiService,
-     GuastiService), che a ogni messaggio MQTT aggiornano treni, stazioni, transiti e
-     guasti e ne scrive le righe di storico (repository.salvaTreno, salvaStoricoTransito,
-     salvaGuasto, ...);
+ Ogni lettura e ogni scrittura del database passa da RailwayRepository. I punti in cui il
+ database cambia davvero sono due:
+   - GestoreEventi, che a ogni evento (messaggio MQTT, comando dell'operatore, tick del
+     watchdog) scrive treni, stazioni, transiti e guasti e le righe di storico, dentro una
+     transazione, prima di far muovere gli automi;
    - gli endpoint amministrativi del RestApiGateway, che creano e cancellano stazioni,
      convogli, tratte e itinerari (repository.salvaStazione, eliminaTratta, ...).
 
- Un'eccezione c'è ed è qui sotto, in onStart(): i campi di Guasto sistemati al caricamento
- (timestamp, severita) sono persistenti e non @Transient, quindi la @Transactional del
- metodo li scrive davvero. I campi di Stazione e Treno toccati nello stesso ciclo invece
- sono @Transient e restano solo in memoria.
+ Un'eccezione c'è ed è qui sotto, in carica(): i campi di Guasto sistemati al caricamento
+ (timestamp, severita) sono colonne, quindi si riscrivono sulla riga. I campi di Stazione e
+ Treno toccati nello stesso ciclo invece vivono solo in memoria.
 */
 
 /**
  * Cache in-memory dello stato corrente della rete ferroviaria.
- * Viene aggiornato in tempo reale dai servizi di monitoraggio e letto 
- * in modo veloce dalle API REST (RestApiGateway), fungendo da strato intermedio
+ * Viene aggiornato in tempo reale dagli automi (AutomaTreno, AutomaStazione, AutomaGuasto)
+ * e letto in modo veloce dalle API REST (RestApiGateway), fungendo da strato intermedio
  * per ridurre il carico sul database relazionale.
  * e allora quando il database in back aggiorna il proprio stato e viceversa
  */
-@ApplicationScoped
 public class TrafficLogicEngine {
+
+    private static final Logger LOG = Logger.getLogger(TrafficLogicEngine.class.getName());
 
     /** Mappa thread-safe per indicizzare i treni in base al loro ID univoco */
     private final Map<String, Treno> treni = new ConcurrentHashMap<>();
@@ -60,8 +54,7 @@ public class TrafficLogicEngine {
     /** Mappa thread-safe per tenere traccia dei guasti attualmente segnalati e non ancora risolti */
     private final Map<String, Guasto> guastiAttivi = new ConcurrentHashMap<>();
     /** Unico punto da cui questa classe legge il database (la cache qui sopra è RAM). */
-    @Inject
-    RailwayRepository repository;
+    public RailwayRepository repository;
 
     /**
      * Oltre quanti secondi di silenzio la telemetria di un convoglio è considerata
@@ -69,45 +62,50 @@ public class TrafficLogicEngine {
      * ogni secondo: qualche secondo di margine copre una riconnessione al broker senza
      * dichiarare perso un treno che sta benissimo.
      */
-    @ConfigProperty(name = "posizione.telemetria.freschezza.secondi", defaultValue = "15")
-    long freschezzaTelemetriaSecondi;
+    public long freschezzaTelemetriaSecondi = 15; // posizione.telemetria.freschezza.secondi
 
-/*Prevenire errori di "Lazy Loading" (Caricamento Pigro): Se la tua entità Stazioni ha dei campi collegati (ad esempio una lista di Sensori o di Storici) che non vengono caricati immediatamente dalla query principale, l'ORM (come Hibernate) proverà a leggerli nel momento in cui accedi a quei campi. Senza una transazione aperta, riceveresti un blocco totale (il famoso errore LazyInitializationException).***/
-    @Transactional
-    void onStart(@Observes StartupEvent ev) {
-        System.out.println("TrafficLogicEngine: Inizializzazione cache dal DB...");
+    /**
+     * Riempie la cache leggendo il database. La chiama il main all'avvio, prima di aprire
+     * MQTT e le API REST: così il primo messaggio che arriva trova già tutti i treni e le
+     * stazioni.
+     */
+    public void carica() {
+        LOG.info("TrafficLogicEngine: Inizializzazione cache dal DB...");
 
         // Popola Stazioni: i campi persistiti (nome, coordinate, binari, tipo)
         // arrivano direttamente dal DB. Lo stato runtime NON viene inventato: resta
         // il default OFFLINE dell'entità con ultimoHeartbeat a null, perché all'avvio
         // nessuna stazione ha ancora battuto (marcarle ONLINE faceva vedere per 30
-        // secondi una rete tutta operativa anche a nodi spenti). Il FaultMonitor
+        // secondi una rete tutta operativa anche a nodi spenti). Il watchdog
         // salta le stazioni con heartbeat nullo, quindi non apre falsi guasti.
         for (Stazione s : repository.tutteLeStazioni()) {
             stazioni.put(s.id, s);
         }
-        System.out.println("Caricate " + stazioni.size() + " stazioni.");
+        LOG.info("Caricate " + stazioni.size() + " stazioni.");
 
         // Popola Treni: l'id del convoglio è il nome scelto dall'amministratore,
         // non c'è nessun altro campo anagrafico da ricostruire.
         // ultimoAggiornamento resta NULL, come ultimoHeartbeat per le stazioni: all'avvio
         // nessun convoglio ha ancora trasmesso, e datare la telemetria all'accensione della
         // Centrale faceva sembrare "appena visti" treni il cui processo non è nemmeno acceso.
-        // Il FaultMonitor salta i treni con ultimoAggiornamento nullo, quindi non apre più i
+        // Il watchdog salta i treni con ultimoAggiornamento nullo, quindi non apre più i
         // guasti "treno fermo" falsi che comparivano dieci secondi dopo ogni riavvio.
         for (Treno t : repository.tuttiITreni()) {
             treni.put(t.id, t);
         }
-        System.out.println("Caricati " + treni.size() + " treni.");
+        LOG.info("Caricati " + treni.size() + " treni.");
 
         // Popola Guasti: tipo/severita/timestamp sono ora persistiti,
         // quindi non vanno sovrascritti; si applicano solo default per righe legacy.
         for (Guasto g : repository.guastiNonRisolti()) {
-            if (g.timestamp == null) g.timestamp = Instant.now();
-            if (g.severita == null) g.severita = "warning";
+            if (g.timestamp == null || g.severita == null) {
+                if (g.timestamp == null) g.timestamp = Instant.now();
+                if (g.severita == null) g.severita = "warning";
+                repository.completaGuasto(g);
+            }
             guastiAttivi.put(g.id, g);
         }
-        System.out.println("Caricati " + guastiAttivi.size() + " guasti attivi.");
+        LOG.info("Caricati " + guastiAttivi.size() + " guasti attivi.");
 
         riprendiInterventiAperti();
     }
@@ -116,7 +114,7 @@ public class TrafficLogicEngine {
      * Rimette in MANUTENZIONE le stazioni su cui un intervento era aperto quando la
      * Centrale si e' spenta.
      *
-     * <p>Lo stato runtime non e' persistito (e' @Transient, vive in questa cache) e per
+     * <p>Lo stato runtime non e' persistito (non e' una colonna, vive in questa cache) e per
      * ONLINE/OFFLINE va benissimo cosi': il primo battito lo ricostruisce da solo. La
      * MANUTENZIONE no, perche' non e' un dato di campo — la decide la Centrale e la
      * stazione continua a dichiararsi GUASTA per conto suo. Senza questo giro un riavvio
@@ -136,7 +134,7 @@ public class TrafficLogicEngine {
             StoricoStatoStazione ultimo = repository.ultimoStatoStoricizzato(stazione.id);
             if (ultimo != null && StatiCanonici.interventoInCorso(ultimo.stato)) {
                 stazione.stato = StatiCanonici.STAZIONE_MANUTENZIONE;
-                System.out.println("Intervento ancora aperto su " + stazione.id
+                LOG.info("Intervento ancora aperto su " + stazione.id
                         + ": stazione ripresa in MANUTENZIONE.");
             }
         }
@@ -194,57 +192,12 @@ public class TrafficLogicEngine {
      * Aggiorna i dati di una stazione nella cache.
      *
      * <p>Serve per i campi che non sono lo stato (istante dell'ultimo battito, treni
-     * presenti): lo stato si scrive con {@link #cambiaStatoStazione} o
-     * {@link #forzaStatoStazione}, che sono l'unico punto in cui vale la regola
-     * dell'intervento in corso.</p>
+     * presenti): lo stato lo scrive solo {@link AutomaStazione}, che e' l'unico punto in cui
+     * vale la regola dell'intervento in corso.</p>
      *
      * @param stazione L'entità Stazione aggiornata.
      */
     public void aggiornaStazione(Stazione stazione) {
-        stazioni.put(stazione.id, stazione);
-    }
-
-    /**
-     * Scrive lo stato di una stazione per un evento che <b>non</b> e' un comando
-     * dell'operatore: un guasto segnalato dal campo, un battito, il watchdog.
-     *
-     * <p>E' qui che sta la regola dell'intervento: finche' la squadra e' sul posto lo
-     * stato non si tocca (RF01.4.1). Prima ogni chiamante scriveva {@code stazione.stato}
-     * per conto suo e la regola era ripetuta a memoria in due punti su cinque: bastava un
-     * alert ripetuto dal campo — e una stazione guasta ne manda uno per ogni treno che
-     * entra — per riportare a GUASTA una stazione in manutenzione. Da li' il primo
-     * RESOLVED del campo la rimetteva ONLINE e i convogli ripartivano con i tecnici
-     * ancora sui binari.</p>
-     *
-     * @return true se lo stato e' stato scritto davvero, false se e' stato rifiutato
-     *         perche' sulla stazione c'e' un intervento in corso.
-     */
-    public boolean cambiaStatoStazione(Stazione stazione, String nuovoStato) {
-        if (stazione == null || nuovoStato == null) {
-            return false;
-        }
-        if (StatiCanonici.interventoInCorso(stazione.stato)
-                && !StatiCanonici.interventoInCorso(nuovoStato)) {
-            return false;
-        }
-        stazione.stato = nuovoStato;
-        stazioni.put(stazione.id, stazione);
-        return true;
-    }
-
-    /**
-     * Scrive lo stato di una stazione per un comando esplicito della Centrale: l'invio
-     * della squadra, la chiusura dell'allarme che chiude l'intervento (RF01.4.2) e il
-     * pannello dell'amministratore.
-     *
-     * <p>E' l'unica strada che puo' far uscire una stazione dalla manutenzione, ed e'
-     * giusto che sia cosi': l'intervento lo apre e lo chiude chi lo ha deciso.</p>
-     */
-    public void forzaStatoStazione(Stazione stazione, String nuovoStato) {
-        if (stazione == null || nuovoStato == null) {
-            return;
-        }
-        stazione.stato = nuovoStato;
         stazioni.put(stazione.id, stazione);
     }
 
@@ -273,18 +226,9 @@ public class TrafficLogicEngine {
         guastiAttivi.put(guasto.id, guasto);
     }
 
-    /**
-     * Contrassegna un guasto come risolto all'interno della cache.
-     * @param id ID dell'allarme da chiudere.
-     */
-    public void risolviGuasto(String id) {
-        if (guastiAttivi.containsKey(id)) {
-            Guasto g = guastiAttivi.get(id);
-            g.risolto = true;
-            guastiAttivi.put(id, g);
-            // Non lo rimuoviamo subito dalla cache così il frontend ha tempo di vedere che è stato risolto
-            // Eventualmente si potrebbe pulire dopo un timeout o spostarlo in uno storico dedicato.
-        }
+    /** @return Il guasto in cache con quell'id (aperto o appena risolto), o null. */
+    public Guasto getGuasto(String id) {
+        return guastiAttivi.get(id);
     }
 
     /**
@@ -313,7 +257,7 @@ public class TrafficLogicEngine {
 
     /**
      * Cerca un guasto ancora aperto generato da una determinata sorgente e con un
-     * determinato tipo. Usato dal FaultMonitor per evitare di creare guasti duplicati
+     * determinato tipo. Usato dal watchdog per evitare di creare guasti duplicati
      * per lo stesso episodio (es. heartbeat mancante segnalato una sola volta).
      *
      * @param sorgenteId ID della sorgente (treno o stazione).
@@ -326,8 +270,8 @@ public class TrafficLogicEngine {
      * <p>Diverso da {@link #getGuastoApertoPerSorgente}, che cerca l'episodio preciso per
      * non duplicarlo: qui la domanda e' "questo nodo e' pulito?", ed e' quella che serve
      * prima di dire al campo che una stazione e' di nuovo agibile. Si guarda la cache e
-     * non il database perche' la si chiama anche fuori da una transazione, sul thread che
-     * sta smaltendo un messaggio MQTT.</p>
+     * non il database: e' una guardia del GestoreEventi, e le guardie leggono lo stato in
+     * memoria.</p>
      */
     public boolean haGuastiAperti(String sorgenteId, String sorgenteTipo) {
         for (Guasto g : guastiAttivi.values()) {
@@ -353,7 +297,7 @@ public class TrafficLogicEngine {
 
     /**
      * Calcola i KPI della dashboard nel formato atteso dal frontend.
-     * Usato sia da GET /api/dashboard che dal broadcast SNAPSHOT del FaultMonitor.
+     * Usato sia da GET /api/dashboard che dal broadcast SNAPSHOT del watchdog.
      * @return Mappa con i contatori aggregati della rete.
      */
     public Map<String, Object> kpiDashboard() {

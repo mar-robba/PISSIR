@@ -1,19 +1,19 @@
 package it.uni.reti2.gateway;
 
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.security.TestSecurity;
-import io.restassured.http.ContentType;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import it.uni.reti2.CentraleDiProva;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
 import java.util.UUID;
-
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.Matchers.hasSize;
 
 /**
  * Test del vincolo sulle tratte negli itinerari.
@@ -25,7 +25,7 @@ import static org.hamcrest.Matchers.hasSize;
  * <p>Lo scenario e' la rete A -> B (una tratta sola) piu' una terza stazione C isolata:
  * tutto cio' che passa da C deve essere rifiutato con 404.</p>
  */
-@QuarkusTest
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class ItinerariTratteTest {
 
@@ -35,8 +35,22 @@ public class ItinerariTratteTest {
     private static final String STAZ_C = "IT_C_" + SUFFISSO;
     private static final String TRATTA_AB = "IT_T_AB_" + SUFFISSO;
     private static final String ITINERARIO = "IT_PERCORSO_" + SUFFISSO;
+    private static final String ITINERARIO_CON_TRENO = "IT_PERCORSO_TRENO_" + SUFFISSO;
+    private static final String TRENO = "IT_TRN_" + SUFFISSO;
 
-    private static void creaStazione(String id, String nome) {
+    private CentraleDiProva centrale;
+
+    @BeforeAll
+    void accendi() throws Exception {
+        centrale = CentraleDiProva.avvia();
+    }
+
+    @AfterAll
+    void spegni() throws Exception {
+        centrale.close();
+    }
+
+    private void creaStazione(String id, String nome) throws Exception {
         String corpo = """
                 {
                     "id": "%s",
@@ -47,19 +61,24 @@ public class ItinerariTratteTest {
                     "binari": 2
                 }
                 """.formatted(id, nome);
-        given()
-            .contentType(ContentType.JSON)
-            .body(corpo)
-        .when()
-            .post("/api/stazioni")
-        .then()
-            .statusCode(201);
+        Assertions.assertEquals(201, centrale.post("/api/stazioni", corpo, centrale.admin()).stato());
+    }
+
+    /** L'itinerario con quell'id nell'elenco di GET /api/tratte, o null. */
+    private JsonObject itinerario(String id) throws Exception {
+        CentraleDiProva.Risposta risposta = centrale.get("/api/tratte", centrale.admin());
+        Assertions.assertEquals(200, risposta.stato());
+        for (JsonElement elemento : risposta.json().getAsJsonArray()) {
+            if (id.equals(elemento.getAsJsonObject().get("id").getAsString())) {
+                return elemento.getAsJsonObject();
+            }
+        }
+        return null;
     }
 
     @Test
     @Order(1)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void preparaLaRete() {
+    public void preparaLaRete() throws Exception {
         creaStazione(STAZ_A, "Alfa " + SUFFISSO);
         creaStazione(STAZ_B, "Bravo " + SUFFISSO);
         creaStazione(STAZ_C, "Charlie " + SUFFISSO);
@@ -73,145 +92,126 @@ public class ItinerariTratteTest {
                     "tempoPercorrenzaMinuti": 20
                 }
                 """.formatted(TRATTA_AB, STAZ_A, STAZ_B);
-        given()
-            .contentType(ContentType.JSON)
-            .body(corpo)
-        .when()
-            .post("/api/tratte-elementari")
-        .then()
-            .statusCode(201);
+        Assertions.assertEquals(201, centrale.post("/api/tratte-elementari", corpo, centrale.admin()).stato());
     }
 
     @Test
     @Order(2)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void itinerarioSuTrattaEsistenteVieneCreato() {
+    public void itinerarioSuTrattaEsistenteVieneCreato() throws Exception {
         String corpo = """
                 { "id": "%s", "stazioni": ["%s", "%s"], "travelTimes": [20] }
                 """.formatted(ITINERARIO, STAZ_A, STAZ_B);
-        given()
-            .contentType(ContentType.JSON)
-            .body(corpo)
-        .when()
-            .post("/api/tratte")
-        .then()
-            .statusCode(201)
-            .body("stazioni", hasSize(2));
+        CentraleDiProva.Risposta risposta = centrale.post("/api/tratte", corpo, centrale.admin());
+        Assertions.assertEquals(201, risposta.stato());
+        Assertions.assertEquals(2, risposta.json().getAsJsonObject().getAsJsonArray("stazioni").size());
     }
 
     @Test
     @Order(3)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void creazioneRifiutataSeLaTrattaNonEsiste() {
+    public void creazioneRifiutataSeLaTrattaNonEsiste() throws Exception {
         String corpo = """
                 { "id": "%s_KO", "stazioni": ["%s", "%s"], "travelTimes": [15] }
                 """.formatted(ITINERARIO, STAZ_A, STAZ_C);
-        given()
-            .contentType(ContentType.JSON)
-            .body(corpo)
-        .when()
-            .post("/api/tratte")
-        .then()
-            .statusCode(404)
-            .body("errore", containsString("Manca la tratta"))
-            .body("coppieMancanti[0].partenzaId", equalTo(STAZ_A))
-            .body("coppieMancanti[0].arrivoId", equalTo(STAZ_C));
+        CentraleDiProva.Risposta risposta = centrale.post("/api/tratte", corpo, centrale.admin());
+        Assertions.assertEquals(404, risposta.stato());
+        JsonObject errore = risposta.json().getAsJsonObject();
+        Assertions.assertTrue(errore.get("errore").getAsString().contains("Manca la tratta"));
+        JsonObject coppia = errore.getAsJsonArray("coppieMancanti").get(0).getAsJsonObject();
+        Assertions.assertEquals(STAZ_A, coppia.get("partenzaId").getAsString());
+        Assertions.assertEquals(STAZ_C, coppia.get("arrivoId").getAsString());
 
         // L'itinerario non deve essere nato a meta'
-        given()
-        .when()
-            .get("/api/tratte")
-        .then()
-            .statusCode(200)
-            .body("findAll { it.id == '%s_KO' }".formatted(ITINERARIO), hasSize(0));
+        Assertions.assertNull(itinerario(ITINERARIO + "_KO"));
     }
 
     @Test
     @Order(4)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void aggiuntaDiStazioneSenzaTrattaVieneRifiutata() {
+    public void aggiuntaDiStazioneSenzaTrattaVieneRifiutata() throws Exception {
         // A -> B esiste, B -> C no: la coda dell'itinerario e' quella che manca.
         String corpo = """
                 { "stazioni": ["%s", "%s", "%s"], "travelTimes": [20, 15] }
                 """.formatted(STAZ_A, STAZ_B, STAZ_C);
-        given()
-            .contentType(ContentType.JSON)
-            .body(corpo)
-        .when()
-            .put("/api/tratte/" + ITINERARIO)
-        .then()
-            .statusCode(404)
-            .body("coppieMancanti", hasSize(1))
-            .body("coppieMancanti[0].partenzaId", equalTo(STAZ_B))
-            .body("coppieMancanti[0].arrivoId", equalTo(STAZ_C));
+        CentraleDiProva.Risposta risposta = centrale.put("/api/tratte/" + ITINERARIO, corpo, centrale.admin());
+        Assertions.assertEquals(404, risposta.stato());
+        JsonArray coppie = risposta.json().getAsJsonObject().getAsJsonArray("coppieMancanti");
+        Assertions.assertEquals(1, coppie.size());
+        Assertions.assertEquals(STAZ_B, coppie.get(0).getAsJsonObject().get("partenzaId").getAsString());
+        Assertions.assertEquals(STAZ_C, coppie.get(0).getAsJsonObject().get("arrivoId").getAsString());
     }
 
     @Test
     @Order(5)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void cambioDiOrdineSenzaTrattaVieneRifiutato() {
+    public void cambioDiOrdineSenzaTrattaVieneRifiutato() throws Exception {
         // Scambiare A e B chiede il verso opposto, B -> A, che in rete non c'e':
         // la tratta e' un arco orientato e i due versi sono due righe distinte.
         String corpo = """
                 { "stazioni": ["%s", "%s"], "travelTimes": [20] }
                 """.formatted(STAZ_B, STAZ_A);
-        given()
-            .contentType(ContentType.JSON)
-            .body(corpo)
-        .when()
-            .put("/api/tratte/" + ITINERARIO)
-        .then()
-            .statusCode(404)
-            .body("coppieMancanti[0].partenzaId", equalTo(STAZ_B))
-            .body("coppieMancanti[0].arrivoId", equalTo(STAZ_A));
+        CentraleDiProva.Risposta risposta = centrale.put("/api/tratte/" + ITINERARIO, corpo, centrale.admin());
+        Assertions.assertEquals(404, risposta.stato());
+        JsonObject coppia = risposta.json().getAsJsonObject().getAsJsonArray("coppieMancanti").get(0).getAsJsonObject();
+        Assertions.assertEquals(STAZ_B, coppia.get("partenzaId").getAsString());
+        Assertions.assertEquals(STAZ_A, coppia.get("arrivoId").getAsString());
     }
 
     @Test
     @Order(6)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void elencoTroppoCortoVieneRifiutato() {
+    public void elencoTroppoCortoVieneRifiutato() throws Exception {
         // Un itinerario con una stazione sola non e' un aggiornamento da ignorare:
         // prima la PUT rispondeva 200 lasciando le stazioni com'erano, e il form
         // dava per salvata una modifica che non era mai stata applicata.
         String corpo = """
                 { "stazioni": ["%s"], "travelTimes": [] }
                 """.formatted(STAZ_A);
-        given()
-            .contentType(ContentType.JSON)
-            .body(corpo)
-        .when()
-            .put("/api/tratte/" + ITINERARIO)
-        .then()
-            .statusCode(400)
-            .body("errore", containsString("almeno due stazioni"));
+        CentraleDiProva.Risposta risposta = centrale.put("/api/tratte/" + ITINERARIO, corpo, centrale.admin());
+        Assertions.assertEquals(400, risposta.stato());
+        Assertions.assertTrue(risposta.json().getAsJsonObject().get("errore").getAsString().contains("almeno due stazioni"));
     }
 
     @Test
     @Order(7)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void ilRifiutoNonSmontaLItinerario() {
+    public void ilRifiutoNonSmontaLItinerario() throws Exception {
         // E' il punto delicato: la PUT cancella le righe di Itinerario_Tratta prima di
-        // ricomporle, e la @Transactional NON fa rollback quando si torna una Response
-        // di errore. Se la verifica non stesse prima della delete, dopo i rifiuti
-        // qui sopra l'itinerario sarebbe rimasto senza nessuna stazione.
-        given()
-        .when()
-            .get("/api/tratte")
-        .then()
-            .statusCode(200)
-            .body("find { it.id == '%s' }.stazioni".formatted(ITINERARIO), hasSize(2))
-            .body("find { it.id == '%s' }.stazioni[0]".formatted(ITINERARIO), equalTo(STAZ_A))
-            .body("find { it.id == '%s' }.stazioni[1]".formatted(ITINERARIO), equalTo(STAZ_B));
+        // ricomporle, e la transazione NON fa rollback quando si torna una risposta di
+        // errore. Se la verifica non stesse prima della delete, dopo i rifiuti qui sopra
+        // l'itinerario sarebbe rimasto senza nessuna stazione.
+        JsonArray stazioni = itinerario(ITINERARIO).getAsJsonArray("stazioni");
+        Assertions.assertEquals(2, stazioni.size());
+        Assertions.assertEquals(STAZ_A, stazioni.get(0).getAsString());
+        Assertions.assertEquals(STAZ_B, stazioni.get(1).getAsString());
     }
 
     @Test
     @Order(8)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void pulisci() {
-        given().when().delete("/api/tratte/" + ITINERARIO).then().statusCode(204);
-        given().when().delete("/api/tratte-elementari/" + TRATTA_AB).then().statusCode(204);
+    public void iTreniAssegnatiAllaCreazioneVengonoAvvisati() throws Exception {
+        // Un treno agganciato a un itinerario appena creato deve ricaricarlo: senza
+        // ITINERARIO_AGGIORNATO il suo digital twin continuava sul percorso vecchio mentre
+        // la Centrale lo dava gia' su quello nuovo (la PUT dell'itinerario e quella del
+        // treno l'avviso lo mandavano gia').
+        Assertions.assertEquals(201, centrale.post("/api/treni", """
+                { "id": "%s", "stato": "fermo" }
+                """.formatted(TRENO), centrale.admin()).stato());
+        centrale.dimenticaUscite();
+
+        String corpo = """
+                { "id": "%s", "stazioni": ["%s", "%s"], "travelTimes": [20], "treniIds": ["%s"] }
+                """.formatted(ITINERARIO_CON_TRENO, STAZ_A, STAZ_B, TRENO);
+        Assertions.assertEquals(201, centrale.post("/api/tratte", corpo, centrale.admin()).stato());
+
+        Assertions.assertTrue(centrale.alertPubblicati().stream().anyMatch(alert ->
+                alert.contains("ITINERARIO_AGGIORNATO") && alert.contains("\"target\":\"" + TRENO + "\"")));
+
+        Assertions.assertEquals(204, centrale.delete("/api/tratte/" + ITINERARIO_CON_TRENO, centrale.admin()).stato());
+        Assertions.assertEquals(204, centrale.delete("/api/treni/" + TRENO, centrale.admin()).stato());
+    }
+
+    @Test
+    @Order(9)
+    public void pulisci() throws Exception {
+        Assertions.assertEquals(204, centrale.delete("/api/tratte/" + ITINERARIO, centrale.admin()).stato());
+        Assertions.assertEquals(204, centrale.delete("/api/tratte-elementari/" + TRATTA_AB, centrale.admin()).stato());
         for (String id : new String[]{STAZ_A, STAZ_B, STAZ_C}) {
-            given().when().delete("/api/stazioni/" + id).then().statusCode(204);
+            Assertions.assertEquals(204, centrale.delete("/api/stazioni/" + id, centrale.admin()).stato());
         }
     }
 }

@@ -933,7 +933,7 @@ export default function TrafficMapPage() {
           // Interpolazione lineare: 0% coincide con la stazione precedente,
           // 100% con la successiva. Il clamp protegge la vista da frame incompleti.
           // Il digital twin calcola la propria posizione GPS nello stesso modo
-          // (TrainJourneyEngine interpola lat/lon sulla percentuale), quindi ora
+          // (AutomaViaggio interpola lat/lon sulla percentuale), quindi ora
           // che le stazioni stanno sulle coordinate vere il punto disegnato qui è
           // proprio quello che il treno pubblica nella telemetria.
           const pct = Math.max(0, Math.min(100, train.progressPercent)) / 100;
@@ -1080,8 +1080,10 @@ export default function TrafficMapPage() {
   const avviaTrascinamento = (evento: EventoPuntatore<SVGSVGElement>) => {
     if (evento.button !== 0) return;
     haTrascinato.current = false;
+    // Il puntatore qui NON va catturato: finché la cattura è attiva il browser
+    // consegna il click all'<svg> che l'ha presa invece che al simbolo sotto il
+    // mouse, e la scheda a destra non si apriva più con nessun click.
     trascinamento.current = { x: evento.clientX, y: evento.clientY, mosso: false };
-    svgRef.current?.setPointerCapture?.(evento.pointerId);
   };
 
   const durante = (evento: EventoPuntatore<SVGSVGElement>) => {
@@ -1091,6 +1093,9 @@ export default function TrafficMapPage() {
     const dy = evento.clientY - stato.y;
     if (!stato.mosso && Math.hypot(dx, dy) < 4) return;
 
+    // Solo adesso si sa che è una panoramica e non un click: con la cattura il
+    // trascinamento continua anche se il mouse esce dal riquadro della mappa.
+    if (!stato.mosso) svgRef.current?.setPointerCapture?.(evento.pointerId);
     stato.mosso = true;
     setInTrascinamento(true);
     stato.x = evento.clientX;

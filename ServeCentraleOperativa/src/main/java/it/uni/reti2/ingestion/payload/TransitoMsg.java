@@ -1,6 +1,6 @@
 package it.uni.reti2.ingestion.payload;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonObject;
 
 import java.time.Instant;
 
@@ -14,7 +14,7 @@ import java.time.Instant;
  */
 public record TransitoMsg(String trenoId, String stazioneId, String tipo, Instant quando) {
 
-    public static TransitoMsg da(JsonNode root) {
+    public static TransitoMsg da(JsonObject root) {
         return new TransitoMsg(
                 Payload.testo(root, "trenoId", ""),
                 Payload.testo(root, "stazioneId", ""),

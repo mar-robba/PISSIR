@@ -1,12 +1,9 @@
 package it.uni.reti2;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.eclipse.microprofile.reactive.messaging.Message;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
 
 /**
  * Prova che una stazione in MANUTENZIONE faccia sul convoglio lo stesso effetto di una
@@ -17,14 +14,13 @@ import java.nio.charset.StandardCharsets;
  * Centrale, anche dal pannello dell'amministratore — quindi l'unico modo che il treno ha
  * di saperlo e' l'alert STATO_STAZIONE.</p>
  *
- * <p>Come RitardoComunicatoTest non e' un @QuarkusTest: gateway e motore sono costruiti a
- * mano e l'alert viene consegnato direttamente al listener, cosi' il broker (condiviso con
- * il sistema acceso) non viene toccato.</p>
+ * <p>Come in RitardoComunicatoTest gateway, gestore e automi sono costruiti a mano (come
+ * fa il main) e l'alert viene consegnato direttamente al listener, cosi' il broker
+ * (condiviso con il sistema acceso) non viene toccato.</p>
  */
 public class StazioneInManutenzioneTest {
 
     private TrainGateway gateway;
-    private TrainJourneyEngine motore;
     private TrainDB db;
 
     /** Convoglio TRN001 in marcia: e' fermo a S3 e la prossima fermata e' S4. */
@@ -35,16 +31,22 @@ public class StazioneInManutenzioneTest {
         db.stazioneCorrente = "S3";
         db.prossimaStazione = "S4";
         db.faseViaggio = "IN_STAZIONE";
-        db.stato = "FERMO";
 
-        motore = new TrainJourneyEngine();
-        motore.trainDB = db;
-        motore.viaggioAvviato = true;
+        AutomaViaggio viaggio = new AutomaViaggio();
+        viaggio.trainDB = db;
+        AutomaCondizione condizione = new AutomaCondizione();
+        condizione.trainDB = db;
+        AutomaStazioniNote stazioni = new AutomaStazioniNote();
+        stazioni.trainDB = db;
+        GestoreEventi gestore = new GestoreEventi();
+        gestore.trainDB = db;
+        gestore.viaggio = viaggio;
+        gestore.condizione = condizione;
+        gestore.stazioni = stazioni;
 
         gateway = new TrainGateway();
         gateway.trainDB = db;
-        gateway.journeyEngine = motore;
-        gateway.objectMapper = new ObjectMapper();
+        gateway.gestore = gestore;
     }
 
     /**
@@ -54,13 +56,13 @@ public class StazioneInManutenzioneTest {
     @Test
     public void laStazioneInManutenzioneFermaIlTrenoInArrivo() {
         db.faseViaggio = "IN_VIAGGIO";
-        db.stato = "IN_VIAGGIO";
+        db.stazioneCorrente = null;
 
         consegna(alertStato("S4", "MANUTENZIONE"));
 
-        Assertions.assertEquals("BLOCCATO_GUASTO_STAZIONE", db.faseViaggio, "S4 e' la mia prossima fermata");
+        Assertions.assertEquals("BLOCCATO_IN_TRATTA", db.faseViaggio, "S4 e' la mia prossima fermata");
         Assertions.assertEquals("S4", db.stazioneBloccante);
-        Assertions.assertEquals("FERMO", db.stato);
+        Assertions.assertEquals("FERMO", db.stato());
         Assertions.assertEquals(0.0, db.velocita, "un treno bloccato non ha velocita'");
     }
 
@@ -72,7 +74,7 @@ public class StazioneInManutenzioneTest {
     public void ilTrenoInTransitoNellaStazioneRestaFermo() {
         consegna(alertStato("S3", "MANUTENZIONE"));
 
-        Assertions.assertEquals("BLOCCATO_GUASTO_STAZIONE", db.faseViaggio);
+        Assertions.assertEquals("BLOCCATO_IN_STAZIONE", db.faseViaggio);
         Assertions.assertEquals("S3", db.stazioneBloccante, "mi blocca la stazione in cui mi trovo");
     }
 
@@ -84,12 +86,12 @@ public class StazioneInManutenzioneTest {
     @Test
     public void ilGuastoRisoltoNonBastaSeLaSquadraELiAncora() {
         consegna(alertGuasto("S4"));
-        Assertions.assertEquals("BLOCCATO_GUASTO_STAZIONE", db.faseViaggio, "il guasto mi ha fermato");
+        Assertions.assertEquals("BLOCCATO_IN_STAZIONE", db.faseViaggio, "il guasto mi ha fermato");
 
         consegna(alertStato("S4", "MANUTENZIONE"));
         consegna(alertResolved("S4"));
 
-        Assertions.assertEquals("BLOCCATO_GUASTO_STAZIONE", db.faseViaggio, "la squadra e' ancora sul posto");
+        Assertions.assertEquals("BLOCCATO_IN_STAZIONE", db.faseViaggio, "la squadra e' ancora sul posto");
         Assertions.assertEquals("S4", db.stazioneBloccante);
 
         consegna(alertStato("S4", "ONLINE"));
@@ -107,11 +109,11 @@ public class StazioneInManutenzioneTest {
     @Test
     public void ilResolvedDaSoloNonFaRipartireIlConvoglio() {
         consegna(alertGuasto("S4"));
-        Assertions.assertEquals("BLOCCATO_GUASTO_STAZIONE", db.faseViaggio, "il guasto mi ha fermato");
+        Assertions.assertEquals("BLOCCATO_IN_STAZIONE", db.faseViaggio, "il guasto mi ha fermato");
 
         consegna(alertResolved("S4"));
 
-        Assertions.assertEquals("BLOCCATO_GUASTO_STAZIONE", db.faseViaggio,
+        Assertions.assertEquals("BLOCCATO_IN_STAZIONE", db.faseViaggio,
                 "l'allarme e' chiuso, ma dei binari non me l'ha detto nessuno");
         Assertions.assertEquals("S4", db.stazioneBloccante);
     }
@@ -125,7 +127,7 @@ public class StazioneInManutenzioneTest {
     @Test
     public void laStazioneDichiarataAgibileFaRipartireAnchePrimaDelResolved() {
         consegna(alertGuasto("S4"));
-        Assertions.assertEquals("BLOCCATO_GUASTO_STAZIONE", db.faseViaggio);
+        Assertions.assertEquals("BLOCCATO_IN_STAZIONE", db.faseViaggio);
 
         consegna(alertStato("S4", "ONLINE"));
 
@@ -157,8 +159,7 @@ public class StazioneInManutenzioneTest {
 
     /** Consegna l'alert al listener come farebbe il connettore MQTT. */
     private void consegna(String payload) {
-        gateway.riceviAlert(Message.of(payload.getBytes(StandardCharsets.UTF_8)))
-                .toCompletableFuture().join();
+        gateway.riceviAlert(payload);
     }
 
     /** Un alert STATO_STAZIONE nel formato che pubblica PubblicatoreAlert. */

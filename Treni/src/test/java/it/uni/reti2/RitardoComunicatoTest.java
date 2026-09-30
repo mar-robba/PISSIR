@@ -1,12 +1,9 @@
 package it.uni.reti2;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.eclipse.microprofile.reactive.messaging.Message;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
 
 /**
  * Prova il ritardo comunicato dall'esterno: il testo del progetto vuole il convoglio
@@ -14,7 +11,7 @@ import java.nio.charset.StandardCharsets;
  * (guasti o ritardi) dalle stazioni o dalla centrale", e i ritardi sono la meta' che
  * mancava sul canale railway/alerts.
  *
- * <p>Non e' un @QuarkusTest: il gateway viene costruito a mano e l'alert gli viene
+ * <p>Il gateway viene costruito a mano (come fa il main) e l'alert gli viene
  * consegnato direttamente, cosi' il test non tocca il broker (che e' condiviso con il
  * sistema acceso, e pubblicarci sopra un ritardo finto si vedrebbe sui treni veri).</p>
  */
@@ -29,7 +26,6 @@ public class RitardoComunicatoTest {
         db.trenoId = "TRN001";
         gateway = new TrainGateway();
         gateway.trainDB = db;
-        gateway.objectMapper = new ObjectMapper();
     }
 
     /** L'alert con il target giusto lascia a bordo i minuti, la stazione e l'ora della misura. */
@@ -71,8 +67,7 @@ public class RitardoComunicatoTest {
 
     /** Consegna l'alert al listener come farebbe il connettore MQTT. */
     private void consegna(String payload) {
-        gateway.riceviAlert(Message.of(payload.getBytes(StandardCharsets.UTF_8)))
-                .toCompletableFuture().join();
+        gateway.riceviAlert(payload);
     }
 
     /** Un alert RITARDO nel formato che pubblica IngestionService.pubblicaRitardoSuMqtt. */

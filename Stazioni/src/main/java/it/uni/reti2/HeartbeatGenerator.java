@@ -1,48 +1,46 @@
 package it.uni.reti2;
 
-import io.quarkus.scheduler.Scheduled;
-import io.smallrye.mutiny.Multi;
-import it.uni.reti2.DBLocale;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.reactive.messaging.Outgoing;
-import org.jboss.logging.Logger;
-
-import java.time.Duration;
 import java.time.Instant;
+import java.util.logging.Logger;
 
 /**
  * Componente responsabile della generazione e dell'invio ciclico del segnale
- * di vitalità (Heartbeat) della stazione verso la Centrale Operativa.
- * Gestisce anche il meccanismo di Store and Forward per svuotare il buffer
- * degli eventi pendenti non appena la connessione viene ristabilita.
+ * di vitalità (Heartbeat) della stazione verso la Centrale Operativa, sul topic
+ * railway/station/{id}/heartbeat.
  *
- * <p>Il keepalive dei sensori di binario, che prima stava qui dentro, adesso è tutto in
- * {@link MonitorSensori}: sono due heartbeat diversi (questo va verso la Centrale, quello
- * arriva dai dispositivi di campo) e tenerli insieme aveva solo confuso le cose.</p>
+ * <p>Il keepalive dei sensori di binario, che un tempo stava qui dentro, è in AutomaSensori:
+ * sono due heartbeat diversi (questo va verso la Centrale, quello arriva dai dispositivi di
+ * campo) e tenerli insieme aveva solo confuso le cose. Anche lo svuotamento del buffer, che
+ * qui girava in un job a parte ogni 10 secondi, non c'è più: lo fa il ConsumatoreBuffer, che
+ * pubblica appena può.</p>
+ *
+ * <p>Il battito non passa dal LocalBuffer ma si pubblica direttamente, a QoS 0: vale solo
+ * adesso. Rimandarne uno vecchio di minuti dopo una caduta direbbe alla Centrale una cosa
+ * falsa (una stazione viva in un momento in cui non lo era), quindi se non parte si perde e
+ * basta: dieci secondi dopo ne parte un altro. Come la telemetria del treno, legge lo stato e
+ * non muove nessun automa, quindi non passa nemmeno dal gestore degli eventi.</p>
  */
-@ApplicationScoped
 public class HeartbeatGenerator implements HeartbeatKA {
-    private static final Logger LOG = Logger.getLogger(HeartbeatGenerator.class);
+    private static final Logger LOG = Logger.getLogger(HeartbeatGenerator.class.getName());
 
-    @Inject
+    /** Stato del nodo: id, stato operativo, riconoscimento. Assegnato dal main. */
     DBLocale dbLocale;
 
-    @Inject
+    /** La coda verso la Centrale: nel battito viaggia quanti eventi aspettano. */
     LocalBuffer localBuffer;
 
-    /**
-     * Gateway verso la Centrale: usato per il flush reale del buffer.
-     */
-    @Inject
-    StationGateway stationGateway;
+    /** Il collegamento con la Centrale: da staccato il battito non parte. */
+    AutomaConnessione connessione;
+
+    /** Con che cosa si pubblica. */
+    ClientMqtt clientMqtt;
 
     /**
      * Il battito è periodico: stamparlo tutte le volte riempirebbe il log di righe uguali.
      * Se ne stampa una quando parte (e una ogni volta che riprende dopo una pausa), il
      * payload completo resta in DEBUG. Questi due campi ricordano cosa è già stato detto,
      * così anche il motivo per cui il battito è sospeso si scrive una volta sola e non a
-     * ogni tick.
+     * ogni giro. Li usa solo il thread dell'orologio.
      */
     private boolean battitoAnnunciato;
     private String motivoSospensione;
@@ -60,28 +58,8 @@ public class HeartbeatGenerator implements HeartbeatKA {
     }
 
     /**
-     * Job periodico di manutenzione del nodo, volutamente SEPARATO dal flusso di heartbeat:
-     * se la connessione è attiva e ci sono eventi pendenti, svuota il buffer
-     * tramite il flush reale del Gateway (store and forward).
-     *
-     * Prima queste due operazioni giravano dentro l'.invoke() del Multi dell'heartbeat:
-     * siccome un Multi che fallisce termina, al primo errore MQTT si fermava anche lo
-     * store-and-forward e gli eventi bufferizzati non sarebbero mai più partiti.
-     * Con un job schedulato indipendente il buffer continua a svuotarsi comunque.
-     */
-    @Scheduled(every = "10s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    void manutenzionePeriodica() {
-        // Se la connessione è attiva e ci sono eventi che non erano stati inviati...
-        if (dbLocale.connessioneCentrale && !localBuffer.isEmpty()) {
-            LOG.infof("📡 Connessione ok, svuoto il buffer (%d eventi)...", localBuffer.size());
-            // Reinvia effettivamente gli eventi sugli emitter corretti
-            stationGateway.flush();
-        }
-    }
-
-    /**
      * Scrive il motivo per cui il battito non parte, ma una volta sola: finché il motivo
-     * resta quello il tick continua a scattare ogni 10 secondi in silenzio invece di
+     * resta quello l'orologio continua a scattare ogni 10 secondi in silenzio invece di
      * ripetere la stessa riga. Alla ripresa {@link #generaHeartbeat()} azzera il campo,
      * così la volta dopo la sospensione si rivede.
      *
@@ -89,7 +67,7 @@ public class HeartbeatGenerator implements HeartbeatKA {
      */
     private void sospendi(String motivo) {
         if (!motivo.equals(motivoSospensione)) {
-            LOG.warn(motivo);
+            LOG.warning(motivo);
             motivoSospensione = motivo;
             // Quando il battito riprende va detto: è la notizia opposta a questa.
             battitoAnnunciato = false;
@@ -97,67 +75,45 @@ public class HeartbeatGenerator implements HeartbeatKA {
     }
 
     /**
-     * Producer reattivo che emette l'heartbeat sul canale MQTT dedicato ("heartbeat-out").
-     * Viene eseguito ogni 10 secondi in background.
+     * Un battito: lo chiama l'Orologio ogni 10 secondi, in background.
      * Se la connessione verso la Centrale è simulata come assente, il battito
      * NON viene emesso (così la Centrale rileva la stazione come OFFLINE).
      * Allo stesso modo, finché l'ID della stazione non è stato riconosciuto dal
      * database centrale (validazione MQTT asincrona via StationDatabaseValidator)
-     * nessun battito viene emesso: il tick di Mutiny continua a scattare ogni 10s
-     * in background (costo trascurabile), ma resta filtrato finché
-     * dbLocale.stazioneRiconosciuta non diventa true; al tick successivo alla
+     * nessun battito viene emesso: l'orologio continua a scattare ogni 10s
+     * (costo trascurabile), ma il battito resta filtrato finché
+     * dbLocale.stazioneRiconosciuta non diventa true; al giro successivo alla
      * conferma l'heartbeat riparte da solo, senza alcun accoppiamento diretto
      * con StationDatabaseValidator.
-     *
-     * @return Il flusso dati Multi di Mutiny contenente le stringhe JSON dei battiti cardiaci.
      */
-    @Outgoing("heartbeat-out")
-    public Multi<String> generaHeartbeat() {
-        // Genera un evento reattivo periodico
-        return Multi.createFrom()
-                .ticks()
-                .every(Duration.ofSeconds(10))
-                .filter(tick -> {
-                    // ID non ancora validato dalla Centrale: nessun battito finché non arriva
-                    // la conferma via MQTT (StationDatabaseValidator.gestisciRispostaValidazione).
-                    if (!dbLocale.stazioneRiconosciuta) {
-                        sospendi("⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.");
-                        return false;
-                    }
-                    return true;
-                })
-                .filter(tick -> {
-                    // Rete simulata giù: si salta il battito, la Centrale ci vedrà OFFLINE
-                    if (!dbLocale.connessioneCentrale) {
-                        sospendi("🔌 Offline: heartbeat non inviato alla Centrale.");
-                        return false;
-                    }
-                    return true;
-                })
-                .map(tick -> {
-                    // Prepara il messaggio
-                    String json = generatePayload(dbLocale.stazioneId, dbLocale.getStato(), localBuffer.size());
-                    if (!battitoAnnunciato) {
-                        // Una riga sola per dire che il battito c'è: il dettaglio è in DEBUG.
-                        LOG.info("💓 [HEARTBEAT] Battito verso la Centrale ogni 10 secondi.");
-                        battitoAnnunciato = true;
-                    }
-                    motivoSospensione = null;
-                    LOG.debugf("💓 [HEARTBEAT] Invio heartbeat: %s", json);
-                    return json;
-                })
-                // Gestione reattiva degli errori di connessione sul canale di invio
-                .onFailure().invoke(e -> {
-                    LOG.error("🔌 Errore connessione MQTT Centrale!");
-                    // Contrassegna la connessione come persa in modo che Gateway sappia
-                    // che deve usare il buffer per i prossimi eventi.
-                    dbLocale.connessioneCentrale = false;
-                })
-                // invoke() esegue solo l'effetto collaterale: il flusso resterebbe comunque
-                // terminato e la stazione non batterebbe MAI più (per la Centrale sarebbe
-                // OFFLINE per sempre). Il retry con backoff riaggancia il canale da solo
-                // quando il broker torna disponibile.
-                .onFailure().retry().withBackOff(Duration.ofSeconds(1), Duration.ofSeconds(10)).indefinitely();
-    }
+    public void generaHeartbeat() {
+        // ID non ancora validato dalla Centrale: nessun battito finché non arriva
+        // la conferma via MQTT (StationDatabaseValidator.gestisciRispostaValidazione).
+        if (!dbLocale.stazioneRiconosciuta) {
+            sospendi("⏳ Stazione non ancora validata dalla Centrale: heartbeat sospeso.");
+            return;
+        }
+        // Rete simulata giù: si salta il battito, la Centrale ci vedrà OFFLINE
+        if (!connessione.collegata()) {
+            sospendi("🔌 Offline: heartbeat non inviato alla Centrale.");
+            return;
+        }
 
+        String json = generatePayload(dbLocale.stazioneId, dbLocale.getStato(), localBuffer.size());
+        try {
+            clientMqtt.pubblica("railway/station/" + dbLocale.stazioneId + "/heartbeat", json, 0);
+        } catch (Exception e) {
+            // Broker giù davvero: Paho si sta già ricollegando da solo, il battito si perde
+            sospendi("🔌 Broker MQTT non raggiungibile: heartbeat non inviato alla Centrale.");
+            return;
+        }
+
+        if (!battitoAnnunciato) {
+            // Una riga sola per dire che il battito c'è: il dettaglio è in DEBUG.
+            LOG.info("💓 [HEARTBEAT] Battito verso la Centrale ogni 10 secondi.");
+            battitoAnnunciato = true;
+        }
+        motivoSospensione = null;
+        LOG.fine(String.format("💓 [HEARTBEAT] Invio heartbeat: %s", json));
+    }
 }

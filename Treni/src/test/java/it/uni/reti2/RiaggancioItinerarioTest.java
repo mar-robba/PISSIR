@@ -6,28 +6,40 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Test del riaggancio all'itinerario modificato a viaggio iniziato (RF02.5.2):
  * il convoglio ancora assegnato deve restare dove si trova e proseguire sulle
  * fermate nuove, non ricominciare dal capolinea.
  *
- * Non è un @QuarkusTest: il motore viene costruito a mano e gli si passa un TrainDB
- * finto, così il test non tocca né il broker MQTT né la Centrale (i metodi provati
- * lavorano solo sullo stato in memoria, non pubblicano nessun passaggio).
+ * Gestore e automi vengono costruiti a mano (come fa il main) e gli si passa un
+ * TrainDB finto, così il test non tocca né il broker MQTT né la Centrale. L'itinerario
+ * arriva come arriverebbe dal GeneratoreEventiTempo, cioè come evento ITINERARIO_CARICATO
+ * (un riaggancio in stazione non pubblica nessun passaggio, quindi i pubblicatori non servono).
  */
 public class RiaggancioItinerarioTest {
 
-    private TrainJourneyEngine motore;
+    private GestoreEventi gestore;
+    private AutomaViaggio viaggio;
     private TrainDB db;
 
     /** Itinerario di partenza: S1 -> S2 -> S3 -> S4, treno fermo a S3 in andata. */
     @BeforeEach
     public void preparaTrenoInMarcia() {
         db = new TrainDB();
-        motore = new TrainJourneyEngine();
-        motore.trainDB = db;
-        motore.sostaSecondi = 20;
+        viaggio = new AutomaViaggio();
+        viaggio.trainDB = db;
+        viaggio.sostaSecondi = 20;
+        AutomaCondizione condizione = new AutomaCondizione();
+        condizione.trainDB = db;
+        AutomaStazioniNote stazioni = new AutomaStazioniNote();
+        stazioni.trainDB = db;
+        gestore = new GestoreEventi();
+        gestore.trainDB = db;
+        gestore.viaggio = viaggio;
+        gestore.condizione = condizione;
+        gestore.stazioni = stazioni;
 
         List<TrainDB.TappaItinerario> vecchio = itinerario("S1", "S2", "S3", "S4");
         db.itinerario = vecchio;
@@ -38,9 +50,7 @@ public class RiaggancioItinerarioTest {
         db.prossimaStazione = "S4";
         db.direzione = "andata";
         db.faseViaggio = "IN_STAZIONE";
-        db.stato = "FERMO";
         db.passeggeri = 123;
-        motore.viaggioAvviato = true;
     }
 
     /**
@@ -50,10 +60,8 @@ public class RiaggancioItinerarioTest {
      */
     @Test
     public void ilTrenoRestaNellaStazioneInCuiSiTrova() {
-        List<TrainDB.TappaItinerario> nuovo = itinerario("S2", "S3", "S4", "S5");
-        motore.applicaItinerario("IT_NUOVO", nuovo, idDi(nuovo), null);
+        carica(new Itinerario("IT_NUOVO", itinerario("S2", "S3", "S4", "S5"), null, Map.of()));
 
-        Assertions.assertTrue(motore.viaggioAvviato, "il viaggio non doveva essere azzerato");
         Assertions.assertEquals("IT_NUOVO", db.itinerarioId);
         Assertions.assertEquals(1, db.indiceStazione, "S3 è la seconda fermata del percorso nuovo");
         Assertions.assertEquals("S3", db.stazioneCorrente);
@@ -67,26 +75,30 @@ public class RiaggancioItinerarioTest {
 
     /**
      * Se la stazione in cui il treno si trova non fa più parte del percorso non c'è nessun
-     * punto a cui agganciarsi: si torna al comportamento di prima, cioè partenza dal capolinea.
+     * punto a cui agganciarsi: si riparte dalla prima tappa del percorso nuovo, subito, senza
+     * passare un giro con l'itinerario nuovo e l'indice di quello vecchio.
      */
     @Test
-    public void senzaLaStazioneCorrenteSiRicominciaDalCapolinea() {
-        List<TrainDB.TappaItinerario> nuovo = itinerario("S7", "S8", "S9");
-        motore.applicaItinerario("IT_ALTROVE", nuovo, idDi(nuovo), null);
+    public void senzaLaStazioneCorrenteSiRiparteDallaPrimaTappa() {
+        carica(new Itinerario("IT_ALTROVE", itinerario("S7", "S8", "S9"), null, Map.of()));
 
-        Assertions.assertFalse(motore.viaggioAvviato, "il tick successivo deve rifare avviaViaggio()");
         Assertions.assertEquals("IT_ALTROVE", db.itinerarioId);
         Assertions.assertEquals(3, db.itinerario.size());
+        Assertions.assertEquals(0, db.indiceStazione);
+        Assertions.assertEquals("S7", db.stazioneCorrente);
+        Assertions.assertEquals("S8", db.prossimaStazione);
+        Assertions.assertEquals("andata", db.direzione);
+        Assertions.assertEquals("IN_STAZIONE", db.faseViaggio);
     }
 
     /**
      * Se la stazione in cui il treno si trova è diventata il capolinea del percorso nuovo
-     * la direzione va invertita, se no la prossima fermata sarebbe null e il viaggio finirebbe.
+     * la direzione va invertita, se no la prossima fermata sarebbe null e il treno non
+     * saprebbe più dove andare.
      */
     @Test
     public void alCapolineaNuovoLaDirezioneSiInverte() {
-        List<TrainDB.TappaItinerario> nuovo = itinerario("S1", "S2", "S3");
-        motore.applicaItinerario("IT_ACCORCIATO", nuovo, idDi(nuovo), null);
+        carica(new Itinerario("IT_ACCORCIATO", itinerario("S1", "S2", "S3"), null, Map.of()));
 
         Assertions.assertEquals(2, db.indiceStazione);
         Assertions.assertEquals("ritorno", db.direzione);
@@ -95,20 +107,21 @@ public class RiaggancioItinerarioTest {
 
     /**
      * Treno in mezzo alla tratta S3 -> S4: non può teletrasportarsi, quindi finisce la tratta
-     * sul percorso vecchio e il nuovo resta in attesa (lo installa arrivoInStazione).
+     * sul percorso vecchio e il nuovo resta in attesa (lo installa l'arrivo in stazione).
      */
     @Test
     public void inMezzoAUnaTrattaIlPercorsoNuovoAspetta() {
         db.faseViaggio = "IN_VIAGGIO";
-        db.stato = "IN_VIAGGIO";
+        db.stazioneCorrente = null;
 
-        List<TrainDB.TappaItinerario> nuovo = itinerario("S3", "S4", "S5");
-        motore.applicaItinerario("IT_NUOVO", nuovo, idDi(nuovo), null);
+        Itinerario nuovo = new Itinerario("IT_NUOVO", itinerario("S3", "S4", "S5"), null, Map.of());
+        carica(nuovo);
 
         Assertions.assertEquals("IT_VECCHIO", db.itinerarioId, "l'itinerario in uso non cambia a metà tratta");
         Assertions.assertEquals(4, db.itinerario.size());
         Assertions.assertEquals("IN_VIAGGIO", db.faseViaggio);
         Assertions.assertEquals("S4", db.prossimaStazione);
+        Assertions.assertSame(nuovo, viaggio.itinerarioPendente(), "il percorso nuovo aspetta l'arrivo");
     }
 
     /**
@@ -118,8 +131,7 @@ public class RiaggancioItinerarioTest {
      */
     @Test
     public void conLeStesseFermateIlViaggioProsegue() {
-        List<TrainDB.TappaItinerario> stesse = itinerario("S1", "S2", "S3", "S4");
-        motore.applicaItinerario("IT_VECCHIO", stesse, idDi(stesse), null);
+        carica(new Itinerario("IT_VECCHIO", itinerario("S1", "S2", "S3", "S4"), null, Map.of()));
 
         Assertions.assertEquals(2, db.indiceStazione, "nessun riaggancio: il treno era già a posto");
         Assertions.assertNull(db.tArrivoInStazione, "la sosta non doveva ripartire");
@@ -134,14 +146,13 @@ public class RiaggancioItinerarioTest {
     @Test
     public void toglierIlCapolineaRimetteInServizioIlTreno() {
         db.capolineaId = "S3";
-        db.stato = "CAPOLINEA";
         db.faseViaggio = "FERMO_CAPOLINEA";
+        db.prossimaStazione = null;
 
-        List<TrainDB.TappaItinerario> stesse = itinerario("S1", "S2", "S3", "S4");
-        motore.applicaItinerario("IT_VECCHIO", stesse, idDi(stesse), null);
+        carica(new Itinerario("IT_VECCHIO", itinerario("S1", "S2", "S3", "S4"), null, Map.of()));
 
         Assertions.assertEquals("IN_STAZIONE", db.faseViaggio, "la corsa è ricominciata");
-        Assertions.assertEquals("FERMO", db.stato);
+        Assertions.assertEquals("FERMO", db.stato());
         Assertions.assertEquals("S3", db.stazioneCorrente, "riparte da dove si era fermato");
         Assertions.assertEquals("S4", db.prossimaStazione);
         Assertions.assertNull(db.capolineaId);
@@ -156,18 +167,55 @@ public class RiaggancioItinerarioTest {
     @Test
     public void ilCapolineaConfermatoTieneFermoIlTreno() {
         db.capolineaId = "S3";
-        db.stato = "CAPOLINEA";
         db.faseViaggio = "FERMO_CAPOLINEA";
+        db.prossimaStazione = null;
 
-        List<TrainDB.TappaItinerario> stesse = itinerario("S1", "S2", "S3", "S4");
-        motore.applicaItinerario("IT_VECCHIO", stesse, idDi(stesse), "S3");
+        carica(new Itinerario("IT_VECCHIO", itinerario("S1", "S2", "S3", "S4"), "S3", Map.of()));
 
         Assertions.assertEquals("FERMO_CAPOLINEA", db.faseViaggio, "la corsa era ed è finita");
-        Assertions.assertEquals("CAPOLINEA", db.stato);
+        Assertions.assertEquals("CAPOLINEA", db.stato());
         Assertions.assertEquals("S3", db.stazioneCorrente);
+        Assertions.assertNull(db.prossimaStazione, "al capolinea non c'è una prossima fermata");
+    }
+
+    /**
+     * Il treno è trattenuto a S3 perché S4 è guasta. Arriva un percorso nuovo e nella stessa
+     * risposta la Centrale dichiara S4 di nuovo ONLINE: il blocco va deciso con quello stato,
+     * anche se nel TrainDB viene scritto solo dopo (è la guardia che guarda avanti).
+     */
+    @Test
+    public void ilRiaggancioUsaGliStatiArrivatiInsiemeAlPercorso() {
+        db.faseViaggio = "BLOCCATO_IN_STAZIONE";
+        db.stazioneBloccante = "S4";
+        db.statoStazioni.put("S4", "GUASTA");
+
+        carica(new Itinerario("IT_NUOVO", itinerario("S2", "S3", "S4", "S5"), null, Map.of("S4", "ONLINE")));
+
+        Assertions.assertEquals("IN_STAZIONE", db.faseViaggio, "S4 è di nuovo percorribile");
+        Assertions.assertNull(db.stazioneBloccante);
+        Assertions.assertEquals("ONLINE", db.statoStazioni.get("S4"), "lo stato nuovo resta scritto a bordo");
+    }
+
+    /** Stesso caso, ma la Centrale dice che S4 è ancora chiusa: il treno resta trattenuto. */
+    @Test
+    public void ilRiaggancioTieneFermoIlTrenoSeLaStazioneEAncoraChiusa() {
+        db.faseViaggio = "BLOCCATO_IN_STAZIONE";
+        db.stazioneBloccante = "S4";
+        db.statoStazioni.put("S4", "GUASTA");
+
+        carica(new Itinerario("IT_NUOVO", itinerario("S2", "S3", "S4", "S5"), null, Map.of("S4", "MANUTENZIONE")));
+
+        Assertions.assertEquals("BLOCCATO_IN_STAZIONE", db.faseViaggio);
+        Assertions.assertEquals("S4", db.stazioneBloccante);
+        Assertions.assertEquals(1, db.indiceStazione, "il riaggancio c'è stato comunque");
     }
 
     // ---------------------------------------------------------------- utilità
+
+    /** Consegna l'itinerario al gestore come farebbe il GeneratoreEventiTempo. */
+    private void carica(Itinerario itinerario) {
+        gestore.gestisci(EventoTreno.itinerarioCaricato(itinerario));
+    }
 
     /** Costruisce un itinerario finto con coordinate e tempi qualsiasi ma validi. */
     private List<TrainDB.TappaItinerario> itinerario(String... stazioni) {

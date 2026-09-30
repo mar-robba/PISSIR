@@ -1,28 +1,23 @@
 package it.uni.reti2;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
-import org.eclipse.microprofile.reactive.messaging.Incoming;
-import org.eclipse.microprofile.reactive.messaging.Message;
-import org.jboss.logging.Logger;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.CompletionStage;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Verifica che l'ID del treno sia valido tramite messaggistica MQTT.
+ *
+ * <p>La domanda parte su railway/train/{id}/validation e la Centrale risponde su
+ * railway/train/{id}/validation-response: la risposta la riceve
+ * {@link #gestisciRispostaValidazione}, che il main registra presso ClientMqtt.</p>
  */
-@ApplicationScoped
 public class TrainDatabaseValidator {
 
-    private static final Logger LOG = Logger.getLogger(TrainDatabaseValidator.class);
+    private static final Logger LOG = Logger.getLogger(TrainDatabaseValidator.class.getName());
     private static final long RETRY_SECONDI = 15;
 
     public enum EsitoVerifica {
@@ -31,16 +26,10 @@ public class TrainDatabaseValidator {
         RIPROVA
     }
 
-    @Inject
     TrainDB trainDB;
 
-    @Inject
-    ObjectMapper mapper;
-
-    // Emitter per l'invio della richiesta di verifica via MQTT
-    @Inject
-    @Channel("validation-request-out")
-    Emitter<String> validationEmitter;
+    // Coda dei messaggi MQTT in uscita, per l'invio della richiesta di verifica
+    CodaPubblicazioni coda;
 
     private Instant ultimoTentativo = Instant.EPOCH;
     private volatile EsitoVerifica esitoCorrente = EsitoVerifica.RIPROVA;
@@ -66,7 +55,7 @@ public class TrainDatabaseValidator {
 
         String idTreno = trainDB.trenoId == null ? "" : trainDB.trenoId.trim();
         if (idTreno.isEmpty()) {
-            LOG.error("Impossibile verificare il processo: ID del treno vuoto");
+            LOG.severe("Impossibile verificare il processo: ID del treno vuoto");
             return EsitoVerifica.RIPROVA;
         }
 
@@ -78,46 +67,45 @@ public class TrainDatabaseValidator {
 
     private void inviaRichiestaValidazione(String idTreno) {
         try {
-            ObjectNode payloadJson = mapper.createObjectNode();
-            payloadJson.put("trenoId", idTreno);
+            JsonObject payloadJson = new JsonObject();
+            payloadJson.addProperty("trenoId", idTreno);
 
-            validationEmitter.send(payloadJson.toString());
-            LOG.infof("📩 Richiesta di validazione inviata per il treno: %s", idTreno);
+            coda.metti("railway/train/" + idTreno + "/validation", payloadJson.toString(), 0);
+            LOG.info(String.format("📩 Richiesta di validazione inviata per il treno: %s", idTreno));
         } catch (Exception e) {
-            LOG.warnf("Errore durante l'invio della richiesta MQTT per ID '%s'; riprovo tra %ds: %s",
-                    idTreno, RETRY_SECONDI, e.getMessage());
+            LOG.warning(String.format("Errore durante l'invio della richiesta MQTT per ID '%s'; riprovo tra %ds: %s",
+                    idTreno, RETRY_SECONDI, e.getMessage()));
         }
     }
 
     /**
-     * Ascolta in modo asincrono la risposta dal server centrale sul canale di validation response.
+     * Ascolta in modo asincrono la risposta dal server centrale sul canale di validation
+     * response (gira sul thread di Paho).
+     *
+     * @param payload Il contenuto della risposta (JSON).
      */
-    @Incoming("validation-response-in")
-    public CompletionStage<Void> gestisciRispostaValidazione(Message<byte[]> messaggio) {
+    public void gestisciRispostaValidazione(String payload) {
         try {
-            String payload = new String(messaggio.getPayload());
-            JsonNode root = mapper.readTree(payload);
+            JsonObject root = JsonParser.parseString(payload).getAsJsonObject();
 
-            String trenoIdRisposta = root.has("trenoId") ? root.get("trenoId").asText() : null;
+            String trenoIdRisposta = CampiJson.testo(root, "trenoId", null);
             String trenoIdCorrente = trainDB.trenoId != null ? trainDB.trenoId.trim() : "";
 
             // Verifica che la risposta appartenga a questo specifico treno
             if (trenoIdRisposta != null && trenoIdRisposta.equals(trenoIdCorrente)) {
-                boolean esiste = root.has("esisteNelDb") && root.get("esisteNelDb").asBoolean();
+                boolean esiste = CampiJson.booleano(root, "esisteNelDb", false);
 
                 if (esiste) {
                     trainDB.trenoRiconosciuto = true;
                     this.esitoCorrente = EsitoVerifica.VALIDATO;
-                    LOG.infof("🚂 Processo associato con successo alla chiave primaria del database: %s", trenoIdRisposta);
+                    LOG.info(String.format("🚂 Processo associato con successo alla chiave primaria del database: %s", trenoIdRisposta));
                 } else {
                     this.esitoCorrente = EsitoVerifica.ID_NON_PRESENTE;
-                    LOG.errorf("❌ L'ID '%s' non è presente nel database centrale: il treno non è registrato.", trenoIdRisposta);
+                    LOG.severe(String.format("❌ L'ID '%s' non è presente nel database centrale: il treno non è registrato.", trenoIdRisposta));
                 }
             }
-        } catch (JsonProcessingException e) {
-            LOG.error("Errore nel parsing del messaggio di risposta di validazione MQTT", e);
+        } catch (Exception e) {
+            LOG.log(Level.SEVERE, "Errore nel parsing del messaggio di risposta di validazione MQTT", e);
         }
-
-        return messaggio.ack();
     }
 }

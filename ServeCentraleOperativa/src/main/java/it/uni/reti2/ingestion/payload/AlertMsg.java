@@ -1,6 +1,6 @@
 package it.uni.reti2.ingestion.payload;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonObject;
 
 import java.time.Instant;
 
@@ -32,7 +32,7 @@ public record AlertMsg(
      * @param payloadGrezzo Testo originale del messaggio, usato come descrizione di
      *                      ripiego quando l'alert non porta un campo "messaggio".
      */
-    public static AlertMsg da(JsonNode root, String payloadGrezzo) {
+    public static AlertMsg da(JsonObject root, String payloadGrezzo) {
         return new AlertMsg(
                 Payload.testo(root, "tipoEvento", ""),
                 Payload.testo(root, "origine", ""),

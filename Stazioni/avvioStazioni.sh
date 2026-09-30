@@ -8,6 +8,13 @@ if [[ ! -f "$NODI_FILE" ]]; then
     exit 1
 fi
 
+# Il jar unico con dentro tutte le librerie: lo crea ./mvnw package
+JAR="target/stazione.jar"
+if [[ ! -f "$JAR" ]]; then
+    echo "❌ Non trovo $JAR: prima va compilato con ./mvnw package"
+    exit 1
+fi
+
 # Lista degli argomenti da passare al main() del JAR, letta dal file
 ARGS=()
 while IFS= read -r riga || [[ -n "$riga" ]]; do
@@ -24,8 +31,8 @@ fi
 # Numero di istanze (una per ogni riga letta dal file)
 N_INSTANCES=${#ARGS[@]}
 
-# Comando base
-JAR_CMD=" java -Dquarkus.profile=tls -jar target/quarkus-app/quarkus-run.jar"
+# Comando base: profilo tls, cioe' MQTT sulla 8883 e API REST dei sensori in HTTPS
+JAR_CMD="java -Dprofilo=tls"
 
 # Porta di partenza (prima istanza su 8080, poi 8081...)
 BASE_PORT=8080
@@ -59,8 +66,8 @@ for i in $(seq 0 $((N_INSTANCES - 1))); do
 
     echo "🚀 Avvio istanza $((i+1)): argomento='$ARG', porta=$PORT"
 
-    # Passa l'argomento al jar (dopo il nome del jar) e imposta la porta via variabile d'ambiente
-    QUARKUS_HTTP_PORT=$PORT $JAR_CMD "$ARG" > "$LOG_FILE" 2>&1 &
+    # Passa l'argomento al jar (dopo il nome del jar) e la porta con -Dhttp.port
+    $JAR_CMD -Dhttp.port=$PORT -jar "$JAR" "$ARG" > "$LOG_FILE" 2>&1 &
 
     PIDS+=($!)
 done

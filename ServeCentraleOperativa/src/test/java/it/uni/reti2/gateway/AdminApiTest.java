@@ -1,80 +1,76 @@
 package it.uni.reti2.gateway;
 
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.security.TestSecurity;
-import io.restassured.http.ContentType;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
+import com.google.gson.JsonObject;
+import it.uni.reti2.CentraleDiProva;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
 
 import java.util.UUID;
-
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.CoreMatchers.equalTo;
 
 /**
  * Test delle API di amministrazione.
  *
- * <p>Prima ogni test faceva un vero {@code POST /api/auth/login} per farsi dare il
- * token: con Keycloak quell'endpoint non esiste piu' e tenere acceso un container
- * solo per i test sarebbe scomodo. Si usa quindi {@code @TestSecurity}, che inietta
- * direttamente l'identita' (utente + ruoli di realm) che il token avrebbe portato;
- * nel profilo di test l'estensione OIDC e' spenta ({@code %test.quarkus.oidc.enabled=false},
- * in application.properties).</p>
+ * <p>Le richieste passano davvero da HTTP, dal filtro e da pac4j: il token lo firma la
+ * {@link CentraleDiProva} con la sua chiave di prova, e porta l'utente e i ruoli di realm
+ * che porterebbe quello di Keycloak. Prima, con Quarkus, l'identita' la iniettava
+ * {@code @TestSecurity} e il controllo del token nei test era spento.</p>
  */
-@QuarkusTest
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class AdminApiTest {
 
     private static final String STAZIONE_ID = "STAZ_TEST_" + UUID.randomUUID().toString().substring(0, 4);
     private static final String TRENO_ID = "TRENO_TEST_" + UUID.randomUUID().toString().substring(0, 4);
 
-    @jakarta.inject.Inject
-    it.uni.reti2.elaboration.TrafficLogicEngine statoRete;
+    private CentraleDiProva centrale;
+
+    @BeforeAll
+    void accendi() throws Exception {
+        centrale = CentraleDiProva.avvia();
+    }
+
+    @AfterAll
+    void spegni() throws Exception {
+        centrale.close();
+    }
 
     @Test
     @Order(0)
-    public void testSenzaTokenVieneRifiutato() {
-        // Prova che gli endpoint non sono pubblici: senza identita' si prende un 401
-        given()
-        .when()
-            .get("/api/stazioni")
-        .then()
-            .statusCode(401);
+    public void testSenzaTokenVieneRifiutato() throws Exception {
+        // Prova che gli endpoint non sono pubblici: senza token si prende un 401
+        CentraleDiProva.Risposta risposta = centrale.get("/api/stazioni", null);
+        Assertions.assertEquals(401, risposta.stato());
+        Assertions.assertEquals("Autenticazione richiesta: effettuare il login",
+                risposta.json().getAsJsonObject().get("errore").getAsString());
     }
 
     @Test
     @Order(1)
-    @TestSecurity(user = "mat003", roles = {"tecnico"})
-    public void testTecnicoNonPuoCreareStazioni() {
+    public void testTecnicoNonPuoCreareStazioni() throws Exception {
         // Il tecnico legge e usa i comandi operativi, ma l'anagrafica non la tocca:
-        // e' la separazione dei due ruoli che chiede il PDF, adesso decisa dal ruolo
-        // di realm che Keycloak scrive nel token.
-        given()
-            .contentType(ContentType.JSON)
-            .body("{\"id\": \"STAZ_VIETATA\", \"nome\": \"Non deve nascere\"}")
-        .when()
-            .post("/api/stazioni")
-        .then()
-            .statusCode(403);
+        // e' la separazione dei due ruoli che chiede il PDF, decisa dal ruolo di realm
+        // che Keycloak scrive nel token.
+        CentraleDiProva.Risposta risposta = centrale.post("/api/stazioni",
+                "{\"id\": \"STAZ_VIETATA\", \"nome\": \"Non deve nascere\"}", centrale.tecnico());
+        Assertions.assertEquals(403, risposta.stato());
+        Assertions.assertNull(centrale.statoRete.getStazione("STAZ_VIETATA"), "la stazione non doveva nascere");
     }
 
     @Test
     @Order(2)
-    @TestSecurity(user = "mat003", roles = {"tecnico"})
-    public void testTecnicoPuoLeggere() {
-        given()
-        .when()
-            .get("/api/stazioni")
-        .then()
-            .statusCode(200);
+    public void testTecnicoPuoLeggere() throws Exception {
+        Assertions.assertEquals(200, centrale.get("/api/stazioni", centrale.tecnico()).stato());
     }
 
     @Test
     @Order(3)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void testCreateStazione() {
+    public void testCreateStazione() throws Exception {
         String requestBody = """
                 {
                     "id": "%s",
@@ -86,50 +82,35 @@ public class AdminApiTest {
                 }
                 """.formatted(STAZIONE_ID);
 
-        given()
-            .contentType(ContentType.JSON)
-            .body(requestBody)
-        .when()
-            .post("/api/stazioni")
-        .then()
-            .statusCode(201)
-            .body("id", equalTo(STAZIONE_ID))
-            .body("nome", equalTo("Stazione Test"));
+        CentraleDiProva.Risposta risposta = centrale.post("/api/stazioni", requestBody, centrale.admin());
+        Assertions.assertEquals(201, risposta.stato());
+        JsonObject stazione = risposta.json().getAsJsonObject();
+        Assertions.assertEquals(STAZIONE_ID, stazione.get("id").getAsString());
+        Assertions.assertEquals("Stazione Test", stazione.get("nome").getAsString());
     }
 
     @Test
     @Order(4)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void testGetStazioni() {
-        given()
-        .when()
-            .get("/api/stazioni")
-        .then()
-            .statusCode(200);
+    public void testGetStazioni() throws Exception {
+        CentraleDiProva.Risposta risposta = centrale.get("/api/stazioni", centrale.admin());
+        Assertions.assertEquals(200, risposta.stato());
+        Assertions.assertTrue(risposta.corpo().contains(STAZIONE_ID));
     }
 
     @Test
     @Order(5)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void testDeleteStazione() {
-        given()
-        .when()
-            .delete("/api/stazioni/" + STAZIONE_ID)
-        .then()
-            .statusCode(204);
+    public void testDeleteStazione() throws Exception {
+        Assertions.assertEquals(204, centrale.delete("/api/stazioni/" + STAZIONE_ID, centrale.admin()).stato());
 
         // Verifica che sia stata cancellata
-        given()
-        .when()
-            .get("/api/stazioni")
-        .then()
-            .statusCode(200);
+        CentraleDiProva.Risposta risposta = centrale.get("/api/stazioni", centrale.admin());
+        Assertions.assertEquals(200, risposta.stato());
+        Assertions.assertFalse(risposta.corpo().contains(STAZIONE_ID));
     }
 
     @Test
     @Order(6)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void testCreateTreno() {
+    public void testCreateTreno() throws Exception {
         // "id" è il nome del convoglio digitato in interfaccia: è la chiave primaria.
         String requestBody = """
                 {
@@ -138,104 +119,88 @@ public class AdminApiTest {
                 }
                 """.formatted(TRENO_ID);
 
-        given()
-            .contentType(ContentType.JSON)
-            .body(requestBody)
-        .when()
-            .post("/api/treni")
-        .then()
-            .statusCode(201)
-            .body("id", equalTo(TRENO_ID));
+        CentraleDiProva.Risposta risposta = centrale.post("/api/treni", requestBody, centrale.admin());
+        Assertions.assertEquals(201, risposta.stato());
+        Assertions.assertEquals(TRENO_ID, risposta.json().getAsJsonObject().get("id").getAsString());
     }
 
     @Test
     @Order(7)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void testNomeConvoglioDuplicatoRifiutato() {
+    public void testNomeConvoglioDuplicatoRifiutato() throws Exception {
         // Il nome è la chiave primaria: un secondo treno con lo stesso nome è un conflitto.
-        given()
-            .contentType(ContentType.JSON)
-            .body("{\"id\": \"%s\", \"stato\": \"fermo\"}".formatted(TRENO_ID))
-        .when()
-            .post("/api/treni")
-        .then()
-            .statusCode(409);
+        CentraleDiProva.Risposta risposta = centrale.post("/api/treni",
+                "{\"id\": \"%s\", \"stato\": \"fermo\"}".formatted(TRENO_ID), centrale.admin());
+        Assertions.assertEquals(409, risposta.stato());
     }
 
     @Test
     @Order(8)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void testRinominaConvoglioRifiutata() {
+    public void testRinominaConvoglioRifiutata() throws Exception {
         // Il nome identifica il convoglio: la PUT non lo cambia, risponde 400.
-        given()
-            .contentType(ContentType.JSON)
-            .body("{\"id\": \"%s_RINOMINATO\", \"stato\": \"fermo\"}".formatted(TRENO_ID))
-        .when()
-            .put("/api/treni/" + TRENO_ID)
-        .then()
-            .statusCode(400);
+        CentraleDiProva.Risposta risposta = centrale.put("/api/treni/" + TRENO_ID,
+                "{\"id\": \"%s_RINOMINATO\", \"stato\": \"fermo\"}".formatted(TRENO_ID), centrale.admin());
+        Assertions.assertEquals(400, risposta.stato());
     }
 
     @Test
     @Order(9)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void testUpdateTrenoSenzaCambiareNome() {
+    public void testUpdateTrenoSenzaCambiareNome() throws Exception {
         // La modifica di stato e itinerario resta permessa e non tocca la chiave.
-        given()
-            .contentType(ContentType.JSON)
-            .body("{\"stato\": \"attivo\"}")
-        .when()
-            .put("/api/treni/" + TRENO_ID)
-        .then()
-            .statusCode(200)
-            .body("id", equalTo(TRENO_ID))
-            .body("stato", equalTo("attivo"));
+        CentraleDiProva.Risposta risposta = centrale.put("/api/treni/" + TRENO_ID,
+                "{\"stato\": \"attivo\"}", centrale.admin());
+        Assertions.assertEquals(200, risposta.stato());
+        JsonObject treno = risposta.json().getAsJsonObject();
+        Assertions.assertEquals(TRENO_ID, treno.get("id").getAsString());
+        Assertions.assertEquals("attivo", treno.get("stato").getAsString());
+        // lo stato l'ha scritto l'automa: sul database e' lo stesso
+        Assertions.assertEquals("attivo", centrale.repository.trovaTreno(TRENO_ID).stato);
     }
 
     @Test
     @Order(10)
-    @TestSecurity(user = "mat003", roles = {"tecnico"})
-    public void testSopprimiTreno() {
-        // Mock the state to simulate the train stopped in a station
-        it.uni.reti2.entity.Treno treno = statoRete.getTreno(TRENO_ID);
-        if (treno != null) {
-            treno.stato = "fermo";
-            treno.stazioneCorrente = STAZIONE_ID;
-        }
-
-        // La soppressione e' uno dei tre comandi operativi concessi anche al tecnico.
-        given()
-            .contentType(ContentType.JSON)
-        .when()
-            .post("/api/treni/" + TRENO_ID + "/sopprimi")
-        .then()
-            .statusCode(200)
-            .body("stato", equalTo("SOPPRESSO"));
+    public void testUnoStatoFuoriVocabolarioSiRifiuta() throws Exception {
+        // Prima arrivava al CHECK della colonna e diventava un 500; adesso e' la guardia
+        // dell'automa a dire di no, con il motivo.
+        CentraleDiProva.Risposta risposta = centrale.put("/api/treni/" + TRENO_ID,
+                "{\"stato\": \"volante\"}", centrale.admin());
+        Assertions.assertEquals(400, risposta.stato());
+        Assertions.assertEquals("attivo", centrale.statoRete.getTreno(TRENO_ID).stato);
     }
 
     @Test
     @Order(11)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void testDeleteTreno() {
-        given()
-        .when()
-            .delete("/api/treni/" + TRENO_ID)
-        .then()
-            .statusCode(204);
+    public void testSopprimiTreno() throws Exception {
+        // Il treno deve essere fermo in una stazione: lo si mette li' a mano in cache
+        it.uni.reti2.entity.Treno treno = centrale.statoRete.getTreno(TRENO_ID);
+        treno.stato = "fermo";
+        treno.stazioneCorrente = STAZIONE_ID;
+
+        // La soppressione e' uno dei tre comandi operativi concessi anche al tecnico.
+        CentraleDiProva.Risposta risposta = centrale.post("/api/treni/" + TRENO_ID + "/sopprimi", null, centrale.tecnico());
+        Assertions.assertEquals(200, risposta.stato());
+        // Il valore canonico, lo stesso che va sul database: prima la cache diceva
+        // "SOPPRESSO" e il database "in manutenzione".
+        Assertions.assertEquals("in manutenzione", risposta.json().getAsJsonObject().get("stato").getAsString());
+        Assertions.assertEquals("in manutenzione", centrale.repository.trovaTreno(TRENO_ID).stato);
+        Assertions.assertTrue(centrale.alertPubblicati().get(centrale.alertPubblicati().size() - 1).contains("\"tipoEvento\":\"STOP\""));
     }
 
     @Test
     @Order(12)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void testProfiloUtenteCollegato() {
+    public void testDeleteTreno() throws Exception {
+        Assertions.assertEquals(204, centrale.delete("/api/treni/" + TRENO_ID, centrale.admin()).stato());
+        Assertions.assertNull(centrale.statoRete.getTreno(TRENO_ID));
+    }
+
+    @Test
+    @Order(13)
+    public void testProfiloUtenteCollegato() throws Exception {
         // /api/auth/me e' cio' che resta di AuthController: la web app lo chiama
         // appena ha il token per sapere chi e' entrato e quale ruolo mostrare.
-        given()
-        .when()
-            .get("/api/auth/me")
-        .then()
-            .statusCode(200)
-            .body("username", equalTo("MAT001"))
-            .body("role", equalTo("amministratore"));
+        CentraleDiProva.Risposta risposta = centrale.get("/api/auth/me", centrale.admin());
+        Assertions.assertEquals(200, risposta.stato());
+        JsonObject profilo = risposta.json().getAsJsonObject();
+        Assertions.assertEquals("MAT001", profilo.get("username").getAsString());
+        Assertions.assertEquals("amministratore", profilo.get("role").getAsString());
     }
 }

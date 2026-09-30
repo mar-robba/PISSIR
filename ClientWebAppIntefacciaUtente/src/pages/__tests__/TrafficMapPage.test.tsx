@@ -332,4 +332,43 @@ describe('TrafficMapPage', () => {
     expect(screen.getByRole('heading', { name: 'Torino Porta Nuova' })).toBeInTheDocument();
     expect(screen.getByText('Binari')).toBeInTheDocument();
   });
+
+  it('apre la scheda anche col click vero, che passa prima da pointerdown e pointerup', () => {
+    // Il fireEvent.click del test qui sopra salta pointerdown e pointerup: è per
+    // questo che passava anche quando nel browser la scheda non si apriva più.
+    // jsdom non conosce la cattura del puntatore, quindi la si simula con la regola
+    // del browser: se il puntatore è catturato, pointerup e click li riceve chi
+    // l'ha catturato (l'<svg>) e non il simbolo che sta sotto il mouse.
+    let catturante: Element | null = null;
+    const prototipo = SVGElement.prototype as unknown as Record<string, unknown>;
+    prototipo.setPointerCapture = function (this: Element) { catturante = this; };
+    prototipo.releasePointerCapture = () => { catturante = null; };
+
+    try {
+      const { container } = render(<TrafficMapPage />);
+      const simboloTorino = [...container.querySelectorAll('.map-marker')]
+        .find(marker => marker.querySelector('title')?.textContent?.startsWith('Torino'))!;
+      const puntatore = (dx: number) => ({ bubbles: true, button: 0, clientX: 200 + dx, clientY: 200 });
+      const premiERilascia = (spostamento: number) => {
+        fireEvent(simboloTorino, new MouseEvent('pointerdown', puntatore(0)));
+        if (spostamento > 0) {
+          fireEvent(simboloTorino, new MouseEvent('pointermove', puntatore(spostamento)));
+        }
+        const bersaglio = catturante ?? simboloTorino;
+        fireEvent(bersaglio, new MouseEvent('pointerup', puntatore(spostamento)));
+        fireEvent.click(bersaglio);
+      };
+
+      // Un trascinamento partito sopra la stazione è una panoramica: niente scheda.
+      premiERilascia(30);
+      expect(screen.queryByRole('heading', { name: 'Torino Porta Nuova' })).not.toBeInTheDocument();
+
+      // Un click fermo invece la apre.
+      premiERilascia(0);
+      expect(screen.getByRole('heading', { name: 'Torino Porta Nuova' })).toBeInTheDocument();
+    } finally {
+      delete prototipo.setPointerCapture;
+      delete prototipo.releasePointerCapture;
+    }
+  });
 });

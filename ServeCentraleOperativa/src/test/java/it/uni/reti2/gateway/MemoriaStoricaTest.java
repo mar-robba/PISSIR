@@ -1,26 +1,24 @@
 package it.uni.reti2.gateway;
 
-import io.quarkus.narayana.jta.QuarkusTransaction;
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.security.TestSecurity;
-import io.restassured.http.ContentType;
+import it.uni.reti2.CentraleDiProva;
 import it.uni.reti2.entity.Stazione;
-import it.uni.reti2.entity.StoricoStatoStazione;
-import it.uni.reti2.entity.StoricoStatoTreno;
 import it.uni.reti2.entity.StoricoTransito;
 import it.uni.reti2.entity.Transito;
-import it.uni.reti2.entity.Tratta;
 import it.uni.reti2.entity.Treno;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
-import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>La rete di prova e' A -&gt; B (usata da un itinerario), B -&gt; C (libera) e una
  * stazione C che alla fine viene dismessa.</p>
  */
-@QuarkusTest
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MemoriaStoricaTest {
 
@@ -50,166 +48,132 @@ public class MemoriaStoricaTest {
     private static final String ITINERARIO = "MEM_IT_" + SUFFISSO;
     private static final String TRENO = "MEM_TRN_" + SUFFISSO;
 
-    private static void creaStazione(String id, String nome) {
-        given()
-            .contentType(ContentType.JSON)
-            .body("""
-                    { "id": "%s", "nome": "%s", "stato": "ONLINE",
-                      "latitudine": 45.0, "longitudine": 9.0, "binari": 2 }
-                    """.formatted(id, nome))
-        .when()
-            .post("/api/stazioni")
-        .then()
-            .statusCode(201);
+    private CentraleDiProva centrale;
+
+    @BeforeAll
+    void accendi() throws Exception {
+        centrale = CentraleDiProva.avvia();
     }
 
-    private static void creaTrattaElementare(String id, String partenza, String arrivo) {
-        given()
-            .contentType(ContentType.JSON)
-            .body("""
-                    { "id": "%s", "stazionePartenzaId": "%s", "stazioneArrivoId": "%s",
-                      "tempoPercorrenzaMinuti": 20 }
-                    """.formatted(id, partenza, arrivo))
-        .when()
-            .post("/api/tratte-elementari")
-        .then()
-            .statusCode(201);
+    @AfterAll
+    void spegni() throws Exception {
+        centrale.close();
+    }
+
+    private void creaStazione(String id, String nome) throws Exception {
+        assertEquals(201, centrale.post("/api/stazioni", """
+                { "id": "%s", "nome": "%s", "stato": "ONLINE",
+                  "latitudine": 45.0, "longitudine": 9.0, "binari": 2 }
+                """.formatted(id, nome), centrale.admin()).stato());
+    }
+
+    private void creaTrattaElementare(String id, String partenza, String arrivo) throws Exception {
+        assertEquals(201, centrale.post("/api/tratte-elementari", """
+                { "id": "%s", "stazionePartenzaId": "%s", "stazioneArrivoId": "%s",
+                  "tempoPercorrenzaMinuti": 20 }
+                """.formatted(id, partenza, arrivo), centrale.admin()).stato());
     }
 
     @Test
     @Order(1)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void preparaLaRete() {
+    public void preparaLaRete() throws Exception {
         creaStazione(STAZ_A, "Memoria Alfa " + SUFFISSO);
         creaStazione(STAZ_B, "Memoria Bravo " + SUFFISSO);
         creaStazione(STAZ_C, "Memoria Charlie " + SUFFISSO);
         creaTrattaElementare(TRATTA_AB, STAZ_A, STAZ_B);
         creaTrattaElementare(TRATTA_BC, STAZ_B, STAZ_C);
 
-        given()
-            .contentType(ContentType.JSON)
-            .body("""
-                    { "id": "%s", "stazioni": ["%s", "%s"], "travelTimes": [20] }
-                    """.formatted(ITINERARIO, STAZ_A, STAZ_B))
-        .when()
-            .post("/api/tratte")
-        .then()
-            .statusCode(201);
+        assertEquals(201, centrale.post("/api/tratte", """
+                { "id": "%s", "stazioni": ["%s", "%s"], "travelTimes": [20] }
+                """.formatted(ITINERARIO, STAZ_A, STAZ_B), centrale.admin()).stato());
 
-        given()
-            .contentType(ContentType.JSON)
-            .body("""
-                    { "id": "%s", "stato": "fermo", "itinerario": { "id": "%s" } }
-                    """.formatted(TRENO, ITINERARIO))
-        .when()
-            .post("/api/treni")
-        .then()
-            .statusCode(201);
+        assertEquals(201, centrale.post("/api/treni", """
+                { "id": "%s", "stato": "fermo", "itinerario": { "id": "%s" } }
+                """.formatted(TRENO, ITINERARIO), centrale.admin()).stato());
     }
 
     @Test
     @Order(2)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void laTrattaPresenteSoloNelloStoricoSiPuoEliminare() {
-        // Un passaggio gia' avvenuto sulla tratta B -> C, come lo scriverebbe l'ingestione.
-        QuarkusTransaction.requiringNew().run(() -> {
-            StoricoTransito storico = StoricoTransito.fotografiaDi(transitoDiProva(STAZ_C, TRATTA_BC));
-            storico.persist();
-            // Il nome della stazione e la descrizione della tratta finiscono dentro la riga:
-            // sono loro a sostituire la chiave esterna.
-            assertNotNull(storico.nomeStazione);
-            assertTrue(storico.descrizioneTratta.contains("->"),
-                    "la riga deve portarsi dentro la descrizione della tratta");
-        });
+    public void laTrattaPresenteSoloNelloStoricoSiPuoEliminare() throws Exception {
+        // Un passaggio gia' avvenuto sulla tratta B -> C, come lo scriverebbe il gestore.
+        Transito transito = transitoDiProva(STAZ_C, TRATTA_BC);
+        StoricoTransito fotografia = StoricoTransito.fotografiaDi(transito);
+        // Il nome della stazione e la descrizione della tratta finiscono dentro la riga:
+        // sono loro a sostituire la chiave esterna.
+        assertNotNull(fotografia.nomeStazione);
+        assertTrue(fotografia.descrizioneTratta.contains("->"),
+                "la riga deve portarsi dentro la descrizione della tratta");
+        centrale.db.inTransazione(() -> centrale.repository.salvaStoricoTransito(transito));
 
         // Prima questa DELETE tornava 409 "Tratta presente nei transiti storici".
-        given()
-        .when()
-            .delete("/api/tratte-elementari/" + TRATTA_BC)
-        .then()
-            .statusCode(204);
+        assertEquals(204, centrale.delete("/api/tratte-elementari/" + TRATTA_BC, centrale.admin()).stato());
 
         // E il passaggio e' ancora li', con il percorso leggibile.
-        QuarkusTransaction.requiringNew().run(() -> {
-            StoricoTransito storico = StoricoTransito.find("trattaId", TRATTA_BC).firstResult();
-            assertNotNull(storico, "il transito storico non deve sparire con la tratta");
-            assertTrue(storico.descrizioneTratta.contains("->"));
-        });
+        List<Object[]> storici = centrale.righe("SELECT descrizione_tratta FROM Storico_Transiti WHERE id_Tratta = ?", TRATTA_BC);
+        assertFalse(storici.isEmpty(), "il transito storico non deve sparire con la tratta");
+        assertTrue(storici.get(0)[0].toString().contains("->"));
     }
 
     @Test
     @Order(3)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void eliminataLaStazioneLaSuaStoriaResta() {
-        QuarkusTransaction.requiringNew().run(() -> {
-            // Un transito ancora aperto (tabella viva) e il cambio di stato della stazione.
-            transitoDiProva(STAZ_C, null).persist();
-            Stazione stazione = Stazione.findById(STAZ_C);
-            StoricoStatoStazione.fotografiaDi(stazione, "GUASTA", "ONLINE").persist();
+    public void eliminataLaStazioneLaSuaStoriaResta() throws Exception {
+        // Un transito ancora aperto (tabella viva) e il cambio di stato della stazione.
+        centrale.db.inTransazione(() -> {
+            centrale.repository.salvaTransito(transitoDiProva(STAZ_C, null));
+            Stazione stazione = centrale.repository.trovaStazione(STAZ_C);
+            centrale.repository.salvaStoricoStatoStazione(stazione, "GUASTA", "ONLINE");
         });
 
-        given()
-        .when()
-            .delete("/api/stazioni/" + STAZ_C)
-        .then()
-            .statusCode(204);
+        assertEquals(204, centrale.delete("/api/stazioni/" + STAZ_C, centrale.admin()).stato());
 
-        QuarkusTransaction.requiringNew().run(() -> {
-            assertEquals(0, Transito.count("stazione.id", STAZ_C),
-                    "i transiti VIVI vanno via con la stazione: sono stato corrente");
-            assertTrue(StoricoTransito.count("stazioneId", STAZ_C) > 0,
-                    "i transiti STORICI restano: la stazione e' stata dismessa, non e' mai esistita");
+        assertEquals(0, centrale.conta("SELECT COUNT(*) FROM Transiti WHERE id_stazione = ?", STAZ_C),
+                "i transiti VIVI vanno via con la stazione: sono stato corrente");
+        assertTrue(centrale.conta("SELECT COUNT(*) FROM Storico_Transiti WHERE id_stazione = ?", STAZ_C) > 0,
+                "i transiti STORICI restano: la stazione e' stata dismessa, non e' mai esistita");
 
-            StoricoStatoStazione statoStorico = StoricoStatoStazione.find("stazioneId", STAZ_C).firstResult();
-            assertNotNull(statoStorico);
-            assertEquals("GUASTA", statoStorico.stato);
-            assertEquals("ONLINE", statoStorico.statoPrecedente);
-            // Il nome sopravvive alla riga di anagrafica: e' il motivo per cui lo si copia.
-            assertTrue(statoStorico.nome.startsWith("Memoria Charlie"));
-        });
+        List<Object[]> statoStorico = centrale.righe(
+                "SELECT stato, stato_precedente, nome FROM Storico_Stato_Stazioni WHERE id_stazione = ?", STAZ_C);
+        assertFalse(statoStorico.isEmpty());
+        assertEquals("GUASTA", statoStorico.get(0)[0]);
+        assertEquals("ONLINE", statoStorico.get(0)[1]);
+        // Il nome sopravvive alla riga di anagrafica: e' il motivo per cui lo si copia.
+        assertTrue(statoStorico.get(0)[2].toString().startsWith("Memoria Charlie"));
     }
 
     @Test
     @Order(4)
-    @TestSecurity(user = "mat001", roles = {"amministratore"})
-    public void eliminatoIlConvoglioISuoiCambiDiStatoRestano() {
-        QuarkusTransaction.requiringNew().run(() -> {
-            Treno treno = Treno.findById(TRENO);
-            treno.posizioneAttualeTratta = Tratta.findById(TRATTA_AB);
-            treno.stato = "attivo";
-            StoricoStatoTreno storico = StoricoStatoTreno.fotografiaDi(treno, "fermo");
-            storico.persist();
-            assertTrue(storico.descrizionePosizione.contains("->"),
-                    "anche la posizione va scritta in chiaro, la tratta si puo' eliminare");
-        });
+    public void eliminatoIlConvoglioISuoiCambiDiStatoRestano() throws Exception {
+        Treno treno = centrale.repository.trovaTreno(TRENO);
+        treno.posizioneAttualeTratta = centrale.repository.trovaTratta(TRATTA_AB);
+        treno.stato = "attivo";
+        centrale.db.inTransazione(() -> centrale.repository.salvaStoricoStatoTreno(treno, "fermo"));
+        List<Object[]> scritto = centrale.righe(
+                "SELECT descrizione_posizione FROM Storico_Stato_Treni WHERE id_convoglio = ?", TRENO);
+        assertTrue(scritto.get(0)[0].toString().contains("->"),
+                "anche la posizione va scritta in chiaro, la tratta si puo' eliminare");
 
-        given()
-        .when()
-            .delete("/api/treni/" + TRENO)
-        .then()
-            .statusCode(204);
+        assertEquals(204, centrale.delete("/api/treni/" + TRENO, centrale.admin()).stato());
 
-        QuarkusTransaction.requiringNew().run(() -> {
-            StoricoStatoTreno storico = StoricoStatoTreno.find("trenoId", TRENO).firstResult();
-            assertNotNull(storico, "i cambi di stato del convoglio restano anche dopo la rottamazione");
-            assertEquals("attivo", storico.stato);
-            assertEquals("fermo", storico.statoPrecedente);
-        });
+        List<Object[]> storico = centrale.righe(
+                "SELECT stato, stato_precedente FROM Storico_Stato_Treni WHERE id_convoglio = ?", TRENO);
+        assertFalse(storico.isEmpty(), "i cambi di stato del convoglio restano anche dopo la rottamazione");
+        assertEquals("attivo", storico.get(0)[0]);
+        assertEquals("fermo", storico.get(0)[1]);
     }
 
     /**
-     * Costruisce un transito come lo scriverebbe l'ingestione alla ricezione di un
-     * ENTRATA, cosi' i test non hanno bisogno del broker MQTT.
+     * Costruisce un transito come lo scriverebbe il gestore degli eventi alla ricezione di
+     * un ENTRATA, cosi' i test non hanno bisogno del broker MQTT.
      *
      * @param stazioneId Stazione attraversata.
      * @param trattaId   Tratta percorsa, oppure null.
      */
-    private static Transito transitoDiProva(String stazioneId, String trattaId) {
+    private Transito transitoDiProva(String stazioneId, String trattaId) {
         Transito transito = new Transito();
         transito.id = "TR-TEST-" + UUID.randomUUID().toString().substring(0, 8);
-        transito.treno = Treno.findById(TRENO);
-        transito.stazione = Stazione.findById(stazioneId);
-        transito.tratta = trattaId != null ? Tratta.findById(trattaId) : null;
+        transito.treno = centrale.repository.trovaTreno(TRENO);
+        transito.stazione = centrale.repository.trovaStazione(stazioneId);
+        transito.tratta = trattaId != null ? centrale.repository.trovaTratta(trattaId) : null;
         transito.tempoEntrata = Instant.now();
         transito.ritardoMinuti = 3;
         return transito;

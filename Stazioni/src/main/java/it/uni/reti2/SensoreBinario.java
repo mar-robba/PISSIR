@@ -46,7 +46,8 @@ public class SensoreBinario {
 
     /**
      * false = sensore in fail-stop: non manda più il keepalive e non rileva più i treni.
-     * volatile perché lo scrive il thread della console e lo legge lo scheduler.
+     * volatile perché lo scrivono le richieste REST di stop/start (che arrivano anche dalla
+     * console) e lo leggono il thread dell'orologio e quello di Paho.
      */
     private volatile boolean attivo = true;
 
@@ -64,10 +65,11 @@ public class SensoreBinario {
      * {@code <stazione>-BIN<n>-IN} oppure {@code <stazione>-BIN<n>-OUT}.
      *
      * <p>Il metodo è statico e sta qui apposta: lo usano sia il simulatore, che deve dare
-     * un nome ai dispositivi che finge di far girare, sia {@link MonitorSensori}, che deve
-     * sapere quali battiti aspettarsi ancora prima di riceverne uno. Se il nome lo
-     * costruissero per conto proprio, la stazione starebbe ad aspettare un sensore con un
-     * id diverso da quello che manda i battiti e si dichiarerebbe guasta per sempre.</p>
+     * un nome ai dispositivi che finge di far girare, sia il main, che mette sotto
+     * osservazione in AutomaSensori i battiti da aspettarsi ancora prima di riceverne uno.
+     * Se il nome lo costruissero per conto proprio, la stazione starebbe ad aspettare un
+     * sensore con un id diverso da quello che manda i battiti e si dichiarerebbe guasta per
+     * sempre.</p>
      *
      * @param stazioneId id della stazione a cui il sensore appartiene.
      * @param binario    numero del binario sorvegliato.

@@ -1,109 +1,76 @@
 package it.uni.reti2;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
-import org.eclipse.microprofile.reactive.messaging.Incoming;
-import org.jboss.logging.Logger;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.time.Instant;
-import java.util.Locale;
-import java.util.concurrent.CompletionStage;
+import java.util.logging.Logger;
 
 /**
- * TrainGateway è il componente responsabile della comunicazione asincrona
- * (tramite broker di messaggistica come Kafka, MQTT o simili) tra il Treno e la Centrale Operativa.
- * Gestisce sia la ricezione di alert in ingresso che l'invio di notifiche di passaggio e guasti.
+ * TrainGateway è il componente responsabile della comunicazione asincrona in ingresso
+ * (tramite broker di messaggistica come Kafka, MQTT o simili) dalla Centrale Operativa al Treno.
+ *
+ * <p>È un generatore di eventi: legge gli alert di railway/alerts, scarta quelli che non
+ * riguardano questo treno e traduce gli altri in un EventoTreno per GestoreEventi. Non
+ * decide come reagire e non scrive lo stato del convoglio (fa eccezione il ritardo
+ * comunicato, che non è lo stato di nessun automa: il treno lo annota e basta). Quello che
+ * esce verso la Centrale lo pubblicano PubblicatoreAlert e PubblicatorePassaggi.</p>
  */
-@ApplicationScoped
 public class TrainGateway {
 
-    private static final Logger LOG = Logger.getLogger(TrainGateway.class);
+    private static final Logger LOG = Logger.getLogger(TrainGateway.class.getName());
 
     /**
-     * Lo stato con cui la Centrale dichiara che una fermata è di nuovo attraversabile.
-     * È l'unico che autorizza un convoglio trattenuto a rimettersi in moto: OFFLINE non
-     * basta (è una stazione che tace, non una stazione riaperta) e la chiusura di un
-     * allarme nemmeno, perché parla del guasto e non dei binari.
+     * Riferimento allo stato in-memory del treno: serve l'id per riconoscere gli alert che
+     * parlano di questo treno, e ci si scrive il ritardo comunicato.
      */
-    private static final String STATO_STAZIONE_AGIBILE = "ONLINE";
-
-    /**
-     * Riferimento allo stato in-memory del treno.
-     * Viene iniettato per permettere di leggere lo stato attuale o aggiornarlo in base ai messaggi.
-     */
-    @Inject
     TrainDB trainDB;
 
-    /**
-     * Motore di viaggio del treno (digital twin): il gateway gli delega le
-     * reazioni agli alert (blocco per stazione guasta, sblocco, ricarica itinerario).
-     */
-    @Inject
-    TrainJourneyEngine journeyEngine;
+    /** Dove vanno gli eventi tradotti dagli alert. */
+    GestoreEventi gestore;
 
     /**
-     * Mapper JSON (fornito da Quarkus) per interpretare i payload degli alert.
+     * Il generatore del tick: la ricarica dell'itinerario la fa lui, perché la GET deve
+     * partire dal thread del tick e non da quello del broker.
      */
-    @Inject
-    ObjectMapper objectMapper;
+    GeneratoreEventiTempo generatoreTempo;
 
-    /**
-     * Emitter reattivo per l'invio di messaggi di allarme (alert) sul canale "alerts-out".
-     * Usato per segnalare guasti a bordo del treno verso la Centrale.
-     * paradigma della programmazione reattiva
-     */
-    @Inject
-    @Channel("alerts-out")
-    Emitter<String> alertsEmitter;
-
-    /**
-     * Emitter reattivo per l'invio di notifiche sul passaggio del treno ai sensori
-     * di binario. I messaggi vengono inviati sul canale "sensori-out".
-     */
-    @Inject
-    @Channel("sensori-out")
-    Emitter<String> sensoriEmitter;
 // ============================== inizio listeners
     /**
      * Listener per la ricezione di avvisi (alert) provenienti dal canale condiviso
-     * "railway/alerts". Il campo discriminante del payload è "tipoEvento":
-     * - STOP con target questo treno: soppressione definitiva della corsa;
-     * - GUASTO di una STAZIONE corrente/prossima: il treno si blocca (trattenuto);
-     * - STATO_STAZIONE con stato GUASTA o MANUTENZIONE: la stazione non è attraversabile,
-     *   il treno si ferma come per un guasto; con stato ONLINE è invece il permesso di
-     *   ripartire, ed è l'unico messaggio che lo dà;
-     * - RESOLVED di una STAZIONE: quel singolo allarme è chiuso, ma il treno fermo resta
-     *   fermo: i binari li riapre solo lo STATO_STAZIONE qui sopra;
-     * - RESOLVED di questo TRENO: rientro dall'emergenza (pronto a ripartire);
-     * - ITINERARIO_AGGIORNATO con target questo treno: ricarica dell'itinerario;
-     * - RITARDO con target questo treno: la Centrale comunica quanti minuti di
-     *   ritardo ha misurato al passaggio in stazione.
+     * "railway/alerts". Il campo discriminante del payload è "tipoEvento", e ognuno diventa
+     * un evento per il gestore:
+     * - STOP con target questo treno: SOPPRESSIONE;
+     * - GUASTO CRITICAL di una STAZIONE: GUASTO_STAZIONE;
+     * - STATO_STAZIONE di una STAZIONE: STATO_STAZIONE, con lo stato dichiarato (GUASTA e
+     *   MANUTENZIONE chiudono i binari, ONLINE è il permesso di ripartire);
+     * - RESOLVED di una STAZIONE: GUASTO_STAZIONE_RISOLTO (l'allarme è chiuso, i binari no);
+     * - RESOLVED di questo TRENO: GUASTO_BORDO_RISOLTO, cioè il rientro dall'emergenza;
+     * - ITINERARIO_AGGIORNATO con target questo treno: si chiede la ricarica al
+     *   GeneratoreEventiTempo;
+     * - RITARDO con target questo treno: la Centrale comunica quanti minuti di ritardo ha
+     *   misurato al passaggio in stazione, e il treno lo annota.
      *
-     * @param message Il messaggio asincrono contenente il payload dell'alert.
-     * @return Una CompletionStage che indica l'avvenuta elaborazione del messaggio (ack).
+     * <p>Gira sul thread di Paho: il main la registra presso ClientMqtt come destinatario
+     * del topic, e la conferma al broker (il PUBACK del QoS 1) la manda Paho quando questo
+     * metodo è finito.</p>
+     *
+     * @param payload Il contenuto dell'alert (JSON).
      */
-    @Incoming("alerts-in")
-    public CompletionStage<Void> riceviAlert(org.eclipse.microprofile.reactive.messaging.Message<byte[]> message) {
-        String payload = new String(message.getPayload());
+    public void riceviAlert(String payload) {
         try {
-            JsonNode alert = objectMapper.readTree(payload);
-            String tipoEvento = alert.path("tipoEvento").asText("");
-            String sorgenteTipo = alert.path("sorgenteTipo").asText("");
-            String sorgenteId = alert.path("sorgenteId").asText("");
-            String severita = alert.path("severita").asText("CRITICAL");
-            String target = alert.path("target").asText("");
+            JsonObject alert = JsonParser.parseString(payload).getAsJsonObject();
+            String tipoEvento = CampiJson.testo(alert, "tipoEvento", "");
+            String sorgenteTipo = CampiJson.testo(alert, "sorgenteTipo", "");
+            String sorgenteId = CampiJson.testo(alert, "sorgenteId", "");
+            String severita = CampiJson.testo(alert, "severita", "CRITICAL");
+            String target = CampiJson.testo(alert, "target", "");
 
             switch (tipoEvento) {
                 case "STOP" -> {
                     // Soppressione della corsa decisa dalla Centrale, solo se il target è questo treno
                     if (trainDB.trenoId.equals(target)) {
-                        LOG.warnf("🛑 [ALERT] Corsa soppressa dalla Centrale: %s", payload);
-                        trainDB.stato = "SOPPRESSO";
-                        trainDB.velocita = 0;
+                        gestore.gestisci(EventoTreno.di(EventoTreno.Tipo.SOPPRESSIONE));
                     }
                 }
                 case "GUASTO" -> {
@@ -111,195 +78,63 @@ public class TrainGateway {
                     // sensore mancante) sono informativi e la stazione resta agibile.
                     if ("STAZIONE".equals(sorgenteTipo) && !sorgenteId.isEmpty()
                             && "CRITICAL".equalsIgnoreCase(severita)) {
-                        // Memorizza la stazione guasta per i controlli di partenza
-                        trainDB.stazioniGuaste.add(sorgenteId);
-                        // Il treno si blocca solo se la stazione guasta lo riguarda direttamente
-                        if (miRiguarda(sorgenteId)) {
-                            LOG.warnf("🚨 [ALERT] Stazione %s guasta sulla mia rotta: mi fermo", sorgenteId);
-                            journeyEngine.bloccaPerGuastoStazione(sorgenteId);
-                        }
+                        gestore.gestisci(EventoTreno.suStazione(EventoTreno.Tipo.GUASTO_STAZIONE, sorgenteId, null));
                     }
                 }
 
                 case "STATO_STAZIONE" -> {
-                    // La Centrale dichiara in che stato ha messo una stazione. Per chi viaggia
-                    // GUASTA e MANUTENZIONE sono la stessa identica cosa: quei binari non si
-                    // attraversano, quindi il treno che sta per arrivarci si ferma e quello
-                    // che è già dentro resta fermo. È l'unico modo che il convoglio ha di
-                    // sapere che i tecnici sono sul posto: la manutenzione la decide la
-                    // Centrale e non nasce da nessun guasto segnalato dal campo.
+                    // La Centrale dichiara in che stato ha messo una stazione: che cosa
+                    // significhi per il convoglio lo decide il gestore.
                     if ("STAZIONE".equals(sorgenteTipo) && !sorgenteId.isEmpty()) {
-                        String statoDichiarato = alert.path("stato").asText("");
-                        trainDB.statoStazioni.put(sorgenteId, statoDichiarato);
-                        if (TrainDB.statoImpercorribile(statoDichiarato)) {
-                            if (miRiguarda(sorgenteId)) {
-                                LOG.warnf("🛠️ [ALERT] Stazione %s dichiarata %s sulla mia rotta: mi fermo",
-                                        sorgenteId, statoDichiarato);
-                                journeyEngine.bloccaPerGuastoStazione(sorgenteId);
-                            }
-                        } else if (STATO_STAZIONE_AGIBILE.equalsIgnoreCase(statoDichiarato)) {
-                            // È l'unico messaggio che rimette in marcia un convoglio fermo,
-                            // e per questo cancella anche il guasto che il treno si era
-                            // segnato: la Centrale sta dicendo che quei binari sono liberi,
-                            // e lei è l'unica a saperlo davvero. Senza questa riga la
-                            // memoria vecchia avrebbe continuato a fermare il treno, perché
-                            // l'annuncio della stazione agibile e la chiusura dell'allarme
-                            // sono due messaggi distinti e arrivano nell'ordine che capita.
-                            trainDB.stazioniGuaste.remove(sorgenteId);
-                            if (sorgenteId.equals(trainDB.stazioneBloccante)) {
-                                LOG.infof("✅ [ALERT] Stazione %s di nuovo agibile (%s): riprendo il viaggio",
-                                        sorgenteId, statoDichiarato);
-                                journeyEngine.sbloccaDaGuastoStazione();
-                            }
-                        }
-                        // Gli altri stati (OFFLINE su tutti) si annotano e basta: una
-                        // stazione muta non è una stazione riaperta, e chi è fermo davanti
-                        // a dei binari chiusi ci resta finché non è la Centrale a dire
-                        // che sono di nuovo suoi.
+                        String statoDichiarato = CampiJson.testo(alert, "stato", "");
+                        gestore.gestisci(EventoTreno.suStazione(EventoTreno.Tipo.STATO_STAZIONE, sorgenteId, statoDichiarato));
                     }
                 }
 
                 case "RESOLVED" -> {
                     if ("STAZIONE".equals(sorgenteTipo)) {
-                        // Quel singolo allarme non è più aperto: il treno se ne prende nota
-                        // e nient'altro. Un guasto chiuso NON vuol dire binari liberi — la
-                        // stazione può avere la squadra ancora al lavoro, o un secondo
-                        // allarme aperto — e a saperlo è solo la Centrale, che quando la
-                        // fermata torna agibile lo dice con STATO_STAZIONE. Prima si
-                        // ripartiva da qui, e siccome questo messaggio lo pubblica anche il
-                        // nodo di terra quando i suoi sensori tornano a battere, bastava
-                        // quello per far entrare un convoglio in una stazione in manutenzione.
-                        trainDB.stazioniGuaste.remove(sorgenteId);
-                        if (sorgenteId.equals(trainDB.stazioneBloccante)) {
-                            LOG.infof("🛠️ [ALERT] Guasto risolto alla stazione %s: resto fermo finché la Centrale non la dichiara agibile",
-                                    sorgenteId);
-                        }
+                        gestore.gestisci(EventoTreno.suStazione(EventoTreno.Tipo.GUASTO_STAZIONE_RISOLTO, sorgenteId, null));
                     } else if ("TRENO".equals(sorgenteTipo) && trainDB.trenoId.equals(sorgenteId)) {
-                        // Rientro dall'emergenza di bordo: il treno è pronto a ripartire
-                        if ("EMERGENZA".equals(trainDB.stato)) {
-                            LOG.info("✅ [ALERT] Guasto di bordo risolto: pronto a ripartire");
-                            trainDB.stato = "FERMO";
-                        }
+                        // Rientro dall'emergenza di bordo
+                        gestore.gestisci(EventoTreno.di(EventoTreno.Tipo.GUASTO_BORDO_RISOLTO));
                     }
                 }
                 case "RITARDO" -> {
                     // L'altra meta' del sistema di comunicazione in ingresso chiesto dal
                     // testo del progetto: il convoglio riceve "guasti o ritardi". Il numero
                     // non lo calcola lui, glielo dice la Centrale, che e' l'unico nodo a
-                    // conoscere l'orario di servizio; qui lo si prende e basta.
+                    // conoscere l'orario di servizio; qui lo si prende e basta. Non passa dal
+                    // gestore perche' non fa muovere nessun automa e nessuna guardia lo legge.
                     if (trainDB.trenoId.equals(target)) {
-                        int ritardo = alert.path("ritardoMinuti").asInt(0);
-                        int variazione = alert.path("variazioneMinuti").asInt(0);
-                        String causa = alert.path("causa").asText("");
+                        int ritardo = CampiJson.intero(alert, "ritardoMinuti", 0);
+                        int variazione = CampiJson.intero(alert, "variazioneMinuti", 0);
+                        String causa = CampiJson.testo(alert, "causa", "");
                         trainDB.ritardoMinuti = Math.max(0, ritardo);
                         trainDB.ritardoRilevatoA = sorgenteId;
                         trainDB.ritardoAggiornatoIl = Instant.now();
                         String dove = sorgenteId.isEmpty() ? "?" : sorgenteId;
                         if (trainDB.ritardoMinuti > 0) {
-                            LOG.warnf("⏱️ [ALERT] La Centrale mi comunica %d minuti di ritardo (%+d a %s, causa %s)",
+                            LOG.warning(String.format("⏱️ [ALERT] La Centrale mi comunica %d minuti di ritardo (%+d a %s, causa %s)",
                                     trainDB.ritardoMinuti, variazione, dove,
-                                    causa.isEmpty() ? "non dichiarata" : causa);
+                                    causa.isEmpty() ? "non dichiarata" : causa));
                         } else {
                             // Tornare in orario non e' un allarme: e' la notizia buona.
-                            LOG.infof("⏱️ [ALERT] La Centrale mi da' di nuovo in orario (%+d a %s)",
-                                    variazione, dove);
+                            LOG.info(String.format("⏱️ [ALERT] La Centrale mi da' di nuovo in orario (%+d a %s)",
+                                    variazione, dove));
                         }
                     }
                 }
                 case "ITINERARIO_AGGIORNATO" -> {
                     if (trainDB.trenoId.equals(target)) {
                         LOG.info("🗺️ [ALERT] La Centrale ha aggiornato il mio itinerario: lo ricarico");
-                        journeyEngine.richiediRicaricaItinerario();
+                        generatoreTempo.richiediRicaricaItinerario();
                     }
                 }
-                default -> LOG.debugf("[ALERT] Evento %s ignorato: %s", tipoEvento, payload);
+                default -> LOG.fine(String.format("[ALERT] Evento %s ignorato: %s", tipoEvento, payload));
             }
         } catch (Exception e) {
-            LOG.warnf("Alert non interpretabile (%s): %s", e.getMessage(), payload);
+            LOG.warning(String.format("Alert non interpretabile (%s): %s", e.getMessage(), payload));
         }
-
-        // Conferma (acknowledge) l'avvenuta processazione del messaggio al broker
-        return message.ack();
     }
-
-    /**
-     * Dice se quella stazione è una di quelle che il treno ha davanti adesso: la fermata in
-     * cui si trova o la prossima. È il filtro che evita di fermare il convoglio per una
-     * stazione dall'altra parte della rete, che con questo itinerario non incontrerà mai.
-     *
-     * <p>Se l'alert arriva mentre il treno è altrove non si perde niente: lo stato resta
-     * scritto nel TrainDB e il motore lo ricontrolla prima di ogni partenza
-     * ({@code TrainJourneyEngine.tickInStazione}).</p>
-     */
-    private boolean miRiguarda(String stazioneId) {
-        return stazioneId.equals(trainDB.prossimaStazione) || stazioneId.equals(trainDB.stazioneCorrente);
-    }
-
 //---- END listeners
-// =========================== inizio emettitori ======================
-
-    /**
-     * Metodo per inviare alla Centrale Operativa una notifica di guasto rilevato sul treno.
-     * Contemporaneamente arresta il convoglio per sicurezza (stato EMERGENZA).
-     *
-     * @param descrizione Il dettaglio testuale o codice del guasto rilevato.
-     * @param severita La gravità del guasto (CRITICAL o WARNING).
-     */
-    public void inviaGuasto(String descrizione, String severita) {
-        // Appena viene rilevato un guasto critico, si arresta subito il treno localmente
-        trainDB.stato = "EMERGENZA";
-        trainDB.velocita = 0;
-
-        // Composizione del payload JSON per l'alert (formato condiviso su railway/alerts)
-                            // formattazione stringhe java classico
-        String alertJson = String.format(Locale.US,
-                "{\"tipoEvento\":\"GUASTO\",\"sorgenteTipo\":\"TRENO\",\"sorgenteId\":\"%s\",\"severita\":\"%s\",\"messaggio\":\"%s\",\"timestamp\":\"%s\"}",
-                trainDB.trenoId, severita, descrizione, Instant.now().toString());
-
-        try {
-            // Invio del messaggio in modo reattivo
-            alertsEmitter.send(alertJson);
-        } catch (Exception e) {
-            LOG.error("Errore invio guasto: " + e.getMessage());
-        }
-    }
-
-    /**
-     * notifica di transito dentro una stazione
-     * Annuncia ai sensori di binario della stazione il passaggio del treno, con l'ora
-     * dell'evento e il verso di marcia.
-     *
-     * <p>Il treno non parla più direttamente con la Centrale su questo evento: pubblica
-     * sul topic "railway/treno-simulatoriSensori/{trenoId}", che i sensori di binario
-     * della stazione interessata ascoltano per rilevare fisicamente il passaggio (vedi
-     * {@code SimulatoreSensori.rilevaPassaggio} lato Stazione). E' la stazione, non il
-     * treno, a informare poi la Centrale con il transito ufficiale su
-     * "railway/station/{stazioneId}/transit".</p>
-     *
-     * <p>La direzione viaggia comunque in questo messaggio perché al capolinea il treno
-     * l'ha appena invertita, e nessun altro nodo lo saprebbe prima del prossimo frame di
-     * telemetria. Il campo "ritardoMinuti" che stava qui è sparito insieme al contatore
-     * di bordo: il ritardo lo calcola solo la Centrale.</p>
-     *
-     * @param stazioneId L'identificativo univoco della stazione interessata.
-     * @param tipo Il tipo di passaggio (es. "ENTRATA" nella stazione, o "USCITA" dalla stazione).
-     */
-    public void notificaPassaggioStazione(String stazioneId, String tipo) {
-        // Se il treno entra in stazione, aggiorniamo il suo stato in-memory per tracciarlo.
-        // Se sta uscendo, impostiamo la stazione corrente a null.
-        trainDB.stazioneCorrente = "ENTRATA".equals(tipo) ? stazioneId : null;
-
-        // Costruzione del messaggio JSON per la telemetria/segnalamento passaggi
-        String json = String.format(Locale.US,
-                "{\"trenoId\":\"%s\",\"stazioneId\":\"%s\",\"tipo\":\"%s\",\"timestamp\":\"%s\",\"direzione\":\"%s\"}",
-                trainDB.trenoId, stazioneId, tipo, Instant.now().toString(), trainDB.direzione);
-
-        try {
-            // Invio del payload sul canale apposito
-            sensoriEmitter.send(json);
-        } catch (Exception e) {
-            LOG.error("Errore notifica passaggio: " + e.getMessage());
-        }
-    }
 }
-//----------------END EMETTITORI
