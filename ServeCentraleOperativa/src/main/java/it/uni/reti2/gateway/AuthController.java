@@ -11,18 +11,15 @@ import java.util.Map;
 /**
  * Profilo dell'operatore collegato.
  *
- * <p>Qui prima c'erano il {@code POST /api/auth/login} che confrontava la password
- * con la colonna della tabella Utenti e il {@code /logout} che buttava via il token:
- * con il passaggio a Keycloak sono spariti tutti e due. Le credenziali le verifica
- * Keycloak, il logout si fa sul suo endpoint di fine sessione, e la Centrale riceve
- * soltanto un JWT firmato di cui controlla la firma (vedi {@link SicurezzaKeycloak}).</p>
+ * <p>La Centrale non ha login ne' logout: le credenziali le verifica Keycloak, il logout
+ * si fa sul suo endpoint di fine sessione, e la Centrale riceve soltanto un JWT di cui
+ * controlla la firma (vedi {@link SicurezzaKeycloak}).</p>
  *
- * <p>Resta un solo endpoint, {@code GET /api/auth/me}: la web app lo chiama appena
- * ottenuto il token per sapere chi e' l'utente e cosa puo' fare. Il payload e' lo
- * stesso di prima (id, username, role, displayName, avatarInitials) perche' il
- * frontend non doveva cambiare struttura dati, ma i valori adesso vengono per meta'
- * dal token e per meta' dalla tabella Utenti, che e' rimasta come anagrafica degli
- * operatori (i guasti hanno una chiave esterna verso di lei).</p>
+ * <p>L'endpoint e' uno solo, {@code GET /api/auth/me}: la web app lo chiama appena
+ * ottenuto il token per sapere chi e' l'utente e cosa puo' fare. Il payload (id,
+ * username, role, displayName, avatarInitials) viene per meta' dal token e per meta'
+ * dalla tabella Utenti, l'anagrafica degli operatori (i guasti hanno una chiave esterna
+ * verso di lei).</p>
  */
 public class AuthController {
 

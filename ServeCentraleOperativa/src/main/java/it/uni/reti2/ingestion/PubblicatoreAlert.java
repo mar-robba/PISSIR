@@ -13,15 +13,10 @@ import java.util.logging.Logger;
 /**
  * L'unica bocca con cui la Centrale parla al campo sul topic condiviso railway/alerts.
  *
- * <p>Prima i messaggi in uscita nascevano in due classi diverse e in due modi diversi:
- * l'ingestione li componeva con un oggetto JSON, le API REST li scrivevano a mano con
- * {@code String.format} su una stringa JSON. Da quella doppia scrittura era gia' nato un
- * difetto silenzioso: il RESOLVED pubblicato dalle REST non portava il campo
- * {@code origine}, quindi quando rientrava alla Centrale (che e' sottoscritta al proprio
- * stesso topic) veniva scambiato per una dichiarazione del campo e poteva chiudere un
- * secondo guasto che nessuno aveva chiesto di chiudere. Adesso <b>ogni</b> messaggio esce
- * da qui e viene firmato {@link AlertMsg#ORIGINE_CENTRALE}, cosi' l'eco si riconosce da
- * sola.</p>
+ * <p><b>Ogni</b> messaggio della Centrale verso il campo esce da qui e viene firmato
+ * {@link AlertMsg#ORIGINE_CENTRALE}: la Centrale e' sottoscritta al proprio stesso topic,
+ * e senza la firma un suo RESOLVED che rientra verrebbe scambiato per una dichiarazione
+ * del campo e potrebbe chiudere un secondo guasto.</p>
  *
  * <p>Il JSON si costruisce sempre con un {@link JsonObject} di Gson e mai concatenando stringhe: un
  * apice o un accento nel messaggio di un guasto basterebbe a produrre un payload

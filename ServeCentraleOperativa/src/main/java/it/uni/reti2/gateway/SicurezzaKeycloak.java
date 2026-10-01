@@ -41,8 +41,8 @@ import java.util.logging.Logger;
  * <p>La web app fa il login su Keycloak e chiama le API con l'access token nell'header
  * {@code Authorization: Bearer <token>}. Il token è un JWT firmato dal realm "railway": per
  * fidarsi basta verificarne la firma con la chiave pubblica del realm, senza chiedere niente a
- * Keycloak a ogni richiesta. Prima lo faceva l'estensione quarkus-oidc; adesso i pezzi sono
- * quelli di pac4j, la libreria del materiale del corso:</p>
+ * Keycloak a ogni richiesta. I pezzi sono quelli di pac4j, la libreria del materiale del
+ * corso:</p>
  * <ul>
  *   <li>{@link DirectBearerAuthClient} prende il token dall'header;</li>
  *   <li>{@link VerificaToken}, un {@link JwtAuthenticator}, ne controlla la firma con le
@@ -219,7 +219,7 @@ public class SicurezzaKeycloak {
 
     /**
      * Il JwtAuthenticator di pac4j controlla firma e scadenza; questa sottoclasse aggiunge i
-     * due controlli che faceva quarkus-oidc: l'emittente ("iss", cioè il realm railway) e
+     * due controlli: l'emittente ("iss", cioè il realm railway) e
      * l'audience ("aud" deve contenere railway-centrale). Senza il secondo la Centrale
      * accetterebbe anche un token rilasciato per un'altra applicazione dello stesso realm.
      */

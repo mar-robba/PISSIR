@@ -28,8 +28,7 @@ import java.util.logging.Logger;
  * {@link Destinatario}), e chi pubblica passa da CodaPubblicazioni.</p>
  *
  * <p>La connessione è una sola per tutta la Centrale, con client-id fisso
- * ({@code centrale-operativa}, da application.properties): prima ogni canale SmallRye apriva
- * la sua, con un client-id per canale. La sessione è persistente (cleanSession=false): se la
+ * ({@code centrale-operativa}, da application.properties). La sessione è persistente (cleanSession=false): se la
  * Centrale perde il collegamento per qualche secondo, gli alert a QoS 1 arrivati nel
  * frattempo su railway/alerts (GUASTO e RESOLVED dei nodi) il broker li tiene da parte e li
  * consegna alla riconnessione. I messaggi a QoS 0 (telemetria, heartbeat, transiti) invece

@@ -28,8 +28,9 @@ import java.time.Instant;
  * lo scrivevano in cinque classi diverse e la regola della manutenzione era ripetuta a
  * memoria in due di loro.</p>
  *
- * <p>Tiene anche i due dati di contorno che cambiano con gli stessi eventi: l'istante
- * dell'ultimo battito e il conteggio dei treni presenti.</p>
+ * <p>Tiene anche i dati di contorno che cambiano con gli stessi eventi: l'istante
+ * dell'ultimo battito, lo stato che il nodo ci ha dichiarato e il conteggio dei treni
+ * presenti.</p>
  */
 public class AutomaStazione {
 
@@ -92,9 +93,17 @@ public class AutomaStazione {
         scrivi(stazione, nuovoStato);
     }
 
-    /** Il nodo ha battuto: si annota quando, è l'orologio del watchdog. */
-    public void battito(Stazione stazione, Instant quando) {
+    /**
+     * Il nodo ha battuto: si annota quando, è l'orologio del watchdog, e lo stato che ha
+     * dichiarato di sé. Quello si annota sempre, anche quando {@link #accettaDalCampo} ha
+     * detto di no: in MANUTENZIONE non diventa lo stato della stazione, ma resta vero che il
+     * nodo si dichiara così, e la web app lo mostra accanto.
+     *
+     * @param dichiarato Lo stato scritto nel battito (ONLINE o GUASTA).
+     */
+    public void battito(Stazione stazione, Instant quando, String dichiarato) {
         stazione.ultimoHeartbeat = quando;
+        stazione.statoDichiarato = dichiarato;
         statoRete.aggiornaStazione(stazione);
     }
 

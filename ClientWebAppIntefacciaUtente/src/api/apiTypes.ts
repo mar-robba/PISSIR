@@ -12,6 +12,10 @@ export interface ApiTrainPayload {
   /** Nome del convoglio: è la chiave primaria del treno sulla Centrale. */
   id: string;
   stato?: string;
+  /** Condizione dichiarata dal convoglio (automa T6), null prima del primo frame. */
+  condizione?: string | null;
+  /** Fase del viaggio dichiarata dal convoglio (automa T5), null prima del primo frame. */
+  faseViaggio?: string | null;
   posizioneAttualeTratta?: {
     stazioneArrivo?: { id: string };
     stazionePartenza?: { id: string };
@@ -72,6 +76,8 @@ export interface ApiStationPayload {
   longitudine?: number;
   binari?: number;
   ultimoHeartbeat?: string;
+  /** Stato che il nodo ha dichiarato nell'ultimo battito (automa S10), null se non ha battuto. */
+  statoDichiarato?: string | null;
 }
 
 export interface ApiRoutePayload {
@@ -149,7 +155,8 @@ export interface ApiCoppiaMancante {
 
 /**
  * Corpo di una risposta di errore della Centrale. Il messaggio sta in "errore"
- * (gli altri due nomi arrivano dalle eccezioni gestite da Quarkus), mentre
+ * ("message" e "detail" sono solo un ripiego per risposte che non vengono dalla
+ * Centrale), mentre
  * coppieMancanti c'è solo sul rifiuto di un itinerario.
  */
 export interface ApiErrorPayload {

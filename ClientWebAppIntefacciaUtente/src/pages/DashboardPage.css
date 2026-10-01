@@ -1,0 +1,121 @@
+.dashboard-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding-bottom: 1.5rem;
+}
+
+/* --- Indicatori in alto --- */
+
+/* Quattro colonne, poi due, poi una, a scatti: con auto-fit a certe larghezze verrebbe un
+   3+1, con l'ultima card da sola sulla seconda riga. */
+.dashboard-kpi-griglia {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-kpi { min-width: 0; padding: 1.25rem; }
+
+/* La Card mette i figli dentro un suo <div>, quindi il flex va dato a questo contenitore.
+   Messo sulla Card, come prima, non arrivava né all'icona né al testo: finivano uno sopra
+   l'altro, con lo sfondo dell'icona tirato per tutta la larghezza dell'etichetta. */
+.dashboard-kpi-corpo { display: flex; align-items: center; gap: 1rem; }
+
+.dashboard-kpi-icona {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+}
+
+.dashboard-kpi-icona-blu { color: var(--primary); background: #dbeafe; }
+.dashboard-kpi-icona-rossa { color: var(--danger); background: #fee2e2; }
+.dashboard-kpi-icona-gialla { color: var(--warning); background: #fef3c7; }
+
+.dashboard-kpi-testo { min-width: 0; }
+
+.dashboard-kpi-etichetta {
+  margin: 0;
+  overflow: hidden;
+  font-size: .875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Niente color qui: lo prende dall'h3, e sugli allarmi attivi lo cambia text-danger. */
+.dashboard-kpi-valore { margin: .1rem 0 0; font-size: 1.75rem; font-weight: 700; line-height: 1.15; }
+.dashboard-kpi-valore small { color: var(--text-muted); font-size: .875rem; font-weight: 500; }
+
+.dashboard-kpi-cliccabile { cursor: pointer; }
+.dashboard-kpi-cliccabile:hover { border-color: #fca5a5; box-shadow: var(--shadow-glow-danger); }
+
+/* --- Allarmi e treni --- */
+
+/* Un terzo agli allarmi e due terzi ai treni: la tabella dei treni ha bisogno della
+   colonna larga, se no i badge dello stato vanno uno sotto l'altro e il ritardo esce
+   dalla card. Le classi col-span-* nel CSS del progetto non esistono, per questo la
+   griglia sta qui. */
+.dashboard-colonne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 1.5rem;
+}
+
+.dashboard-pannello { min-width: 0; }
+.dashboard-pannello h3 { margin: 0; }
+.dashboard-bottone { padding: .35rem .75rem; font-size: .75rem; }
+
+.dashboard-allarmi { display: flex; flex-direction: column; gap: .6rem; }
+
+.dashboard-allarme {
+  padding: .65rem .85rem;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--info);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.dashboard-allarme-warning { border-left-color: var(--warning); }
+.dashboard-allarme-critical { border-left-color: var(--danger); }
+
+.dashboard-allarme-testa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .35rem;
+}
+
+.dashboard-allarme-ora { color: var(--text-muted); font-size: .75rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dashboard-allarme p { margin: 0; color: var(--text-main); font-size: .8125rem; overflow-wrap: anywhere; }
+
+.dashboard-treni { border: 1px solid var(--border-color); border-radius: var(--radius-md); }
+.dashboard-treni th, .dashboard-treni td { padding-left: .75rem; padding-right: .75rem; }
+.dashboard-treni td { padding-top: .6rem; padding-bottom: .6rem; }
+
+.dashboard-treno-stato { display: flex; align-items: center; gap: .6rem; }
+/* Senza questo il pallino si stringeva a una lineetta per far posto ai badge. */
+.dashboard-treno-stato .status-indicator { flex-shrink: 0; }
+
+.dashboard-treno-tratta { display: flex; align-items: center; gap: .35rem; white-space: nowrap; }
+.dashboard-treno-ritardo { white-space: nowrap; }
+
+/* Sotto i 1366px, in due terzi di pagina, la tabella dei treni non ci sta più con una riga
+   per treno (i tre badge dello stato vanno a capo): meglio le due card una sotto l'altra. */
+@media (max-width: 1365px) {
+  .dashboard-colonne { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 1279px) {
+  .dashboard-kpi-griglia { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .dashboard-kpi-griglia { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-pannello { padding: 1rem; }
+}

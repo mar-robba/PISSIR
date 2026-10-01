@@ -140,8 +140,8 @@ class WebSocketClient {
 
 // Esporta un'istanza singoletto (Singleton pattern) per essere riusata nell'intera Web App.
 // L'URL non è fisso: si legge da VITE_WS_URL (file .env di Vite).
-// Default: wss:// sulla 8444, cioè la Centrale avviata con -Dquarkus.profile=tls.
-// Come per le chiamate REST non è più la 8781 in chiaro: da una pagina https il
+// Default: wss:// sulla 8444, cioè la Centrale avviata con -Dprofilo=tls.
+// Come per le chiamate REST non si usa la 8781 in chiaro: da una pagina https il
 // browser rifiuta le socket ws:// non cifrate.
 const WS_URL: string = import.meta.env.VITE_WS_URL ?? 'wss://localhost:8444/ws/realtime';
 

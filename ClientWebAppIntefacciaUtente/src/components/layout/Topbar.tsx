@@ -7,7 +7,7 @@ export default function Topbar() {
   const { logout } = useAuthStore();
   const location = useLocation();
 
-  // Non serve piu' navigare a mano su /login: il logout porta il browser
+  // Il logout porta il browser
   // sull'endpoint di fine sessione di Keycloak, che chiude anche il Single Sign-On
   // e poi rimanda lui stesso alla pagina di accesso (post_logout_redirect_uri).
   const handleLogout = () => {

@@ -46,9 +46,8 @@ import java.util.logging.Logger;
  *       automi. Qui resta la traduzione fra HTTP e dominio.</li>
  * </ul>
  *
- * <p><b>Transazioni.</b> Con Quarkus ogni metodo di scrittura era {@code @Transactional}; qui
- * lo stesso lavoro sta dentro {@code db.inTransazione(...)}, che restituisce la risposta da
- * dare. La cache si tocca dopo il commit, così resta l'immagine esatta del database anche se
+ * <p><b>Transazioni.</b> Ogni metodo di scrittura fa il suo lavoro dentro
+ * {@code db.inTransazione(...)}, che restituisce la risposta da dare. La cache si tocca dopo il commit, così resta l'immagine esatta del database anche se
  * il commit fallisce.</p>
  */
 public class RestApiGateway {
@@ -205,7 +204,7 @@ public class RestApiGateway {
                 dto.longitudine != null ? dto.longitudine : 0.0,
                 dto.binari != null ? dto.binari : 1);
         // Lo stato di partenza della stazione appena nata: e' l'unico che non passa
-        // dall'automa, perche' prima di adesso la stazione non esisteva.
+        // dall'automa, perche' fino a questo punto la stazione non esiste.
         stazione.stato = dto.stato != null
                 ? StatiCanonici.stazioneDallOperatore(dto.stato)
                 : StatiCanonici.STAZIONE_OFFLINE;
@@ -266,7 +265,7 @@ public class RestApiGateway {
      * riga di anagrafica. Risponde 204, 404 o 409.
      *
      * <p><b>Lo storico non si tocca</b> (RF02.7): le righe di Storico_Transiti,
-     * Storico_Stato_Stazioni ed eventi_stazioni restano dov'erano. Adesso che gli storici
+     * Storico_Stato_Stazioni ed eventi_stazioni restano dove sono. Siccome gli storici
      * portano dentro l'id e il nome della stazione, la storia di una stazione dismessa
      * resta consultabile — che è esattamente quello che il requisito chiede.</p>
      */
@@ -385,7 +384,7 @@ public class RestApiGateway {
      * <p>L'itinerario è anagrafica e si scrive qui; lo stato invece è dell'automa, e ci
      * arriva con un evento STATO_TRENO_OPERATORE. Il vocabolario dello stato si controlla
      * però prima di scrivere l'itinerario, così una richiesta con uno stato sbagliato non
-     * cambia nemmeno l'itinerario (prima le due scritture stavano nella stessa transazione).</p>
+     * cambia nemmeno l'itinerario.</p>
      *
      * <p>Il nome del convoglio NON si aggiorna qui: è la chiave primaria della tabella Treni,
      * quindi è immutabile per costruzione. Per cambiarlo si elimina il treno e si ricrea (la

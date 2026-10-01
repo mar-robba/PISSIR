@@ -6,11 +6,13 @@ interface BadgeProps {
   children: React.ReactNode;
   type?: BadgeType;
   className?: string;
+  /** Testo che compare passandoci sopra col mouse. */
+  title?: string;
 }
 
-export default function Badge({ children, type = 'neutral', className = '' }: BadgeProps) {
+export default function Badge({ children, type = 'neutral', className = '', title }: BadgeProps) {
   return (
-    <span className={`badge badge-${type} ${className}`}>
+    <span className={`badge badge-${type} ${className}`} title={title}>
       {children}
     </span>
   );

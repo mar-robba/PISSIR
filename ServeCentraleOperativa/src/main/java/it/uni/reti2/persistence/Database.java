@@ -19,8 +19,7 @@ import java.util.logging.Logger;
  *       lavoro e fa commit, o rollback se il lavoro lancia un'eccezione. Tutte le chiamate al
  *       repository fatte DENTRO il lavoro usano quella stessa connessione, quindi finiscono
  *       nella stessa transazione. Una transazione aperta dentro un'altra è una transazione
- *       nuova e indipendente (la esterna resta sospesa finché la interna non ha finito): è lo
- *       stesso comportamento del {@code QuarkusTransaction.requiringNew()} di prima;</li>
+ *       nuova e indipendente (la esterna resta sospesa finché la interna non ha finito);</li>
  *   <li><b>le letture fuori da una transazione</b> (le GET della web app, per esempio): il
  *       repository apre una connessione in autocommit, legge e la chiude.</li>
  * </ul>
@@ -111,8 +110,7 @@ public class Database {
     /**
      * Crea le tabelle che mancano, eseguendo lo script schema.sql del classpath.
      *
-     * <p>Prima le creava Hibernate al primo avvio ({@code database.generation=update}); adesso
-     * lo script ha solo {@code CREATE ... IF NOT EXISTS}, quindi su un database già pieno non
+     * <p>Lo script ha solo {@code CREATE ... IF NOT EXISTS}, quindi su un database già pieno non
      * tocca niente e su uno vuoto prepara tutte le tabelle. Le istruzioni sono separate dal
      * punto e virgola a fine riga; le righe di commento ({@code --}) si saltano.</p>
      */

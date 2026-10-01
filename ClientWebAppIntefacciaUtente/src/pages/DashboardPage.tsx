@@ -1,6 +1,8 @@
 import { useRailwayStore } from '../store/railwayStore';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import StatoComposto from '../components/ui/StatoComposto';
+import { statiDelTreno } from '../api/apiClient';
 import { 
   Train, 
   Building2, 
@@ -9,6 +11,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import './DashboardPage.css';
 
 /**
  * Componente principale che renderizza la Dashboard riassuntiva.
@@ -41,74 +44,83 @@ export default function DashboardPage() {
   const activeAlerts = numero(kpi?.activeAlerts);
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in">
+    <div className="dashboard-page animate-fade-in">
       {/* KPI Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* KPI: Treni Attivi */}
-        <Card className="flex items-center gap-4">
-          <div className="p-3 bg-primary/20 rounded-full text-primary" style={{ background: 'rgba(59, 130, 246, 0.2)' }}>
-            <Train size={24} color="#3b82f6" />
-          </div>
-          <div>
-            <p className="text-sm text-muted m-0">Treni Attivi</p>
-            <h3 className="text-2xl font-bold m-0">{trainsInMotion} <span className="text-sm font-normal text-muted">/ {kpi?.totalTrains ?? trains.length}</span></h3>
+      <div className="dashboard-kpi-griglia">
+
+        {/* KPI: Treni Attivi. Icona e testo stanno in dashboard-kpi-corpo e non
+            direttamente nella Card: il perché è in DashboardPage.css */}
+        <Card className="dashboard-kpi">
+          <div className="dashboard-kpi-corpo">
+            <span className="dashboard-kpi-icona dashboard-kpi-icona-blu">
+              <Train size={22} />
+            </span>
+            <div className="dashboard-kpi-testo">
+              <p className="dashboard-kpi-etichetta">Treni Attivi</p>
+              <h3 className="dashboard-kpi-valore">{trainsInMotion} <small>/ {kpi?.totalTrains ?? trains.length}</small></h3>
+            </div>
           </div>
         </Card>
 
         {/* KPI: Ritardo Medio */}
-        <Card className="flex items-center gap-4">
-          <div className="p-3 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.2)' }}>
-            <Clock size={24} color="#ef4444" />
-          </div>
-          <div>
-            <p className="text-sm text-muted m-0">Ritardo Medio</p>
-            <h3 className="text-2xl font-bold m-0">{avgDelay} <span className="text-sm font-normal text-muted">min</span></h3>
+        <Card className="dashboard-kpi">
+          <div className="dashboard-kpi-corpo">
+            <span className="dashboard-kpi-icona dashboard-kpi-icona-rossa">
+              <Clock size={22} />
+            </span>
+            <div className="dashboard-kpi-testo">
+              <p className="dashboard-kpi-etichetta">Ritardo Medio</p>
+              <h3 className="dashboard-kpi-valore">{avgDelay} <small>min</small></h3>
+            </div>
           </div>
         </Card>
 
         {/* KPI: Stazioni con Anomalie */}
-        <Card className="flex items-center gap-4">
-          <div className="p-3 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.2)' }}>
-            <Building2 size={24} color="#f59e0b" />
-          </div>
-          <div>
-            <p className="text-sm text-muted m-0">Stazioni Anomale</p>
-            <h3 className="text-2xl font-bold m-0">{faultyStations} <span className="text-sm font-normal text-muted">/ {stations.length}</span></h3>
+        <Card className="dashboard-kpi">
+          <div className="dashboard-kpi-corpo">
+            <span className="dashboard-kpi-icona dashboard-kpi-icona-gialla">
+              <Building2 size={22} />
+            </span>
+            <div className="dashboard-kpi-testo">
+              <p className="dashboard-kpi-etichetta">Stazioni Anomale</p>
+              <h3 className="dashboard-kpi-valore">{faultyStations} <small>/ {stations.length}</small></h3>
+            </div>
           </div>
         </Card>
 
         {/* KPI: Allarmi Critici (Cliccabile) */}
-        <Card className="flex items-center gap-4 cursor-pointer hover:border-red-500/50 transition-colors" onClick={() => navigate('/alerts')}>
-          <div className="p-3 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.2)' }}>
-            <AlertTriangle size={24} color="#ef4444" />
-          </div>
-          <div>
-            <p className="text-sm text-muted m-0">Allarmi Attivi</p>
-            <h3 className="text-2xl font-bold m-0 text-danger">{activeAlerts}</h3>
+        <Card className="dashboard-kpi dashboard-kpi-cliccabile" onClick={() => navigate('/alerts')}>
+          <div className="dashboard-kpi-corpo">
+            <span className="dashboard-kpi-icona dashboard-kpi-icona-rossa">
+              <AlertTriangle size={22} />
+            </span>
+            <div className="dashboard-kpi-testo">
+              <p className="dashboard-kpi-etichetta">Allarmi Attivi</p>
+              <h3 className="dashboard-kpi-valore text-danger">{activeAlerts}</h3>
+            </div>
           </div>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+      <div className="dashboard-colonne">
         {/* Sezione: Log Allarmi Recenti */}
-        <Card title="Ultimi Allarmi" className="col-span-1" action={
-          <button onClick={() => navigate('/alerts')} className="btn btn-outline text-xs py-1 px-2">
+        <Card title="Ultimi Allarmi" className="dashboard-pannello" action={
+          <button onClick={() => navigate('/alerts')} className="btn btn-outline dashboard-bottone">
             Vedi tutti
           </button>
         }>
-          <div className="flex flex-col gap-3">
+          <div className="dashboard-allarmi">
             {alerts.slice(0, 5).map(alert => (
-              <div key={alert.id} className="p-3 border border-border-color rounded-md bg-black/20">
-                <div className="flex justify-between items-start mb-2">
+              <div key={alert.id} className={`dashboard-allarme dashboard-allarme-${alert.severity}`}>
+                <div className="dashboard-allarme-testa">
                   <Badge type={alert.severity === 'critical' ? 'danger' : alert.severity === 'warning' ? 'warning' : 'info'}>
                     {alert.type.replace('_', ' ')}
                   </Badge>
-                  <span className="text-xs text-muted">
+                  <span className="dashboard-allarme-ora">
                     {new Date(alert.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
-                <p className="text-sm m-0">{alert.message}</p>
+                <p>{alert.message}</p>
               </div>
             ))}
             {alerts.length === 0 && <p className="text-center text-muted">Nessun allarme recente</p>}
@@ -116,12 +128,12 @@ export default function DashboardPage() {
         </Card>
 
         {/* Sezione: Snapshot Live dei Treni */}
-        <Card title="Treni in Viaggio" className="col-span-2" action={
-          <button onClick={() => navigate('/map')} className="btn btn-outline text-xs py-1 px-2">
+        <Card title="Treni in Viaggio" className="dashboard-pannello" action={
+          <button onClick={() => navigate('/map')} className="btn btn-outline dashboard-bottone">
             Mappa Completa
           </button>
         }>
-          <div className="table-container">
+          <div className="table-container dashboard-treni">
             <table>
               <thead>
                 <tr>
@@ -140,21 +152,21 @@ export default function DashboardPage() {
                     <tr key={train.id}>
                       <td className="font-medium font-mono">{train.id}</td>
                       <td>
-                        <div className="flex items-center gap-2">
+                        <div className="dashboard-treno-stato">
                           <span className={`status-indicator status-pulse ${train.status === 'in_ritardo' ? 'status-guasta' : 'status-operativa'}`}></span>
-                          <span className="text-sm capitalize">{train.status.replace('_', ' ')}</span>
+                          <StatoComposto stati={statiDelTreno(train)} />
                         </div>
                       </td>
                       <td>
-                        <div className="flex items-center gap-2 text-sm">
+                        <div className="dashboard-treno-tratta">
                           {prevStation?.code || '?'} <ArrowRight size={14} className="text-muted" /> {nextStation?.code || '?'}
                         </div>
                       </td>
-                      <td>
+                      <td className="dashboard-treno-ritardo">
                         {train.delayMinutes > 0 ? (
                           <span className="text-danger font-medium">+{train.delayMinutes} min</span>
                         ) : (
-                          <span className="text-success text-sm">In orario</span>
+                          <span className="text-success">In orario</span>
                         )}
                       </td>
                     </tr>

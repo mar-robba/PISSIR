@@ -14,9 +14,8 @@
 //      originale. Chi avesse rubato il codice dagli URL non potrebbe usarlo,
 //      perche' il verifier non e' mai passato in chiaro sulla rete.
 //
-// Prima di Keycloak la LoginPage mandava username e password alla Centrale, che
-// le confrontava con una colonna della tabella Utenti: ora la Centrale non
-// conosce nessuna password e si limita a verificare la firma del token.
+// La Centrale non conosce nessuna password: si limita a verificare la firma del
+// token.
 // ============================================================
 
 /**

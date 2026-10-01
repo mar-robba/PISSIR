@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRailwayStore } from '../../store/railwayStore';
-import { Station, StationStatus } from '../../types';
+import { Station } from '../../types';
 import { X, Save } from 'lucide-react';
 import Card from '../ui/Card';
+import CampoNumerico from '../ui/CampoNumerico';
 
 interface StationEditorModalProps {
   isOpen: boolean;
@@ -10,16 +11,13 @@ interface StationEditorModalProps {
   stationIdToEdit?: string | null;
 }
 
-const STATUS_OPTIONS: { value: StationStatus; label: string }[] = [
-  { value: 'operativa', label: 'Operativa' },
-  { value: 'guasta', label: 'Guasta' },
-  { value: 'manutenzione', label: 'In manutenzione' },
-  { value: 'offline', label: 'Offline' },
-];
-
 /**
  * Modale amministrativo per registrare una nuova stazione nella rete
- * o modificare i dati (nome, stato, binari, coordinate) di una esistente.
+ * o modificare i dati (nome, coordinate) di una esistente.
+ *
+ * Il codice è l'id della stazione sulla Centrale (quello con cui si avvia il nodo), quindi
+ * in modifica resta bloccato. Stato e binari non si scrivono da qui: lo stato lo decidono
+ * il battito del nodo e i comandi del tecnico, i binari restano quelli dell'anagrafica.
  */
 export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }: StationEditorModalProps) {
   const { stations, adminCreateStation, adminUpdateStation } = useRailwayStore();
@@ -30,8 +28,6 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
     id: '',
     code: '',
     name: '',
-    status: 'operativa',
-    platforms: 1,
     coordinates: { x: 0, y: 0 },
   });
 
@@ -48,7 +44,9 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
           code: '',
           name: '',
           city: '',
-          status: 'operativa',
+          // Stato e binari il form non li chiede: sono i valori con cui la Centrale
+          // registra una stazione nuova, OFFLINE finché il nodo non batte e un binario.
+          status: 'offline',
           platforms: 1,
           coordinates: { x: 0, y: 0 },
           // Una stazione appena registrata non ha ancora battuto: il campo resta vuoto e
@@ -83,8 +81,6 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
     if (stationIdToEdit) {
       await adminUpdateStation(stationIdToEdit, {
         name: formData.name,
-        status: formData.status,
-        platforms: formData.platforms,
         coordinates: formData.coordinates,
       });
     } else {
@@ -132,59 +128,32 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-muted mb-1">Stato</label>
-              <select
-                className="input-field w-full"
-                value={formData.status || 'operativa'}
-                onChange={e => setFormData({ ...formData, status: e.target.value as StationStatus })}
-              >
-                {STATUS_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-muted mb-1">Binari</label>
-              <input
-                type="number"
-                min="1"
-                className="input-field w-full"
-                value={formData.platforms ?? 1}
-                onChange={e => setFormData({ ...formData, platforms: parseInt(e.target.value) || 1 })}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
               <label className="block text-sm font-medium text-muted mb-1">Latitudine</label>
-              <input
-                type="number"
+              <CampoNumerico
                 step="any"
                 min="-90"
                 max="90"
                 className="input-field w-full font-mono"
                 placeholder="es. 45.4869"
-                value={formData.coordinates?.x ?? 0}
-                onChange={e => setFormData({
+                valore={formData.coordinates?.x ?? 0}
+                onCambia={x => setFormData({
                   ...formData,
-                  coordinates: { x: parseFloat(e.target.value) || 0, y: formData.coordinates?.y ?? 0 }
+                  coordinates: { x, y: formData.coordinates?.y ?? 0 }
                 })}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-muted mb-1">Longitudine</label>
-              <input
-                type="number"
+              <CampoNumerico
                 step="any"
                 min="-180"
                 max="180"
                 className="input-field w-full font-mono"
                 placeholder="es. 9.2050"
-                value={formData.coordinates?.y ?? 0}
-                onChange={e => setFormData({
+                valore={formData.coordinates?.y ?? 0}
+                onCambia={y => setFormData({
                   ...formData,
-                  coordinates: { x: formData.coordinates?.x ?? 0, y: parseFloat(e.target.value) || 0 }
+                  coordinates: { x: formData.coordinates?.x ?? 0, y }
                 })}
               />
             </div>
@@ -195,8 +164,8 @@ export default function StationEditorModal({ isOpen, onClose, stationIdToEdit }:
               messa in base alle tratte invece che al posto suo. */}
           <p className="text-xs text-muted mt-2">
             Coordinate GPS in gradi decimali (WGS84): la mappa del traffico
-            dispone le stazioni proprio su questi valori. Lasciandole a 0 la
-            stazione viene piazzata vicino a quelle a cui è collegata.
+            dispone le stazioni proprio su questi valori. Lasciandole vuote (o a 0)
+            la stazione viene piazzata vicino a quelle a cui è collegata.
           </p>
         </div>
 

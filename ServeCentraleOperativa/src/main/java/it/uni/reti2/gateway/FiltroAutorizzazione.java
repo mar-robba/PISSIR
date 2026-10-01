@@ -9,13 +9,11 @@ import java.util.logging.Logger;
 /**
  * Il filtro che protegge le API della Centrale: un before-handler di Javalin su /api/*.
  *
- * <p>Il PDF chiede due tipologie di utenti con permessi diversi. Prima la distinzione
- * era solo grafica: nessun endpoint controllava nulla e chiunque poteva cancellare un
- * treno con un curl. Adesso ogni richiesta sotto /api deve portare l'access token
- * rilasciato da Keycloak nell'header {@code Authorization: Bearer <token>}.</p>
+ * <p>Il PDF chiede due tipologie di utenti con permessi diversi. Ogni richiesta sotto
+ * /api deve portare l'access token rilasciato da Keycloak nell'header
+ * {@code Authorization: Bearer <token>}, e il controllo sta qui, non nell'interfaccia.</p>
  *
- * <p>Attenzione a dove finisce la responsabilita' di ciascun pezzo, perche' con
- * l'arrivo di Keycloak il filtro fa meta' del lavoro di prima:</p>
+ * <p>Attenzione a dove finisce la responsabilita' di ciascun pezzo:</p>
  * <ul>
  *   <li>chi il token e' VALIDO lo stabilisce {@link SicurezzaKeycloak} (pac4j), che ne
  *       verifica firma, scadenza, emittente e audience con le chiavi pubbliche del
@@ -103,7 +101,7 @@ public class FiltroAutorizzazione {
 
     /**
      * Il nome con cui l'utente ha fatto il login (mat001). E' il claim preferred_username di
-     * Keycloak, lo stesso che quarkus-oidc usava come nome del principal; se manca, l'id del
+     * Keycloak; se manca, l'id del
      * profilo (il "sub" del token).
      */
     public static String nomeUtente(UserProfile profilo) {

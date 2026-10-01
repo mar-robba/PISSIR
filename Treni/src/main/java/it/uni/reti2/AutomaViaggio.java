@@ -16,8 +16,7 @@ import java.util.Random;
  * BLOCCATO_IN_TRATTA e FERMO_CAPOLINEA. Il blocco è diviso in due perché le due situazioni
  * si comportano in modo diverso: fermo al binario il treno aspetta e basta, fermo a metà
  * tratta ha un avanzamento da congelare, e allo sblocco riprende la marcia e non la sosta.
- * Prima era una fase sola e la differenza stava in una variabile a parte (la fase di prima
- * del blocco), che era uno stato nascosto.</p>
+ * Con due fasi distinte non serve tenere da parte la fase precedente al blocco.</p>
  *
  * <p>La classe non decide quando muoversi e non parla con nessuno. Offre le guardie, cioè
  * metodi che leggono lo stato e rispondono senza scrivere niente (compresi quelli che
@@ -378,9 +377,9 @@ public class AutomaViaggio {
     /**
      * Sposta avanti di un secondo l'inizio della tratta corrente: il tempo "percorso" resta
      * invariato e l'avanzamento non cresce mentre il treno è fermo in tratta (bloccato o in
-     * emergenza). Il tempo perso qui non viene contato: che si traduca in un ritardo lo
-     * stabilisce la Centrale, quando il treno si presenta alla fermata successiva più tardi
-     * dell'orario previsto.
+     * emergenza). Il tempo perso qui il treno non lo conta: è la Centrale a vederlo, perché
+     * la telemetria le porta un avanzamento fermo mentre l'orario corre, e a misurarlo
+     * quando il treno si presenta alla fermata successiva più tardi del previsto.
      */
     public void congela() {
         if (trainDB.tInizioTratta != null) {

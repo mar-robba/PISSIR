@@ -4,8 +4,9 @@
 -- ================================================================
 -- La Centrale esegue questo file a ogni avvio (Database.creaTabelleMancanti): ogni
 -- istruzione e' un CREATE ... IF NOT EXISTS, quindi su un database gia' popolato non
--- cambia niente e su uno vuoto crea tutte le tabelle. Prima le creava Hibernate dalle
--- entita' al primo avvio.
+-- cambia niente e su uno vuoto crea tutte le tabelle.
+-- Lo esegue anche popola_db.sh (nella radice del progetto) con psql, prima di caricare
+-- i dati demo: cosi' le tabelle ci sono gia' senza dover accendere la Centrale.
 -- Siccome lo legge la Centrale, ogni istruzione finisce con il punto e virgola a fine
 -- riga (e' da li' che capisce dove finisce un'istruzione).
 
@@ -121,13 +122,11 @@ CREATE TABLE IF NOT EXISTS Guasti_Pervenuti_da_treni_o_Staz (
 );
 
 -- --- Eventi delle Stazioni (audit log) ---
--- Tabella della classe EventoStazione: non era prevista dallo schema iniziale.
+-- Tabella della classe EventoStazione (estensione dello schema).
 -- E' gia' una tabella di storico: nessuna FK, e il nome della stazione congelato dentro
--- la riga (vedi la regola degli storici piu' sotto). I nomi delle colonne sono quelli
--- che generava Hibernate dai campi dell'entita', cioe' tutti attaccati e minuscoli: i
--- database creati prima di questo file li hanno cosi', e le query della Centrale pure.
--- L'id lo prende la Centrale dalla sequenza qui sotto, che e' quella che usava
--- Hibernate (con passo 50: le righe gia' scritte hanno numeri piu' bassi).
+-- la riga (vedi la regola degli storici piu' sotto). I nomi delle colonne sono tutti
+-- attaccati e minuscoli, come li usano le query della Centrale.
+-- L'id lo prende la Centrale dalla sequenza qui sotto.
 CREATE SEQUENCE IF NOT EXISTS eventi_stazioni_seq START WITH 1 INCREMENT BY 50;
 
 CREATE TABLE IF NOT EXISTS eventi_stazioni (
@@ -147,15 +146,14 @@ CREATE TABLE IF NOT EXISTS eventi_stazioni (
 -- tabelle dello stato corrente (Stazione, Treni, Tratte, Itinerari, Guasti, Utenti).
 --
 -- Il motivo e' nell'enunciato del requisito: la storia deve restare consultabile anche
--- quando i nodi che l'hanno prodotta non ci sono piu'. Con la chiave esterna succedeva
--- l'opposto: per cancellare una stazione bisognava prima cancellare i suoi transiti
--- storici, quindi eliminare una stazione dalla rete voleva dire perdere tutti i
--- passaggi mai avvenuti li' dentro (e la tratta storicizzata non si poteva togliere
--- affatto). Il vincolo di integrita' e' giusto per lo stato corrente, dove il dato deve
+-- quando i nodi che l'hanno prodotta non ci sono piu'. Con la chiave esterna
+-- succederebbe l'opposto: per cancellare una stazione bisognerebbe prima cancellare i
+-- suoi transiti storici, cioe' perdere tutti i passaggi mai avvenuti li' dentro (e la
+-- tratta storicizzata non si potrebbe togliere affatto). Il vincolo di integrita' e' giusto per lo stato corrente, dove il dato deve
 -- essere coerente adesso; su un fatto gia' avvenuto e' fuori posto.
 --
 -- Al posto della chiave esterna ogni riga porta:
---   * l'identificativo "logico" dell'attore (stessa colonna di prima, senza vincolo);
+--   * l'identificativo "logico" dell'attore, senza vincolo;
 --   * il suo nome e le informazioni che servono a rileggere la riga (tipo della
 --     stazione, descrizione della tratta, matricola dell'operatore...), congelati
 --     all'istante del fatto.
@@ -196,7 +194,7 @@ CREATE TABLE IF NOT EXISTS Storico_Guasti (
     nome_sorgente       VARCHAR(100),  -- nome della stazione (per il treno coincide con l'id)
     messaggio           VARCHAR(500),
     Stato_RisoltoONO    BOOLEAN NOT NULL,
-    id_operatore        VARCHAR(50),   -- ex OperatoreCheSeNeStaOccupandoFK: non e' piu' una FK
+    id_operatore        VARCHAR(50),   -- riferimento logico all'operatore, senza FK
     nome_operatore      VARCHAR(255),
     matricola_operatore VARCHAR(50),
     ts_apertura         TIMESTAMP NOT NULL,
@@ -273,7 +271,7 @@ CREATE TABLE IF NOT EXISTS Storico_Assegnazioni_Guasti (
     sorgenteTipo            VARCHAR(20),
     sorgenteId              VARCHAR(50),
     nome_sorgente           VARCHAR(100),
-    id_operatore            VARCHAR(50) NOT NULL,  -- ex id_utente: non e' piu' una FK
+    id_operatore            VARCHAR(50) NOT NULL,  -- riferimento logico all'operatore, senza FK
     nome_operatore          VARCHAR(255),
     matricola_operatore     VARCHAR(50),           -- legame con l'utente di Keycloak
     ruolo_operatore         VARCHAR(50),

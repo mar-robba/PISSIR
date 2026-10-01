@@ -10,8 +10,8 @@ import java.util.logging.Logger;
  * condiviso del canale, con il discriminante "tipoEvento") e li mette nel LocalBuffer: a
  * pubblicarli è il ConsumatoreBuffer, nell'ordine in cui sono nati.
  *
- * <p>Stava nello StationGateway, ma a chiamarlo adesso è GestoreEventi (è l'azione delle
- * mosse che guastano o ripristinano la stazione), e il gateway passa a sua volta gli alert al
+ * <p>Lo chiama GestoreEventi (è l'azione delle mosse che guastano o ripristinano la
+ * stazione). Non sta nello StationGateway perché il gateway passa a sua volta gli alert al
  * gestore: con la pubblicazione dentro il gateway i due si chiamerebbero a vicenda. Nel treno
  * PubblicatoreAlert esiste per lo stesso motivo.</p>
  *
@@ -36,11 +36,9 @@ public class PubblicatoreAlert {
     /**
      * Segnala un guasto della stazione con un alert GUASTO.
      *
-     * <p>Il campo {@code tipoGuasto} è la classificazione dichiarata dalla sorgente. Prima non
-     * c'era e la Centrale la indovinava cercando la parola "sensore" nel testo del messaggio:
-     * siccome i guasti di terra parlano quasi sempre di sensori, finivano tutti classificati
-     * come {@code sensore_offline} e l'operatore si ritrovava senza il comando per mandare la
-     * squadra di manutenzione. Chi segnala il guasto sa che tipo è: lo dice.</p>
+     * <p>Il campo {@code tipoGuasto} è la classificazione dichiarata dalla sorgente: chi
+     * segnala il guasto sa che tipo è, e la Centrale non deve ricavarlo dal testo. Da lui
+     * dipende anche se all'operatore compare il comando per mandare la squadra.</p>
      *
      * @param descrizione La descrizione del problema rilevato.
      * @param severita    "CRITICAL" oppure "WARNING".

@@ -396,9 +396,9 @@ public class GestoreEventi {
      * Quel singolo allarme non è più aperto: il treno se ne prende nota e nient'altro. Un
      * guasto chiuso NON vuol dire binari liberi (la stazione può avere la squadra ancora al
      * lavoro, o un secondo allarme aperto) e a saperlo è solo la Centrale, che quando la
-     * fermata torna agibile lo dice con STATO_STAZIONE. Prima si ripartiva da qui, e siccome
-     * questo messaggio lo pubblica anche il nodo di terra quando i suoi sensori tornano a
-     * battere, bastava quello per far entrare un convoglio in una stazione in manutenzione.
+     * fermata torna agibile lo dice con STATO_STAZIONE. Questo messaggio lo pubblica anche il
+     * nodo di terra quando i suoi sensori tornano a battere, quindi ripartire da qui farebbe
+     * entrare un convoglio in una stazione in manutenzione.
      */
     private void suGuastoStazioneRisolto(String stazioneId) {
         // 1. guardie: nessuna mossa del viaggio, si guarda solo se era lei a trattenermi

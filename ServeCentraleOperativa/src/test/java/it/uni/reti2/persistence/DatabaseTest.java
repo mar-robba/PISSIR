@@ -7,8 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Le transazioni JDBC di {@link Database}: al posto del {@code QuarkusTransaction.requiringNew()}
- * di prima, le stesse garanzie scritte a mano.
+ * Le transazioni JDBC di {@link Database}: commit, rollback e transazioni annidate
+ * indipendenti.
  */
 public class DatabaseTest {
 

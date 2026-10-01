@@ -8,11 +8,10 @@ import java.util.logging.Logger;
  * di vitalità (Heartbeat) della stazione verso la Centrale Operativa, sul topic
  * railway/station/{id}/heartbeat.
  *
- * <p>Il keepalive dei sensori di binario, che un tempo stava qui dentro, è in AutomaSensori:
- * sono due heartbeat diversi (questo va verso la Centrale, quello arriva dai dispositivi di
- * campo) e tenerli insieme aveva solo confuso le cose. Anche lo svuotamento del buffer, che
- * qui girava in un job a parte ogni 10 secondi, non c'è più: lo fa il ConsumatoreBuffer, che
- * pubblica appena può.</p>
+ * <p>Il keepalive dei sensori di binario è un'altra cosa e sta in AutomaSensori: questo
+ * battito va verso la Centrale, quello arriva dai dispositivi di campo. Nemmeno lo
+ * svuotamento del buffer passa da qui: lo fa il ConsumatoreBuffer, che pubblica appena
+ * può.</p>
  *
  * <p>Il battito non passa dal LocalBuffer ma si pubblica direttamente, a QoS 0: vale solo
  * adesso. Rimandarne uno vecchio di minuti dopo una caduta direbbe alla Centrale una cosa

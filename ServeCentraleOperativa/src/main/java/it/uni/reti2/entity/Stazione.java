@@ -55,6 +55,15 @@ public class Stazione {
     /** Timestamp dell'ultimo segnale di heartbeat ricevuto dalla stazione. */
     public Instant ultimoHeartbeat;
 
+    /**
+     * Lo stato che il nodo ha dichiarato di sé nell'ultimo battito (ONLINE o GUASTA, il
+     * suo automa S10), null se non ha ancora battuto. Di solito coincide con {@link #stato},
+     * perché la Centrale lo prende per buono a ogni battito; non coincide in MANUTENZIONE,
+     * dove la Centrale non lo accetta e la stazione è in due stati insieme: la squadra è
+     * sul posto e il nodo si dichiara ancora GUASTA (o già ONLINE).
+     */
+    public String statoDichiarato;
+
     /** Conteggio dei treni attualmente presenti in stazione. */
     public int treniInStazione;
 

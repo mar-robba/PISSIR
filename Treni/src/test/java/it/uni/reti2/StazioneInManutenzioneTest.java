@@ -79,7 +79,7 @@ public class StazioneInManutenzioneTest {
     }
 
     /**
-     * Il caso che prima non funzionava: la stazione e' guasta, l'operatore ci manda la
+     * La stazione e' guasta, l'operatore ci manda la
      * squadra e poi chiude l'allarme. Il RESOLVED da solo non basta, perche' i tecnici sono
      * ancora sui binari: il treno riparte solo quando la Centrale la dichiara agibile.
      */

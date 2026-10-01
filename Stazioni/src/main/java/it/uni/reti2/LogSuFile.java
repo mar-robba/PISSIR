@@ -159,7 +159,7 @@ public final class LogSuFile {
     /**
      * Il formato di una riga di log, uguale a schermo e su file (e uguale a quello del
      * Treno), cosi' il file prodotto da qui e quelli di avvioStazioni.sh si leggono allo
-     * stesso modo, e allo stesso modo dei log di quando il nodo girava su Quarkus:
+     * stesso modo:
      * {@code 2026-08-24 17:54:44,715 INFO  [it.uni.reti2.main] (main) messaggio}.
      */
     private static final class FormatoRighe extends Formatter {
@@ -189,7 +189,7 @@ public final class LogSuFile {
         }
 
         /**
-         * I nomi corti dei livelli, quelli che si leggevano nei log di Quarkus: WARN e non
+         * I nomi corti dei livelli, quelli che si leggono nei log del Treno: WARN e non
          * WARNING, ERROR e non SEVERE, DEBUG e non FINE.
          */
         private static String nomeLivello(Level livello) {

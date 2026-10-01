@@ -22,16 +22,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Test di non regressione per tre dei bug corretti il 16/08/2026
- * (elenco in doc/AnalisiDellaBaseDiCodice/bug_trovati.md):
+ * Casi limite dell'anagrafica e dello snapshot, uno per test:
  *
  * <ul>
- *   <li><b>A06</b>: una PUT su un itinerario che non parla di assegnazioni non deve
+ *   <li>una PUT su un itinerario che non parla di assegnazioni non deve
  *       sganciare i convogli assegnati da un'altra schermata;</li>
- *   <li><b>A20</b>: un itinerario che ripassa sulla stessa tratta va rifiutato con un 400
+ *   <li>un itinerario che ripassa sulla stessa tratta va rifiutato con un 400
  *       che si capisce, non con il 500 della chiave primaria violata;</li>
- *   <li><b>A12</b>: una tratta usata come posizione corrente di un convoglio va rifiutata
- *       con un 409, non con il 500 della chiave esterna violata.</li>
+ *   <li>una tratta usata come posizione corrente di un convoglio va rifiutata
+ *       con un 409, non con il 500 della chiave esterna violata;</li>
+ *   <li>lo snapshot periodico porta, oltre ai KPI, l'elenco completo di treni e stazioni.</li>
  * </ul>
  *
  * <p>La rete di prova e' A -&gt; B e B -&gt; A (i due versi sono archi distinti), un
@@ -99,7 +99,7 @@ public class RegressioniBugTest {
 
         // Il convoglio viene assegnato dalla pagina Amministrazione (form Treni), cioe'
         // da una schermata diversa dall'editor degli itinerari: e' il punto di partenza
-        // dello scenario di A06.
+        // dello scenario.
         assertEquals(201, centrale.post("/api/treni", """
                 { "id": "%s", "stato": "fermo", "itinerario": { "id": "%s" } }
                 """.formatted(TRENO, ITINERARIO), centrale.admin()).stato());
@@ -108,10 +108,9 @@ public class RegressioniBugTest {
     @Test
     @Order(2)
     public void modificareLeStazioniNonSganciaITreniAssegnati() throws Exception {
-        // A06: l'editor degli itinerari cambia solo le stazioni e NON manda "treniIds",
-        // perche' quelle assegnazioni non le gestisce. Prima rimandava indietro la lista
-        // scaricata all'avvio della pagina e il convoglio assegnato poco prima veniva
-        // sganciato senza che nessuno lo avesse chiesto.
+        // L'editor degli itinerari cambia solo le stazioni e NON manda "treniIds",
+        // perche' quelle assegnazioni non le gestisce: il convoglio assegnato dall'altra
+        // schermata deve restare dov'e'.
         assertEquals(200, centrale.put("/api/tratte/" + ITINERARIO, """
                 { "stazioni": ["%s", "%s"], "travelTimes": [25] }
                 """.formatted(STAZ_A, STAZ_B), centrale.admin()).stato());
@@ -136,7 +135,7 @@ public class RegressioniBugTest {
     @Test
     @Order(4)
     public void itinerarioCheRipassaSullaStessaTrattaVieneRifiutato() throws Exception {
-        // A20: la chiave di Itinerario_Tratta e' (id_itinerario, id_Tratta) e l'ordine non
+        // La chiave di Itinerario_Tratta e' (id_itinerario, id_Tratta) e l'ordine non
         // ne fa parte, quindi A -> B -> A -> B chiederebbe due righe con la stessa chiave.
         // Entrambi gli archi esistono in rete: l'unico problema e' la ripetizione.
         CentraleDiProva.Risposta risposta = centrale.post("/api/tratte", """
@@ -153,7 +152,7 @@ public class RegressioniBugTest {
     @Test
     @Order(5)
     public void trattaUsataComePosizioneDiUnTrenoNonSiElimina() throws Exception {
-        // A12: la posizione del convoglio la scrive il gestore degli eventi al passaggio,
+        // La posizione del convoglio la scrive il gestore degli eventi al passaggio,
         // qui la si imposta a mano perche' non esiste una REST che lo faccia.
         centrale.db.inTransazione(() -> centrale.repository.aggiornaPosizioneTreno(TRENO, TRATTA_BA));
 
@@ -170,9 +169,8 @@ public class RegressioniBugTest {
     @Test
     @Order(6)
     public void loSnapshotPortaKpiTreniEStazioni() {
-        // A03: lo snapshot periodico conteneva i soli KPI, quindi anche leggendolo il
-        // browser non avrebbe potuto riallineare niente (RF02.6.3 parla di "fotografia
-        // completa dello stato corrente"). Qui si fa scattare l'evento vero e si controlla
+        // Con i soli KPI il browser non potrebbe riallineare niente (RF02.6.3 parla di
+        // "fotografia completa dello stato corrente"). Qui si fa scattare l'evento vero e si controlla
         // che quello che esce sulla WebSocket porti i campi che il mappatore del frontend
         // si aspetta: sono oggetti con relazioni, ed e' il punto dove una serializzazione
         // puo' rompersi.

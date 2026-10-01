@@ -28,6 +28,7 @@ const stazione = (
   status: 'operativa',
   coordinates: { x: latitudine, y: longitudine },
   lastHeartbeat: Date.now(),
+  declaredStatus: 'ONLINE',
   platforms: 4,
 });
 
@@ -41,12 +42,15 @@ const puntoDelMarker = (contenitore: HTMLElement, nome: string): { x: number; y:
 
 const treno = (id: string, campi: Partial<Train> = {}): Train => ({
   id,
-  status: 'in_stazione',
+  status: 'fermo',
   currentStationId: 'st-mi',
   nextStationId: null,
   previousStationId: null,
   routeId: 'r-1',
   direction: 'andata',
+  condition: 'REGOLARE',
+  journeyPhase: 'IN_STAZIONE',
+  declaredDirection: 'andata',
   // Il convoglio di riferimento è uno di cui la Centrale sa dire dove sta: i casi
   // incerti si costruiscono passando positionKnown: false nei campi.
   positionKnown: true,
@@ -229,8 +233,8 @@ describe('TrafficMapPage', () => {
 
   it('con la sola partenza sconosciuta non disegna la corsa: mette il convoglio in elenco', () => {
     // È il caso della stazione spenta. La destinazione si conosce (Palermo), la
-    // provenienza no: prima la mappa pescava l'ultima stazione nota e tracciava la corsa
-    // fino a lì, disegnando un convoglio in viaggio su una tratta che non esiste.
+    // provenienza no: la mappa non deve ripiegare sull'ultima stazione nota, che
+    // disegnerebbe un convoglio in viaggio su una tratta che non esiste.
     useRailwayStore.setState({
       trains: [
         treno('REG 600', {

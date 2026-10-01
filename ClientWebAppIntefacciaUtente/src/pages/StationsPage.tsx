@@ -1,17 +1,18 @@
 import { useRailwayStore } from '../store/railwayStore';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import StatoComposto from '../components/ui/StatoComposto';
 import { useEffect, useState } from 'react';
 import { Building2, Wrench, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { apiClient, descriviIncertezzaPosizione } from '../api/apiClient';
+import { apiClient, descriviIncertezzaPosizione, statiDelTreno, statiDellaStazione } from '../api/apiClient';
 import type { ExpectedTrain } from '../types';
 
 /** Millisecondi fra due letture del tabellone: è una previsione, si rinfresca da sola. */
 const RINFRESCO_ATTESI_MS = 5000;
 
 export default function StationsPage() {
-  const { stations, completeMaintenance } = useRailwayStore();
+  const { stations, trains, completeMaintenance } = useRailwayStore();
   const [search, setSearch] = useState('');
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [expectedTrains, setExpectedTrains] = useState<ExpectedTrain[]>([]);
@@ -25,11 +26,8 @@ export default function StationsPage() {
 
   const selectedStation = stations.find(s => s.id === selectedStationId);
 
-  // Treni attesi (UC4): l'elenco lo calcola la Centrale sull'itinerario dei convogli.
-  // Prima lo costruiva questa pagina filtrando i treni la cui posizione istantanea
-  // coincideva con la stazione, quindi si vedeva solo chi stava arrivando dalla tratta
-  // adiacente e chi era fermo lì: chi sarebbe passato di lì due fermate più avanti non
-  // compariva, e l'orario previsto non c'era proprio.
+  // Treni attesi (UC4): l'elenco lo calcola la Centrale sull'itinerario dei convogli,
+  // con l'orario previsto, quindi compare anche chi passerà di qui fra qualche fermata.
   useEffect(() => {
     if (!selectedStationId) {
       setExpectedTrains([]);
@@ -93,12 +91,7 @@ export default function StationsPage() {
                     <td className="font-mono text-sm">{station.code}</td>
                     <td className="font-medium">{station.name}</td>
                     <td>
-                      <Badge type={
-                        station.status === 'operativa' ? 'success' : 
-                        station.status === 'manutenzione' ? 'warning' : 'danger'
-                      }>
-                        {station.status.toUpperCase()}
-                      </Badge>
+                      <StatoComposto stati={statiDellaStazione(station)} />
                     </td>
                     <td className="text-sm font-mono">
                       {/* Un trattino, non l'ora corrente: se lastHeartbeat è nullo la
@@ -135,9 +128,7 @@ export default function StationsPage() {
               <div className="mb-6">
                 <h3 className="text-xl mb-1">{selectedStation.name}</h3>
                 <p className="text-sm font-mono text-muted mb-3">Codice: {selectedStation.code}</p>
-                <Badge type={selectedStation.status === 'operativa' ? 'success' : (selectedStation.status === 'manutenzione' ? 'warning' : 'danger')}>
-                  Stato: {selectedStation.status.toUpperCase()}
-                </Badge>
+                <StatoComposto stati={statiDellaStazione(selectedStation)} />
                 
                 {selectedStation.faultDescription && (
                   <div className="mt-3 p-3 bg-danger/10 border border-danger/30 rounded text-danger text-sm flex gap-2 items-start">
@@ -178,9 +169,15 @@ export default function StationsPage() {
                         </Badge>
                       </div>
                       
-                      <div className="flex justify-between text-sm">
+                      {/* Lo stato composto si prende dal convoglio in memoria, che la
+                          WebSocket tiene aggiornato: la riga del tabellone si rilegge ogni
+                          pochi secondi e porta solo il riassunto della Centrale. */}
+                      <div className="flex justify-between items-center gap-2 text-sm">
                         <span className="text-muted">Stato:</span>
-                        <span className="capitalize">{train.status.replace('_', ' ')}</span>
+                        <StatoComposto stati={statiDelTreno(
+                          trains.find(t => t.id === train.trainId)
+                            ?? { status: train.status, condition: null, journeyPhase: null, declaredDirection: null }
+                        )} />
                       </div>
                       
                       {train.delayMinutes > 0 && (

@@ -68,8 +68,8 @@ public class RiaggancioItinerarioTest {
         Assertions.assertEquals("S4", db.prossimaStazione);
         Assertions.assertEquals("IN_STAZIONE", db.faseViaggio);
         Assertions.assertEquals("andata", db.direzione);
-        // Il ritardo non si controlla più qui: non è più un dato del convoglio, lo tiene
-        // la Centrale (PrevisioneArrivi) confrontando i passaggi con l'orario previsto.
+        // Il ritardo non si controlla qui: non è un dato del convoglio, lo tiene la
+        // Centrale (PrevisioneArrivi) confrontando i passaggi con l'orario previsto.
         Assertions.assertEquals(123, db.passeggeri, "i passeggeri a bordo sono del convoglio, non dell'itinerario");
     }
 

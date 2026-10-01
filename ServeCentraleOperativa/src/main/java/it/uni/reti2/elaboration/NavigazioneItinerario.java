@@ -12,9 +12,7 @@ import java.util.List;
  *
  * <p>E' geometria della rete, non ingestione di messaggi: le stesse domande se le
  * pone il digital twin del treno quando chiede {@code GET /api/prossima-stazione},
- * e prima la risposta era scritta due volte, una nel consumer MQTT e una
- * nell'endpoint REST, con due convenzioni diverse per la direzione ("ritorno" da
- * una parte, "R" dall'altra).</p>
+ * quindi la risposta sta qui, con una sola convenzione per la direzione.</p>
  *
  * <p><b>La direzione ribalta tutto.</b> Un itinerario e' una sequenza ordinata di
  * tratte orientate: percorrerlo al ritorno significa leggerlo all'indietro e

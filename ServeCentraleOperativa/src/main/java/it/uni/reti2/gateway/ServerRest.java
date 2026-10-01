@@ -19,11 +19,11 @@ import java.util.logging.Logger;
  *   <li>il CORS aperto a qualsiasi origine, come prima: la web app gira su un'altra porta
  *       (Vite) e il browser senza queste intestazioni bloccherebbe le sue chiamate;</li>
  *   <li>il filtro di FiltroAutorizzazione davanti a ogni richiesta sotto /api;</li>
- *   <li>la WebSocket /ws/realtime, che non passa dal filtro (come prima);</li>
+ *   <li>la WebSocket /ws/realtime, che non passa dal filtro;</li>
  *   <li>il certificato: sotto profilo tls il plugin SSL di Javalin aggiunge l'HTTPS sulla
  *       8444 (server-centrale.crt, firmato dalla CA del progetto) e l'HTTP in chiaro resta
- *       sulla 8781, come con {@code quarkus.http.insecure-requests=enabled}. L'HTTPS parla
- *       solo HTTP/1.1: con l'HTTP/2 la WebSocket non arrivava al browser (vedi sotto).</li>
+ *       sulla 8781. L'HTTPS parla solo HTTP/1.1: con l'HTTP/2 la WebSocket non arriva al
+ *       browser (vedi sotto).</li>
  * </ul>
  */
 public class ServerRest {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRailwayStore } from '../../store/railwayStore';
-import { Train, TrainStatus } from '../../types';
+import { Train } from '../../types';
 import { X, Save } from 'lucide-react';
 import Card from '../ui/Card';
 
@@ -10,21 +10,15 @@ interface TrainEditorModalProps {
   trainIdToEdit?: string | null;
 }
 
-const STATUS_OPTIONS: { value: TrainStatus; label: string }[] = [
-  { value: 'in_attesa', label: 'In attesa' },
-  { value: 'in_viaggio', label: 'In viaggio' },
-  { value: 'in_stazione', label: 'In stazione' },
-  { value: 'in_ritardo', label: 'In ritardo' },
-  { value: 'guasto', label: 'Guasto' },
-  { value: 'soppresso', label: 'Soppresso' },
-];
-
 /**
- * Modale amministrativo per creare un nuovo treno o modificare i dati (tratta, stato,
- * passeggeri, ritardo) di uno esistente (UC8).
+ * Modale amministrativo per creare un nuovo treno o cambiare la tratta assegnata a uno
+ * esistente (UC8).
  *
  * Il nome del convoglio si sceglie solo in creazione: è la chiave primaria del treno
- * sulla Centrale, quindi in modifica il campo è in sola lettura.
+ * sulla Centrale, quindi in modifica il campo è in sola lettura. Stato, ritardo e
+ * passeggeri invece non si scrivono da qui: lo stato lo tengono gli automi della Centrale
+ * con la telemetria del convoglio, il ritardo lo misura la Centrale ai passaggi e i
+ * passeggeri li dichiara il treno nel suo frame.
  */
 export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: TrainEditorModalProps) {
   const { trains, routes, adminCreateTrain, adminUpdateTrain } = useRailwayStore();
@@ -32,9 +26,6 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
   const [formData, setFormData] = useState<Partial<Train>>({
     id: '',
     routeId: '',
-    status: 'in_attesa',
-    passengers: 0,
-    delayMinutes: 0,
   });
 
   useEffect(() => {
@@ -45,10 +36,13 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
           setFormData({ ...existingTrain });
         }
       } else {
+        // Il form chiede solo nome e tratta: il resto sono i valori con cui la Centrale
+        // crea un convoglio che non ha ancora trasmesso (stato "fermo", nessun ritardo),
+        // e restano finché non arriva il suo primo frame.
         setFormData({
           id: '',
           routeId: '',
-          status: 'in_attesa',
+          status: 'fermo',
           currentStationId: null,
           nextStationId: null,
           previousStationId: null,
@@ -74,12 +68,9 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
   const handleSave = async () => {
     if (trainIdToEdit) {
       // Il nome del convoglio non è tra i campi modificabili: è la chiave primaria
-      // del treno sulla Centrale, quindi si aggiornano solo stato e tratta.
+      // del treno sulla Centrale, quindi si aggiorna solo la tratta.
       await adminUpdateTrain(trainIdToEdit, {
         routeId: formData.routeId,
-        status: formData.status,
-        passengers: formData.passengers,
-        delayMinutes: formData.delayMinutes,
       });
     } else {
       // Il nome scritto nel form diventa l'identificativo del convoglio (chiave
@@ -111,37 +102,23 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
         </div>
 
         <div className="flex-1 overflow-y-auto pr-2 space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-muted mb-1">Convoglio</label>
-              <input
-                type="text"
-                className="input-field w-full font-mono disabled:opacity-60 disabled:cursor-not-allowed"
-                value={formData.id || ''}
-                onChange={e => setFormData({ ...formData, id: e.target.value })}
-                placeholder="es. IC 351"
-                maxLength={50}
-                disabled={!!trainIdToEdit}
-              />
-              {trainIdToEdit && (
-                <p className="text-xs text-muted mt-1">
-                  Il nome identifica il convoglio e non si può cambiare: per rinominarlo
-                  elimina il treno e ricrealo.
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-muted mb-1">Stato</label>
-              <select
-                className="input-field w-full"
-                value={formData.status || 'in_attesa'}
-                onChange={e => setFormData({ ...formData, status: e.target.value as TrainStatus })}
-              >
-                {STATUS_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-muted mb-1">Convoglio</label>
+            <input
+              type="text"
+              className="input-field w-full font-mono disabled:opacity-60 disabled:cursor-not-allowed"
+              value={formData.id || ''}
+              onChange={e => setFormData({ ...formData, id: e.target.value })}
+              placeholder="es. IC 351"
+              maxLength={50}
+              disabled={!!trainIdToEdit}
+            />
+            {trainIdToEdit && (
+              <p className="text-xs text-muted mt-1">
+                Il nome identifica il convoglio e non si può cambiare: per rinominarlo
+                elimina il treno e ricrealo.
+              </p>
+            )}
           </div>
 
           <div>
@@ -156,29 +133,6 @@ export default function TrainEditorModal({ isOpen, onClose, trainIdToEdit }: Tra
                 <option key={r.id} value={r.id}>{r.name} ({r.code})</option>
               ))}
             </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-muted mb-1">Passeggeri</label>
-              <input
-                type="number"
-                min="0"
-                className="input-field w-full"
-                value={formData.passengers ?? 0}
-                onChange={e => setFormData({ ...formData, passengers: parseInt(e.target.value) || 0 })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-muted mb-1">Ritardo (min)</label>
-              <input
-                type="number"
-                min="0"
-                className="input-field w-full"
-                value={formData.delayMinutes ?? 0}
-                onChange={e => setFormData({ ...formData, delayMinutes: parseInt(e.target.value) || 0 })}
-              />
-            </div>
           </div>
         </div>
 

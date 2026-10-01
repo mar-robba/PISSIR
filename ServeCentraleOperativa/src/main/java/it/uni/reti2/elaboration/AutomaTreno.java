@@ -107,14 +107,20 @@ public class AutomaTreno {
 
     /**
      * Il convoglio ha trasmesso la sua telemetria: stato, posizione, velocità e fermate si
-     * prendono dal frame. Il ritardo NO: non è un dato del payload ma il risultato del
-     * confronto fra orario previsto e passaggio reale, che fa la Centrale al passaggio.
+     * prendono dal frame. Il ritardo NO: non è un dato del payload ma il confronto fra
+     * l'orario e il punto in cui il convoglio si trova, che fa la Centrale. Con la posizione
+     * nuova lo si rifà qui, ed è così che cresce il ritardo di un treno fermo fra un
+     * passaggio e l'altro.
      *
      * @param trattaDedotta La tratta ricavata dalla fermata che il convoglio dichiara di avere
      *                      davanti, o null se quella in cache era già giusta.
      */
     public void telemetria(Treno treno, TelemetriaMsg msg, Tratta trattaDedotta, Instant quando) {
         treno.stato = msg.stato();
+        // Lo stato dei due automi del convoglio, cosi' come li dichiara: non cambiano
+        // nessuna decisione della Centrale, servono alla web app per mostrarli tutti e due.
+        treno.condizione = msg.condizione();
+        treno.faseViaggio = msg.faseViaggio();
         treno.latitudine = msg.latitudine();
         treno.longitudine = msg.longitudine();
         treno.velocita = msg.velocita();
@@ -127,24 +133,27 @@ public class AutomaTreno {
         if (trattaDedotta != null) {
             treno.posizioneAttualeTratta = trattaDedotta;
         }
-        // Con la posizione appena aggiornata si rifa' la previsione: e' il frame di
-        // telemetria a dire quanta strada resta della tratta in corso.
+        // Con la posizione appena aggiornata si rifanno la previsione e il ritardo: e' il
+        // frame di telemetria a dire quanta strada resta della tratta in corso.
         previsioni.aggiornaPrevisione(treno);
+        previsioni.aggiornaRitardo(treno, quando);
         statoRete.aggiornaTreno(treno);
     }
 
     /**
      * Il sensore di terra ha visto passare il convoglio. È qui che la Centrale misura il
      * ritardo: all'ingresso confronta l'ora vera con quella programmata, all'uscita misura la
-     * sosta e programma l'arrivo alla fermata dopo.
+     * sosta e programma l'arrivo alla fermata dopo. La misura prende il posto della stima
+     * fatta con la telemetria dall'ultimo passaggio.
      *
      * @param posizione     Dove si trova il convoglio dopo il passaggio (calcolato dal gestore).
      * @param cambiaFase    La risposta di {@link #cambiaFaseAlPassaggio}, data nella fase 1.
-     * @return Di quanti minuti è cambiato il ritardo con questo passaggio (0 se non è cambiato).
+     * @return Di quanti minuti è cambiato il ritardo misurato con questo passaggio (0 se non
+     *         è cambiato): la stima non conta, il treno lo viene a sapere solo dalle misure.
      */
     public int passaggio(Treno treno, TransitoMsg msg, String direzione,
                          NavigazioneItinerario.Posizione posizione, boolean cambiaFase, Instant quando) {
-        int ritardoPrima = treno.ritardo;
+        int ritardoPrima = previsioni.ritardoMisurato(treno);
         if (msg.entrata()) {
             previsioni.registraArrivo(treno, msg.stazioneId(), msg.quando());
             treno.stazioneCorrente = msg.stazioneId();
@@ -165,8 +174,9 @@ public class AutomaTreno {
         }
         treno.ultimoAggiornamento = quando;
         previsioni.aggiornaPrevisione(treno);
+        previsioni.aggiornaRitardo(treno, quando);
         statoRete.aggiornaTreno(treno);
-        return treno.ritardo - ritardoPrima;
+        return previsioni.ritardoMisurato(treno) - ritardoPrima;
     }
 
     /** -> rotto: un guasto di bordo. Il tachimetro va a zero subito, senza aspettare la telemetria. */

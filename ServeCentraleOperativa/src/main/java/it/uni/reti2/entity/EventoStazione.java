@@ -11,9 +11,7 @@ import java.time.LocalDateTime;
  * {@code Storico_Stato_Stazioni} e {@code Storico_Guasti} perché cattura eventi
  * di livello più granulare e libero nel formato.</p>
  *
- * <p>L'id è un numero che il repository prende dalla sequenza {@code eventi_stazioni_seq},
- * la stessa che usava Hibernate quando le righe le scriveva lui: quelle già presenti hanno
- * numeri più bassi, quindi le nuove non si scontrano.</p>
+ * <p>L'id è un numero che il repository prende dalla sequenza {@code eventi_stazioni_seq}.</p>
  *
  * @see it.uni.reti2.entity.StoricoStatoStazione
  */

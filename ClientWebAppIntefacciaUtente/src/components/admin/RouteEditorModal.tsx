@@ -5,6 +5,7 @@ import { ErroreApi } from '../../api/apiClient';
 import type { ApiCoppiaMancante } from '../../api/apiTypes';
 import { X, Save, Trash2, ArrowUp, ArrowDown, AlertTriangle, Flag } from 'lucide-react';
 import Card from '../ui/Card';
+import CampoNumerico from '../ui/CampoNumerico';
 
 interface RouteEditorModalProps {
   isOpen: boolean;
@@ -244,9 +245,8 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
               Il codice è l'id dell'itinerario e lo assegna il server al salvataggio
               (IT-xxxxxxxx), poi resta perché ci puntano le chiavi esterne degli storici.
               Il nome non esiste nemmeno come colonna: il server lo ricompone a ogni GET
-              concatenando i nomi delle stazioni attraversate. Prima erano due campi di
-              testo, ma POST e PUT /api/tratte non li leggono: si scrivevano, si salvava
-              e al reload tornavano quelli decisi dal server. */}
+              concatenando i nomi delle stazioni attraversate. POST e PUT /api/tratte
+              non li leggono, quindi un campo di testo qui sarebbe un inganno. */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-muted mb-1">Nome Tratta</label>
@@ -393,12 +393,11 @@ export default function RouteEditorModal({ isOpen, onClose, routeIdToEdit }: Rou
                           <div className="w-1 h-8 border-l-2 border-dashed border-border-color"></div>
                           <div className="absolute bg-bg-panel px-3 border border-border-color rounded-full flex items-center gap-2">
                             <span className="text-xs text-muted">Tempo previsto:</span>
-                            <input
-                              type="number"
+                            <CampoNumerico
                               min="1"
                               className="input-field text-center text-xs py-1 w-16"
-                              value={travelTimes[index] || 0}
-                              onChange={e => updateTravelTime(index, parseInt(e.target.value) || 0)}
+                              valore={travelTimes[index] || 0}
+                              onCambia={minuti => updateTravelTime(index, minuti)}
                             />
                             <span className="text-xs text-muted">min</span>
                           </div>

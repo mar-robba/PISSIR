@@ -95,8 +95,8 @@ public class TrafficLogicEngine {
         }
         LOG.info("Caricati " + treni.size() + " treni.");
 
-        // Popola Guasti: tipo/severita/timestamp sono ora persistiti,
-        // quindi non vanno sovrascritti; si applicano solo default per righe legacy.
+        // Popola Guasti: tipo/severita/timestamp sono persistiti, quindi non vanno
+        // sovrascritti; i default servono solo alle righe che ne sono prive.
         for (Guasto g : repository.guastiNonRisolti()) {
             if (g.timestamp == null || g.severita == null) {
                 if (g.timestamp == null) g.timestamp = Instant.now();

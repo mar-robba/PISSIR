@@ -18,8 +18,7 @@ import java.util.UUID;
  *
  * <p>Le richieste passano davvero da HTTP, dal filtro e da pac4j: il token lo firma la
  * {@link CentraleDiProva} con la sua chiave di prova, e porta l'utente e i ruoli di realm
- * che porterebbe quello di Keycloak. Prima, con Quarkus, l'identita' la iniettava
- * {@code @TestSecurity} e il controllo del token nei test era spento.</p>
+ * che porterebbe quello di Keycloak.</p>
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -159,8 +158,8 @@ public class AdminApiTest {
     @Test
     @Order(10)
     public void testUnoStatoFuoriVocabolarioSiRifiuta() throws Exception {
-        // Prima arrivava al CHECK della colonna e diventava un 500; adesso e' la guardia
-        // dell'automa a dire di no, con il motivo.
+        // E' la guardia dell'automa a dire di no, con il motivo, prima che il valore
+        // arrivi al CHECK della colonna.
         CentraleDiProva.Risposta risposta = centrale.put("/api/treni/" + TRENO_ID,
                 "{\"stato\": \"volante\"}", centrale.admin());
         Assertions.assertEquals(400, risposta.stato());
@@ -178,8 +177,7 @@ public class AdminApiTest {
         // La soppressione e' uno dei tre comandi operativi concessi anche al tecnico.
         CentraleDiProva.Risposta risposta = centrale.post("/api/treni/" + TRENO_ID + "/sopprimi", null, centrale.tecnico());
         Assertions.assertEquals(200, risposta.stato());
-        // Il valore canonico, lo stesso che va sul database: prima la cache diceva
-        // "SOPPRESSO" e il database "in manutenzione".
+        // Il valore canonico, lo stesso in cache e sul database.
         Assertions.assertEquals("in manutenzione", risposta.json().getAsJsonObject().get("stato").getAsString());
         Assertions.assertEquals("in manutenzione", centrale.repository.trovaTreno(TRENO_ID).stato);
         Assertions.assertTrue(centrale.alertPubblicati().get(centrale.alertPubblicati().size() - 1).contains("\"tipoEvento\":\"STOP\""));

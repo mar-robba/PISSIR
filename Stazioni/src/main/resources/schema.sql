@@ -1,12 +1,12 @@
 -- ================================================================
 -- SCHEMA DEL DATABASE LOCALE - STAZIONE
 -- ================================================================
--- Questo file non e' piu' soltanto il modello sulla carta: e' il DDL che il
--- nodo Stazione esegue davvero all'avvio su un file SQLite (vedi la classe
+-- Questo file e' il DDL che il nodo Stazione esegue all'avvio su un file
+-- SQLite (vedi la classe
 -- PersistenzaLocale). Serve a sopravvivere a un fault energetico del nodo: se
 -- il processo muore, al riavvio la stazione ritrova lo stato che aveva (GUASTA
 -- oppure ONLINE, i treni ancora fermi sui binari, la coda degli eventi non
--- ancora spediti alla Centrale) invece di ripartire da zero come faceva prima.
+-- ancora spediti alla Centrale) invece di ripartire da zero.
 --
 -- Differenze rispetto al modello concettuale, tutte volute:
 --  * SQLite non ha i tipi BOOLEAN e TIMESTAMP: i booleani diventano INTEGER

@@ -9,5 +9,5 @@ java -Dprofilo=tls -Dhttp.port=8400 -jar target/stazione.jar MI   # una stazione
 ./mvnw test                                                  # test
 ```
 
-Da lanciare dentro questa cartella. L'ID deve esistere nel DB centrale
-(`MI, TO, FI, BO, PA, BE, CA, PAL`).
+Da lanciare dentro questa cartella. L'ID deve esistere nel DB centrale: con i dati
+demo di `populate_db.sql` sono `MI, TO, FI, BO, PA, BE, CA, PAL, AS, AL-67`.

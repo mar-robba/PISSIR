@@ -9,5 +9,6 @@ java -Dprofilo=tls -Dhttp.port=9400 -jar target/treno.jar Jaz    # un treno
 ./mvnw test                                                  # test
 ```
 
-Da lanciare dentro questa cartella. L'ID deve esistere nel DB centrale
-(`Jaz, LUNGO, Smeraldo, Rosso, Pietra`).
+Da lanciare dentro questa cartella. L'ID deve esistere nel DB centrale: con i dati
+demo di `populate_db.sql` sono `Jaz, LUNGO, Smeraldo, Rosso, Pietra, Barbera, Moscato,
+Nebbiolo, Grignolino, Dolcetto, Freisa, Brachetto, Arneis, Cortese, Ruche`.

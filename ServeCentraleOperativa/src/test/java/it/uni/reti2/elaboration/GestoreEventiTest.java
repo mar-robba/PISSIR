@@ -55,6 +55,12 @@ public class GestoreEventiTest {
                 """.formatted(stato, velocita, stazioneCorrente == null ? "null" : "\"" + stazioneCorrente + "\"", prossima));
     }
 
+    /** Il transito di T1 come lo pubblica la stazione, con l'ora del rilevamento. */
+    private String passaggio(String stazione, String tipo, Instant quando) {
+        return "{\"trenoId\":\"T1\",\"stazioneId\":\"" + stazione + "\",\"tipo\":\"" + tipo
+                + "\",\"timestamp\":\"" + quando + "\"}";
+    }
+
     private JsonObject ultimoAlert() {
         List<String> alert = centrale.alertPubblicati();
         Assertions.assertFalse(alert.isEmpty(), "doveva partire almeno un alert");
@@ -89,12 +95,84 @@ public class GestoreEventiTest {
     }
 
     @Test
+    void inManutenzioneSiTieneAncheLoStatoDichiaratoDalNodo() throws Exception {
+        centrale.alert("""
+                {"tipoEvento":"GUASTO","origine":"STAZIONE","sorgenteTipo":"STAZIONE","sorgenteId":"B","severita":"CRITICAL","messaggio":"scambio"}
+                """);
+        Assertions.assertEquals(200, centrale.post("/api/stazioni/B/manutenzione", null, centrale.tecnico()).stato());
+        centrale.eventiWeb.clear();
+
+        centrale.heartbeat("{\"stazioneId\":\"B\",\"stato\":\"GUASTA\"}");
+
+        // La stazione e' in due stati insieme: MANUTENZIONE per la Centrale, GUASTA per il nodo
+        Assertions.assertEquals(StatiCanonici.STAZIONE_MANUTENZIONE, centrale.statoRete.getStazione("B").stato);
+        Assertions.assertEquals("GUASTA", centrale.statoRete.getStazione("B").statoDichiarato);
+        JsonObject battito = JsonParser.parseString(centrale.eventiWeb.get(centrale.eventiWeb.size() - 1)).getAsJsonObject();
+        Assertions.assertEquals("HEARTBEAT", battito.get("eventType").getAsString());
+        Assertions.assertEquals("manutenzione", battito.get("status").getAsString());
+        Assertions.assertEquals("GUASTA", battito.get("statoDichiarato").getAsString());
+        for (var stazione : centrale.get("/api/stazioni", centrale.tecnico()).json().getAsJsonArray()) {
+            if ("B".equals(stazione.getAsJsonObject().get("id").getAsString())) {
+                Assertions.assertEquals("GUASTA", stazione.getAsJsonObject().get("statoDichiarato").getAsString());
+            }
+        }
+    }
+
+    @Test
     void unaStazioneSconosciutaSiIgnora() {
         GestoreEventi.Esito esito = centrale.gestore.gestisci(EventoCentrale.heartbeat(
                 it.uni.reti2.ingestion.payload.HeartbeatMsg.da(JsonParser.parseString("{\"stazioneId\":\"Z\"}").getAsJsonObject()),
                 new JsonObject()));
         Assertions.assertEquals(GestoreEventi.Esito.Risposta.IGNORATO, esito.risposta());
         Assertions.assertTrue(centrale.eventiWeb.isEmpty());
+    }
+
+    // ============================================================== telemetria
+
+    @Test
+    void laTelemetriaPortaLoStatoCompostoDelTrenoFinoAllaWebApp() throws Exception {
+        // Il convoglio trattenuto a meta' tratta: per la Centrale e' "fermo" come uno in
+        // sosta, e solo condizione e fase dicono quale dei due e'.
+        centrale.telemetria("""
+                {"trenoId":"T1","stato":"FERMO","condizione":"REGOLARE","faseViaggio":"BLOCCATO_IN_TRATTA",
+                 "latitudine":45.0,"longitudine":9.0,"velocita":0,"progressPercent":11,"passeggeri":10,
+                 "stazioneCorrente":"","prossimaStazione":"B","direzione":"andata"}
+                """);
+
+        Assertions.assertEquals("fermo", centrale.statoRete.getTreno("T1").stato);
+        Assertions.assertEquals("REGOLARE", centrale.statoRete.getTreno("T1").condizione);
+        Assertions.assertEquals("BLOCCATO_IN_TRATTA", centrale.statoRete.getTreno("T1").faseViaggio);
+        JsonObject evento = JsonParser.parseString(centrale.eventiWeb.get(centrale.eventiWeb.size() - 1)).getAsJsonObject();
+        Assertions.assertEquals("TELEMETRY", evento.get("eventType").getAsString());
+        Assertions.assertEquals("REGOLARE", evento.get("condizione").getAsString());
+        Assertions.assertEquals("BLOCCATO_IN_TRATTA", evento.get("faseViaggio").getAsString());
+        Assertions.assertEquals("andata", evento.get("direzione").getAsString());
+        JsonObject treno = centrale.get("/api/treni", centrale.tecnico()).json().getAsJsonArray().get(0).getAsJsonObject();
+        Assertions.assertEquals("BLOCCATO_IN_TRATTA", treno.get("faseViaggio").getAsString());
+    }
+
+    @Test
+    void ilTrenoRottoAnnunciatoDallaCentralePortaCondizioneEFaseAncheANull() {
+        // Un frame senza condizione e fase (un convoglio che non le manda): restano null,
+        // e l'evento li scrive lo stesso, null espliciti, perche' la web app cancelli i vecchi.
+        telemetria("IN_VIAGGIO", null, "B", 100);
+        centrale.eventiWeb.clear();
+
+        centrale.alert("""
+                {"tipoEvento":"GUASTO","origine":"TRENO","sorgenteTipo":"TRENO","sorgenteId":"T1","severita":"CRITICAL","messaggio":"freni"}
+                """);
+
+        JsonObject evento = null;
+        for (String inviato : centrale.eventiWeb) {
+            JsonObject letto = JsonParser.parseString(inviato).getAsJsonObject();
+            if ("TELEMETRY".equals(letto.get("eventType").getAsString())) {
+                evento = letto;
+            }
+        }
+        Assertions.assertNotNull(evento, "la Centrale doveva annunciare il treno rotto senza aspettare la telemetria");
+        Assertions.assertEquals("rotto", evento.get("stato").getAsString());
+        Assertions.assertTrue(evento.has("condizione") && evento.get("condizione").isJsonNull());
+        Assertions.assertTrue(evento.has("faseViaggio") && evento.get("faseViaggio").isJsonNull());
     }
 
     // ============================================================== guasti
@@ -221,10 +299,13 @@ public class GestoreEventiTest {
 
     @Test
     void iPassaggiMisuranoIlRitardoEScrivonoITransiti() throws Exception {
+        // Gli orari partono da adesso: la telemetria apre la sosta di partenza in A con l'ora
+        // della Centrale, e un'uscita datata in un altro anno la farebbe durare anni.
+        Instant partenza = Instant.now();
         telemetria("FERMO", "A", "B", 0);
-        centrale.transito("{\"trenoId\":\"T1\",\"stazioneId\":\"A\",\"tipo\":\"USCITA\",\"timestamp\":\"2030-01-01T10:00:00Z\"}");
+        centrale.transito(passaggio("A", "USCITA", partenza));
         // la tratta dura 10 minuti di orario = 6 secondi reali; arriva 12 secondi dopo il previsto
-        centrale.transito("{\"trenoId\":\"T1\",\"stazioneId\":\"B\",\"tipo\":\"ENTRATA\",\"timestamp\":\"2030-01-01T10:00:18Z\"}");
+        centrale.transito(passaggio("B", "ENTRATA", partenza.plusSeconds(18)));
 
         Assertions.assertEquals(20, centrale.statoRete.getTreno("T1").ritardo);
         JsonObject ritardo = ultimoAlert();
@@ -239,7 +320,7 @@ public class GestoreEventiTest {
         Assertions.assertEquals(1, centrale.statoRete.getStazione("B").treniInStazione);
         Assertions.assertEquals("AB", centrale.repository.trovaTreno("T1").posizioneAttualeTratta.id);
 
-        centrale.transito("{\"trenoId\":\"T1\",\"stazioneId\":\"B\",\"tipo\":\"USCITA\",\"timestamp\":\"2030-01-01T10:00:20Z\"}");
+        centrale.transito(passaggio("B", "USCITA", partenza.plusSeconds(20)));
         Assertions.assertEquals(0, centrale.conta("SELECT COUNT(*) FROM Transiti WHERE tempoUscita IS NULL"), "l'uscita chiude il transito");
         Assertions.assertEquals(3, centrale.conta("SELECT COUNT(*) FROM Storico_Transiti"), "una riga di storico per ogni evento");
         Assertions.assertEquals("BC", centrale.repository.trovaTreno("T1").posizioneAttualeTratta.id);

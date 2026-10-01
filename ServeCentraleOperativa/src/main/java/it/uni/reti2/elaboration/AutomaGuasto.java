@@ -22,8 +22,7 @@ import java.util.UUID;
  *
  * <p>Come gli altri automi offre guardie e mosse e non chiama nessuno. Le mosse scrivono la
  * copia in cache ({@link TrafficLogicEngine}); la riga del database la scrive GestoreEventi.
- * Qui c'è anche il vocabolario con cui i guasti si classificano, che prima stava in
- * GuastiService.</p>
+ * Qui c'è anche il vocabolario con cui i guasti si classificano.</p>
  */
 public class AutomaGuasto {
 
@@ -49,7 +48,7 @@ public class AutomaGuasto {
      *
      * <p>Se il nodo ha dichiarato un tipo che il frontend conosce si usa quello, altrimenti se
      * ne deduce uno dalla sorgente. È la stessa regola per l'ingestione e per GET
-     * /api/allarmi: prima era scritta due volte, in due file diversi.</p>
+     * /api/allarmi.</p>
      */
     public static String tipoPerFrontend(String sorgenteTipo, String tipoDichiarato) {
         if (tipoDichiarato != null && !tipoDichiarato.isBlank()) {

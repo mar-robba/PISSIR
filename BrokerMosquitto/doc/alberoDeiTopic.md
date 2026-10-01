@@ -20,11 +20,11 @@ Note di progetto:
   traduzione MQTT dell'evento del sensore verso il resto del sistema.
 - Le stazioni sono sottoscritte a `railway/treno-simulatoriSensori/+` e **filtrano** i messaggi
   con il proprio `stazioneId`: così il treno non deve conoscere host/porta delle stazioni.
-  Non è la Centrale a riceverlo: il treno non le parla più direttamente su questo evento,
+  Non è la Centrale a riceverlo: il treno non le parla direttamente su questo evento,
   è la stazione a inoltrarle il transito ufficiale su `railway/station/{id}/transit` una
   volta che il sensore l'ha rilevato.
 - Il transito ENTRATA/USCITA distingue il tipo con il campo `tipo` nel payload (non con
-  sotto-topic `/in` `/out`): meno canali da configurare in SmallRye e stesso potere espressivo.
+  sotto-topic `/in` `/out`): meno sottoscrizioni da gestire e stesso potere espressivo.
 
 ## Payload
 

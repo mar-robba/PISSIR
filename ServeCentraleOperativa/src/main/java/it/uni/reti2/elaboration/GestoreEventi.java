@@ -61,9 +61,6 @@ import java.util.logging.Logger;
  * fondo prima che parta il successivo. Le pubblicazioni MQTT non aspettano il broker (le
  * consegna il thread di CodaPubblicazioni), quindi il lock dura quanto le letture e le
  * scritture sul database.</p>
- *
- * <p>Qui c'è la logica che prima stava in cinque servizi: MonitoraggioTreni,
- * MonitoraggioStazioni, TransitiService, GuastiService e FaultMonitor.</p>
  */
 public class GestoreEventi {
 
@@ -243,13 +240,12 @@ public class GestoreEventi {
      * La tratta su cui si trova il convoglio, dedotta dalla fermata che dichiara di avere
      * davanti.
      *
-     * <p>{@code posizioneAttualeTratta} prima la scriveva solo il passaggio, cioè il sensore
-     * di terra della stazione. Se una stazione del percorso è spenta il suo transito non
-     * arriva mai e il campo resta indietro di un segmento: la Centrale continua a dire "sta fra
-     * Bologna e Firenze" per un treno che ha già superato Firenze. Il frontend da quel segmento
-     * ricava i due capi dell'arco su cui disegnare il convoglio, e con la tratta sbagliata il
-     * treno spariva dalla mappa. È esattamente il caso di un convoglio fermo a metà tratta per
-     * un guasto, che sulla mappa è proprio quello che si vuole vedere.</p>
+     * <p>{@code posizioneAttualeTratta} non la scrive solo il passaggio, cioè il sensore di
+     * terra della stazione: se una stazione del percorso è spenta il suo transito non arriva
+     * mai, e il campo resterebbe indietro di un segmento ("sta fra Bologna e Firenze" per un
+     * treno che ha già superato Firenze). Il frontend da quel segmento ricava i due capi
+     * dell'arco su cui disegnare il convoglio, e con la tratta sbagliata il treno sparirebbe
+     * dalla mappa proprio quando è fermo a metà tratta per un guasto.</p>
      *
      * <p>Il ricalcolo costa una lettura dell'itinerario, quindi si fa solo quando serve: se la
      * tratta in cache porta già alla fermata dichiarata è quella giusta. A regime succede una
@@ -450,7 +446,7 @@ public class GestoreEventi {
         if (accettato) {
             stazioni.dalCampo(stazione, msg.stato());
         }
-        stazioni.battito(stazione, adesso);
+        stazioni.battito(stazione, adesso, msg.stato());
         for (Guasto guasto : daChiudere) {
             guasti.chiudi(guasto, adesso);
         }

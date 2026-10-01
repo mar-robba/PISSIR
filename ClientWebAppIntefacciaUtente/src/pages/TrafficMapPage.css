@@ -40,6 +40,16 @@
     #fbfdff;
 }
 
+/* La sfocatura dello sfondo che .glass-panel dà a tutti i pannelli qui non si
+   vede (il pannello è quasi opaco) ma costa cara: il browser la ricalcola ogni
+   volta che il diagramma cambia, cioè a ogni scatto della rotella, e lo zoom
+   andava a scatti. Doppia classe perché index.css viene caricato dopo questo
+   file e, a parità di peso, vincerebbe .glass-panel. */
+.map-canvas-card.glass-panel {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .map-svg {
   width: 100%;
   height: 100%;
@@ -91,6 +101,14 @@
   /* La transizione rende fluido lo spostamento dei treni fra un aggiornamento
      WebSocket e il successivo, invece di farli "saltare". */
   transition: transform 0.7s ease-out;
+}
+
+/* Durante lo zoom la transizione va spenta: i treni sventagliati cambiano posto
+   a ogni scatto (il ventaglio è misurato in pixel di schermo) e inseguirebbero
+   la nuova posizione per quasi un secondo, staccati dalle stanghette e dalle
+   etichette che invece si spostano subito. */
+.map-svg--zoom .map-marker {
+  transition: none;
 }
 
 .map-marker__simbolo {

@@ -17,13 +17,11 @@ import java.util.Map;
  *
  * <p>Gli eventi che viaggiano sulla WebSocket hanno nomi di campo loro
  * ({@code trainId}, {@code stationId}, {@code delayMinutes}, {@code status}) che non
- * sono quelli del database ne' quelli dei topic MQTT. Prima quelle traduzioni erano
- * sparse fra l'ingestione, il watchdog e le API REST, e ogni pezzo di Centrale che
- * voleva far sapere qualcosa al browser doveva rifarsi da capo il proprio oggetto JSON.
- * Adesso chi ha una notizia da dare chiama un metodo con nome parlante e non sa
- * nemmeno come e' fatto il JSON che parte.</p>
+ * sono quelli del database ne' quelli dei topic MQTT. Le traduzioni stanno tutte qui:
+ * chi ha una notizia da dare chiama un metodo con nome parlante e non sa nemmeno come
+ * e' fatto il JSON che parte.</p>
  *
- * <p><b>Perche' certi metodi ricevono ancora il JsonObject grezzo.</b> Per telemetria,
+ * <p><b>Perche' certi metodi ricevono il JsonObject grezzo.</b> Per telemetria,
  * heartbeat e transiti l'evento si costruisce copiando il payload arrivato dal campo e
  * aggiungendoci i campi canonici. Non e' pigrizia: quel payload porta anche campi che
  * la Centrale non usa ma il browser si', e ricostruirlo da un record vorrebbe dire
@@ -58,6 +56,7 @@ public class NotificatoreRealtime {
         evento.addProperty("longitudine", treno.longitudine);
         scriviPrevisione(evento, treno);
         scriviPosizione(evento, treno);
+        scriviStatoComposto(evento, treno);
         webSocket.broadcast(evento.toString());
     }
 
@@ -80,6 +79,7 @@ public class NotificatoreRealtime {
         evento.addProperty("longitudine", treno.longitudine);
         scriviPrevisione(evento, treno);
         scriviPosizione(evento, treno);
+        scriviStatoComposto(evento, treno);
         webSocket.broadcast(evento.toString());
     }
 
@@ -104,6 +104,22 @@ public class NotificatoreRealtime {
         scriviTestoONull(evento, "direzioneCorrente", treno.direzioneCorrente);
         scriviTestoONull(evento, "incertezzaPosizione", treno.incertezzaPosizione);
         evento.addProperty("posizioneNota", treno.posizioneNota);
+    }
+
+    /**
+     * Attacca a un evento TELEMETRY lo stato degli automi del convoglio, condizione (T6),
+     * fase del viaggio (T5) e verso di marcia (T7), come li ha dichiarati nell'ultimo frame.
+     *
+     * <p>Il campo "stato" da solo non basta: e' un riassunto, e il riassunto di un treno
+     * trattenuto a meta' tratta e di uno in sosta al binario e' lo stesso "fermo". Si
+     * prendono dalla cache e non dal frame grezzo perche' anche l'evento che parte senza
+     * telemetria ({@link #statoTreno}) deve portarli, e sempre, anche a null: un evento senza
+     * questi campi lascerebbe sullo schermo quelli di prima.</p>
+     */
+    private void scriviStatoComposto(JsonObject evento, Treno treno) {
+        scriviTestoONull(evento, "condizione", treno.condizione);
+        scriviTestoONull(evento, "faseViaggio", treno.faseViaggio);
+        scriviTestoONull(evento, "direzione", treno.direzione);
     }
 
     /** Scrive il campo, oppure un null esplicito che vale "non lo so". */
@@ -152,6 +168,9 @@ public class NotificatoreRealtime {
         evento.addProperty("eventType", "HEARTBEAT");
         evento.addProperty("stationId", stazione.id);
         evento.addProperty("status", statoPerFrontend(stazione.stato));
+        // Lo stato che il nodo dichiara di se', che in MANUTENZIONE non e' quello che la
+        // Centrale gli da' e la web app lo mostra accanto.
+        scriviTestoONull(evento, "statoDichiarato", stazione.statoDichiarato);
         webSocket.broadcast(evento.toString());
     }
 

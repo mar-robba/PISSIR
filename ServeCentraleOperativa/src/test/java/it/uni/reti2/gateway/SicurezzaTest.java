@@ -14,10 +14,9 @@ import org.junit.jupiter.api.TestInstance;
 /**
  * Prova la verifica dei token fatta con pac4j e le regole di FiltroAutorizzazione.
  *
- * <p>Con quarkus-oidc questi controlli li faceva l'estensione e nei test erano spenti; adesso
- * sono codice della Centrale (SicurezzaKeycloak), e ognuno ha il suo caso: un token
- * scaduto, uno per un'altra applicazione, uno di un altro realm, uno firmato da chi non e'
- * Keycloak, uno non firmato affatto. Tutti devono prendere 401, come prima.</p>
+ * <p>I controlli sono codice della Centrale (SicurezzaKeycloak), e ognuno ha il suo caso:
+ * un token scaduto, uno per un'altra applicazione, uno di un altro realm, uno firmato da
+ * chi non e' Keycloak, uno non firmato affatto. Tutti devono prendere 401.</p>
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SicurezzaTest {

@@ -1,0 +1,8 @@
+/* I badge dello stato composto stanno su una riga e vanno a capo da soli quando non ci
+   stanno, invece di schiacciarsi uno sull'altro nelle colonne strette delle tabelle. */
+.stato-composto {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  vertical-align: middle;
+}

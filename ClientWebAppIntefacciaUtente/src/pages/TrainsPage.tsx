@@ -1,7 +1,7 @@
 import { useRailwayStore } from '../store/railwayStore';
-import { descriviIncertezzaPosizione } from '../api/apiClient';
+import { descriviIncertezzaPosizione, statiDelTreno } from '../api/apiClient';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
+import StatoComposto from '../components/ui/StatoComposto';
 import { useState } from 'react';
 import { Train as TrainIcon, Clock, Users, MapPin } from 'lucide-react';
 import './TrainsPage.css';
@@ -22,20 +22,6 @@ export default function TrainsPage() {
     if (!id) return '-';
     const station = stations.find(s => s.id === id);
     return station ? station.name : id;
-  };
-
-  const getStatusBadgeType = (status: string) => {
-    switch(status) {
-      case 'in_viaggio': return 'success';
-      case 'in_stazione': return 'info';
-      case 'in_ritardo': return 'warning';
-      case 'guasto': 
-      case 'soppresso': return 'danger';
-      // Corsa finita al capolinea: non è un allarme, è un convoglio che ha concluso il
-      // servizio. Grigio come gli stati di quiete, non rosso come i guasti.
-      case 'capolinea': return 'neutral';
-      default: return 'info';
-    }
   };
 
   return (
@@ -74,19 +60,20 @@ export default function TrainsPage() {
                       </div>
                     </td>
                     <td>
-                      <Badge type={getStatusBadgeType(train.status)}>
-                        {train.status.replace('_', ' ').toUpperCase()}
-                      </Badge>
+                      <StatoComposto stati={statiDelTreno(train)} />
                     </td>
                     <td className="capitalize">{train.direction ?? '?'}</td>
                     {/* Quando la Centrale non garantisce la posizione qui non si compone
                         niente: "Tra X e Y" messo insieme con una partenza vecchia e un
                         arrivo aggiornato era il modo in cui comparivano tratte che nella
                         rete non esistono. Meglio un punto di domanda onesto. */}
+                    {/* In stazione o in linea lo dice la stazione corrente, non lo stato:
+                        "fermo" vale anche per il convoglio trattenuto a metà tratta, che
+                        guardando lo stato finiva in una stazione che non c'era ("-"). */}
                     <td className="text-sm">
                       {!train.positionKnown
                         ? <span className="text-warning">? · posizione incerta</span>
-                        : train.status === 'in_viaggio'
+                        : !train.currentStationId
                           ? `Tra ${getStationName(train.previousStationId)} e ${getStationName(train.nextStationId)}`
                           : getStationName(train.currentStationId)
                       }
@@ -128,9 +115,7 @@ export default function TrainsPage() {
                     <TrainIcon size={24} />
                     {selectedTrain.id}
                   </h3>
-                  <Badge type={getStatusBadgeType(selectedTrain.status)} className="mt-2">
-                    {selectedTrain.status.replace('_', ' ').toUpperCase()}
-                  </Badge>
+                  <StatoComposto stati={statiDelTreno(selectedTrain)} className="mt-2" />
                 </div>
                 <div className="text-right">
                   <span className="text-xs uppercase tracking-widest text-muted block mb-1">Passeggeri</span>
@@ -159,7 +144,9 @@ export default function TrainsPage() {
                         </p>
                       )}
                     </div>
-                  ) : selectedTrain.status === 'in_viaggio' ? (
+                  ) : !selectedTrain.currentStationId ? (
+                    // In linea: la barra vale anche per il convoglio fermo a metà tratta
+                    // (trattenuto o in avaria), e dice a che punto si è fermato.
                     <div>
                       <div className="flex justify-between text-sm mb-1">
                         <span>{getStationName(selectedTrain.previousStationId)}</span>
@@ -172,7 +159,8 @@ export default function TrainsPage() {
                         />
                       </div>
                       <p className="text-center text-xs mt-2 text-muted">
-                        In viaggio verso {getStationName(selectedTrain.nextStationId)}
+                        {selectedTrain.status === 'in_viaggio' ? 'In viaggio verso' : 'Fermo in linea, diretto a'}{' '}
+                        {getStationName(selectedTrain.nextStationId)}
                       </p>
                     </div>
                   ) : (
@@ -251,10 +239,12 @@ export default function TrainsPage() {
                         let isPast = false;
                         let isCurrent = false;
                         
-                        if (selectedTrain.status === 'in_viaggio') {
+                        // Anche qui conta dove si trova, non lo stato: un convoglio fermo in
+                        // linea ha già passato la stazione da cui è uscito come uno in marcia.
+                        if (!selectedTrain.currentStationId) {
                           const currentIndex = selectedTrainRoute.stationIds.indexOf(selectedTrain.previousStationId || '');
                           if (index <= currentIndex) isPast = true;
-                        } else if (selectedTrain.status === 'in_stazione' || selectedTrain.status === 'capolinea') {
+                        } else {
                           const currentIndex = selectedTrainRoute.stationIds.indexOf(selectedTrain.currentStationId || '');
                           if (index < currentIndex) isPast = true;
                           if (index === currentIndex) isCurrent = true;

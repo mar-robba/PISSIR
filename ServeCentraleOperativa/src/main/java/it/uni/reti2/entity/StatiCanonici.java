@@ -15,10 +15,8 @@ import java.util.List;
  * <p><b>Due vocabolari in ingresso, non uno.</b> Il campo e il pannello
  * dell'amministratore parlano lingue diverse: dal campo arrivano gli stati del
  * protocollo MQTT (IN_VIAGGIO, EMERGENZA...), dalla web app arrivano gia' i valori
- * canonici digitati da un form. I due metodi restano quindi separati, ognuno con la
- * sua regola di ripiego, ma stanno finalmente nello stesso file: prima erano due
- * metodi omonimi in due classi diverse ({@code IngestionService} e
- * {@code RestApiGateway}) che facevano cose diverse.</p>
+ * canonici digitati da un form. I due metodi sono quindi separati, ognuno con la
+ * sua regola di ripiego, nello stesso file.</p>
  */
 public final class StatiCanonici {
 

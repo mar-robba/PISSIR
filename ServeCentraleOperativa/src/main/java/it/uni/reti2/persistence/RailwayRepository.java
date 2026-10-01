@@ -35,9 +35,8 @@ import java.util.List;
  * lettura in più che serve.</p>
  *
  * <h3>Niente scritture "automatiche"</h3>
- * <p>Con Hibernate bastava cambiare un campo di un oggetto letto dentro una transazione
- * perché la riga venisse aggiornata al commit. In JDBC non succede: ogni cambiamento ha il
- * suo UPDATE, con un metodo che dice cosa scrive ({@link #aggiornaStatoTreno},
+ * <p>Cambiare un campo di un oggetto letto dentro una transazione non aggiorna la riga:
+ * ogni cambiamento ha il suo UPDATE, con un metodo che dice cosa scrive ({@link #aggiornaStatoTreno},
  * {@link #chiudiGuasto}, {@link #chiudiTransito}...). È più lungo, ma chi legge il codice
  * vede ogni scrittura.</p>
  *
@@ -810,10 +809,8 @@ public class RailwayRepository {
     /**
      * Nome della sorgente da congelare nello storico del guasto. Per una stazione va letto
      * dall'anagrafica (l'id da solo, tipo "S3", non dice niente a chi rilegge lo storico fra
-     * un mese); per un convoglio l'identificativo è già il nome.
-     *
-     * <p>Questa lettura stava dentro StoricoGuasto: era l'unica query nascosta in un'entità,
-     * ed è la ragione per cui adesso il nome lo passa il repository.</p>
+     * un mese); per un convoglio l'identificativo è già il nome. La lettura sta qui e non
+     * in StoricoGuasto perché le entità non fanno query.
      */
     private String nomeDellaSorgente(Guasto guasto) {
         if (guasto.sorgenteId == null || guasto.sorgenteId.isEmpty()) {

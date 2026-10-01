@@ -9,11 +9,8 @@ import java.time.Instant;
 /**
  * Piccoli attrezzi di lettura condivisi da tutti i messaggi che arrivano dal campo.
  *
- * <p>Prima ogni consumer si scriveva in proprio la stessa riga
- * ({@code root.has("x") ? root.get("x").asText() : "default"}) per ognuno dei suoi
- * campi: una decina di ternari per metodo, ripetuti cinque volte. Il valore di
- * ripiego di un campo assente e' una decisione che va presa una volta sola e in un
- * posto in cui si vede, non annegata dentro la logica.</p>
+ * <p>Il valore di ripiego di un campo assente e' una decisione che va presa una volta
+ * sola e in un posto in cui si vede, non annegata dentro la logica di ogni consumer.</p>
  */
 public final class Payload {
 

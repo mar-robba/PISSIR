@@ -1,6 +1,7 @@
 package it.uni.reti2.elaboration;
 
 import it.uni.reti2.CentraleDiProva;
+import it.uni.reti2.entity.StatiCanonici;
 import it.uni.reti2.entity.Treno;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -43,6 +44,9 @@ public class PrevisioneArriviTest {
 
     /** Quanti secondi reali dura un minuto di orario con il fattore 100 configurato. */
     private static final double SECONDI_PER_MINUTO = 0.6;
+
+    /** L'istante da cui partono gli orari dei test sul ritardo in corso, che li ricevono tutti come parametro. */
+    private static final Instant ORA = Instant.parse("2030-01-01T10:00:00Z");
 
     private CentraleDiProva centrale;
     private PrevisioneArrivi previsioni;
@@ -213,6 +217,100 @@ public class PrevisioneArriviTest {
     }
 
     // ──────────────────────────────────────────────────────────────
+    // RITARDO IN CORSO
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Il convoglio trattenuto in banchina accumula ritardo mentre aspetta, non solo quando
+     * riparte; e quando riparte la misura dell'uscita prende il posto della stima, senza
+     * contare due volte lo stesso tempo.
+     */
+    @Test
+    @Order(9)
+    public void ilTrenoTrattenutoInStazioneAccumulaRitardoMentreAspetta() {
+        Treno treno = inStazione(STAZ_B, STAZ_C);
+        ricomincia(treno);
+        previsioni.registraArrivo(treno, STAZ_B, ORA);
+
+        // La sosta in B vale 2 secondi: 10 minuti di orario dopo la sua fine il ritardo e'
+        // gia' di 10, dopo 20 minuti e' di 20.
+        previsioni.aggiornaRitardo(treno, ORA.plusMillis(sostaInMillisecondi() + millisecondiPer(10)));
+        Assertions.assertEquals(10, treno.ritardo, "fermo oltre la sosta, il ritardo cresce");
+        Instant uscita = ORA.plusMillis(sostaInMillisecondi() + millisecondiPer(20));
+        previsioni.aggiornaRitardo(treno, uscita);
+        Assertions.assertEquals(20, treno.ritardo, "e continua a crescere finche' resta fermo");
+
+        previsioni.programmaArrivo(treno, STAZ_B, uscita, "andata");
+        inTratta(STAZ_C, 0.0);
+        previsioni.aggiornaRitardo(treno, uscita.plusMillis(500));
+        Assertions.assertEquals(20, treno.ritardo, "all'uscita la misura prende il posto della stima: 20, non 40");
+    }
+
+    /**
+     * In tratta conta la strada fatta: a meta' tratta dopo meta' del tempo il convoglio e'
+     * in orario, fermo a meta' tratta accumula ritardo. All'arrivo vale la misura.
+     */
+    @Test
+    @Order(10)
+    public void inTrattaSiConfrontaIlTempoConLaStradaFatta() {
+        Treno treno = inStazione(STAZ_B, STAZ_C);
+        ricomincia(treno);
+        previsioni.programmaArrivo(treno, STAZ_B, ORA, "andata");
+
+        // B-C dura 20 minuti di orario: dopo 10 il treno a meta' tratta e' puntuale.
+        inTratta(STAZ_C, 50.0);
+        previsioni.aggiornaRitardo(treno, ORA.plusMillis(millisecondiPer(10)));
+        Assertions.assertEquals(0, treno.ritardo, "a meta' tratta dopo meta' del tempo e' in orario");
+
+        // Resta fermo li' altri 15 minuti: la strada fatta vale sempre 10 minuti.
+        previsioni.aggiornaRitardo(treno, ORA.plusMillis(millisecondiPer(25)));
+        Assertions.assertEquals(15, treno.ritardo, "fermo in linea, il ritardo cresce");
+
+        // Ripartito, arriva in C dopo 35 minuti invece di 20.
+        Assertions.assertTrue(previsioni.registraArrivo(treno, STAZ_C, ORA.plusMillis(millisecondiPer(35))));
+        Assertions.assertEquals(15, treno.ritardo, "all'arrivo la misura prende il posto della stima: 15, non 30");
+    }
+
+    /**
+     * Nella prima fermata il convoglio non entra, ci compare: la sosta comincia dal primo
+     * frame di telemetria che lo vede li'. Senza, un treno trattenuto alla partenza
+     * risultava puntuale.
+     */
+    @Test
+    @Order(11)
+    public void allaPartenzaLaSostaSiContaDalPrimoFrame() {
+        Treno treno = inStazione(STAZ_A, STAZ_B);
+        ricomincia(treno);
+
+        previsioni.aggiornaRitardo(treno, ORA);
+        Instant uscita = ORA.plusMillis(sostaInMillisecondi() + millisecondiPer(10));
+        previsioni.aggiornaRitardo(treno, uscita);
+        Assertions.assertEquals(10, treno.ritardo, "trattenuto alla partenza, il ritardo cresce");
+
+        previsioni.programmaArrivo(treno, STAZ_A, uscita, "andata");
+        Assertions.assertEquals(10, treno.ritardo, "e all'uscita resta, misurato");
+    }
+
+    /** A corsa finita il ritardo resta quello dell'arrivo, per quanto il treno resti fermo. */
+    @Test
+    @Order(12)
+    public void alCapolineaIlRitardoNonCrescePiu() {
+        Treno treno = inStazione(STAZ_B, STAZ_C);
+        ricomincia(treno);
+        previsioni.programmaArrivo(treno, STAZ_B, ORA, "andata");
+
+        // Il frame del capolinea arriva prima dell'ENTRATA: l'ultima tratta si misura lo stesso.
+        inStazione(STAZ_C, null);
+        treno.stato = StatiCanonici.TRENO_CAPOLINEA;
+        previsioni.aggiornaRitardo(treno, ORA.plusMillis(millisecondiPer(25)));
+        previsioni.registraArrivo(treno, STAZ_C, ORA.plusMillis(millisecondiPer(25)));
+        Assertions.assertEquals(5, treno.ritardo, "5 minuti persi sull'ultima tratta");
+
+        previsioni.aggiornaRitardo(treno, ORA.plusSeconds(3600));
+        Assertions.assertEquals(5, treno.ritardo, "fermo al capolinea non e' in ritardo: la corsa e' finita");
+    }
+
+    // ──────────────────────────────────────────────────────────────
     // TABELLONE DELLA STAZIONE
     // ──────────────────────────────────────────────────────────────
 
@@ -222,7 +320,7 @@ public class PrevisioneArriviTest {
      * istantanea del vecchio frontend non vedeva.
      */
     @Test
-    @Order(9)
+    @Order(13)
     public void ilTabelloneGuardaLIntinerarioNonLaPosizione() {
         inStazione(STAZ_A, STAZ_B);
 
@@ -239,7 +337,7 @@ public class PrevisioneArriviTest {
 
     /** Lo stesso elenco passando dall'API REST che usa la pagina Stazioni. */
     @Test
-    @Order(10)
+    @Order(14)
     public void lEndpointDeiTreniAttesiRisponde() throws Exception {
         inStazione(STAZ_A, STAZ_B);
 
@@ -256,7 +354,7 @@ public class PrevisioneArriviTest {
     // ──────────────────────────────────────────────────────────────
 
     @Test
-    @Order(11)
+    @Order(15)
     public void smontaLaLinea() throws Exception {
         for (String percorso : new String[]{"/api/treni/" + TRENO, "/api/tratte/" + ITINERARIO,
                 "/api/tratte-elementari/" + TRATTA_BC, "/api/tratte-elementari/" + TRATTA_AB,
@@ -291,6 +389,12 @@ public class PrevisioneArriviTest {
         treno.prossimaStazione = prossima;
         treno.progresso = progresso;
         return treno;
+    }
+
+    /** Riparte da un convoglio senza ritardo e senza orari o soste in sospeso. */
+    private void ricomincia(Treno treno) {
+        previsioni.dimenticaTreno(treno.id);
+        treno.ritardo = 0;
     }
 
     /** La riga del convoglio di prova dentro un tabellone (gli altri treni non contano). */

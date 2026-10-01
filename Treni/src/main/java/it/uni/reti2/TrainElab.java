@@ -29,7 +29,8 @@ public class TrainElab {
     /**
      * Invio periodico dei dati di telemetria. Uguale a all'heath beath della stazione
      * Lo chiama l'Orologio una volta al secondo, in background, e manda un pacchetto di dati
-     * (posizioni, velocità, stato, progresso della tratta, passeggeri) sul topic
+     * (posizioni, velocità, stato, condizione e fase del viaggio, progresso della tratta,
+     * passeggeri) sul topic
      * railway/train/{trenoId}/telemetry verso la Centrale Operativa.
      *
      * Come l'heartbeat della stazione, l'invio è filtrato su trenoRiconosciuto: finché
@@ -53,12 +54,17 @@ public class TrainElab {
         }
 
         // Costruisce il payload JSON contenente il frame telemetrico completo
-        // (stazioneCorrente/prossimaStazione: stringa vuota se assenti)
+        // (stazioneCorrente/prossimaStazione: stringa vuota se assenti).
+        // Oltre a "stato", che e' un riassunto calcolato da TrainDB.stato(), il frame porta
+        // lo stato vero dei due automi: condizione (T6) e faseViaggio (T5). Dal solo "stato"
+        // non si torna indietro: FERMO vale sia per un treno in sosta al binario sia per uno
+        // trattenuto a meta' tratta, e la web app non sapeva piu' quale dei due mostrare.
         String json = String.format(Locale.US,
-                "{\"trenoId\":\"%s\",\"stato\":\"%s\",\"latitudine\":%.5f,\"longitudine\":%.5f,"
+                "{\"trenoId\":\"%s\",\"stato\":\"%s\",\"condizione\":\"%s\",\"faseViaggio\":\"%s\","
+                        + "\"latitudine\":%.5f,\"longitudine\":%.5f,"
                         + "\"velocita\":%.1f,\"progressPercent\":%.1f,\"passeggeri\":%d,"
                         + "\"stazioneCorrente\":\"%s\",\"prossimaStazione\":\"%s\",\"direzione\":\"%s\",\"timestamp\":\"%s\"}",
-                trainDB.trenoId, trainDB.stato(),
+                trainDB.trenoId, trainDB.stato(), trainDB.condizione, trainDB.faseViaggio,
                 trainDB.latitudine, trainDB.longitudine,
                 trainDB.velocita, trainDB.progressPercent,
                 trainDB.passeggeri,

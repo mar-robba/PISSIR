@@ -1,4 +1,4 @@
-import { Train, Station, Route, TrackSegment, Alert, DashboardKPI, Transit, TrainStatus, User, UserRole, ExpectedTrain } from '../types';
+import { Train, Station, Route, TrackSegment, Alert, DashboardKPI, Transit, TrainStatus, User, UserRole, ExpectedTrain, StatoAutoma } from '../types';
 import type {
   ApiAlertPayload,
   ApiCoppiaMancante,
@@ -14,21 +14,20 @@ import type {
 } from './apiTypes';
 
 /**
- * L'URL di base del server backend Java Quarkus (RestApiGateway).
- * Non è più fisso nel codice: si legge dalla variabile d'ambiente di Vite
- * VITE_API_BASE_URL (file .env), così puntare a un'altra porta non richiede di
- * ricompilare nulla.
- * Default: HTTPS sulla 8444, cioè la Centrale avviata con -Dquarkus.profile=tls.
- * Non è più la 8781 in chiaro perché la pagina ora è servita in https: il
- * browser bloccherebbe come "mixed content" ogni chiamata verso http://.
+ * L'URL di base delle API della Centrale (RestApiGateway).
+ * Si legge dalla variabile d'ambiente di Vite VITE_API_BASE_URL (file .env), così
+ * puntare a un'altra porta non richiede di ricompilare nulla.
+ * Default: HTTPS sulla 8444, cioè la Centrale avviata con -Dprofilo=tls.
+ * Non si usa la 8781 in chiaro perché la pagina è servita in https: il browser
+ * bloccherebbe come "mixed content" ogni chiamata verso http://.
  */
 const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'https://localhost:8444/api';
 
 /**
  * Access token OAuth2 rilasciato da Keycloak: la Centrale lo pretende nell'header
- * Authorization su tutte le API (lo verifica quarkus-oidc e ne legge i ruoli
- * FiltroAutorizzazione), altrimenti risponde 401. Non e' piu' un UUID inventato
- * dalla Centrale ma un JWT firmato dall'Identity Provider; lo imposta l'authStore
+ * Authorization su tutte le API (lo verifica SicurezzaKeycloak e ne legge i ruoli
+ * FiltroAutorizzazione), altrimenti risponde 401. E' un JWT firmato dall'Identity
+ * Provider; lo imposta l'authStore
  * dopo lo scambio del codice di autorizzazione e a ogni rinnovo.
  */
 let authToken: string | null = null;
@@ -134,6 +133,109 @@ export const descriviIncertezzaPosizione = (motivo: string | null): string => {
 };
 
 /**
+ * Le fasi del viaggio in cui il convoglio sta percorrendo l'itinerario in un verso: è lì
+ * che è acceso il suo automa T7 (andata o ritorno). Senza itinerario non c'è nessun verso,
+ * e al capolinea la corsa è chiusa: T7 ne esce proprio arrivando lì.
+ */
+const FASI_CON_UN_VERSO = ['IN_STAZIONE', 'IN_VIAGGIO', 'BLOCCATO_IN_STAZIONE', 'BLOCCATO_IN_TRATTA'];
+
+/** Colore della condizione del convoglio (T6). */
+const tonoCondizione = (condizione: string): StatoAutoma['tono'] => {
+  if (condizione === 'REGOLARE') return 'success';
+  if (condizione === 'EMERGENZA' || condizione === 'SOPPRESSO') return 'danger';
+  return 'neutral';
+};
+
+/** Colore della fase del viaggio (T5): in giallo i due blocchi, in blu la marcia. */
+const tonoFase = (fase: string): StatoAutoma['tono'] => {
+  if (fase === 'IN_VIAGGIO') return 'info';
+  if (fase === 'BLOCCATO_IN_STAZIONE' || fase === 'BLOCCATO_IN_TRATTA') return 'warning';
+  return 'neutral';
+};
+
+/**
+ * Lo stato composto di un convoglio: un valore per ognuno dei suoi automi, nell'ordine in
+ * cui li descrive la documentazione del treno.
+ *
+ * - T6 condizione: come sta (REGOLARE, EMERGENZA, SOPPRESSO);
+ * - T5 fase del viaggio: dove si trova e se può muoversi (IN_STAZIONE, BLOCCATO_IN_TRATTA...);
+ * - T7 verso di marcia (ANDATA, RITORNO), solo nelle fasi in cui il treno ne ha uno.
+ *
+ * Sono tre valori e non uno perché il treno sta in tutti e tre insieme: un convoglio in
+ * EMERGENZA resta nella fase in cui era, uno trattenuto da una stazione guasta è REGOLARE e
+ * BLOCCATO_IN_TRATTA. Il riassunto della Centrale da solo direbbe "fermo" sia per il treno
+ * in sosta sia per quello fermo a metà tratta.
+ *
+ * Se il convoglio non ha ancora trasmesso dopo l'avvio della Centrale (o non è mai stato
+ * acceso) dei suoi automi non si sa niente: resta lo stato che gli dà la Centrale (M13),
+ * scritto con le sue parole.
+ *
+ * Sta qui, con gli altri traduttori del vocabolario del backend, perché la usano tutte le
+ * schermate che mostrano un treno, e devono dire la stessa cosa.
+ */
+export const statiDelTreno = (
+  train: Pick<Train, 'status' | 'condition' | 'journeyPhase' | 'declaredDirection'>
+): StatoAutoma[] => {
+  if (!train.condition || !train.journeyPhase) {
+    const statoCentrale = mapFrontendStatus(train.status);
+    return [{
+      automa: 'M13 stato del treno (Centrale): il convoglio non ha ancora trasmesso',
+      valore: statoCentrale.toUpperCase(),
+      tono: statoCentrale === 'attivo' ? 'info'
+        : (statoCentrale === 'rotto' || statoCentrale === 'in manutenzione') ? 'danger' : 'neutral',
+    }];
+  }
+  const stati: StatoAutoma[] = [
+    { automa: 'T6 condizione del convoglio', valore: train.condition, tono: tonoCondizione(train.condition) },
+    { automa: 'T5 fase del viaggio', valore: train.journeyPhase, tono: tonoFase(train.journeyPhase) },
+  ];
+  if (train.declaredDirection && FASI_CON_UN_VERSO.includes(train.journeyPhase)) {
+    stati.push({
+      automa: 'T7 direzione di marcia',
+      valore: train.declaredDirection.toUpperCase(),
+      tono: 'neutral',
+    });
+  }
+  return stati;
+};
+
+/** Lo stato della Centrale (M12) con il nome che gli dà l'automa. */
+const STATO_STAZIONE_CENTRALE: Record<Station['status'], string> = {
+  operativa: 'ONLINE',
+  guasta: 'GUASTA',
+  manutenzione: 'MANUTENZIONE',
+  offline: 'OFFLINE',
+};
+
+/**
+ * Lo stato composto di una stazione: quello che le dà la Centrale (M12) e, quando è un
+ * altro, quello che il nodo dichiara di sé nel battito (S10).
+ *
+ * Il secondo si mostra solo in MANUTENZIONE. In tutti gli altri stati la Centrale prende
+ * per buono a ogni battito quello che il nodo dichiara (AutomaStazione.accettaDalCampo), e
+ * i due automi sono nello stesso stato; in MANUTENZIONE invece la Centrale non lo accetta,
+ * e la stazione è in due stati insieme: la squadra è sul posto e il nodo si dichiara ancora
+ * GUASTA, oppure già ONLINE. Da OFFLINE il nodo non batte, e un suo stato vecchio non è lo
+ * stato di adesso.
+ */
+export const statiDellaStazione = (station: Pick<Station, 'status' | 'declaredStatus'>): StatoAutoma[] => {
+  const stati: StatoAutoma[] = [{
+    automa: 'M12 stato della stazione (Centrale)',
+    valore: STATO_STAZIONE_CENTRALE[station.status] ?? station.status.toUpperCase(),
+    tono: station.status === 'operativa' ? 'success' : (station.status === 'manutenzione' ? 'warning' : 'danger'),
+  }];
+  if (station.status === 'manutenzione' && station.declaredStatus) {
+    const dichiarato = station.declaredStatus.toUpperCase();
+    stati.push({
+      automa: 'S10 stato dichiarato dal nodo',
+      valore: dichiarato,
+      tono: dichiarato === 'ONLINE' ? 'success' : 'danger',
+    });
+  }
+  return stati;
+};
+
+/**
  * Converte il DTO treno della Centrale nella shape Train del frontend.
  * Esportata perché la usano in due: la GET /api/treni e lo SNAPSHOT che arriva ogni dieci
  * secondi dalla WebSocket, che porta gli stessi identici oggetti. Un mappatore solo per
@@ -141,20 +243,23 @@ export const descriviIncertezzaPosizione = (motivo: string | null): string => {
  * possono discordare.
  */
 export const mapApiTrain = (t: ApiTrainPayload): Train => {
-  // Gli estremi della tratta NON si ricavano più da posizioneAttualeTratta.
+  // Gli estremi della tratta NON si ricavano da posizioneAttualeTratta.
   //
   // Quel campo lo scrive solo il passaggio rilevato dai sensori di terra, che arriva
   // alla Centrale passando dal nodo Stazione: se una stazione è spenta i suoi passaggi
   // non li registra nessuno e la tratta resta ferma sull'ultima confermata, mentre il
-  // convoglio è andato avanti. Leggerla lo stesso significava comporre una partenza
-  // vecchia con un arrivo attuale e ottenere tratte che in rete non esistono (il caso
-  // classico: un convoglio disegnato in viaggio da Milano a Berlino).
+  // convoglio è andato avanti. Leggerla vorrebbe dire comporre una partenza vecchia con
+  // un arrivo attuale e ottenere tratte che in rete non esistono (un convoglio in
+  // viaggio da Milano a Berlino).
   //
-  // Adesso il giudizio lo dà la Centrale, che le due fonti le incrocia lei
+  // Il giudizio lo dà la Centrale, che le due fonti le incrocia lei
   // (PosizioneConvoglio): qui si prende quello che garantisce, e quando garantisce null
   // il null si tiene. È il punto di domanda che le schermate mostrano e il motivo per
   // cui il convoglio finisce nell'elenco di quelli a posizione incerta.
   const direzione = t.direzioneCorrente ?? null;
+  // Il verso dichiarato dal convoglio, che è lo stato del suo automa T7: è un'altra cosa
+  // rispetto a direzioneCorrente, che è quanto la Centrale si sente di garantire.
+  const versoDichiarato = t.direzione ?? null;
 
   return {
     // L'id È il nome del convoglio (chiave primaria Treni.id_convoglio): la Centrale
@@ -166,6 +271,11 @@ export const mapApiTrain = (t: ApiTrainPayload): Train => {
     previousStationId: t.partenzaCorrente ?? null,
     routeId: t.itinerario?.id || '',
     direction: direzione === 'ritorno' ? 'ritorno' : (direzione ? 'andata' : null),
+    // Lo stato dei tre automi del convoglio, come lui lo dichiara. "stato" qui sopra è
+    // solo il riassunto che ne fa la Centrale, e non basta a dire come sta il treno.
+    condition: t.condizione || null,
+    journeyPhase: t.faseViaggio || null,
+    declaredDirection: versoDichiarato === 'ritorno' ? 'ritorno' : (versoDichiarato ? 'andata' : null),
     // Il default è false apposta: una Centrale che non manda il campo è una Centrale
     // che non si è espressa, e nel dubbio il convoglio va in elenco, non sulla mappa.
     positionKnown: t.posizioneNota === true,
@@ -196,6 +306,7 @@ export const mapApiStation = (s: ApiStationPayload): Station => ({
   // stazioni spente: sostituirlo con Date.now() faceva scrivere l'ora corrente nella
   // colonna "Ultimo Heartbeat" di una stazione che non ha mai dato segni di vita.
   lastHeartbeat: s.ultimoHeartbeat ? new Date(s.ultimoHeartbeat).getTime() : null,
+  declaredStatus: s.statoDichiarato || null,
   operatorsDispatched: s.stato === 'MANUTENZIONE'
 });
 
@@ -237,7 +348,10 @@ const mapApiTrackSegment = (t: ApiTrackSegmentPayload): TrackSegment => ({
 export const mapBackendStatus = (s: string): TrainStatus => {
   const lower = (s || '').toLowerCase();
   if (lower === 'attivo') return 'in_viaggio';
-  if (lower === 'fermo') return 'in_stazione';
+  // "fermo" resta "fermo": non vuol dire "in stazione". La Centrale lo scrive anche per
+  // un convoglio trattenuto a metà tratta, e dove il treno si trovi lo dice la stazione
+  // corrente, non lo stato.
+  if (lower === 'fermo') return 'fermo';
   if (lower === 'rotto') return 'guasto';
   if (lower === 'in manutenzione') return 'soppresso';
   if (lower === 'capolinea') return 'capolinea';
@@ -245,19 +359,18 @@ export const mapBackendStatus = (s: string): TrainStatus => {
 };
 
 /**
- * Mappa inversa: converte lo stato del frontend nei valori canonici del DB centrale
- * (minuscoli: il CHECK sulla colonna Treni.stato rifiuta le varianti maiuscole).
+ * Mappa inversa: riporta lo stato del frontend alla parola con cui lo scrive la Centrale
+ * (colonna Treni.stato). La usa statiDelTreno per un convoglio che non ha ancora
+ * trasmesso, di cui si mostra lo stato con le parole della Centrale.
  */
 export const mapFrontendStatus = (s: TrainStatus): string => {
   switch (s) {
     case 'in_viaggio': return 'attivo';
-    case 'in_stazione': return 'fermo';
+    case 'fermo': return 'fermo';
     case 'guasto': return 'rotto';
     case 'soppresso': return 'in manutenzione';
-    // Non c'e' nessun campo dell'amministrazione che imposti questo stato a mano: lo
-    // decide il convoglio arrivando al capolinea. La riga serve perche' le PUT parziali
-    // rimandano indietro lo stato che hanno letto, e senza di essa una modifica
-    // qualsiasi su un treno a fine corsa lo rimetterebbe "fermo".
+    // Lo decide il convoglio arrivando al capolinea: senza questa riga un treno a fine
+    // corsa che non ha ancora trasmesso comparirebbe "fermo".
     case 'capolinea': return 'capolinea';
     default: return 'fermo';
   }
@@ -274,17 +387,6 @@ export const mapBackendStationStatus = (s: string): 'operativa' | 'guasta' | 'ma
     case 'MANUTENZIONE': return 'manutenzione';
     case 'OFFLINE': return 'offline';
     default: return 'operativa';
-  }
-};
-
-/** Mappa inversa: dallo StationStatus del frontend al vocabolario runtime del backend. */
-const mapFrontendStationStatus = (s: string): string => {
-  switch (s) {
-    case 'operativa': return 'ONLINE';
-    case 'guasta': return 'GUASTA';
-    case 'manutenzione': return 'MANUTENZIONE';
-    case 'offline': return 'OFFLINE';
-    default: return 'ONLINE';
   }
 };
 
@@ -329,10 +431,8 @@ export const apiClient = {
   /**
    * I convogli che la Centrale si aspetta in una stazione, con l'orario previsto.
    *
-   * <p>Il calcolo lo fa la Centrale sull'itinerario dei treni: prima questo elenco lo
-   * costruiva la pagina Stazioni filtrando i convogli la cui posizione istantanea
-   * coincideva con la stazione, quindi mostrava solo chi stava già arrivando dalla
-   * tratta adiacente e non chi sarebbe passato di lì qualche fermata più avanti.</p>
+   * <p>Il calcolo lo fa la Centrale sull'itinerario dei treni, quindi l'elenco comprende
+   * anche chi passerà di lì qualche fermata più avanti.</p>
    */
   getExpectedTrains: async (stationId: string): Promise<ExpectedTrain[]> => {
     const res = await fetch(`${API_BASE_URL}/stazioni/${encodeURIComponent(stationId)}/treni-attesi`, {
@@ -488,6 +588,7 @@ export const apiClient = {
    * Crea un nuovo treno (operazione riservata all'amministratore).
    * L'id inviato è il nome del convoglio scritto nel form: lato Centrale diventa la
    * chiave primaria del treno, quindi è l'unico momento in cui si può scegliere.
+   * Lo stato non si manda: senza, la Centrale crea il convoglio "fermo".
    */
   createTrain: async (train: Train): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/treni`, {
@@ -495,29 +596,24 @@ export const apiClient = {
       headers: authHeaders(true),
       body: JSON.stringify({
         id: train.id,
-        stato: mapFrontendStatus(train.status),
-        itinerario: train.routeId ? { id: train.routeId } : null,
-        passeggeri: train.passengers,
-        ritardo: train.delayMinutes
+        itinerario: train.routeId ? { id: train.routeId } : null
       })
     });
     if (!res.ok) throw await createApiError(res);
   },
 
   /**
-   * Aggiorna stato e tratta di un treno esistente (amministratore). Il nome del
+   * Aggiorna la tratta di un treno esistente (amministratore). Il nome del
    * convoglio non è tra i campi inviati: è la chiave primaria del treno e non si
-   * modifica (per cambiarlo si elimina il treno e si ricrea).
+   * modifica (per cambiarlo si elimina il treno e si ricrea). Nemmeno lo stato: la
+   * PUT della Centrale lo accetterebbe ancora, ma dall'interfaccia non si sceglie più.
    */
   updateTrain: async (id: string, train: Partial<Train>): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/treni/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: authHeaders(true),
       body: JSON.stringify({
-        stato: train.status !== undefined ? mapFrontendStatus(train.status) : undefined,
-        itinerario: train.routeId ? { id: train.routeId } : undefined,
-        passeggeri: train.passengers,
-        ritardo: train.delayMinutes
+        itinerario: train.routeId ? { id: train.routeId } : undefined
       })
     });
     if (!res.ok) throw await createApiError(res);
@@ -532,7 +628,9 @@ export const apiClient = {
   },
 
   /**
-   * Registra una nuova stazione nella rete (amministratore).
+   * Registra una nuova stazione nella rete (amministratore). Stato e binari non si
+   * mandano: senza, la Centrale la crea OFFLINE (finché il nodo non batte) e con un
+   * binario.
    */
   createStation: async (station: Station): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/stazioni`, {
@@ -541,17 +639,17 @@ export const apiClient = {
       body: JSON.stringify({
         id: station.id,
         nome: station.name,
-        stato: mapFrontendStationStatus(station.status || 'operativa'),
         latitudine: station.coordinates.x,
-        longitudine: station.coordinates.y,
-        binari: station.platforms
+        longitudine: station.coordinates.y
       })
     });
     if (!res.ok) throw await createApiError(res);
   },
 
   /**
-   * Aggiorna i dati di una stazione esistente (amministratore).
+   * Aggiorna nome e coordinate di una stazione esistente (amministratore). Stato e
+   * binari non si mandano: la PUT della Centrale li accetterebbe ancora, ma
+   * dall'interfaccia non si scelgono più.
    */
   updateStation: async (id: string, station: Partial<Station>): Promise<void> => {
     const res = await fetch(`${API_BASE_URL}/stazioni/${encodeURIComponent(id)}`, {
@@ -559,10 +657,8 @@ export const apiClient = {
       headers: authHeaders(true),
       body: JSON.stringify({
         nome: station.name,
-        stato: station.status !== undefined ? mapFrontendStationStatus(station.status) : undefined,
         latitudine: station.coordinates?.x,
-        longitudine: station.coordinates?.y,
-        binari: station.platforms
+        longitudine: station.coordinates?.y
       })
     });
     if (!res.ok) throw await createApiError(res);

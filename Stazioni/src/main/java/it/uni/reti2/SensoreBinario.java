@@ -7,9 +7,9 @@ import java.time.Instant;
  *
  * <p>Nel sistema vero questi sono due scatolotti attaccati alla rotaia (spire induttive
  * o lettori RFID): uno all'imbocco del binario, che vede il convoglio ENTRARE, e uno
- * all'uscita, che lo vede USCIRE. Per adesso la stazione ha un binario solo, quindi i
- * sensori sono esattamente due, ma la classe è già scritta col numero di binario dentro
- * l'id: aggiungerne altri vuol dire solo creare altre istanze.</p>
+ * all'uscita, che lo vede USCIRE. La stazione ha un binario solo, quindi i sensori sono
+ * esattamente due; la classe ha il numero di binario dentro l'id, quindi aggiungerne altri
+ * vuol dire solo creare altre istanze.</p>
  *
  * <p>Ogni sensore fa due cose: manda periodicamente il proprio keepalive alla stazione
  * (REST, come da scelta di progetto per i sensori) e segnala i passaggi che rileva.

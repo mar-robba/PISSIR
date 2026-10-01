@@ -10,10 +10,11 @@ import {
 } from 'react';
 import { Building2, Maximize2, Minus, Plus, Tag, Train as TrainIcon, X } from 'lucide-react';
 import { useRailwayStore } from '../store/railwayStore';
-import { descriviIncertezzaPosizione } from '../api/apiClient';
+import { descriviIncertezzaPosizione, statiDelTreno, statiDellaStazione } from '../api/apiClient';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { Route, Station, TrackSegment, Train as TrainType } from '../types';
+import StatoComposto from '../components/ui/StatoComposto';
+import { Route, Station, StatoAutoma, TrackSegment, Train as TrainType } from '../types';
 import './TrafficMapPage.css';
 
 type DiagramPoint = { x: number; y: number };
@@ -96,7 +97,10 @@ const RAGGIO_SOVRAPPOSIZIONE = 26;
 // del treno (20) più un po' di aria.
 const DISTANZA_MINIMA = 34;
 // Limiti dello zoom, espressi come frazione della larghezza del diagramma.
-const ZOOM_MIN = 1 / 8;
+// ZOOM_MIN = 1/64 vuol dire ingrandire fino a 64 volte: con una rete grande come
+// quella demo (da Berlino a Catania) sulla vista intera un pixel vale qualche
+// chilometro, e due stazioni della stessa città si staccano solo molto vicino.
+const ZOOM_MIN = 1 / 64;
 const ZOOM_MAX = 1.1;
 // Un grado di latitudine sono sempre ~111 km (i meridiani sono tutti uguali):
 // è il fattore che trasforma le unità del diagramma in chilometri veri.
@@ -521,7 +525,7 @@ function adattaAlDiagramma(positions: Map<string, DiagramPoint>, riquadro: Riqua
  *
  * Per lo stesso motivo qui NON si chiede più che lo stato sia "in viaggio": fermo non vuol
  * dire senza posizione. Un convoglio guasto in linea (EMERGENZA) o trattenuto dal guasto di
- * qualcun altro (BLOCCATO_GUASTO_*, gli eventi domino) manda telemetria come prima, con gli
+ * qualcun altro (BLOCCATO_IN_TRATTA, gli eventi domino) manda telemetria come prima, con gli
  * stessi due estremi e la percentuale congelata dove si è fermato: chiedendo lo stato
  * spariva dalla mappa — finendo nel conteggio dei "treni senza posizione nota" — proprio
  * nel momento in cui all'operatore serve vedere dove si è piantato.
@@ -539,15 +543,18 @@ function coloreTreno(train: TrainType): { simbolo: string; classe: string } {
   if (train.status === 'in_ritardo' || train.delayMinutes > 0) {
     return { simbolo: '#f59e0b', classe: 'map-label--ritardo' };
   }
-  if (train.status === 'in_stazione' || train.status === 'in_attesa') {
+  if (train.status === 'fermo' || train.status === 'in_attesa') {
     return { simbolo: '#64748b', classe: 'map-label--fermo' };
   }
   return { simbolo: '#3b82f6', classe: '' };
 }
 
-/** Etichetta leggibile dello stato, senza underscore. */
-function descriviStato(stato: string): string {
-  return stato.replace(/_/g, ' ').toUpperCase();
+/**
+ * Lo stato composto in una riga di testo, per il tooltip del simbolo e per l'elenco dei
+ * sovrapposti: tutti gli stati in cui l'elemento si trova, non uno solo.
+ */
+function descriviStati(stati: StatoAutoma[]): string {
+  return stati.map(stato => stato.valore.replace(/_/g, ' ')).join(', ');
 }
 
 
@@ -805,6 +812,7 @@ export default function TrafficMapPage() {
   // `null` significa "tutto il diagramma": è la vista finché non si usa lo zoom.
   const [vista, setVista] = useState<Vista | null>(null);
   const [inTrascinamento, setInTrascinamento] = useState(false);
+  const [inZoom, setInZoom] = useState(false);
   const [selettore, setSelettore] = useState<
     { elementi: ElementoMappa[]; x: number; y: number } | null
   >(null);
@@ -814,6 +822,8 @@ export default function TrafficMapPage() {
   // Stato del trascinamento: serve a distinguere una panoramica da un click.
   const trascinamento = useRef<{ x: number; y: number; mosso: boolean } | null>(null);
   const haTrascinato = useRef(false);
+  // Timer che chiude lo zoom in corso: vedi segnalaZoom.
+  const fineZoom = useRef<number | undefined>(undefined);
 
   const graphEdges = useMemo(
     () => buildGraphEdges(stations, routes, trackSegments),
@@ -893,7 +903,7 @@ export default function TrafficMapPage() {
           id: station.id,
           nome: station.status === 'manutenzione' ? `${station.name} (MANUTENZIONE)` : station.name,
           etichetta: station.status === 'manutenzione' ? `${station.code} (MANUTENZIONE)` : station.code,
-          nota: `Stazione · ${descriviStato(station.status)}`,
+          nota: `Stazione · ${descriviStati(statiDellaStazione(station))}`,
           colore: station.status === 'manutenzione' ? '#f59e0b' : (inAvaria ? '#ef4444' : '#10b981'),
           classeEtichetta: station.status === 'manutenzione' ? 'text-warning font-bold' : '',
           ancora,
@@ -911,8 +921,8 @@ export default function TrafficMapPage() {
         // Se la Centrale non garantisce la posizione qui non si prova a rimediare con
         // quello che resta in memoria: il convoglio va in elenco e basta. È la regola
         // che vale anche nel caso più insidioso, quello in cui manca SOLO la partenza:
-        // l'arrivo lo si conosce, e prima si disegnava la corsa dall'ultima stazione
-        // nota fino a lì, inventando una tratta che in rete non esiste.
+        // l'arrivo lo si conosce, ma disegnare la corsa dall'ultima stazione nota fino a
+        // lì vorrebbe dire inventare una tratta che in rete non esiste.
         if (!train.positionKnown) {
           incerti.push({ id: train.id, motivo: train.positionDoubt });
           return null;
@@ -964,7 +974,7 @@ export default function TrafficMapPage() {
           // I nomi lunghi vengono accorciati: il nome intero resta nel selettore
           // dei sovrapposti e nel pannello di dettaglio.
           etichetta: train.id.length > 14 ? `${train.id.slice(0, 13)}…` : train.id,
-          nota: `Treno · ${descriviStato(train.status)}`,
+          nota: `Treno · ${descriviStati(statiDelTreno(train))}`,
           colore: colori.simbolo,
           classeEtichetta: colori.classe,
           ancora,
@@ -1037,6 +1047,20 @@ export default function TrafficMapPage() {
     return () => osservatore.disconnect();
   }, []);
 
+  /**
+   * Segna che è in corso uno zoom, per spegnere la transizione dei simboli (vedi
+   * .map-svg--zoom nel CSS). Va chiamata insieme al cambio di vista, così React
+   * mette la classe e le nuove posizioni nello stesso aggiornamento; si spegne da
+   * sola 300 ms dopo l'ultimo scatto della rotella.
+   */
+  const segnalaZoom = () => {
+    setInZoom(true);
+    window.clearTimeout(fineZoom.current);
+    fineZoom.current = window.setTimeout(() => setInZoom(false), 300);
+  };
+
+  useEffect(() => () => window.clearTimeout(fineZoom.current), []);
+
   // Zoom con la rotella. Il listener è nativo perché React registra "wheel" come
   // passivo e preventDefault verrebbe ignorato (la pagina scorrerebbe sotto).
   useEffect(() => {
@@ -1045,6 +1069,7 @@ export default function TrafficMapPage() {
 
     const allaRotella = (evento: WheelEvent) => {
       evento.preventDefault();
+      segnalaZoom();
       const dimensioni = svg.getBoundingClientRect();
       setVista(precedente => {
         const attuale = precedente ?? { x: 0, y: 0, w: riquadro.w, h: riquadro.h };
@@ -1119,6 +1144,7 @@ export default function TrafficMapPage() {
   };
 
   const zoomDaPulsante = (fattore: number) => {
+    segnalaZoom();
     setVista(precedente => {
       const attuale = precedente ?? vistaPiena;
       return zoomVerso(
@@ -1341,7 +1367,7 @@ export default function TrafficMapPage() {
         <div className="glass-panel map-canvas-card" ref={contenitoreRef}>
           <svg
             ref={svgRef}
-            className={`map-svg${inTrascinamento ? ' map-svg--trascinamento' : ''}`}
+            className={`map-svg${inTrascinamento ? ' map-svg--trascinamento' : ''}${inZoom ? ' map-svg--zoom' : ''}`}
             viewBox={`${vistaCorrente.x} ${vistaCorrente.y} ${vistaCorrente.w} ${vistaCorrente.h}`}
             /* Le misure che stanno nel CSS (spessori delle tratte, corpo dei testi)
                si correggono con questa variabile: `calc(3.5px * var(--map-k))`. */
@@ -1449,7 +1475,10 @@ export default function TrafficMapPage() {
             <button
               type="button"
               className="map-tool-btn"
-              onClick={() => setVista(null)}
+              onClick={() => {
+                segnalaZoom();
+                setVista(null);
+              }}
               title="Adatta alla finestra"
             >
               <Maximize2 size={15} />
@@ -1614,9 +1643,7 @@ export default function TrafficMapPage() {
               </p>
 
               <div className="map-detail__stati">
-                <Badge type={stazioneSelezionata.status === 'operativa' ? 'success' : 'danger'}>
-                  {descriviStato(stazioneSelezionata.status)}
-                </Badge>
+                <StatoComposto stati={statiDellaStazione(stazioneSelezionata)} />
                 {stazioneSelezionata.operatorsDispatched && (
                   <Badge type="warning">Squadra inviata</Badge>
                 )}
@@ -1686,15 +1713,10 @@ export default function TrafficMapPage() {
               </p>
 
               <div className="map-detail__stati">
-                <Badge
-                  type={trenoSelezionato.status === 'in_viaggio'
-                    ? 'info'
-                    : trenoSelezionato.status === 'in_ritardo'
-                      ? 'warning'
-                      : trenoSelezionato.status === 'guasto' ? 'danger' : 'neutral'}
-                >
-                  {descriviStato(trenoSelezionato.status)}
-                </Badge>
+                {/* Lo stato composto: condizione, fase del viaggio e verso, tutti insieme.
+                    Prima qui c'era una parola sola ricavata dal riassunto della Centrale,
+                    e un convoglio trattenuto a metà tratta risultava "IN STAZIONE". */}
+                <StatoComposto stati={statiDelTreno(trenoSelezionato)} />
                 {trenoSelezionato.delayMinutes > 0 && (
                   <Badge type="danger">+{trenoSelezionato.delayMinutes} min</Badge>
                 )}

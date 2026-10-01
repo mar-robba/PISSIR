@@ -58,10 +58,10 @@ public class StationGateway {
      *
      * <p>Perché serve la firma: railway/alerts è un topic condiviso, e la stazione ci pubblica
      * e ci è anche sottoscritta, quindi si risente i propri GUASTO e RESOLVED, uguali a quelli
-     * della Centrale tranne che per il marcatore. Prima li trattava come se arrivassero dalla
-     * Centrale, e con lo store and forward un RESOLVED spedito in ritardo (rimasto nel buffer
-     * mentre la rete era giù) poteva rimettere ONLINE una stazione tornata GUASTA nel
-     * frattempo. La Centrale fa lo stesso controllo, al contrario, per non riascoltare i suoi.</p>
+     * della Centrale tranne che per il marcatore. Senza il controllo, con lo store and forward
+     * un suo RESOLVED spedito in ritardo (rimasto nel buffer mentre la rete era giù) potrebbe
+     * rimettere ONLINE una stazione tornata GUASTA nel frattempo. La Centrale fa lo stesso
+     * controllo, al contrario, per non riascoltare i suoi.</p>
      *
      * @param payload Il contenuto dell'alert (JSON).
      */

@@ -18,9 +18,9 @@ import java.util.UUID;
 /**
  * Test del vincolo sulle tratte negli itinerari.
  *
- * <p>Un itinerario puo' usare solo collegamenti che in rete esistono davvero: prima il
- * gateway creava al volo la Tratta mancante, cosi' spostando o aggiungendo una stazione
- * si inventavano archi fisici che nessuno aveva mai registrato.</p>
+ * <p>Un itinerario puo' usare solo collegamenti che in rete esistono davvero: il gateway
+ * non crea al volo la Tratta mancante, se no spostando o aggiungendo una stazione si
+ * inventerebbero archi fisici che nessuno ha mai registrato.</p>
  *
  * <p>Lo scenario e' la rete A -> B (una tratta sola) piu' una terza stazione C isolata:
  * tutto cio' che passa da C deve essere rifiutato con 404.</p>
@@ -158,8 +158,7 @@ public class ItinerariTratteTest {
     @Order(6)
     public void elencoTroppoCortoVieneRifiutato() throws Exception {
         // Un itinerario con una stazione sola non e' un aggiornamento da ignorare:
-        // prima la PUT rispondeva 200 lasciando le stazioni com'erano, e il form
-        // dava per salvata una modifica che non era mai stata applicata.
+        // con un 200 il form darebbe per salvata una modifica mai applicata.
         String corpo = """
                 { "stazioni": ["%s"], "travelTimes": [] }
                 """.formatted(STAZ_A);

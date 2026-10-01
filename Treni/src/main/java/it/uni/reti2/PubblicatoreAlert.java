@@ -8,8 +8,8 @@ import java.time.Instant;
  * Pubblica su railway/alerts i guasti rilevati a bordo del treno, perché la Centrale apra
  * l'allarme.
  *
- * <p>Stava nel TrainGateway, ma a chiamarlo adesso è GestoreEventi (è l'azione della mossa
- * che manda il convoglio in EMERGENZA), e il gateway passa a sua volta gli alert al
+ * <p>Lo chiama GestoreEventi (è l'azione della mossa che manda il convoglio in
+ * EMERGENZA). Non sta nel TrainGateway perché il gateway passa a sua volta gli alert al
  * gestore: con la pubblicazione dentro il gateway i due si chiamerebbero a vicenda. È lo
  * stesso motivo per cui esiste PubblicatorePassaggi, e nella Centrale PubblicatoreAlert
  * fa la stessa cosa per i suoi alert.</p>

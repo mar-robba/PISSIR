@@ -66,10 +66,10 @@ export function useRealtimeUpdates() {
           currentStationId: originStationId,
           // Gli estremi e il verso si scrivono SEMPRE, null compreso: quel null è la
           // notizia (nessuno conferma più da dove il convoglio sta arrivando), non
-          // l'assenza di una notizia. Prima si scrivevano solo se valorizzati, e il
-          // risultato era il peggiore dei due mondi: l'ultima posizione buona restava
-          // appiccicata al treno mentre lo snapshot successivo gli metteva accanto un
-          // arrivo aggiornato, e la coppia che ne usciva non era una tratta della rete.
+          // l'assenza di una notizia. Scrivendoli solo se valorizzati, l'ultima
+          // posizione buona resterebbe appiccicata al treno mentre lo snapshot successivo
+          // gli mette accanto un arrivo aggiornato, e la coppia non sarebbe una tratta
+          // della rete.
           previousStationId: partenza,
           nextStationId: arrivo,
           positionKnown: data.posizioneNota === true,
@@ -78,6 +78,12 @@ export function useRealtimeUpdates() {
           // lo portava solo lo snapshot, e per una decina di secondi il pannello annunciava
           // ancora "corsa di andata" mentre il convoglio stava già tornando indietro.
           direction: direzione === 'ritorno' ? 'ritorno' : (direzione ? 'andata' : null),
+          // Lo stato dei tre automi del convoglio (T6, T5, T7) come lo dichiara lui. La
+          // Centrale li scrive in ogni evento, anche a null, così come la posizione: un
+          // null vuol dire che non si sa, e va scritto al posto del valore di prima.
+          condition: testo(data.condizione),
+          journeyPhase: testo(data.faseViaggio),
+          declaredDirection: data.direzione === 'ritorno' ? 'ritorno' : (testo(data.direzione) ? 'andata' : null),
           // Previsione di arrivo calcolata dalla Centrale. Il null è un valore vero e va
           // scritto: vuol dire che per questo convoglio una stima non c'è più (corsa
           // soppressa, itinerario tolto), e tenersi quella di prima mostrerebbe un orario
@@ -93,6 +99,11 @@ export function useRealtimeUpdates() {
       if (data.stationId) {
         updateStation(data.stationId, {
           status: data.status ?? 'operativa',
+          // Lo stato che il nodo dichiara di sé (S10): in MANUTENZIONE non è quello che
+          // gli dà la Centrale, e la schermata li mostra tutti e due.
+          declaredStatus: typeof data.statoDichiarato === 'string' && data.statoDichiarato
+            ? data.statoDichiarato
+            : null,
           lastHeartbeat: istanteEvento(data.timestamp)
         });
       }

@@ -2,7 +2,7 @@
 // TYPES — Sistema di Monitoraggio Traffico Ferroviario
 // 
 // File centrale contenente tutte le interfacce e i tipi TypeScript 
-// strutturati in modo coerente col backend Java Panache.
+// strutturati in modo coerente con le API della Centrale.
 // Garantisce la Type Safety nell'intera Web App React.
 // ============================================================
 
@@ -34,6 +34,12 @@ export interface Station {
    * corrente faceva vedere "ultimo heartbeat: adesso" per una stazione spenta.
    */
   lastHeartbeat: number | null;
+  /**
+   * Lo stato che il nodo dichiara di sé nel battito (ONLINE o GUASTA, il suo automa S10),
+   * null se non ha ancora battuto. status invece è lo stato che gli dà la Centrale (M12):
+   * di solito sono uguali, in MANUTENZIONE no, e lì la stazione si mostra in tutti e due.
+   */
+  declaredStatus: string | null;
   platforms: number;
   faultDescription?: string;
   faultSince?: number;
@@ -41,9 +47,20 @@ export interface Station {
 }
 
 // --- TRENI ---
+/**
+ * Lo stato del convoglio come lo tiene la Centrale (colonna Treni.stato, automa M13),
+ * tradotto nelle parole della web app. È un riassunto: per sapere come sta davvero il
+ * treno si guardano condition e journeyPhase, cioè lo stato dei suoi due automi.
+ */
 export type TrainStatus =
   | 'in_viaggio'
-  | 'in_stazione'
+  /**
+   * "fermo" della Centrale: il convoglio non sta andando, ma NON vuol dire che sia in
+   * una stazione. Vale anche per il treno trattenuto a metà tratta da una stazione
+   * guasta davanti a lui: prima qui c'era 'in_stazione', e un treno fermo in linea
+   * compariva "IN STAZIONE". Se è in stazione lo dice currentStationId.
+   */
+  | 'fermo'
   | 'in_ritardo'
   | 'guasto'
   | 'soppresso'
@@ -69,6 +86,24 @@ export interface Train {
   routeId: string;
   /** null quando la Centrale non è in grado di garantire il verso di marcia. */
   direction: 'andata' | 'ritorno' | null;
+  /**
+   * Condizione del convoglio come la dichiara lui nella telemetria: REGOLARE, EMERGENZA
+   * o SOPPRESSO, lo stato del suo automa T6 (TrainDB.condizione). null finché la Centrale
+   * non ha ricevuto un frame dal convoglio.
+   */
+  condition: string | null;
+  /**
+   * Fase del viaggio dichiarata dal convoglio: SENZA_ITINERARIO, IN_STAZIONE, IN_VIAGGIO,
+   * BLOCCATO_IN_STAZIONE, BLOCCATO_IN_TRATTA o FERMO_CAPOLINEA, lo stato del suo automa T5
+   * (TrainDB.faseViaggio). null come sopra.
+   */
+  journeyPhase: string | null;
+  /**
+   * Il verso che il convoglio dichiara (automa T7), anche quando la Centrale non lo
+   * garantisce: direction è il giudizio della Centrale sulla posizione, questo è lo stato
+   * dell'automa. null se il convoglio non l'ha mai mandato.
+   */
+  declaredDirection: 'andata' | 'ritorno' | null;
   /**
    * true quando la Centrale sa dire dove sta il convoglio: fermo in una stazione,
    * oppure in linea con TUTTI E DUE gli estremi della tratta noti.
@@ -103,6 +138,22 @@ export interface Train {
   passengers: number;
   lastUpdate: number; // ultimo dato telemetrico GPS
   progressPercent: number; // 0-100, posizione interpolata tra stazione precedente e successiva per visualizzatori lineari
+}
+
+/**
+ * Lo stato di uno degli automi di un elemento (treno o stazione), pronto da stampare.
+ *
+ * Un elemento non sta mai in uno stato solo: un treno è in una condizione (T6), in una
+ * fase del viaggio (T5) e in un verso di marcia (T7) tutto insieme, e la schermata li deve
+ * mostrare tutti. Il suo stato composto è quindi un elenco di questi, uno per automa.
+ */
+export interface StatoAutoma {
+  /** La macchina a stati a cui appartiene il valore, come la chiama la documentazione. */
+  automa: string;
+  /** Il valore come lo scrive l'automa, per esempio "BLOCCATO_IN_TRATTA". */
+  valore: string;
+  /** Il colore del badge. */
+  tono: 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 }
 
 // --- TRATTE ---

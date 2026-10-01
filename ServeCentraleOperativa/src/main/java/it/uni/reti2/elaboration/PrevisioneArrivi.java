@@ -22,9 +22,21 @@ import java.util.logging.Logger;
  * <p>Le due cose stanno nella stessa classe perche' sono la stessa operazione guardata
  * da due lati: la Centrale calcola l'orario in cui il convoglio <b>deve</b> arrivare, e
  * il ritardo non e' altro che la differenza fra quell'orario e quello in cui il treno e'
- * arrivato davvero. Prima il ritardo lo contava il digital twin a bordo del convoglio e
- * la Centrale si limitava a ricopiarlo dal payload: il dato c'era, ma era calcolato nel
- * nodo sbagliato.</p>
+ * arrivato davvero. Per questo il ritardo lo calcola la Centrale, che ha l'orario, e non
+ * il digital twin a bordo.</p>
+ *
+ * <h3>Il ritardo cresce mentre il treno e' fermo</h3>
+ * <p>Il ritardo e' quanto il convoglio e' indietro rispetto all'orario nel punto in cui si
+ * trova: se fin li' ha impiegato esattamente il tempo delle tratte percorse piu' quello
+ * delle soste previste, e' in orario. Il conto ha due parti. Quella <b>misurata</b> si
+ * chiude a ogni passaggio davanti ai sensori di stazione, con l'ora vera dell'ingresso e
+ * dell'uscita. Quella <b>in corso</b> e' il tempo che il convoglio sta perdendo adesso,
+ * dall'ultimo passaggio: la sosta che dura piu' del previsto, oppure la tratta in cui
+ * l'avanzamento resta indietro rispetto al tempo trascorso dalla partenza. Si rifa' a ogni
+ * frame di telemetria, ed e' quella che fa crescere il ritardo di un treno trattenuto da
+ * una stazione guasta per tutto il tempo in cui resta fermo, invece di farlo comparire
+ * tutto insieme quando riparte. Al passaggio successivo la stima lascia il posto alla
+ * misura dello stesso tempo, quindi niente viene contato due volte.</p>
  *
  * <h3>Da dove esce l'orario previsto</h3>
  * <p>L'itinerario del treno e' una sequenza di tratte, e ogni tratta porta il proprio
@@ -100,11 +112,20 @@ public class PrevisioneArrivi {
     private final Map<String, Marcia> tabellaDiMarcia = new ConcurrentHashMap<>();
 
     /**
-     * L'ora in cui ogni convoglio e' entrato nella stazione in cui si trova. Serve per
-     * misurare la sosta: il tempo perso non e' solo quello in linea, un treno trattenuto
-     * in stazione da un guasto riparte tardi e quel ritardo va contato.
+     * La sosta in corso di ogni convoglio fermo in una stazione: dove, da quando e quanto
+     * deve durare. Serve per misurare la sosta: il tempo perso non e' solo quello in
+     * linea, un treno trattenuto in stazione da un guasto riparte tardi e quel ritardo va
+     * contato. La riga si scrive quando il treno entra e si consuma quando esce.
      */
-    private final Map<String, Instant> arriviEffettivi = new ConcurrentHashMap<>();
+    private final Map<String, Sosta> soste = new ConcurrentHashMap<>();
+
+    /**
+     * La quota di ritardo che ogni convoglio sta accumulando dall'ultimo passaggio, gia'
+     * compresa in {@code treno.ritardo}. Si tiene a parte per poterla togliere: a ogni frame
+     * di telemetria la stima nuova prende il posto della vecchia, e al passaggio il suo
+     * posto lo prende la misura.
+     */
+    private final Map<String, Integer> ritardoInCorso = new ConcurrentHashMap<>();
 
     /**
      * Una fermata dell'itinerario con il tempo che la separa dalla successiva
@@ -114,7 +135,10 @@ public class PrevisioneArrivi {
     public record Tappa(String stazioneId, int minutiVersoProssima) {}
 
     /** Impegno di orario preso da un convoglio alla partenza da una stazione. */
-    private record Marcia(String stazioneAttesa, Instant arrivoProgrammato) {}
+    private record Marcia(String stazioneAttesa, Instant partenza, Instant arrivoProgrammato) {}
+
+    /** Sosta di un convoglio in una stazione, con la durata prevista in minuti di servizio. */
+    private record Sosta(String stazioneId, Instant inizio, double minutiPrevisti) {}
 
     /** Previsione completa verso una stazione: quanto manca e quante fermate ci sono prima. */
     public record Previsione(int minuti, int fermateIntermedie) {}
@@ -141,9 +165,7 @@ public class PrevisioneArrivi {
         // capolinea basterebbe la prossima stazione vuota, ma dirlo qui rende la regola
         // esplicita e regge anche l'ultimo frame di telemetria che arrivasse ancora con la
         // fermata successiva valorizzata.
-        boolean corsaFinita = "in manutenzione".equalsIgnoreCase(treno.stato)
-                || StatiCanonici.TRENO_CAPOLINEA.equalsIgnoreCase(treno.stato);
-        Previsione previsione = corsaFinita ? null : previsioneVerso(treno, treno.prossimaStazione);
+        Previsione previsione = corsaFinita(treno) ? null : previsioneVerso(treno, treno.prossimaStazione);
         if (previsione == null) {
             treno.minutiAllArrivo = null;
             treno.arrivoPrevisto = null;
@@ -297,12 +319,15 @@ public class PrevisioneArrivi {
         if (treno == null || treno.itinerario == null || stazionePartenza == null) {
             return;
         }
+        // La sosta si chiude prima di cercare la stazione nel percorso: il treno da li' e'
+        // uscito comunque, e una sosta lasciata aperta continuerebbe a contare ritardo
+        // mentre il convoglio viaggia.
+        contaSostaOltreIlPrevisto(treno, stazionePartenza, quandoEUscito);
         List<Tappa> tappe = percorsoDi(treno.itinerario.id);
         int qui = indiceDi(tappe, stazionePartenza);
         if (qui < 0) {
             return;
         }
-        contaSostaOltreIlPrevisto(treno, stazionePartenza, qui, tappe.size(), quandoEUscito);
         boolean andata = !"ritorno".equalsIgnoreCase(direzione);
         int prossimo = andata ? qui + 1 : qui - 1;
         if (prossimo < 0 || prossimo >= tappe.size()) {
@@ -314,7 +339,7 @@ public class PrevisioneArrivi {
                 ? tappe.get(qui).minutiVersoProssima()
                 : tappe.get(prossimo).minutiVersoProssima();
         Instant previsto = quandoEUscito.plus(durataReale(percorrenza));
-        tabellaDiMarcia.put(treno.id, new Marcia(tappe.get(prossimo).stazioneId(), previsto));
+        tabellaDiMarcia.put(treno.id, new Marcia(tappe.get(prossimo).stazioneId(), quandoEUscito, previsto));
         LOG.fine(String.format("⏱️ %s parte da %s: arrivo previsto a %s fra %d minuti di servizio",
                 treno.id, stazionePartenza, tappe.get(prossimo).stazioneId(), percorrenza));
     }
@@ -327,23 +352,32 @@ public class PrevisioneArrivi {
      * non "in anticipo" (la simulazione non fa viaggiare i convogli piu' veloci del tempo
      * di percorrenza, quindi un anticipo sarebbe solo un errore di misura).</p>
      *
+     * <p>Il tempo perso su questa tratta la telemetria l'aveva gia' stimato e sommato al
+     * ritardo: la stima si toglie prima di sommare la misura, che conta lo stesso tempo.</p>
+     *
      * @param quandoEEntrato Istante del passaggio dichiarato dal convoglio.
-     * @return true se il ritardo del treno e' stato modificato.
+     * @return true se il ritardo misurato del treno e' stato modificato.
      */
     public boolean registraArrivo(Treno treno, String stazioneRaggiunta, Instant quandoEEntrato) {
         if (treno == null || stazioneRaggiunta == null) {
             return false;
         }
         // L'ora dell'ingresso si annota sempre, anche quando non c'era nessun orario da
-        // rispettare: e' l'inizio della sosta, e la sosta va misurata comunque.
-        arriviEffettivi.put(treno.id, quandoEEntrato);
+        // rispettare: e' l'inizio della sosta, e la sosta va misurata comunque. Non quando la
+        // corsa e' finita (capolinea marcato): da li' il treno non riparte, e una sosta
+        // aperta per sempre diventerebbe tutta ritardo il giorno in cui lo si rimette in
+        // servizio.
+        if (!corsaFinita(treno)) {
+            soste.put(treno.id, new Sosta(stazioneRaggiunta, quandoEEntrato, sostaPrevistaIn(treno, stazioneRaggiunta)));
+        }
         Marcia marcia = tabellaDiMarcia.remove(treno.id);
         if (marcia == null || !marcia.stazioneAttesa().equals(stazioneRaggiunta)) {
             // Nessun impegno di orario per questa fermata: succede al primo passaggio dopo
-            // l'accensione della Centrale (la tabella di marcia sta in RAM) e quando
-            // l'itinerario e' cambiato mentre il treno era in viaggio.
+            // l'accensione della Centrale (la tabella di marcia sta in RAM) e dopo che il
+            // convoglio e' stato sganciato dal suo itinerario.
             return false;
         }
+        int prima = togliQuotaInCorso(treno);
         // Il confronto con la tolleranza si fa sullo scarto vero, non su quello arrotondato:
         // il quanto del twin vale 1,67 minuti di orario, che arrotondati diventano 2 e
         // passavano un controllo scritto proprio per fermarli.
@@ -351,8 +385,7 @@ public class PrevisioneArrivi {
         if (Math.abs(scarto) < tolleranzaMinuti()) {
             return false;
         }
-        int prima = treno.ritardo;
-        treno.ritardo = Math.max(0, treno.ritardo + arrotonda(scarto));
+        treno.ritardo = Math.max(0, prima + arrotonda(scarto));
         LOG.info(String.format("⏱️ %s arrivato a %s con %+d minuti sull'orario: ritardo da %d a %d",
                 treno.id, stazioneRaggiunta, arrotonda(scarto), prima, treno.ritardo));
         return treno.ritardo != prima;
@@ -367,52 +400,197 @@ public class PrevisioneArrivi {
      * e risulterebbe puntuale. E' il caso piu' frequente di tutti, perche' e' quello che
      * succede quando una stazione guasta trattiene un treno in banchina.</p>
      *
-     * <p>Al capolinea la sosta prevista e' doppia: il convoglio deve invertire la marcia,
-     * e il digital twin la raddoppia per conto suo.</p>
+     * <p>Come all'arrivo, la stima fatta con la telemetria durante la sosta lascia il
+     * posto alla misura.</p>
      *
      * @param stazione La stazione da cui il convoglio sta uscendo.
-     * @param qui      Posizione di quella stazione nel percorso.
-     * @param fermate  Quante fermate ha il percorso, per riconoscere i due capolinea.
      */
-    private void contaSostaOltreIlPrevisto(Treno treno, String stazione, int qui, int fermate,
-                                           Instant quandoEUscito) {
-        Instant entrato = arriviEffettivi.remove(treno.id);
-        if (entrato == null) {
-            return; // prima partenza della corsa: non c'e' nessuna sosta da misurare
+    private void contaSostaOltreIlPrevisto(Treno treno, String stazione, Instant quandoEUscito) {
+        Sosta sosta = soste.remove(treno.id);
+        if (sosta == null || !sosta.stazioneId().equals(stazione)) {
+            return; // nessuna sosta aperta in questa stazione: non c'e' niente da misurare
         }
-        boolean capolinea = qui == 0 || qui == fermate - 1;
-        double sostaPrevista = capolinea ? sostaMinuti() * 2 : sostaMinuti();
+        int prima = togliQuotaInCorso(treno);
         // Come per l'arrivo: si confronta l'eccesso vero con la tolleranza e si arrotonda solo
         // quello che finisce davvero nel ritardo.
-        double eccesso = minutiDiServizio(Duration.between(entrato, quandoEUscito)) - sostaPrevista;
+        double eccesso = minutiDiServizio(Duration.between(sosta.inizio(), quandoEUscito)) - sosta.minutiPrevisti();
         if (eccesso < tolleranzaMinuti()) {
             return;
         }
-        int prima = treno.ritardo;
-        treno.ritardo = Math.max(0, treno.ritardo + arrotonda(eccesso));
+        treno.ritardo = Math.max(0, prima + arrotonda(eccesso));
         LOG.info(String.format("⏱️ %s trattenuto in %s per %d minuti oltre la sosta: ritardo da %d a %d",
                 treno.id, stazione, arrotonda(eccesso), prima, treno.ritardo));
     }
 
-    /** Il convoglio non c'e' piu' (eliminato o soppresso): via il suo orario e la sua sosta. */
-    public void dimenticaTreno(String trenoId) {
-        tabellaDiMarcia.remove(trenoId);
-        arriviEffettivi.remove(trenoId);
+    /**
+     * Ricalcola il ritardo del convoglio nel punto in cui si trova adesso: quello misurato
+     * ai passaggi piu' quello che sta accumulando dall'ultimo. Lo chiama AutomaTreno a ogni
+     * frame di telemetria e dopo ogni passaggio.
+     *
+     * <p>Il convoglio che marcia in orario o che sta facendo la sua sosta non accumula
+     * niente. Quello fermo dove non dovrebbe (trattenuto da una stazione chiusa, in
+     * emergenza, oltre la sosta) si', e il suo ritardo cresce finche' resta fermo.</p>
+     *
+     * <p>A corsa finita (capolinea, soppressione, convoglio sganciato dall'itinerario) il
+     * ritardo resta quello raggiunto, perche' non c'e' piu' un orario da rispettare. La sosta
+     * aperta si chiude: un treno rimesso in servizio dopo ore al capolinea si troverebbe
+     * addosso tutte quelle ore. L'arrivo atteso invece resta finche' c'e' un itinerario: il
+     * frame che annuncia il capolinea puo' arrivare prima dell'ENTRATA, e l'ultima tratta va
+     * misurata lo stesso.</p>
+     *
+     * @param adesso L'istante della misura.
+     */
+    public void aggiornaRitardo(Treno treno, Instant adesso) {
+        if (treno == null) {
+            return;
+        }
+        if (corsaFinita(treno)) {
+            soste.remove(treno.id);
+            if (treno.itinerario == null) {
+                tabellaDiMarcia.remove(treno.id); // sganciato: l'arrivo che aspettava non ci sara'
+            }
+            return;
+        }
+        boolean inStazione = treno.stazioneCorrente != null && !treno.stazioneCorrente.isEmpty();
+        if (inStazione && sostaValida(treno) == null && marciaValida(treno) == null) {
+            // Il convoglio e' fermo in una stazione in cui non e' mai entrato: e' la prima
+            // fermata della corsa, da cui si esce senza entrare, oppure quella in cui e' stato
+            // rimesso con un itinerario nuovo. La sosta comincia adesso, ed e' quella
+            // semplice, come la fa il digital twin alla partenza.
+            soste.put(treno.id, new Sosta(treno.stazioneCorrente, adesso, sostaMinuti()));
+        }
+        int misurato = ritardoMisurato(treno);
+        int inCorso = quotaInCorso(treno, adesso);
+        ritardoInCorso.put(treno.id, inCorso);
+        treno.ritardo = misurato + inCorso;
+    }
+
+    /** @return Il ritardo misurato ai passaggi: quello del convoglio senza la quota in corso. */
+    public int ritardoMisurato(Treno treno) {
+        return Math.max(0, treno.ritardo - ritardoInCorso.getOrDefault(treno.id, 0));
     }
 
     /**
-     * L'amministratore ha toccato tratte o itinerari: i percorsi memorizzati non valgono
-     * piu' e nemmeno gli orari calcolati con i tempi di percorrenza di prima.
+     * Il convoglio non c'e' piu' (eliminato o soppresso): via il suo orario e la sua sosta.
+     * Il ritardo che aveva resta com'era, stima compresa: nessun passaggio la misurera' meglio.
+     */
+    public void dimenticaTreno(String trenoId) {
+        tabellaDiMarcia.remove(trenoId);
+        soste.remove(trenoId);
+        ritardoInCorso.remove(trenoId);
+    }
+
+    /**
+     * L'amministratore ha toccato tratte o itinerari: i percorsi memorizzati non valgono piu'.
+     *
+     * <p>La tabella di marcia e le soste invece restano. Sono orari che i convogli hanno gia'
+     * preso: chi e' in tratta la finisce con il percorso di prima (il digital twin installa
+     * quello nuovo solo all'arrivo), e chi e' fermo in stazione ci e' entrato davvero a
+     * quell'ora. Svuotarle azzerava il ritardo che sta maturando un treno trattenuto solo
+     * perche' qualcuno aveva modificato un itinerario. Una riga rimasta indietro non fa
+     * danni: ognuna dice a quale stazione si riferisce, e quando non e' piu' quella del
+     * convoglio non viene usata.</p>
      */
     public void itinerariCambiati() {
         percorsi.clear();
-        tabellaDiMarcia.clear();
-        arriviEffettivi.clear();
     }
 
     // ──────────────────────────────────────────────────────────────
     // METODI DI SUPPORTO PRIVATI
     // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Corsa soppressa, finita al capolinea o senza un itinerario: non c'e' nessun arrivo
+     * da prevedere e nessun orario da rispettare.
+     */
+    private boolean corsaFinita(Treno treno) {
+        return treno.itinerario == null
+                || "in manutenzione".equalsIgnoreCase(treno.stato)
+                || StatiCanonici.TRENO_CAPOLINEA.equalsIgnoreCase(treno.stato);
+    }
+
+    /**
+     * La sosta prevista in una stazione. Agli estremi dell'itinerario e' doppia: il
+     * convoglio deve invertire la marcia, e il digital twin la raddoppia per conto suo.
+     */
+    private double sostaPrevistaIn(Treno treno, String stazioneId) {
+        List<Tappa> tappe = percorsoDi(treno.itinerario != null ? treno.itinerario.id : null);
+        int qui = indiceDi(tappe, stazioneId);
+        boolean estremo = qui >= 0 && (qui == 0 || qui == tappe.size() - 1);
+        return estremo ? sostaMinuti() * 2 : sostaMinuti();
+    }
+
+    /**
+     * La sosta aperta del convoglio, se riguarda ancora il punto in cui si trova: la
+     * stazione in cui e' fermo, oppure la tratta appena imboccata, quando la telemetria dice
+     * gia' che e' partito e l'USCITA non e' ancora arrivata (fa piu' strada: passa dai
+     * sensori e dalla stazione).
+     *
+     * @return La sosta, oppure null se non c'e' o e' di un'altra stazione.
+     */
+    private Sosta sostaValida(Treno treno) {
+        Sosta sosta = soste.get(treno.id);
+        if (sosta == null) {
+            return null;
+        }
+        boolean inStazione = treno.stazioneCorrente != null && !treno.stazioneCorrente.isEmpty();
+        return !inStazione || sosta.stazioneId().equals(treno.stazioneCorrente) ? sosta : null;
+    }
+
+    /**
+     * L'arrivo che il convoglio deve rispettare, se riguarda ancora il punto in cui si
+     * trova: la tratta verso la stazione attesa, oppure quella stazione, quando la telemetria
+     * dice gia' che e' arrivato e l'ENTRATA non e' ancora arrivata.
+     *
+     * @return La marcia, oppure null se non c'e' o porta da un'altra parte.
+     */
+    private Marcia marciaValida(Treno treno) {
+        Marcia marcia = tabellaDiMarcia.get(treno.id);
+        if (marcia == null) {
+            return null;
+        }
+        boolean inStazione = treno.stazioneCorrente != null && !treno.stazioneCorrente.isEmpty();
+        String dove = inStazione ? treno.stazioneCorrente : treno.prossimaStazione;
+        return marcia.stazioneAttesa().equals(dove) ? marcia : null;
+    }
+
+    /**
+     * Quanti minuti di orario il convoglio sta perdendo dall'ultimo passaggio. In sosta sono
+     * quelli oltre la sosta prevista. In tratta e' la differenza fra il tempo trascorso dalla
+     * partenza e quello che l'orario assegna alla strada fatta, cioe' alla quota di tratta
+     * dichiarata dalla telemetria: un treno fermo a meta' tratta non avanza mentre l'orologio
+     * corre, e la differenza cresce.
+     *
+     * <p>Sotto la tolleranza e' rumore di misura, come al passaggio: la quota di tratta
+     * arriva con il frame, che puo' essere vecchio di un tick.</p>
+     */
+    private int quotaInCorso(Treno treno, Instant adesso) {
+        Sosta sosta = sostaValida(treno);
+        Marcia marcia = marciaValida(treno);
+        double perso;
+        if (sosta != null) {
+            perso = minutiDiServizio(Duration.between(sosta.inizio(), adesso)) - sosta.minutiPrevisti();
+        } else if (marcia != null) {
+            double percorrenza = minutiDiServizio(Duration.between(marcia.partenza(), marcia.arrivoProgrammato()));
+            double stradaFatta = percorrenza * Math.max(0.0, Math.min(100.0, treno.progresso)) / 100.0;
+            perso = minutiDiServizio(Duration.between(marcia.partenza(), adesso)) - stradaFatta;
+        } else {
+            return 0; // nessun orario con cui confrontarsi
+        }
+        return perso < tolleranzaMinuti() ? 0 : arrotonda(perso);
+    }
+
+    /**
+     * Toglie dal ritardo del convoglio la stima del tempo perso dall'ultimo passaggio: la
+     * chiama il passaggio successivo, che quel tempo lo misura.
+     *
+     * @return Il ritardo misurato, a cui sommare la misura del passaggio.
+     */
+    private int togliQuotaInCorso(Treno treno) {
+        treno.ritardo = ritardoMisurato(treno);
+        ritardoInCorso.remove(treno.id);
+        return treno.ritardo;
+    }
 
     /** Il percorso dell'itinerario, letto dal database solo la prima volta. */
     private List<Tappa> percorsoDi(String itinerarioId) {

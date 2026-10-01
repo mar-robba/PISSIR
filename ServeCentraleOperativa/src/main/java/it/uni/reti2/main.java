@@ -30,8 +30,8 @@ import java.util.logging.Logger;
 /**
  * Punto di ingresso del servizio Centrale Operativa.
  *
- * <p>Crea gli oggetti e li collega a mano, assegnando i campi, come fa il main del treno:
- * prima lo faceva Quarkus con {@code @Inject}. L'ordine conta, ed è quello dei commenti qui
+ * <p>Crea gli oggetti e li collega a mano, assegnando i campi, come fa il main del treno.
+ * L'ordine conta, ed è quello dei commenti qui
  * sotto: database, stato, automi e gestore, generatori; poi si accende il server e si apre
  * MQTT, perché il primo messaggio che arriva deve trovare la cache già piena.</p>
  */

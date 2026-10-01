@@ -154,7 +154,7 @@ endlegend
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-FdBd44/plantuml-AXcwxO.png]]
+[[file:/tmp/babel-kH43Op/plantuml-l5ZpW1.png]]
 
 ** Glossario dei termini di dominio
 
@@ -208,10 +208,9 @@ situazione corrente della rete, la sua storia e i comandi previsti per il loro r
 descritto da RF02 e' sbagliato, RF01 mostra correttamente un dato sbagliato: per questo ogni ramo di
 RF01 dipende dal corrispondente ramo di RF02.
 
-*Stato di implementazione*: parziale — la visualizzazione, l'amministrazione dei dati, lo storico e
-l'accesso ci sono per intero; dei tre comandi operativi di RF01.4 i due che riguardano il guasto
-sono completi, resta parziale la soppressione della corsa, che non verifica la propria
-precondizione.
+*Stato di implementazione*: parziale — la visualizzazione, l'amministrazione dei dati e l'accesso
+ci sono per intero, e i tre comandi operativi di RF01.4 fanno quello che devono. Mancano la
+ripartizione dei comandi per ruolo (RF04.2) e la schermata dello storico (RF01.5).
 
 **** RF01.1 - Visualizzazione della situazione corrente
 
@@ -222,20 +221,20 @@ precondizione.
   che stanno seguendo e al loro stato.
 - dipende da: RF02.2.2.
 - stato di implementazione: completo. Il convoglio viene disegnato sulla posizione interpolata fra
-  le due stazioni della tratta che sta percorrendo, con sopra il percorso e il colore dello stato.
-  Se pero' la centrale non e' in grado di garantire la posizione (RF02.2.2.1) il convoglio *non
-  viene disegnato*: finisce in un elenco a parte, in un angolo della mappa, con il nome e il motivo
-  per cui non si sa dove sia. Disegnarlo lo stesso vorrebbe dire scegliere un punto a caso, e la
-  mappa e' proprio la schermata su cui una posizione inventata non si distingue da una vera.
+  le due stazioni della tratta che sta percorrendo, con sopra il percorso e il colore dello stato;
+  il pannello di dettaglio ne mostra lo stato composto (vedi il vocabolario degli stati osservabili).
+  Se la centrale non garantisce la posizione (RF02.2.2.1) il convoglio *non viene disegnato* ma
+  elencato a parte, con il nome e il motivo: sulla mappa una posizione inventata non si
+  distinguerebbe da una vera.
 
 ***** RF01.1.2 - Elenco dei convogli
 - enunciato: per ogni convoglio sono visibili il numero, la stazione o la tratta su cui si trova, lo
   stato, il ritardo accumulato e i passeggeri a bordo.
 - dipende da: RF02.2.
-- stato di implementazione: completo. Dove la posizione non e' garantita l'elenco scrive un punto
-  di domanda con il motivo, invece di comporre un "fra X e Y" mettendo insieme una provenienza
-  vecchia e una destinazione aggiornata: il trattino vuol dire "non si applica", il punto di
-  domanda "c'e', ma non lo sappiamo", e sono due cose diverse.
+- stato di implementazione: completo. Lo stato e' quello composto, un valore per ogni automa del
+  convoglio (condizione, fase del viaggio, verso), e non il riassunto che ne tiene la centrale. Dove
+  la posizione non e' garantita l'elenco scrive un punto di domanda con il motivo: il trattino vuol
+  dire "non si applica", il punto di domanda "c'e', ma non lo sappiamo".
 
 ***** RF01.1.3 - Elenco delle stazioni
 - enunciato: per ogni stazione sono visibili lo stato operativo, i convogli fermi sui binari in quel
@@ -243,9 +242,8 @@ precondizione.
 - dipende da: RF02.3.1.
 - stato di implementazione: completo. Lo stato operativo lo tiene la centrale, i convogli sui binari
   li dichiara il nodo di stazione: la schermata mette insieme le due cose. Nel tabellone degli attesi
-  il convoglio a posizione incerta *resta in elenco* — la stazione lo aspetta comunque, la lista la
-  costruisce l'itinerario — ma accanto all'orario compare l'avviso: quella stima e' calcolata
-  sull'ultima posizione certa, che puo' essere vecchia, ed e' giusto che chi legge lo sappia.
+  il convoglio a posizione incerta resta in elenco, con un avviso accanto all'orario: la stima e'
+  calcolata sull'ultima posizione certa.
 
 ***** RF01.1.4 - Aggiornamento continuo
 - enunciato: le schermate si aggiornano da sole mentre l'operatore le guarda, senza che lui debba
@@ -256,9 +254,8 @@ precondizione.
 - *distinzione che conta*: l'aggiornamento e' *spinto dal sistema quando l'evento accade*, non
   ottenuto da interrogazioni a orologio da parte della schermata. La fotografia periodica non e' il
   meccanismo di aggiornamento: serve a riallineare chi si e' collegato dopo o ha perso qualcosa.
-- stato di implementazione: completo, ed e' completa anche la distinzione qui sopra: l'evento viene
-  spinto sulla websocket nel momento in cui accade, e la fotografia periodica viaggia sullo stesso
-  canale senza che il browser chieda niente.
+- stato di implementazione: completo, distinzione compresa: l'evento viene spinto sulla websocket
+  quando accade, e la fotografia periodica viaggia sullo stesso canale.
 
 ***** RF01.1.5 - Indicatori di sintesi
 - enunciato: una schermata di riepilogo riassume in pochi numeri i convogli in circolazione, le
@@ -294,26 +291,32 @@ precondizione.
 *Enunciato del ramo*: la creazione, la modifica e l'eliminazione dell'anagrafica della rete sono
 riservate all'amministratore; il tecnico vede tutto ma non modifica nulla.
 
-*Rispetto alla consegna*: la consegna chiede all'amministratore di aggiungere ed eliminare le tratte
-(RF01.3.3) e di modificare le stazioni attraversate dai treni (RF01.3.4). La gestione delle stazioni
-(RF01.3.1) e quella dei convogli (RF01.3.2) sono un'aggiunta, e stanno qui perche' la consegna da'
-per scontata una rete gia' popolata: senza un posto in cui crearla non ci sarebbero ne' le tratte da
-aggiungere ne' i treni a cui cambiare le stazioni attraversate.
+*Rispetto alla consegna*: la consegna chiede le tratte (RF01.3.3) e la modifica delle stazioni
+attraversate (RF01.3.4). Stazioni (RF01.3.1) e convogli (RF01.3.2) sono un'aggiunta: la consegna da'
+per scontata una rete gia' popolata, e serviva un posto in cui crearla.
 
 *Stato di implementazione*: completo, tutte e cinque le voci.
 
 ***** RF01.3.1 - Stazioni
 - enunciato: l'amministratore crea, modifica ed elimina le stazioni della rete.
-- stato di implementazione: completo.
+- stato di implementazione: completo. Dal form si scelgono il codice (l'id della stazione, fisso in
+  modifica), il nome e le coordinate; le coordinate lasciate vuote valgono 0, e la mappa piazza la
+  stazione vicino a quelle collegate. Stato e binari non si scrivono: una stazione nuova nasce
+  OFFLINE con un binario, poi lo stato lo decidono il battito del nodo e i comandi del tecnico. La
+  PUT della Centrale accetterebbe ancora tutti e due, ma la web app non li manda.
 
 ***** RF01.3.2 - Convogli
 - enunciato: l'amministratore crea, modifica ed elimina i convogli.
-- stato di implementazione: completo.
+- stato di implementazione: completo. Dal form si scelgono il nome del convoglio, solo in
+  creazione perche' e' la chiave primaria, e l'itinerario. Stato, ritardo e passeggeri no: lo stato
+  lo tengono gli automi della Centrale con la telemetria, il ritardo lo misura la Centrale ai
+  passaggi e i passeggeri li dichiara il convoglio. Un convoglio nuovo nasce "fermo"; la PUT della
+  Centrale accetterebbe ancora lo stato, ma la web app non lo manda.
 
 ***** RF01.3.3 - Tratte elementari
 - enunciato: l'amministratore crea, modifica ed elimina i collegamenti diretti fra due stazioni
   adiacenti.
-- stato di implementazione: completo.
+- stato di implementazione: completo. Il form rifiuta un tempo di percorrenza sotto il minuto.
 
 ***** RF01.3.4 - Itinerari e assegnazione dei convogli
 - enunciato: l'amministratore compone un itinerario come sequenza ordinata di stazioni con i tempi di
@@ -324,41 +327,29 @@ aggiungere ne' i treni a cui cambiare le stazioni attraversate.
   fermata intermedia non e' ammessa, perche' spezzerebbe l'itinerario in due senza dire che ne e'
   del pezzo restante.
 - dipende da: RF02.5, perche' la modifica deve restare corretta anche con convogli gia' in marcia.
-- stato di implementazione: completo per la parte di composizione e assegnazione; quello che succede
-  ai convogli gia' in marcia e' invece il ramo RF02.5, che completo non e'. Il capolinea si marca e
-  si toglie con la bandierina accanto alle due stazioni estreme, e toglierlo e' anche l'unico modo
-  per rimettere in servizio un convoglio che la corsa l'ha gia' chiusa.
+- stato di implementazione: completo; quello che succede ai convogli gia' in marcia e' il ramo
+  RF02.5. Il capolinea si marca e si toglie con la bandierina accanto alle due stazioni estreme, e
+  toglierlo e' l'unico modo per rimettere in servizio un convoglio che ha gia' chiuso la corsa.
 
 ***** RF01.3.5 - Integrita' dei dati alle eliminazioni
 - enunciato: l'eliminazione di un'entita' non lascia riferimenti pendenti, e non e' permessa finche'
   qualcosa la sta ancora usando.
 - esito atteso: o l'eliminazione viene rifiutata con una spiegazione comprensibile, oppure viene
   eseguita insieme a tutto cio' che senza quell'entita' non avrebbe piu' significato.
-- *perche' e' qui*:
- senza questo requisito la correttezza promessa da RF02 dura fino alla prima
-  eliminazione.
-- stato di implementazione: completo. Ogni eliminazione o viene rifiutata dicendo il motivo (la
-  stazione ancora usata da una tratta, la tratta ancora usata da un itinerario o gia' finita nei
-  transiti storici), oppure porta via con se' i record che senza quell'entita' non vorrebbero piu'
-  dire niente. Una parte della garanzia pero' la tengono i vincoli del database e non i controlli
-  scritti a mano.
+- stato di implementazione: completo. Ogni eliminazione o viene rifiutata con il motivo (la
+  stazione usata da una tratta, la tratta usata da un itinerario o gia' nei transiti storici),
+  oppure porta via i record che senza quell'entita' non significano piu' niente. Una parte della
+  garanzia la tengono i vincoli del database.
 
 **** RF01.4 - Comandi operativi
 
-*Chi puo' dare quale comando*: lo dice la consegna, e non e' lo stesso ruolo per tutti e tre. La
-squadra sulla stazione guasta la manda il *tecnico*; la corsa la sopprime l'*amministratore*, e la
-consegna mette questo comando fra parentesi come facoltativo. La chiusura dell'allarme la consegna
-non la assegna esplicitamente: sta sul tecnico perche' e' il seguito dell'invio degli operatori, che
-e' compito suo.
+*Chi puo' dare quale comando*: la squadra la manda il *tecnico*, la corsa la sopprime
+l'*amministratore* (comando facoltativo nella consegna). La chiusura dell'allarme la consegna non la
+assegna: sta sul tecnico perche' e' il seguito dell'invio degli operatori.
 
-*Limite comune a tutti e tre*: la ripartizione qui sopra e' quella disegnata nei casi d'uso, ma il
-controllo dei permessi non la fa rispettare — i tre comandi sono concessi a entrambi i ruoli. E' il
-solo punto in cui il sistema realizzato e' piu' permissivo della consegna, ed e' il motivo per cui
-RF04.2 non e' completo.
-
-*Stato di implementazione*: parziale, ma solo per i permessi — tutti e tre i comandi fanno per
-intero quello che devono (RF01.4.1, RF01.4.2, RF01.4.3), mentre la ripartizione per ruolo non viene
-fatta rispettare (vedi il limite comune qui sopra e RF04.2).
+*Stato di implementazione*: parziale, solo per i permessi. I tre comandi fanno per intero quello che
+devono, ma il filtro dei permessi li concede a entrambi i ruoli: e' l'unico punto in cui il sistema
+e' piu' permissivo della consegna (RF04.2).
 
 ***** RF01.4.1 - Invio della squadra di manutenzione
 - enunciato: il tecnico manda la squadra su una stazione guasta; la stazione resta inutilizzabile
@@ -369,28 +360,20 @@ fatta rispettare (vedi il limite comune qui sopra e RF04.2).
 - esito atteso: la stazione risulta in MANUTENZIONE a chi la guarda, e ci resta finche' il tecnico
   non chiude il guasto; il campo viene informato e i guasti aperti /restano aperti/, perche' l'invio
   degli operatori apre l'intervento e non lo conclude.
-- nota di progetto: MANUTENZIONE e' uno stato della Centrale e vale "guasta piu' squadra inviata" -
-  e' il "preso in carico" del guasto, visto dal lato della stazione invece che da quello
-  dell'allarme, ed e' per questo che non serve duplicarlo con un terzo stato sul guasto. Sul nodo
-  lo stato locale resta GUASTA, ed e' quello che continua a trattenere i treni in ingresso: se il
-  nodo passasse anche lui in manutenzione smetterebbe di trattenerli proprio durante la
-  riparazione. Ai convogli lo stato lo dice la Centrale con l'alert =STATO_STAZIONE=: per il twin
-  di bordo GUASTA e MANUTENZIONE sono la stessa identica cosa - quei binari non si attraversano -
-  quindi chi sta arrivando si ferma prima di entrare e chi e' gia' fermo li' dentro non riparte.
-  Senza quel messaggio la manutenzione decisa dal pannello dell'amministratore, che non nasce da
-  nessun guasto segnalato dal campo, non avrebbe fermato nessuno. Durante l'intervento nessun evento
-  del campo riscrive lo stato della stazione: il battito aggiorna il solo istante di ultimo contatto
-  (altrimenti il primo heartbeat, che arriva ancora come GUASTA, cancellerebbe la manutenzione
-  appena aperta) e nemmeno un alert di guasto nuovo la riporta a GUASTA - e siccome una stazione
-  guasta manda un alert per ogni treno che entra, quella ripetizione arriva sempre. La regola sta
-  scritta in un punto solo, il metodo con cui si scrive lo stato in cache (M12): gli eventi del
-  campo non escono dalla manutenzione, i comandi dell'operatore si'.
+- nota di progetto: MANUTENZIONE e' uno stato della Centrale e vale "guasta piu' squadra inviata":
+  e' il "preso in carico" del guasto visto dal lato della stazione, quindi il guasto non ha bisogno
+  di un terzo stato. Sul nodo lo stato resta GUASTA, ed e' quello che continua a trattenere i treni
+  in ingresso. Ai convogli lo dice la Centrale con l'alert =STATO_STAZIONE=: per il twin di bordo
+  GUASTA e MANUTENZIONE sono la stessa cosa, quei binari non si attraversano. Durante l'intervento
+  nessun evento del campo riscrive lo stato: il battito (che arriva ancora come GUASTA) aggiorna solo
+  l'ultimo contatto, e un alert di guasto nuovo non riporta la stazione a GUASTA. La regola sta in un
+  punto solo, la scrittura dello stato in cache (M12): gli eventi del campo non escono dalla
+  manutenzione, i comandi dell'operatore si'.
 - stato di implementazione: completo. Il comando porta la stazione in MANUTENZIONE, scrive la riga
-  di storico del passaggio e avvisa il campo; il ritorno in servizio non e' piu' dentro la stessa
-  chiamata ma e' legato alla fine vera dell'intervento, cioe' a RF01.4.2. L'intervento sopravvive
-  anche a un riavvio della centrale: lo stato runtime non e' persistito, ma all'avvio la riga di
-  =Storico_Stato_Stazioni= piu' recente, letta insieme ai guasti ancora aperti, dice quali stazioni
-  erano in intervento e le riprende cosi'.
+  di storico e avvisa il campo; il ritorno in servizio e' legato alla fine dell'intervento
+  (RF01.4.2). L'intervento sopravvive a un riavvio della centrale: all'avvio la riga piu' recente di
+  =Storico_Stato_Stazioni=, letta insieme ai guasti ancora aperti, dice quali stazioni erano in
+  intervento.
 
 ***** RF01.4.2 - Chiusura dell'allarme e ripresa della circolazione
 - enunciato: il tecnico dichiara concluso l'intervento; il guasto passa a chiuso e cio' che era
@@ -400,15 +383,11 @@ fatta rispettare (vedi il limite comune qui sopra e RF04.2).
 - esito atteso: il guasto risulta risolto, la stazione torna ONLINE se non le restano altri guasti
   aperti, la transizione viene storicizzata e i convogli fermi in stazione ripartono.
 - dipende da: RF01.4.1, di cui chiude l'intervallo.
-- stato di implementazione: completo. La chiusura fa partire il RESOLVED verso il campo, che
-  riporta il nodo a ONLINE, e insieme a quello lo =STATO_STAZIONE= con cui la Centrale dichiara la
-  stazione di nuovo agibile: e' quest'ultimo a liberare i convogli, perche' un RESOLVED che arriva
-  mentre la squadra e' ancora sui binari non deve far ripartire nessuno. La riga di storico chiude
-  il passaggio per MANUTENZIONE aperto dal comando precedente.
-- limite dichiarato: non viene registrato /chi/ ha chiuso il guasto, il campo =Guasto.operatore=
-  resta vuoto. E' la parte di RF02.1.3 che la consegna non chiede: il PDF vuole che gli operatori
-  vengano inviati e che il guasto sia ripristinato, non che il sistema tenga il registro di quale
-  operatore se ne sia occupato.
+- stato di implementazione: completo. La chiusura manda al campo il RESOLVED, che riporta il nodo a
+  ONLINE, e lo =STATO_STAZIONE= che dichiara la stazione agibile: e' quest'ultimo a liberare i
+  convogli. La riga di storico chiude il passaggio per MANUTENZIONE.
+- limite dichiarato: non viene registrato /chi/ ha chiuso il guasto (=Guasto.operatore= resta
+  vuoto); la consegna non lo chiede (RF02.1.3).
 
 ***** RF01.4.3 - Soppressione di un convoglio fermo in stazione
 - enunciato: l'amministratore annulla una corsa; il convoglio passa in SOPPRESSO e non viaggia piu'.
@@ -426,17 +405,17 @@ fatta rispettare (vedi il limite comune qui sopra e RF04.2).
 - rispetto alla consegna: e' un'aggiunta. La consegna chiede alla centrale di *memorizzare* lo
   storico dei transiti, e quello e' RF02.7; mostrarlo in una schermata non lo chiede nessuno.
 - dipende da: RF02.7.
-- stato di implementazione: completo.
+- stato di implementazione: parziale. La Centrale serve lo storico (=GET /api/transiti=) e la web
+  app lo carica nello store, ma nell'interfaccia non c'e' nessuna schermata che lo mostri.
 
 **** RF01.6 - Accesso al sistema
 
 - enunciato: l'uso dell'applicazione richiede di identificarsi; l'identita' accompagna tutte le
   operazioni successive e termina con l'uscita esplicita.
 - l'identificazione avviene *fuori dall'applicazione*, sulla schermata del servizio di identita':
-  l'applicazione non raccoglie e non vede mai le credenziali, riceve solo l'attestato di accesso.
+  l'applicazione non vede mai le credenziali, riceve solo l'attestato di accesso.
 - rimando: il dettaglio dei permessi e' in RF04.
-- stato di implementazione: completo. L'identificazione avviene sulla schermata del servizio di
-  identita', l'applicazione riceve solo l'attestato e l'uscita esplicita chiude la sessione.
+- stato di implementazione: completo.
 
 *** RF02 - Correttezza dello stato rappresentato
 *Enunciato*: lo stato che il sistema mostra e conserva corrisponde a quello che sta realmente
@@ -471,10 +450,9 @@ guasto manca la presa in carico (RF02.1.3).
 - precondizione: la stazione continua a funzionare e i suoi sensori continuano a rilevare.
 - esito atteso: al ritorno del collegamento la centrale riceve tutti gli eventi prodotti durante
   l'interruzione, nessuno escluso.
-- stato di implementazione: completo. Il nodo continua a rilevare e accoda cio' che non riesce a
-  consegnare, e svuota la coda quando il collegamento torna. La coda sta in memoria ma ha una copia
-  su un SQLite locale (tabella =bufferChache=), quindi regge anche alla caduta del processo: al
-  riavvio la stazione rilegge da disco cio' che non era partito e lo consegna comunque.
+- stato di implementazione: completo. Il nodo accoda cio' che non riesce a consegnare e svuota la
+  coda quando il collegamento torna. La coda ha una copia sul SQLite locale (tabella
+  =bufferChache=), quindi regge anche a un riavvio del processo.
 
 ******* RF02.1.1.1.2 - Ordine di consegna preservato
 - enunciato: la consegna differita rispetta l'ordine in cui gli eventi sono stati generati; se una
@@ -490,12 +468,9 @@ guasto manca la presa in carico (RF02.1.3).
 
 *Stato di implementazione*: completo.
 
-*Che cosa vuol dire "non percorribile"*: sono due le condizioni che chiudono i binari di una
-stazione, e per chi viaggia sono la stessa cosa. La prima e' il *guasto*, che nasce dal campo. La
-seconda e' la *manutenzione*, che la decide la centrale mandando la squadra (RF01.4.1): li' dentro
-si sta lavorando, quindi non ci si entra. Il convoglio le tratta insieme perche' la domanda che si
-fa e' una sola, "posso attraversare quella fermata"; a distinguerle e' solo l'operatore, che di una
-deve capire la causa e dell'altra sapere che l'intervento e' in corso.
+*Che cosa vuol dire "non percorribile"*: la stazione e' *guasta* (lo dice il campo) oppure in
+*manutenzione* (la squadra mandata dalla centrale, RF01.4.1). Per il convoglio sono la stessa cosa;
+a distinguerle serve solo all'operatore.
 
 ******* RF02.1.1.2.1 - Il convoglio diretto alla stazione non percorribile si ferma
 - enunciato: se la prossima stazione dell'itinerario non e' percorribile, il convoglio non vi entra e
@@ -508,10 +483,9 @@ deve capire la causa e dell'altra sapere che l'intervento e' in corso.
 ******* RF02.1.1.2.2 - Riparte solo al ripristino
 - enunciato: il convoglio trattenuto riprende la corsa quando arriva il ripristino di quella
   stazione, non prima e non per scadenza di un tempo.
-- stato di implementazione: completo. Lo sblocco arriva solo con il ripristino e riprende la fase
-  che era in corso: nel codice non c'e' nessun tempo massimo che faccia ripartire il convoglio da
-  solo. Il ripristino che conta e' quello dello *stato della stazione*, non la chiusura del singolo
-  allarme: un =RESOLVED= che arriva mentre la squadra e' ancora sui binari lascia il convoglio dov'e'.
+- stato di implementazione: completo, senza nessun tempo massimo. Il ripristino che conta e' quello
+  dello *stato della stazione*, non la chiusura del singolo allarme: un =RESOLVED= che arriva mentre
+  la squadra e' ancora sul posto lascia il convoglio dov'e'.
 
 ******* RF02.1.1.2.3 - Il blocco vale anche per chi e' gia' fermo li'
 - enunciato: un convoglio gia' in sosta nella stazione che si guasta non riparte finche' il guasto e'
@@ -519,13 +493,9 @@ deve capire la causa e dell'altra sapere che l'intervento e' in corso.
 - *perche' e' un requisito a se'*: senza di esso il guasto bloccherebbe solo chi arriva dopo, e la
   stazione non risulterebbe davvero non percorribile.
 - stato di implementazione: completo. Il convoglio tiene in memoria lo stato di ogni stazione che lo
-  riguarda e lo ricontrolla prima di ogni partenza, quindi resta fermo sia se l'annuncio arriva
-  mentre e' li', sia se e' arrivato mentre stava altrove.
-- *il caso che prima restava scoperto*: un convoglio acceso /dopo/ l'annuncio non aveva modo di
-  saperne niente, perche' gli alert su un topic li sente solo chi era in ascolto quando sono
-  passati. Adesso lo stato di ogni fermata viaggia dentro l'itinerario che il treno scarica
-  all'avvio (campo =stato= di ogni tappa), quindi la fotografia con cui entra in servizio e' gia'
-  quella giusta.
+  riguarda e lo ricontrolla prima di ogni partenza. Un convoglio acceso /dopo/ l'annuncio lo trova
+  nell'itinerario scaricato all'avvio (campo =stato= di ogni tappa), perche' gli alert su un topic
+  li sente solo chi era in ascolto.
 
 ***** RF02.1.2 - Guasto del convoglio
 
@@ -555,10 +525,9 @@ quello guasto in tratta.
 - enunciato: se il convoglio si guasta fra due stazioni, e' la tratta elementare che sta percorrendo
   a risultare non percorribile; nessuna stazione cambia stato.
 - dipende da: RF02.2.2.1.
-- stato di implementazione: non realizzato. L'allarme si apre
-  sul convoglio, ma la tratta non ha nessuno stato di percorribilita' che qualcuno cambi: continua a
-  risultare libera e nessun altro convoglio viene fermato. Vale anche per l'allarme che la centrale
-  deduce da sola (RF02.6.2).
+- stato di implementazione: non realizzato. L'allarme si apre sul convoglio, ma la tratta non ha uno
+  stato di percorribilita': resta libera e nessun altro convoglio viene fermato. Vale anche per
+  l'allarme dedotto (RF02.6.2).
 
 ***** RF02.1.3 - Ciclo di vita del guasto
 - enunciato: un guasto ha uno stato di lavorazione (aperto, preso in carico, chiuso), un
@@ -567,11 +536,9 @@ quello guasto in tratta.
 - *perche' l'unicita' e' un requisito*: le anomalie dedotte vengono ricontrollate a ritmo periodico,
   e senza unicita' la stessa condizione genererebbe un allarme nuovo a ogni controllo, rendendo
   l'elenco inutilizzabile proprio quando serve.
-- stato di implementazione: parziale. L'unicita' del guasto aperto per sorgente c'e', da qualunque
-  parte arrivi il guasto, ed e' quella che tiene leggibile l'elenco; apertura e chiusura lasciano
-  traccia nello storico. Gli stati pero' sono due e non tre, perche' il guasto porta solo un
-  "risolto" vero o falso, e l'assegnatario non viene mai valorizzato: la colonna e la tabella delle
-  assegnazioni esistono nello schema ma restano vuote.
+- stato di implementazione: parziale. L'unicita' per sorgente c'e', e apertura e chiusura lasciano
+  traccia nello storico. Gli stati pero' sono due (il guasto porta solo "risolto" vero o falso) e
+  l'assegnatario non viene mai scritto: colonna e tabella delle assegnazioni restano vuote.
 
 ***** RF02.1.4 - Chiusura automatica quando la causa rientra
 - enunciato: un guasto aperto perche' un nodo taceva si chiude da solo quando il nodo torna a dare
@@ -580,10 +547,8 @@ quello guasto in tratta.
   altrimenti l'elenco degli allarmi si riempie di condizioni gia' rientrate che nessuno chiude.
 - precondizione: il guasto e' stato aperto per deduzione e non per segnalazione.
 - dipende da: RF02.3.2.
-- stato di implementazione: completo. Il battito che torna richiude il guasto dedotto sulla stazione
-  e il convoglio che riprende a muoversi richiude il proprio, in tutti e due i casi senza che nessuno
-  debba premere niente; la chiusura automatica riguarda solo i guasti che la centrale ha dedotto,
-  come dice la precondizione.
+- stato di implementazione: completo. Il battito che torna richiude il guasto dedotto sulla stazione,
+  il convoglio che riprende a muoversi richiude il proprio.
 
 **** RF02.2 - Gestione dei convogli
 
@@ -608,27 +573,16 @@ quello guasto in tratta.
   oppure fra quali due stazioni sta viaggiando e in quale direzione.
 - esito atteso: la risposta alla domanda "il convoglio e' in stazione o in tratta?" e' sempre
   definita, in ogni istante della corsa.
-- *nota*: questo e' il *predicato centrale della specifica*. Da "dove si trova il convoglio"
-  dipendono la scelta della conseguenza di un guasto (stazione o tratta non percorribile), la
-  gestione della modifica dell'itinerario a sistema acceso e il riconoscimento dell'anomalia del
-  convoglio fermo troppo a lungo. Se questa informazione non e' affidabile, cadono sei requisiti
-  insieme.
-- stato di implementazione: completo. Il convoglio dichiara o la stazione in cui e' fermo o la
-  tratta che sta percorrendo con la direzione, e la centrale incrocia quella dichiarazione con i
-  passaggi rilevati a terra.
-- *le due fonti non valgono uguale, e non sempre concordano*: la telemetria arriva di continuo e dice
-  dove il convoglio *crede* di essere; il passaggio rilevato dai sensori di binario e' l'unico che
-  conferma da dove e' uscito davvero, ma passa dal nodo stazione, e se quella stazione e' spenta il
-  transito non lo registra nessuno. Da li' in poi le due fonti raccontano due momenti diversi: la
-  fermata davanti e' quella di adesso, la tratta confermata e' quella di prima. Comporle sarebbe la
-  cosa piu' comoda e la piu' sbagliata — ne uscivano corse fra due stazioni che nessun binario
-  collega.
-- *quello che la centrale fa quando non sa*: non sceglie. Dichiara la posizione *incerta*, dice
-  perche' (non trasmette, nessun sensore conferma la partenza, non dichiara la fermata davanti, verso
-  di marcia ignoto) e lascia che sia l'interfaccia a mostrarlo come tale. La stessa regola vale per
-  il verso di marcia: quando non lo garantisce scrive un valore nullo, non "andata" per ripiego.
-  Il predicato della nota qui sopra resta quindi sempre definito, ma con tre esiti e non due: in
-  stazione, in tratta fra due estremi noti, oppure /non lo so/, che e' un'informazione anche quella.
+- *nota*: e' il *predicato centrale della specifica*: ne dipendono la conseguenza di un guasto
+  (stazione o tratta), la modifica dell'itinerario a sistema acceso e l'anomalia del convoglio fermo.
+- stato di implementazione: completo. Il convoglio dichiara la stazione in cui e' fermo o la tratta
+  che percorre con la direzione, e la centrale incrocia la dichiarazione con i passaggi rilevati a
+  terra. Le due fonti possono non concordare: la telemetria dice dove il convoglio *crede* di
+  essere, il passaggio dei sensori conferma da dove e' uscito davvero, ma se la stazione e' spenta
+  nessuno lo registra. In quel caso la centrale non le compone: dichiara la posizione *incerta* con
+  il motivo (non trasmette, nessun sensore conferma la partenza, fermata davanti non dichiarata,
+  verso ignoto), e il verso non garantito resta nullo. Il predicato ha quindi tre esiti: in
+  stazione, in tratta fra due estremi noti, oppure /non lo so/.
 
 ****** RF02.2.2.2 - Ritardo accumulato
 - enunciato: il convoglio dichiara il ritardo accumulato dall'inizio della corsa.
@@ -638,15 +592,15 @@ quello guasto in tratta.
 ****** RF02.2.2.3 - Stato del convoglio
 - enunciato: il convoglio dichiara come sta, con uno dei valori del vocabolario degli stati, e questa
   informazione e' distinta dalla posizione.
-- stato di implementazione: completo, e la distinzione dalla posizione e' rispettata anche a
-  database, dove la colonna dello stato accetta solo i cinque valori del vocabolario.
+- stato di implementazione: completo; a database la colonna dello stato accetta solo i cinque
+  valori del vocabolario. Quei valori sono un riassunto: la telemetria porta anche condizione e fase
+  del viaggio, ed e' quello che l'interfaccia mostra.
 
 ****** RF02.2.2.4 - Velocita' e passeggeri a bordo
 - enunciato: il convoglio dichiara la velocita' corrente e il numero di passeggeri a bordo.
 - *nota di ambito*: sono valori simulati che rendono leggibile la corsa sulla mappa; non provengono
   da nessuna rilevazione reale e non alimentano nessuna decisione del sistema.
-- stato di implementazione: completo, con l'ambito dichiarato qui sopra: sono numeri generati dal
-  convoglio a ogni fermata.
+- stato di implementazione: completo, nell'ambito dichiarato.
 
 ***** RF02.2.3 - Andata e ritorno sullo stesso itinerario
 - enunciato: raggiunto un estremo dell'itinerario, il convoglio inverte la marcia e lo ripercorre in
@@ -655,8 +609,7 @@ quello guasto in tratta.
 - esito atteso: la corsa e' continua, senza che il convoglio scompaia e riappaia all'altro estremo.
 - eccezione: l'estremo marcato come capolinea (RF01.3.4) non e' un punto in cui girarsi ma quello in
   cui il servizio finisce, e li' l'inversione non avviene.
-- stato di implementazione: completo. All'estremo la direzione si inverte, l'itinerario viene
-  ripercorso al contrario e ogni tappa usa il tempo di percorrenza del verso che sta percorrendo.
+- stato di implementazione: completo.
 
 ***** RF02.2.4 - Passaggi asimmetrici in stazione
 - enunciato: un convoglio puo' uscire da una stazione senza esservi entrato, e puo' entrare in una
@@ -666,14 +619,10 @@ quello guasto in tratta.
 - *perche' va scritto*: e' il caso che rompe l'abbinamento ingenuo fra entrate e uscite nello
   storico. Chi conta le coppie deve sapere che la prima e l'ultima sono spaiate per costruzione, e
   che questo non e' un errore di rilevazione.
-- stato di implementazione: completo. I due casi sono gestiti e non scartati: l'uscita senza entrata
-  diventa un transito puntuale, in cui entrata e uscita coincidono, e l'entrata senza uscita resta un
-  transito aperto. Nello storico pero' non sono marcati come caso a se': chi conta le coppie deve
-  saperlo da qui.
-- *dove nasce il secondo caso*: finche' ogni estremo era un punto di inversione, il convoglio da
-  ogni stazione prima o poi usciva, e l'entrata senza uscita durava il tempo di una sosta doppia.
-  Con il capolinea di RF01.3.4 il caso diventa quello vero e definitivo: il treno entra li' e non
-  ne esce piu', e quel transito resta aperto finche' non gli viene assegnato un altro itinerario.
+- stato di implementazione: completo. L'uscita senza entrata diventa un transito puntuale (entrata e
+  uscita coincidono), l'entrata senza uscita resta un transito aperto: al capolinea di RF01.3.4 resta
+  aperto finche' al convoglio non viene assegnato un altro itinerario. Nello storico i due casi non
+  sono marcati a parte.
 
 **** RF02.3 - Gestione delle stazioni
 
@@ -685,8 +634,7 @@ quello guasto in tratta.
 - dipende da: RF02.1.1.1.1 — l'informazione locale che serve alla visualizzazione *e' la stessa* che
   permette alla stazione di sopravvivere a un'interruzione del collegamento. Non sono due memorie
   distinte, ed e' un vincolo di specifica: se fossero due potrebbero divergere.
-- stato di implementazione: completo, vincolo compreso: la fotografia che la stazione tiene in
-  memoria e' la stessa che risponde alle interrogazioni locali e che alimenta la coda di RF02.1.1.1.1.
+- stato di implementazione: completo, vincolo compreso.
 
 ***** RF02.3.2 - Segnale di vita verso la centrale
 - enunciato: la stazione emette un battito periodico verso la centrale, con periodo =P_bat=, anche
@@ -699,15 +647,13 @@ quello guasto in tratta.
 - enunciato: i sensori dichiarano periodicamente alla stazione di essere vivi, con periodo =P_kal=;
   se uno smette, la stazione lo considera guasto e lo segnala alla centrale.
 - esito atteso: la stazione con un sensore muto dichiara il proprio stato come GUASTA.
-- stato di implementazione: completo, esito compreso. La stazione sa in partenza quali sensori
-  aspettarsi (quelli del suo binario, uno per verso) e li mette sotto osservazione all'avvio, con il
-  timeout che parte da quel momento: anche un sensore che non ha mai battuto risulta guasto.
+- stato di implementazione: completo. La stazione mette sotto osservazione all'avvio i sensori che
+  si aspetta (uno per verso), quindi risulta guasto anche un sensore che non ha mai battuto.
 
 ***** RF02.3.4 - Stato che la stazione dichiara di se'
 - enunciato: la stazione dichiara di se' soltanto ONLINE o GUASTA.
 - rimando: la motivazione e' nella sezione sul vocabolario degli stati osservabili.
-- stato di implementazione: completo. Il nodo dichiara due stati, la centrale ne tiene quattro:
-  l'asimmetria voluta dal requisito c'e' tutta.
+- stato di implementazione: completo: il nodo dichiara due stati, la centrale ne tiene quattro.
 
 **** RF02.4 - Identita' del nodo di campo
 
@@ -716,28 +662,20 @@ quello guasto in tratta.
 ***** RF02.4.1 - L'identita' dichiarata viene verificata
 - enunciato: un nodo che entra in servizio dichiara la propria identita' alla centrale, che la
   verifica sull'anagrafica della rete prima di accettarne qualsiasi dato.
-- *perche'*: senza questa verifica chiunque avvii un nodo con un'identita' inventata inquina lo stato
-  della centrale con la telemetria di un convoglio che non esiste, e la correttezza promessa da RF02
-  non e' piu' difendibile.
-- stato di implementazione: completo. Il nodo chiede alla centrale se esiste e non manda niente
-  finche' non ha avuto la risposta: la verifica non puo' auto-validarsi con il primo dato che arriva.
+- *perche'*: senza verifica un nodo con un'identita' inventata inquina lo stato della centrale con
+  la telemetria di un convoglio che non esiste.
+- stato di implementazione: completo. Il nodo non manda niente finche' la centrale non gli ha
+  risposto.
 
 ***** RF02.4.2 - Esito negativo: il nodo non entra in servizio
 - enunciato: se l'identita' non e' riconosciuta, il nodo non entra in servizio e termina, invece di
   restare attivo senza poter comunicare.
-- *perche' terminare e non restare in attesa*: un nodo acceso ma non riconosciuto e' indistinguibile
-  da un nodo sano dal punto di vista di chi guarda i processi, ed e' una sorgente di confusione
-  durante la diagnosi.
-- stato di implementazione: completo. Il nodo non riconosciuto termina con codice di uscita 1, non
-  resta acceso in attesa.
+- *perche' terminare*: a chi guarda i processi un nodo acceso ma non riconosciuto sembra sano.
+- stato di implementazione: completo: il nodo termina con codice di uscita 1.
 
 ***** RF02.4.3 - Portata della dipendenza
-Non e' un requisito a se': e' la regola di lettura del grafo. Senza RF02.4 nessun nodo entra in
-servizio, quindi non arriva nessun dato e cadono per intero RF02.1, RF02.2 e RF02.3. Per questo nel
-grafo la dipendenza e' disegnata una volta sola sui tre rami invece che su ogni foglia.
-
-*Stato di implementazione*: non ne ha uno proprio, non essendo un requisito; vale quello di RF02.4.1
-e RF02.4.2.
+Non e' un requisito a se': senza RF02.4 nessun nodo entra in servizio, quindi da RF02.4 dipendono
+per intero RF02.1, RF02.2 e RF02.3.
 
 **** RF02.5 - Modifica dell'itinerario a sistema acceso
 *Enunciato del ramo*: l'amministratore puo' cambiare le stazioni attraversate da un itinerario e i
@@ -751,13 +689,9 @@ in attesa, sia quello che resta assegnato, che prosegue dal punto in cui la modi
   viaggiare e resta fermo in attesa di essere soppresso.
 - esito atteso: il convoglio non produce piu' transiti e non avanza; resta visibile nelle schermate,
   perche' un convoglio fermo su un binario e' un fatto che l'operatore deve vedere.
-- *punto delicato della specifica*: la notifica della modifica deve raggiungere *anche* i convogli
-  che la modifica esclude. Un convoglio escluso a cui nessuno dice niente continuerebbe a percorrere
-  l'itinerario vecchio senza saperlo, ed e' il caso peggiore possibile, perche' il sistema mostrerebbe
-  uno stato plausibile ma falso.
-- stato di implementazione: completo, punto delicato compreso: l'avviso parte anche verso i convogli
-  che la modifica esclude, e chi resta senza itinerario si dichiara fermo invece di continuare a
-  raccontare di essere in marcia.
+- *punto delicato della specifica*: la notifica deve raggiungere *anche* i convogli esclusi, se no
+  continuerebbero a percorrere l'itinerario vecchio mostrando uno stato plausibile ma falso.
+- stato di implementazione: completo, punto delicato compreso.
 
 ***** RF02.5.2 - Convoglio ancora assegnato
 - enunciato: se dopo la modifica il convoglio e' ancora assegnato all'itinerario, prosegue sul nuovo
@@ -769,21 +703,14 @@ in attesa, sia quello che resta assegnato, che prosegue dal punto in cui la modi
 - caso limite: se la stazione da cui e' appena passato non fa piu' parte dell'itinerario, il convoglio
   riprende dal capolinea del nuovo itinerario, perche' non esiste un punto di ripresa sensato.
 - dipende da: RF02.2.2.1.
-- stato di implementazione: completo. Ricevuto l'avviso il convoglio riscarica l'itinerario senza
-  buttare via quello che ha (se lo svuotasse subito si dichiarerebbe fermo anche quando un istante
-  dopo arriva il percorso nuovo), poi cerca nella lista nuova la stazione in cui si trova e ci si
-  riaggancia: ricalcola indice, direzione e prossima fermata e riapre la sosta, mentre ritardo,
-  passeggeri e stato restano quelli di prima, perche' il convoglio e' lo stesso ed e' cambiato solo
-  l'elenco delle fermate che ha davanti. Non viene pubblicato nessun passaggio, dato che il treno non
-  si e' mosso di un metro e un ENTRATA inventato verrebbe storicizzato come vero.
-- *scelta di progetto sul convoglio in mezzo a una tratta*: se la modifica arriva mentre il treno e'
-  fra due stazioni il percorso nuovo non viene installato subito ma resta in attesa e sostituisce il
-  vecchio quando il convoglio entra nella stazione di arrivo. Un treno lanciato su un binario non
-  puo' cambiare percorso a meta' strada: riagganciarlo subito vorrebbe dire farlo saltare indietro
-  alla stazione di partenza, cioe' proprio il salto di posizione che il requisito vieta.
-- il caso limite previsto dalla specifica resta quello che era: se la stazione di riferimento non fa
-  piu' parte dell'itinerario non c'e' nessun punto a cui agganciarsi e il viaggio riparte dal
-  capolinea, con una segnalazione nei log del convoglio.
+- stato di implementazione: completo, caso limite compreso (con una riga nel log del convoglio).
+  Ricevuto l'avviso il convoglio riscarica l'itinerario senza buttare via quello che ha, cerca nella
+  lista nuova la stazione in cui si trova e ci si riaggancia: ricalcola indice, direzione e prossima
+  fermata, mentre ritardo, passeggeri e stato restano quelli di prima. Non pubblica nessun
+  passaggio, perche' non si e' mosso.
+- *scelta di progetto sul convoglio in mezzo a una tratta*: il percorso nuovo resta in attesa e
+  sostituisce il vecchio quando il convoglio entra nella stazione di arrivo; riagganciarlo subito
+  lo farebbe saltare indietro alla stazione di partenza, il salto che il requisito vieta.
 
 **** RF02.6 - Anomalie dedotte dalla centrale
 
@@ -801,17 +728,15 @@ anche l'unico invisibile.
   caduta, la mostra come OFFLINE e apre un guasto su di essa.
 - dipende da: RF02.3.2, perche' senza un segnale regolare non c'e' un silenzio da misurare.
 - si chiude da solo per RF02.1.4.
-- stato di implementazione: completo, e il guasto aperto non resta dentro la centrale: viene
-  pubblicato verso il campo, cosi' i convogli diretti alla stazione caduta si fermano come se il
-  guasto lo avesse dichiarato lei.
+- stato di implementazione: completo; il guasto viene pubblicato verso il campo, quindi i convogli
+  diretti alla stazione caduta si fermano.
 
 ***** RF02.6.2 - Convoglio fermo fuori stazione oltre la soglia
 - enunciato: se un convoglio resta fermo fra due stazioni per piu' di =T_fer=, la centrale apre un
   allarme su di esso.
 - precondizione: il convoglio non e' in una stazione e non e' soppresso.
 - dipende da: RF02.2.2.1, perche' "fuori stazione" e' una domanda sulla posizione.
-- stato di implementazione: completo per quanto riguarda l'allarme; quello che l'allarme *non* fa
-  e' rendere non percorribile la tratta, ed e' il limite di RF02.1.2.2.2.
+- stato di implementazione: completo; la tratta pero' resta percorribile (limite di RF02.1.2.2.2).
 
 ***** RF02.6.3 - Fotografia periodica dello stato
 - enunciato: ogni =P_ria= la centrale rende disponibile alle schermate una fotografia completa dello
@@ -819,8 +744,8 @@ anche l'unico invisibile.
 - *a cosa serve*: a riallineare chi si e' collegato dopo che gli eventi erano gia' avvenuti, o chi ne
   ha persi. Non e' il meccanismo con cui le schermate si aggiornano (RF01.1.4), e' la rete di
   sicurezza sotto di esso.
-- stato di implementazione: completo. La fotografia porta i numeri di sintesi e anche l'elenco
-  completo di convogli e stazioni, quindi rimette a posto il browser e non solo i contatori.
+- stato di implementazione: completo: la fotografia porta i numeri di sintesi e l'elenco completo
+  di convogli e stazioni.
 
 **** RF02.7 - Memoria storica
 
@@ -829,19 +754,12 @@ anche l'unico invisibile.
   itinerari percorsi.
 - esito atteso: la storia e' consultabile anche dopo che i nodi che l'hanno prodotta sono stati
   spenti e riavviati.
-- *regola di registrazione*: la storia registra i *cambiamenti*, non i campionamenti. Un convoglio
-  che dichiara la propria telemetria a ritmo regolare per un'ora, senza mai cambiare stato, deve
-  lasciare una sola riga di storia e non una per ogni dichiarazione. Senza questa regola lo storico
-  cresce in proporzione al tempo invece che agli avvenimenti, e diventa illeggibile proprio dove
-  serve.
-- stato di implementazione: parziale. Delle cinque cose elencate nell'enunciato ne vengono scritte
-  tre — transiti, cambi di stato dei convogli e delle stazioni, guasti — e vengono scritte ai
-  cambiamenti e non a ogni campionamento, quindi la regola di registrazione e' rispettata. Gli
-  itinerari percorsi e le assegnazioni degli operatori no: le quattro tabelle che servirebbero
-  (=Storico_Itinerari= e la sua associativa, =Storico_Assegnazioni_Guasti=,
-  =Storico_Interventi_Manutenzione=) esistono nello schema ma non le scrive nessuno, e compaiono
-  solo nelle cancellazioni di pulizia. L'elenco completo, con chi scrive che cosa, sta nel capitolo
-  /Modello/.
+- *regola di registrazione*: la storia registra i *cambiamenti*, non i campionamenti: un'ora di
+  telemetria senza cambi di stato lascia una riga sola.
+- stato di implementazione: parziale. Delle cinque cose ne vengono scritte tre (transiti, cambi di
+  stato di convogli e stazioni, guasti), ai cambiamenti. Itinerari percorsi e assegnazioni degli
+  operatori no: le quattro tabelle relative esistono nello schema ma nessuno le scrive (elenco nel
+  capitolo /Modello/).
 
 *** RF03 - Contratti di interazione fra le parti
 *Enunciato*: le parti del sistema interagiscono secondo obblighi dichiarati, in modo che ciascuna
@@ -858,9 +776,8 @@ cosa, che cosa una parte puo' e non puo' toccare dell'altra.
   una indipendentemente dall'altra.
 - esito atteso: l'arresto di un nodo non ferma gli altri; la rete continua a funzionare in modo
   ridotto, con l'assenza segnalata come anomalia (RF02.6.1) e non come blocco generale.
-- stato di implementazione: completo. Ogni convoglio e ogni stazione sono processi a se', si
-  avviano con il proprio identificativo passato da riga di comando e se ne possono tenere accesi
-  quanti se ne vuole sulla stessa macchina.
+- stato di implementazione: completo: ogni nodo e' un processo a se', avviato con il proprio
+  identificativo.
 
 **** RF03.2 - Disaccoppiamento fra campo e centrale
 - enunciato: quando un nodo di campo comunica con la centrale non resta in attesa che la centrale sia
@@ -880,37 +797,25 @@ cosa, che cosa una parte puo' e non puo' toccare dell'altra.
     convoglio tace, ed e' quella che deve finire nello storico;
   - la dichiarazione del convoglio e' la *fonte di verita' per la posizione corrente*: e' disponibile
     prima e con piu' dettaglio, ed e' quella che alimenta il tempo reale.
-- *perche' due e non una*: eliminando la prima si perde la storia quando il convoglio non parla;
-  eliminando la seconda si perde il tempo reale fra una stazione e l'altra, dove nessun sensore vede
-  niente. Sono due requisiti diversi serviti da due vie diverse, non una ridondanza da ottimizzare.
-- stato di implementazione: completo, ripartizione degli obblighi compresa, ma non piu' come nella
-  prima versione. La dichiarazione del convoglio arriva in centrale *soltanto* con la telemetria:
-  il messaggio con cui il treno annuncia di essere passato non e' piu' indirizzato alla centrale ma
-  ai sensori di binario della stazione, che sono i soli a poter vedere un transito. Le due vie
-  restano due e restano indipendenti — la rilevazione a terra fa la storia, la telemetria fa il
-  tempo reale — ma lo stesso passaggio non entra piu' in centrale da due porte diverse.
-- *perche' e' stato cambiato*: un convoglio vero non telefona alla sala controllo per dire che e'
-  passato, passa e basta; e con il sensore in mezzo il suo fail-stop ha la conseguenza giusta, cioe'
-  che il transito non lo registra nessuno. Con il vecchio topic la centrale sapeva del passaggio
-  anche a sensori morti, il che rendeva innocuo proprio il guasto che RF02.3.3 vuole far pesare.
-- *conseguenza da dichiarare*: il verso di marcia la centrale lo conosce solo dalla telemetria, che
-  arriva ogni =P_tel=. Fra un'inversione all'estremo dell'itinerario e il frame successivo il verso
-  in centrale e' ancora quello vecchio, e in quella finestra la fermata successiva viene cercata
-  dalla parte sbagliata dell'itinerario. La direzione dichiarata insieme al passaggio era l'unico
-  motivo per cui quel topic esisteva.
+- *perche' due e non una*: senza la prima si perde la storia quando il convoglio tace, senza la
+  seconda il tempo reale fra due stazioni, dove nessun sensore vede niente.
+- stato di implementazione: completo. La dichiarazione del convoglio arriva in centrale *soltanto*
+  con la telemetria: l'annuncio del passaggio e' rivolto ai sensori di binario della stazione, non
+  alla centrale. Cosi' il fail-stop di un sensore ha la conseguenza giusta: il transito non lo
+  registra nessuno.
+- *conseguenza*: il verso di marcia la centrale lo conosce solo dalla telemetria (ogni =P_tel=); fra
+  un'inversione all'estremo e il frame successivo la fermata successiva viene cercata dalla parte
+  sbagliata dell'itinerario.
 
 **** RF03.4 - I sensori usano solo l'interfaccia pubblica del nodo
 - enunciato: i sensori dichiarano cio' che rilevano attraverso l'interfaccia che il nodo espone
   verso l'esterno, senza nessun accesso privilegiato al suo stato interno.
-- *perche' e' un requisito e non una scelta interna*: e' cio' che rende il nodo verificabile. Se i
-  sensori potessero modificare direttamente lo stato del nodo, il comportamento osservato durante una
-  prova non sarebbe lo stesso di quello in esercizio, e la specifica non sarebbe piu' controllabile
-  dall'esterno.
+- *perche' e' un requisito*: rende il nodo verificabile dall'esterno, con lo stesso comportamento
+  in prova e in esercizio.
 - esito atteso: una dichiarazione fatta a mano da uno strumento di prova e una fatta dal sensore reale
   producono nel nodo esattamente lo stesso effetto.
-- stato di implementazione: completo, sia per i sensori di binario sia per quelli di bordo: passano
-  tutti dalle sole chiamate che il nodo espone verso l'esterno, e infatti tutte le prove dei guasti
-  si fanno da li'.
+- stato di implementazione: completo, per i sensori di binario e di bordo; tutte le prove dei
+  guasti si fanno da li'.
 
 **** RF03.5 - L'itinerario e' fornito dalla centrale
 - enunciato: il convoglio non conosce l'itinerario per conto proprio: lo riceve dalla centrale, che
@@ -922,11 +827,8 @@ cosa, che cosa una parte puo' e non puo' toccare dell'altra.
 - *perche' l'unicita' della fonte conta*: se il convoglio conservasse un itinerario proprio, dopo una
   modifica fatta a sistema acceso esisterebbero due versioni dell'itinerario e RF02.5 non sarebbe
   garantibile.
-- stato di implementazione: completo. Delle due modalita' ammesse e' realizzata la prima: il
-  convoglio riceve l'itinerario intero quando entra in servizio e lo richiede di nuovo a ogni
-  modifica. Anche la seconda esiste ed e' funzionante — c'e' l'operazione che risponde "data questa
-  stazione e questa direzione, qual e' la prossima" — ma nessuno la usa: e' li' perche' il requisito
-  le dichiara entrambe valide.
+- stato di implementazione: completo. Il convoglio usa la prima modalita' (itinerario intero
+  all'avvio e di nuovo a ogni modifica); l'operazione della seconda esiste ma nessuno la usa.
 
 *** RF04 - Accesso e protezione
 
@@ -938,75 +840,45 @@ comandi operativi (RF04.2).
 - enunciato: gli utenti sono registrati presso il servizio di identita' e accedono dichiarando li'
   le proprie credenziali; l'accesso produce un attestato che accompagna le operazioni successive.
 - *requisito fondamentale*: le credenziali sono conosciute da una parte sola. Chi custodisce i dati
-  della rete non conserva password e non ne verifica nessuna: si limita a controllare che
-  l'attestato esibito sia autentico e non scaduto. Una realizzazione in cui la centrale confronta
-  una password con una propria copia *non* soddisfa questo requisito.
-- l'attestato e' verificabile da solo: chi lo riceve stabilisce se e' buono senza dover interrogare
-  il servizio di identita' a ogni richiesta. E' questo che rende il controllo indipendente dalla
-  disponibilita' momentanea di quel servizio.
+  della rete non conserva password: controlla solo che l'attestato sia autentico e non scaduto.
+- l'attestato e' verificabile da solo, senza interrogare il servizio di identita' a ogni richiesta.
 - l'attestato ha una durata limitata (=T_att=) e viene rinnovato senza disturbare l'utente finche'
   la sessione presso il servizio di identita' resta aperta (=T_ina=, =T_ses=).
-- stato di implementazione: completo, requisito fondamentale compreso: chi custodisce i dati della
-  rete non conserva nessuna password e si limita a controllare la firma dell'attestato, senza
-  interpellare il servizio di identita' a ogni richiesta.
+- stato di implementazione: completo: la centrale controlla la firma dell'attestato.
 
 **** RF04.2 - Autorizzazione per ruolo
 - enunciato: ogni operazione e' permessa o negata in base al ruolo di chi la chiede: le letture sono
   permesse a entrambi i ruoli, la modifica dell'anagrafica della rete al solo amministratore, e
   ciascun comando operativo al ruolo che la consegna gli assegna — l'invio della squadra al tecnico,
   la soppressione della corsa all'amministratore (RF01.4).
-- *requisito fondamentale*: il controllo dei permessi e' fatto dalla parte che possiede i dati, non
-  dall'interfaccia. Un'interfaccia che si limita a nascondere i comandi non consentiti non soddisfa
-  questo requisito, perche' chiunque puo' formulare la stessa richiesta senza passare
-  dall'interfaccia.
-- il ruolo e' scritto *dentro l'attestato* dal servizio di identita': chi possiede i dati lo legge
-  da li' e non lo deduce da una propria tabella. Cambiare il ruolo di un utente e' un'operazione che
-  si fa in un posto solo, e ha effetto dal primo attestato successivo.
-- eccezioni dichiarate, ciascuna con la sua motivazione:
-  - l'identificazione avviene presso il servizio di identita' e non fra le operazioni protette:
-    non c'e' quindi nessuna operazione di accesso da lasciare aperta su chi possiede i dati;
-  - le richieste preliminari che i browser inviano prima di una chiamata vera non portano identita' e
-    devono poter passare, altrimenti la chiamata vera non parte nemmeno;
-  - le due sole letture di cui i nodi di campo hanno bisogno (RF03.5) restano accessibili senza
-    identita' di utente: i nodi non sono utenti e non si identificano con credenziali, la loro
-    verifica e' quella dell'identita' di nodo (RF02.4). Sono letture, non modifiche, ed e' un confine
-    che vale la pena tenere stretto a due sole operazioni.
-- stato di implementazione: parziale, e il pezzo che manca e' la ripartizione dei comandi operativi.
-  Il controllo sta dalla parte che possiede i dati e il ruolo viene letto dentro l'attestato:
-  nascondere i comandi nell'interfaccia non serve a passare il controllo, e su letture e anagrafica
-  la ripartizione e' rispettata per intero, con esattamente le tre eccezioni dichiarate qui sopra e
-  nessun'altra. I tre comandi operativi pero' sono concessi a entrambi i ruoli: il tecnico puo'
-  sopprimere una corsa e l'amministratore puo' mandare la squadra, mentre la consegna li assegna uno
-  per ruolo. Resta fuori anche la sola websocket, che non e' un'operazione sui dati ma una porta di
-  sola lettura, ed e' un limite dichiarato nel capitolo /Progettazione/.
+- *requisito fondamentale*: il controllo dei permessi lo fa la parte che possiede i dati, non
+  l'interfaccia: nascondere un comando non impedisce di mandare la stessa richiesta a mano.
+- il ruolo e' scritto *dentro l'attestato* dal servizio di identita', non in una tabella della
+  centrale: si cambia in un posto solo e vale dal primo attestato successivo.
+- eccezioni dichiarate:
+  - le richieste preliminari dei browser (preflight), che non portano identita';
+  - le due sole letture che servono ai nodi di campo (RF03.5): i nodi non sono utenti, la loro
+    verifica e' quella di RF02.4.
+- stato di implementazione: parziale. Controllo lato centrale e ruolo letto dall'attestato ci sono,
+  e su letture e anagrafica la ripartizione e' rispettata con le sole eccezioni qui sopra. I tre
+  comandi operativi pero' sono concessi a entrambi i ruoli. Resta fuori anche la websocket, porta di
+  sola lettura (limite dichiarato in /Progettazione/).
 
 **** RF04.3 - Protezione dei canali
 - enunciato: il sistema puo' funzionare con tutti i canali di comunicazione protetti, in modo che il
   contenuto scambiato fra le parti non sia leggibile ne' alterabile da un osservatore della rete.
 - esito atteso: la protezione e' una condizione dell'*intero* sistema e non della singola parte: o
   tutti i canali sono protetti, o la garanzia non vale.
-- *conseguenza da tenere presente*: se un solo canale resta in chiaro mentre gli altri sono protetti,
-  cio' che si osserva non e' un errore di sicurezza ma un nodo che non riesce a entrare in servizio.
-  E' un sintomo che punta lontano dalla causa, e va messo per iscritto qui perche' e' proprio in
-  fase di verifica che si presenta.
-- *il canale delle credenziali non e' un canale come gli altri*: gli altri trasportano posizioni,
-  transiti e allarmi, cioe' dati che un osservatore leggerebbe ma non potrebbe riusare; li' passano
-  invece le parole d'ordine degli operatori, che chi le intercetta puo' adoperare per entrare. Per
-  questo la sua protezione non e' legata al profilo: il servizio di identita' accetta soltanto
-  connessioni protette e quella in chiaro non esiste, cosi' non c'e' modo di usarlo senza
-  protezione nemmeno per distrazione.
-- *conseguenza sulla schermata*: se la pagina da cui si avvia l'accesso restasse non protetta, il
-  guadagno si perderebbe lo stesso, perche' e' su di lei che torna l'attestato appena rilasciato.
-  Va quindi servita protetta anche lei, e questo si porta dietro il resto: una pagina protetta non
-  puo' rivolgersi a indirizzi non protetti, il programma di navigazione glielo impedisce, quindi
-  usare la schermata implica avere attivo il profilo di protezione su tutti gli altri canali.
-- stato di implementazione: completo. Con il profilo apposta tutti i canali fra le parti sono
-  protetti — MQTT sulla porta cifrata, compresi i canali con cui i nodi si fanno riconoscere,
-  HTTPS verso la centrale, che la schermata segue cambiando due indirizzi senza essere ricompilata,
-  e HTTPS anche sulle interfacce dei nodi di campo da cui passano i sensori — e il canale verso il
-  servizio di identita' e' protetto sempre, in qualunque configurazione. Le
-  parti si riconoscono fra loro tramite un'autorita' di certificazione privata del progetto, la
-  stessa che firma i certificati di tutti i servizi.
+- *conseguenza da tenere presente*: un solo canale in chiaro fra canali protetti non si vede come
+  errore di sicurezza ma come un nodo che non riesce a entrare in servizio.
+- *il canale delle credenziali e' protetto sempre*: li' passano le password degli operatori, che
+  chi le intercetta puo' riusare. Il servizio di identita' accetta solo connessioni protette, in
+  qualunque profilo. Di conseguenza anche la pagina su cui torna l'attestato va servita protetta, e
+  una pagina protetta non puo' chiamare indirizzi in chiaro: usare la schermata richiede il profilo
+  di protezione su tutti i canali.
+- stato di implementazione: completo. Con il profilo apposito sono protetti MQTT (porta cifrata,
+  compresa la validazione dei nodi), l'HTTPS verso la centrale e quello delle interfacce dei nodi di
+  campo. Le parti si riconoscono tramite un'autorita' di certificazione privata del progetto.
 
 ** Requisiti non funzionali osservabili
 
@@ -1430,35 +1302,22 @@ Il =TrafficLogicEngine= tiene tre mappe in memoria (treni, stazioni, guasti aper
 lettura rispondono da lì. La domanda naturale è perché non interrogare direttamente PostgreSQL.
 
 *Primo: per buona parte di quei dati il database non è un'alternativa*, perché non li contiene.
-Posizione, velocità, ritardo, passeggeri, progresso lungo la tratta, stato runtime della stazione
-e ultimo battito sono campi delle entità che il repository non legge e non scrive: nello schema non
-esiste nessuna colonna corrispondente. Non è quindi una cache in senso stretto — una cache si può svuotare e ricalcolare
-dalla sorgente — ma il posto in cui quello stato vive. Infatti al riavvio la rete riparte OFFLINE
-e riscopre tutto dai messaggi del campo.
-
-Non sono colonne nemmeno i cinque campi con cui la Centrale dichiara la posizione del convoglio
+Posizione, velocità, ritardo corrente, passeggeri, progresso, condizione e fase del viaggio del
+convoglio, stato runtime e ultimo battito della stazione non hanno colonne nello schema: la mappa
+in RAM è il posto in cui quello stato vive, e al riavvio la rete riparte OFFLINE e lo riscopre dai
+messaggi del campo. I cinque campi con cui la Centrale dichiara la posizione del convoglio
 (=partenzaCorrente=, =arrivoCorrente=, =direzioneCorrente=, =posizioneNota=,
-=incertezzaPosizione=), ma per un motivo in più: quelli non sono nemmeno un dato *ricevuto*, sono
-un *giudizio*, e viene rifatto a ogni lettura della cache. Persisterli sarebbe scrivere su disco
-un'opinione che scade da sola dopo =T_pos=: riletta il giorno dopo direbbe "so dov'è" di un
-convoglio spento da ore.
+=incertezzaPosizione=) poi sono un *giudizio* rifatto a ogni lettura, che scade dopo =T_pos=:
+persisterlo non avrebbe senso.
 
-*Secondo: la memoria occupata cresce con la topologia della rete, non con il tempo.* Le due mappe
-principali hanno una entry per stazione e una per convoglio esistente, non una per evento. Con i
-numeri di una rete vera — RFI ha circa 2.200 stazioni e in Italia circolano circa 10.000 treni al
-giorno — un oggetto =Treno= occupa un centinaio di byte, che diventano 400-500 contando le
-stringhe referenziate e la entry della mappa: diecimila convogli stanno in *circa 5 MB*, venti
-abbondando. Le stazioni sono un ordine di grandezza meno. Ciò che invece cresce senza limite è lo
-storico, e quello sta solo su PostgreSQL: la divisione è limitato in RAM, illimitato su disco.
+*Secondo: la memoria cresce con la topologia, non con il tempo.* Una entry per stazione e una per
+convoglio: con i numeri di una rete vera (circa 2.200 stazioni e 10.000 treni al giorno in Italia)
+e 400-500 byte per =Treno=, diecimila convogli stanno in circa 5 MB. Quello che cresce senza
+limite è lo storico, e sta su PostgreSQL.
 
-*Terzo: il costo dell'alternativa non sarebbe una SELECT in più.* La telemetria arriva ogni
-=P_tel= per convoglio, cioè circa 10.000 aggiornamenti al secondo su una flotta di diecimila
-treni, ai quali si aggiungono i battiti delle stazioni e i tre controlli del watchdog che ogni
-=P_ria= scorrono l'intera rete. Persistere quel flusso significherebbe altrettanti UPDATE con commit, WAL
-e tuple morte da far digerire all'autovacuum, per dati che diventano obsoleti dopo pochi secondi
-e che non ha senso rendere durabili. È il caso d'uso per cui in esercizio si affianca al database
-un archivio in memoria: qui la stessa funzione la assolve una =ConcurrentHashMap=, che per un
-sistema a nodo singolo è la semplificazione ragionevole.
+*Terzo: l'alternativa costerebbe un UPDATE per ogni telemetria*, circa 10.000 al secondo con
+diecimila treni, per dati che invecchiano in pochi secondi. Per un sistema a nodo singolo una
+=ConcurrentHashMap= è la semplificazione ragionevole.
 
 *** Sul sistema di validazione
 I test hanno un database loro, non quello di lavoro
@@ -1502,52 +1361,42 @@ perso, altrimenti una singola consegna in ritardo verrebbe scambiata per una cad
 modo =T_fer= deve essere maggiore del piu' lungo tempo di percorrenza previsto fra due stazioni,
 altrimenti una corsa normale verrebbe segnalata come anomalia.
 
-=T_fer= viene usato in due modi, e sono tutti e due dei silenzi: la *durata minima* per cui il
-convoglio deve risultare immobile prima che l'anomalia scatti (il watchdog tiene da parte l'istante
-in cui l'ha visto fermo la prima volta) e la soglia oltre la quale una telemetria non piu'
-aggiornata vale essa stessa come immobilita'. Serve inoltre che =T_fer > P_tel=, se no una
-telemetria consegnata con un attimo di ritardo verrebbe scambiata per un convoglio fermo.
+=T_fer= vale sia come durata minima dell'immobilita' prima dell'anomalia, sia come soglia oltre la
+quale una telemetria non aggiornata conta come immobilita'.
 
-=T_pos= e' un altro silenzio, ma di un tipo diverso: non dice che il convoglio e' fermo, dice che la
-centrale non sa piu' dov'e'. Vale =P_tel < T_pos < T_fer=, e i tre valori in fila raccontano una
-sequenza: entro =P_tel= il frame successivo e' gia' arrivato; passato =T_pos= la posizione non e'
-piu' garantita e il convoglio compare fra quelli a posizione incerta; passato =T_fer= diventa
-un'anomalia con tanto di allarme. Un convoglio che sparisce viene quindi prima *dichiarato ignoto* e
-solo dopo *segnalato*, che e' l'ordine giusto: la centrale ammette di non sapere prima di accusare.
+Vale =P_tel < T_pos < T_fer=: passato =T_pos= senza frame il convoglio diventa a posizione incerta,
+passato =T_fer= scatta l'allarme. Un convoglio che sparisce viene prima *dichiarato ignoto* e solo
+dopo *segnalato*.
 
-Sui parametri dell'accesso vale
-=T_att < T_ina < T_ses=: l'attestato deve scadere molto prima della sessione, se no il rinnovo non
-servirebbe a niente, e la sessione deve avere comunque una fine, se no una postazione lasciata
-aperta resterebbe valida per sempre.
+Sui parametri dell'accesso vale =T_att < T_ina < T_ses=: l'attestato scade molto prima della
+sessione, e la sessione ha comunque una fine.
 
 ** Modello
 Il sistema non ha un database unico ma tre livelli di persistenza, uno per tipo di nodo.
 Il database centrale è quello della Centrale (PostgreSQL, schema in
 =ServeCentraleOperativa/src/main/resources/schema.sql=, che la Centrale esegue a ogni avvio: sono
 tutte =CREATE ... IF NOT EXISTS=, quindi su un database vuoto crea le tabelle e su uno già popolato
-non tocca niente): è lì che stanno l'anagrafica della rete e tutto lo storico. La Centrale ci parla
+non tocca niente; lo esegue anche =popola_db.sh= prima di caricare i dati demo): è lì che stanno
+l'anagrafica della rete e tutto lo storico. La Centrale ci parla
 in JDBC puro, e tutte le query stanno in una classe sola, =RailwayRepository=. La stazione ha un suo database locale, un file SQLite con lo schema
 di =Stazioni/src/main/resources/schema.sql=, gestito dalla classe =PersistenzaLocale=. Il
-treno invece tiene tutto in memoria dentro =TrainDB=, un oggetto solo per processo, e il suo
-=schema.sql= rimane il modello di come quello stato andrebbe persistito.
+treno invece tiene tutto in memoria dentro =TrainDB=, un oggetto solo per processo, e non ha
+database.
 
-La differenza fra i due nodi di campo non è una dimenticanza ma la conseguenza di che cosa
-tengono in mano. Il treno non possiede niente di unico: l'itinerario lo riscarica dalla
-Centrale all'avvio e la posizione se la ricalcola percorrendolo, quindi un riavvio gli costa
-il viaggio in corso ma non un dato. La stazione invece produce dati che non esistono da
-nessun'altra parte finché non riesce a consegnarli — i transiti rilevati e i guasti segnalati
-mentre il collegamento con la Centrale è giù — e in più è l'unica a sapere di essere guasta.
-Se ripartisse dai valori di default direbbe di essere ONLINE con i binari liberi, cioè
-esattamente il contrario del vero, e i treni in arrivo verrebbero fatti entrare in una
-stazione inagibile. Per questo la persistenza locale è stata implementata sulla stazione e
-non sul treno.
+La differenza fra i due nodi di campo dipende da che cosa tengono in mano. Il treno non possiede
+niente di unico: l'itinerario lo riscarica dalla Centrale e un riavvio gli costa il viaggio in
+corso, non un dato. La stazione invece tiene dati che esistono solo li' finche' non li consegna
+(transiti e guasti accumulati a collegamento giu'), ed e' l'unica a sapere di essere guasta: se
+ripartisse dai valori di default si direbbe ONLINE e farebbe entrare i treni in una stazione
+inagibile. Per questo la persistenza locale c'e' sulla stazione e non sul treno.
 
 *** Il database della Centrale
 Le tabelle si dividono in tre gruppi.
 
 Anagrafica (i dati che l'amministratore crea dalla dashboard):
 - =Stazione=: id, nome, tipo (capolinea / partenza / normale) e, come estensione,
-  latitudine, longitudine e numero di binari per poterle disegnare sulla mappa
+  latitudine, longitudine e numero di binari per poterle disegnare sulla mappa (i binari dalla
+  dashboard non si scelgono: una stazione creata li' ne ha uno)
 - =Tratte=: un arco fra due stazioni (=StazionePartenzaFK= -> =StazioneArrivoFK=) più il
   tempo nominale di percorrenza in minuti, che serve poi al calcolo del ritardo
 - =Itinerari= e =Itinerario_Tratta=: l'itinerario di per sè è un id e poco altro, il percorso
@@ -1564,53 +1413,36 @@ Anagrafica (i dati che l'amministratore crea dalla dashboard):
   nome del treno (es. "IC 351"): non c'è una colonna nome separata, così il nome è univoco
   per costruzione, però diventa immutabile (per rinominare un convoglio va cancellato e
   ricreato)
-- =Utenti=: anagrafica degli operatori (nome, cognome, matricola univoca, tipo). Da quando
-  l'autenticazione è passata a Keycloak *non c'è più la colonna password* e su questa tabella
-  non si appoggia più il login: le credenziali e i ruoli stanno nel realm. La riga resta
-  perchè =Guasti= e =Storico_Assegnazioni_Guasti= hanno una chiave esterna verso
-  =id_utente=, cioè servono a dire quale operatore sta seguendo un guasto; il collegamento
-  fra l'utente di Keycloak e la riga qui dentro è la *matricola*, che viaggia dentro il token
+- =Utenti=: anagrafica degli operatori (nome, cognome, matricola univoca, tipo), *senza password*:
+  credenziali e ruoli stanno nel realm di Keycloak. Serve alle chiavi esterne di =Guasti= e
+  =Storico_Assegnazioni_Guasti= verso =id_utente=; il legame con l'utente di Keycloak è la
+  *matricola*, che viaggia nel token
 
 Operative (le scrive il sistema, non l'amministratore):
 - =Transiti=: un treno dentro una stazione, con =tempoEntrata= e =tempoUscita=. La riga
   nasce quando la stazione segnala l'entrata e viene chiusa alla segnalazione dell'uscita,
   quindi finché =tempoUscita= è null il treno è ancora in stazione. I due istanti sono quelli
-  scritti dalla stazione nel messaggio di passaggio e non quelli di arrivo del messaggio: con lo
-  store and forward i transiti accodati durante un'interruzione tornano tutti insieme, e datarli
-  al rientro schiaccerebbe dieci minuti di passaggi sullo stesso minuto. La colonna
-  =ritardoMinuti= (estensione) è il ritardo del convoglio *nell'istante* del
-  passaggio: va congelato lì perché il ritardo che sta in cache cambia di continuo, e lo storico
-  deve dire quanto era in ritardo il treno quando è passato, non quanto lo è adesso
+  scritti dalla stazione nel messaggio, non quelli di arrivo: con lo store and forward i transiti
+  accodati tornano tutti insieme. La colonna =ritardoMinuti= (estensione) congela il ritardo
+  *nell'istante* del passaggio
 - =Guasti_Pervenuti_da_treni_o_Staz=: il guasto aperto, con tipo, severità, sorgente
   (STAZIONE o TRENO più l'id), messaggio, timestamp di apertura e di risoluzione e
   l'operatore che se ne sta occupando
-- =eventi_stazioni=: log degli eventi di stazione (heartbeat perso, guasto, manutenzione).
-  Non era prevista nello schema iniziale: e' un'estensione, con la sua sequenza per l'id
+- =eventi_stazioni=: log degli eventi di stazione (heartbeat perso, guasto, manutenzione),
+  estensione
 
-Una nota sulle estensioni. Oggi stanno tutte in =schema.sql= (=ritardoMinuti=, le coordinate delle
-stazioni, la colonna =capolinea= degli itinerari e il valore =capolinea= nel CHECK di =Treni.stato=),
-quindi un database creato da zero le ha già. Un database *già in uso* invece no: =schema.sql= crea
-le tabelle che mancano ma non aggiunge colonne a quelle che esistono, e non rifà i vincoli. È il caso
-peggiore, perché l'eccezione non arriva quando lo stato viene scritto in memoria ma al commit: la
-scrittura fallisce, e con lei l'evento che la conteneva. Per questo ci sono due script da lanciare
-una volta sola sul database già in uso: =ServeCentraleOperativa/src/main/resources/migrazione_capolinea.sql=
-aggiunge la colonna =capolinea=, la sua chiave esterna verso =Stazione= e rifà il CHECK con il valore
-nuovo; =migrazione_storici_rf0207.sql= toglie agli storici le chiavi esterne verso le tabelle dello
-stato corrente (RF02.7). Sono scritti per essere innocui su un database creato da zero e per potersi
-rilanciare quante volte si vuole.
+Le estensioni (=ritardoMinuti=, le coordinate delle stazioni, =capolinea= degli itinerari e il
+valore =capolinea= nel CHECK di =Treni.stato=) stanno tutte in =schema.sql=, quindi un database
+creato da =schema.sql= (a mano o da =popola_db.sh=) le ha gia'.
 
 Storici: sono tabelle separate in sola aggiunta, ognuna con la sua chiave =SERIAL= e un campo
 =ts_storicizzazione=. La scelta è stata di non versionare le tabelle operative con dei flag
 ma di copiare la riga in una tabella gemella quando lo stato cambia: le query della
 dashboard sul dato corrente restano semplici e lo storico non le appesantisce.
-=Storico_Transiti= porta la stessa colonna =ritardoMinuti= di =Transiti=, copiata al momento
-della storicizzazione: è quella che la pagina Transiti legge, e per le righe già presenti prima
-dell'aggiunta resta nulla e viene esposta come ritardo zero.
+=Storico_Transiti= porta la stessa colonna =ritardoMinuti= di =Transiti=, ed è quella che la
+pagina Transiti legge (un valore nullo vale zero).
 
-Le tabelle di storico sono otto, ma non sono tutte vive, e vale la pena dire quali perché la
-differenza si vede solo leggendo il =RailwayRepository=, che è l'unica classe che le scrive. Delle
-quattro che nessuno scrive non esiste nemmeno la classe Java: la tabella la crea =schema.sql=, e
-basta.
+Le tabelle di storico sono otto, ma ne vengono scritte quattro, tutte dal =RailwayRepository=:
 
 #+ATTR_LATEX: :environment longtable :align L{0.34\textwidth}L{0.14\textwidth}L{0.46\textwidth} :font \small
 | tabella                          | scritta | quando                                            |
@@ -1624,17 +1456,13 @@ basta.
 | =Storico_Assegnazioni_Guasti=    | no      | servirebbe a dire quale operatore ha preso in carico un guasto, ed è il pezzo di RF02.1.3 che resta scoperto |
 | =Storico_Interventi_Manutenzione= | no     | l'intervento è già raccontato dallo storico di stato della stazione |
 
-Non c'e' invece nessuna tabella per la traccia di ogni frame di telemetria ricevuto: c'era
-(=telemetria_treni=), veniva creata e non ci scriveva nessuno, ed e' stata tolta. È una scelta e non
-una dimenticanza — la telemetria arriva ogni =P_tel= per convoglio e persisterla vorrebbe dire
-scrivere migliaia di righe al secondo per un dato che invecchia in pochi secondi (vedi /Sul metodo
-di repository/) — ma va detta, se no il modello promette più di quello che mantiene.
+Non c'è nessuna tabella per i singoli frame di telemetria, per scelta: sarebbero migliaia di righe
+al secondo per un dato che invecchia in pochi secondi (vedi /Sul metodo di repository/).
 
 *** I db locali dei nodi di campo
-Il treno ha una sola tabella, =Stato_convoglio=: direzione, stato, stazione corrente,
-prossima stazione e tratta corrente. È di fatto la fotografia di dove si trova il convoglio,
-la stessa che poi viene spedita in telemetria. Resta un modello sulla carta: nel codice
-quella fotografia è l'oggetto =TrainDB= in memoria, per il motivo detto sopra.
+Il treno non ha un db locale: la fotografia di dove si trova il convoglio (direzione, stato,
+stazione corrente, prossima stazione e tratta) è l'oggetto =TrainDB= in memoria, la stessa che
+viene spedita in telemetria, per il motivo detto sopra.
 
 La stazione ne ha di più perchè deve sopravvivere alla disconnessione, e il suo schema è
 davvero eseguito: all'avvio =PersistenzaLocale= apre il file =Stazioni/data/stazione-{id}.db=
@@ -1644,42 +1472,32 @@ e ci lancia dentro le =CREATE TABLE IF NOT EXISTS= di =schema.sql=.
 - =Tratte=: copia locale delle tratte che toccano la stazione (stessi id del db centrale).
   La tabella viene creata ma resta vuota: il nodo non ragiona per tratte, il grafo della rete
   è roba della Centrale
-- =Guasto_Locale_Momentaneo= e la associativa =Tratta_Guasto=: quale guasto sta bloccando
-  quali tratte. E' il registro dei guasti aperti della stazione: ogni guasto dichiarato dal nodo
-  (un sensore muto, un'avaria segnalata dai sottosistemi) e ogni guasto con cui la Centrale la
-  chiude ci finisce aperto, e viene chiuso quando arriva il RESOLVED della Centrale oppure, per i
-  soli guasti dei sensori, quando i sensori tornano a battere. L'allarme con cui la stazione
-  trattiene un treno appena entrato invece non apre una riga: la stazione era gia' guasta, e al
-  riavvio sembrerebbe un secondo guasto. Dal registro si ricostruisce anche, al riavvio, se la
-  stazione era guasta solo per i sensori; anche qui l'associativa resta vuota
+- =Guasto_Locale_Momentaneo= e la associativa =Tratta_Guasto= (vuota): il registro dei guasti
+  aperti della stazione, quelli dichiarati dal nodo e quelli con cui la Centrale la chiude. Una
+  riga si chiude con il RESOLVED della Centrale oppure, per i guasti dei sensori, quando i sensori
+  tornano a battere. L'allarme con cui la stazione trattiene un treno appena entrato non apre
+  righe. Al riavvio dal registro si ricostruisce anche se la stazione era guasta solo per i sensori
 - =Treno=: i treni presenti al momento, con tempo di entrata e di partenza. Chi ha il tempo
   di partenza a NULL è ancora fermo sui binari, ed è da questa query che al riavvio si
   ricostruisce la mappa dei presenti
-- =bufferChache=: la coda degli eventi prodotti e non ancora consegnati alla Centrale, da
-  rispedire in blocco al ritorno della connessione. Nel codice corrisponde alla classe
-  =LocalBuffer=, che è una coda FIFO in memoria (il buffer di uno schema
-  produttore/consumatore) in cui ogni elemento si porta dietro anche il canale di destinazione
-  ("transit" o "alert"), così il consumatore sa su quale topic pubblicarlo. Ci passano tutti i
-  transiti e gli allarmi, non solo quelli nati durante un'interruzione: la riga si cancella
-  appena il broker ha preso l'evento
+- =bufferChache=: la coda degli eventi non ancora consegnati alla Centrale. Nel codice è la
+  classe =LocalBuffer=, il buffer FIFO di uno schema produttore/consumatore, in cui ogni elemento
+  porta il canale di destinazione ("transit" o "alert"). Ci passano tutti i transiti e gli
+  allarmi: la riga si cancella appena il broker ha preso l'evento
 
-Il criterio con cui si è deciso che cosa persistere e che cosa no è che sul disco va solo
-quello che al riavvio non si sa più ricavare. Lo stato operativo, i treni sui binari e la
-coda degli eventi non consegnati vengono riletti; la connessione MQTT, la validazione
-dell'ID e i keepalive dei sensori no, perché si rifanno da capo comunque. I keepalive in
-particolare sarebbe sbagliato rileggerli: sono un segnale di vitalità, e ripartire con
-battiti vecchi di ore vorrebbe dire dichiarare guasti dei sensori che stanno benissimo.
+Il criterio: sul disco va solo quello che al riavvio non si sa più ricavare. Stato operativo,
+treni sui binari e coda vengono riletti; connessione MQTT, validazione dell'ID e keepalive dei
+sensori si rifanno da capo (rileggere battiti vecchi di ore farebbe dichiarare guasti sensori
+sani).
 
 ** Topic
 La comunicazione fra i nodi passa da un broker Mosquitto (localhost:1883, oppure 8883 con
 TLS sotto il profilo =tls=, cioè lanciando i nodi con =-Dprofilo=tls=). Ogni nodo ha una sola
 connessione, fatta con il client Eclipse Paho e chiusa dentro la classe =ClientMqtt=. Tutti i topic stanno sotto il prefisso =railway/= e sono
-organizzati per nodo: =railway/train/{id}/...= e =railway/station/{id}/...=, con l'id del
-nodo dentro il topic. In questo modo chi pubblica scrive sul proprio topic personale, mentre
-la Centrale si iscrive con la wildcard =+= a un livello (per esempio
-=railway/train/+/telemetry=) e riceve in un unico canale i messaggi di tutti i treni,
-senza dover sapere in anticipo quanti nodi ci sono nè riconfigurarsi quando se ne aggiunge
-uno. Il payload è sempre JSON.
+organizzati per nodo: =railway/train/{id}/...= e =railway/station/{id}/...=. Ogni nodo pubblica
+sul proprio topic, la Centrale si iscrive con la wildcard =+= (per esempio
+=railway/train/+/telemetry=) e riceve i messaggi di tutti senza sapere quanti nodi ci sono. Il
+payload è sempre JSON.
 
 Topic del treno, tutti sotto il prefisso =railway/train/{id}/=:
 
@@ -1688,15 +1506,12 @@ Topic del treno, tutti sotto il prefisso =railway/train/{id}/=:
 |---------------------+------------------------------+----------------------------------------------|
 | validation          | treno -> centrale            | richiesta di validazione dell'id all'avvio   |
 | validation-response | centrale -> treno            | esito: se l'id non è a db il nodo non entra  |
-| telemetry           | treno -> centrale            | posizione, velocità, progresso, stato, passeggeri, fermate e direzione (il ritardo no: lo misura la centrale) |
+| telemetry           | treno -> centrale            | posizione, velocità, progresso, stato, condizione e fase del viaggio, passeggeri, fermate e direzione (il ritardo no: lo calcola la centrale da stazione e progresso) |
 
-C'è poi un topic che il treno pubblica ma che alla Centrale non arriva mai,
-=railway/treno-simulatoriSensori/{id}=: è l'annuncio del passaggio rivolto ai *sensori di binario*
-della stazione. Sta fuori dal prefisso =railway/train/= proprio perché non è una comunicazione verso
-la Centrale, ma il modo con cui la simulazione mette il convoglio davanti al sensore, che è l'unico
-a poterlo vedere passare. Le stazioni si iscrivono con la wildcard
-=railway/treno-simulatoriSensori/+= e tengono solo i messaggi con il proprio =stazioneId=, così il
-treno non deve conoscere né l'indirizzo né la porta di nessuna stazione.
+Il treno pubblica anche =railway/treno-simulatoriSensori/{id}=, che alla Centrale non arriva: è il
+modo con cui la simulazione mette il convoglio davanti ai *sensori di binario* della stazione. Le
+stazioni si iscrivono con =railway/treno-simulatoriSensori/+= e tengono solo i messaggi con il
+proprio =stazioneId=.
 
 Topic della stazione, sotto il prefisso =railway/station/{id}/=:
 
@@ -1708,34 +1523,26 @@ Topic della stazione, sotto il prefisso =railway/station/{id}/=:
 | heartbeat           | stazione -> centrale | battito periodico, il silenzio vale come guasto |
 | transit             | stazione -> centrale | passaggio del treno visto dai sensori           |
 
-Le due coppie =validation= / =validation-response= sono l'unico scambio di tipo
-richiesta-risposta: il nodo che si avvia dichiara il proprio id, la Centrale lo cerca a
-database e risponde sul topic dedicato di quel nodo (lo costruisce con l'id letto nella
-richiesta, perchè il topic di uscita dipende dal mittente: la Centrale ascolta tutte le richieste
-con un solo filtro, =railway/train/+/validation=, e risponde a ciascuno sul suo).
+Le coppie =validation= / =validation-response= sono l'unico scambio richiesta-risposta: la
+Centrale ascolta tutte le richieste con un solo filtro (=railway/train/+/validation=), cerca l'id a
+database e risponde sul topic del mittente.
 
-Fuori da questi due gruppi c'è un unico topic senza id, =railway/alerts=: è un canale
-broadcast su cui girano apertura e chiusura dei guasti, e a cui sono iscritti tutti e tre i
-tipi di nodo. Serve così perchè un guasto di stazione interessa tutti i treni, non solo
-quello vicino. Il tipo di
-messaggio si distingue con il campo =tipoEvento= del payload; siccome anche la Centrale è
-iscritta al topic su cui lei stessa pubblica, negli alert che genera mette un marcatore che
-le permette di riconoscere e scartare i propri messaggi, altrimenti si richiamerebbe da sola
-in un ciclo. Il marcatore (="origine": "CENTRALE"=) serve anche al contrario: la stazione reagisce
-solo agli alert che lo portano, e scarta cosi' l'eco dei propri.
+Fuori da questi due gruppi c'è un unico topic senza id, =railway/alerts=: il canale broadcast dei
+guasti, a cui sono iscritti tutti e tre i tipi di nodo, perché un guasto di stazione interessa
+tutti i treni. Il tipo di messaggio sta nel campo =tipoEvento=. Negli alert che genera la Centrale
+mette il marcatore ="origine": "CENTRALE"=, con cui scarta l'eco dei propri messaggi; la stazione,
+al contrario, reagisce solo agli alert che lo portano.
 
 La qualità del servizio non è la stessa per tutti. =railway/alerts= viaggia a QoS 1, cioè con la
 conferma del broker, e ogni nodo si collega con una sessione persistente (=cleanSession=false= e un
 client-id fisso: =treno-<ID>=, =stazione-<ID>=, =centrale-operativa=): gli alert arrivati mentre un
-nodo era staccato il broker li tiene da parte e glieli consegna alla riconnessione. Sono i messaggi
-che nessuno ripete, e perderne uno vuol dire un convoglio che entra in una stazione chiusa o che
-resta fermo per un guasto già risolto. Per questo i destinatari dei topic si registrano *prima* di
-collegarsi: gli alert conservati arrivano appena la connessione è aperta. Tutto il resto
-(telemetria, battiti, passaggi, transiti, validazioni) va a QoS 0, perché si ripete da solo o, per
-i transiti, perché restano nella coda della stazione finché il client non riesce a consegnarli. Nessun nodo pubblica dal
-thread delle callback di Paho: i messaggi in uscita passano da una coda (=CodaPubblicazioni= sul
-treno e sulla Centrale, =LocalBuffer= sulla stazione) svuotata da un thread suo, perché una
-pubblicazione a QoS 1 aspetta la conferma che porta proprio quel thread.
+nodo era staccato il broker glieli consegna alla riconnessione, perché nessuno li ripete. Per
+questo i destinatari si registrano *prima* di collegarsi. Tutto il resto (telemetria, battiti,
+passaggi, transiti, validazioni) va a QoS 0: si ripete da solo o, per i transiti, resta nella coda
+della stazione finché non viene consegnato. Nessun nodo pubblica dal thread delle callback di
+Paho: i messaggi in uscita passano da una coda (=CodaPubblicazioni= sul treno e sulla Centrale,
+=LocalBuffer= sulla stazione) svuotata da un thread suo, perché una pubblicazione a QoS 1 aspetta
+la conferma che porta proprio quel thread.
 
 Un messaggio =GUASTO= porta =sorgenteTipo= (STAZIONE o TRENO), =sorgenteId=, =severita=,
 =messaggio= e =timestamp=, più un campo facoltativo =tipoGuasto= con cui *chi segnala dichiara di
@@ -1743,55 +1550,35 @@ che guasto si tratta*. La stazione lo valorizza in due casi: =sensore_offline=, 
 automatico quando scade il keepalive di un sensore di binario, e =binario_guasto=, dichiarato
 dall'operatore tramite la CLI della stazione (endpoint =/stazione/sensore/guasto=) quando a
 guastarsi non è l'intera stazione ma un singolo binario o scambio — la stessa CLI, con
-l'altra scelta, dichiara =stazione_guasta=. È il campo che permette alla Centrale di
-classificare l'allarme senza doverlo indovinare dal testo: prima bastava la parola "sensore"
-nella descrizione per far passare per guasto di terra l'avaria di bordo di un convoglio, e
-siccome i guasti di terra parlano quasi sempre di sensori il tipo =stazione_guasta= non
-veniva quasi mai prodotto. Se il campo manca, il tipo lo decide il tipo di sorgente, che è
-comunque un dato strutturato.
+l'altra scelta, dichiara =stazione_guasta=. Con questo campo la Centrale classifica l'allarme senza
+indovinarlo dal testo; se manca, il tipo lo decide il tipo di sorgente.
 
-Un messaggio =RITARDO= è l'unico del canale che non parla di guasti: con quello la Centrale
-comunica al convoglio quanti minuti di ritardo gli ha misurato. Porta =target= (il treno a
-cui è destinato, come =STOP= e =ITINERARIO_AGGIORNATO=), =ritardoMinuti= con il totale,
-=variazioneMinuti= con quanto è cambiato in quel passaggio, =causa= (=ARRIVO_IN_RITARDO= se
-il tempo si è perso in linea, =SOSTA_PROLUNGATA= se si è perso fermi in banchina) e
-=sorgenteId=, che qui è la stazione al cui passaggio la misura è stata fatta. Serve perchè
-la consegna vuole il convoglio *"in grado di ricevere informazioni (guasti o ritardi)"*: il
-ritardo il treno non se lo può calcolare, dato che l'orario di servizio ce l'ha solo la
-Centrale, quindi l'unico modo perchè lo conosca è che glielo dica chi lo ha misurato. A
-bordo il numero non viene usato per decidere niente, si ferma al display: è la Centrale che
-governa il traffico, il treno lo mostra e basta. L'alert parte solo quando il ritardo
-cambia, non a ogni passaggio, se no il canale condiviso si riempirebbe di messaggi che
-dicono tutti la stessa cosa.
+Un messaggio =RITARDO= è l'unico del canale che non parla di guasti: la Centrale comunica al
+convoglio il ritardo che gli ha misurato. Porta =target= (il treno destinatario, come =STOP= e
+=ITINERARIO_AGGIORNATO=), =ritardoMinuti= con il totale, =variazioneMinuti=, =causa=
+(=ARRIVO_IN_RITARDO= se il tempo si è perso in linea, =SOSTA_PROLUNGATA= se in banchina) e
+=sorgenteId=, la stazione del passaggio in cui è stato misurato. Serve perché la consegna vuole il
+convoglio *"in grado di ricevere informazioni (guasti o ritardi)"*, e l'orario di servizio ce l'ha
+solo la Centrale. A bordo il numero si ferma al display. L'alert parte solo quando il ritardo
+misurato cambia.
 
-Un messaggio =STATO_STAZIONE= è l'unico che la Centrale manda al campo per dire non che cosa
-è successo, ma *in che stato ha messo* una stazione. Porta =sorgenteId= e =stato= (uno dei quattro
-del vocabolario) e parte da tutti i punti in cui quello stato lo decide lei: l'invio della
-squadra, il cambio fatto a mano dal pannello dell'amministratore, il ritorno a ONLINE quando
-l'allarme viene chiuso e quello dichiarato dal nodo stesso con il battito, se a quella stazione
-non resta aperto nessun allarme. Serve perché il convoglio, degli stati della stazione, ne conosceva uno
-solo: quello che nasce da un =GUASTO= segnalato dal campo. La MANUTENZIONE non nasce da nessun
-guasto, quindi senza questo annuncio i treni entravano in stazione mentre i tecnici erano sui
-binari. Per il twin di bordo GUASTA e MANUTENZIONE sono la stessa identica cosa — quei binari non
-si attraversano — e la differenza fra i due la vede solo l'operatore.
+Un messaggio =STATO_STAZIONE= dice *in che stato la Centrale ha messo* una stazione. Porta
+=sorgenteId= e =stato= (uno dei quattro del vocabolario) e parte da tutti i punti in cui lo stato
+lo decide lei: l'invio della squadra, la PUT della stazione, il ritorno a ONLINE alla chiusura
+dell'allarme e quello dichiarato dal nodo con il battito, se non le resta nessun allarme aperto.
+Serve perché la MANUTENZIONE non nasce da nessun =GUASTO= del campo: senza questo annuncio i treni
+non la vedrebbero.
 
-Ne segue la regola che vale la pena scrivere per intero: il =RESOLVED= di un guasto *non è mai* il
-permesso di ripartire. Guasto chiuso e binari liberi sono due condizioni diverse — sulla stazione
-può esserci ancora la squadra al lavoro, o un secondo allarme aperto — e per di più quel messaggio
-lo pubblica anche il nodo di terra quando i suoi sensori tornano a battere, che di una squadra sui
-binari non sa niente. A liberare i treni è quindi soltanto lo =STATO_STAZIONE= che dichiara la
-stazione di nuovo ONLINE, ed è per questo che quel messaggio parte da ogni punto in cui la stazione
-torna davvero agibile.
+Ne segue che il =RESOLVED= di un guasto *non è mai* il permesso di ripartire: sulla stazione può
+esserci ancora la squadra o un secondo allarme aperto, e quel messaggio lo pubblica anche il nodo di
+terra quando i sensori tornano a battere. A liberare i treni è soltanto lo =STATO_STAZIONE= che
+dichiara la stazione ONLINE.
 
-Lo stesso passaggio fisico attraversa quindi tre canali in fila, ed è una catena e non tre copie
-della stessa notizia: sul primo (=railway/treno-simulatoriSensori/{id}=, MQTT) il convoglio si
-limita a *passare*, sul secondo (=POST /stazione/sensore/treno=, REST) il sensore di binario
-*rileva*, sul terzo (=railway/station/{id}/transit=, MQTT) la stazione *certifica* alla Centrale.
-Prima il treno pubblicava anche un passaggio indirizzato alla Centrale, che quindi riceveva lo stesso
-fatto per due strade; è stato tolto perché un convoglio vero non telefona alla sala controllo per
-dire che è passato, e perché con il sensore in mezzo il suo fail-stop ha la conseguenza giusta — se
-il dispositivo è morto quel transito non lo registra nessuno, che è poi il motivo per cui una
-stazione senza sensori è una stazione guasta.
+Lo stesso passaggio fisico attraversa tre canali in fila: su =railway/treno-simulatoriSensori/{id}=
+(MQTT) il convoglio *passa*, con =POST /stazione/sensore/treno= (REST) il sensore di binario
+*rileva*, su =railway/station/{id}/transit= (MQTT) la stazione *certifica* alla Centrale. Se il
+sensore è morto il transito non lo registra nessuno, ed è per questo che una stazione senza sensori
+è una stazione guasta (RF03.3).
 
 ** Vocabolario degli stati osservabili
 
@@ -1818,6 +1605,34 @@ contraddizione: e' la conseguenza di che cosa ciascuno dei due puo' sapere.
 | GUASTA       | la stazione, la centrale | la stazione non e' percorribile: i convogli non ci entrano e non ne escono |
 | OFFLINE      | solo la centrale       | la stazione non da' piu' notizie di se'                                   |
 | MANUTENZIONE | solo la centrale       | la squadra e' sul posto e sta lavorando: non e' percorribile, come GUASTA |
+
+*** Stato composto mostrato dall'interfaccia
+
+I cinque valori dello stato del convoglio sono un *riassunto*: =TrainDB.stato()= li calcola dalla
+condizione (T6) e dalla fase del viaggio (T5), e nel calcolo si perde qualcosa. FERMO vale per il
+convoglio in sosta al binario, per quello trattenuto al binario e per quello trattenuto a meta'
+tratta; EMERGENZA nasconde la fase in cui il convoglio si e' fermato. Un elemento pero' non sta mai
+in uno stato solo: sta in uno stato per ognuno dei suoi automi, tutti nello stesso momento, ed e'
+questo *stato composto* che l'interfaccia stampa, un badge per automa.
+
+Per il convoglio i valori arrivano dalla telemetria, che oltre al riassunto porta =condizione= e
+=faseViaggio=; il verso c'era gia'.
+
+#+attr_latex: :align |p{0.22\textwidth}|p{0.68\textwidth}|
+| automa                | che cosa si stampa                                                              |
+|-----------------------+---------------------------------------------------------------------------------|
+| T6 condizione         | REGOLARE, EMERGENZA o SOPPRESSO                                                 |
+| T5 fase del viaggio   | una delle sei fasi: SENZA_ITINERARIO, IN_STAZIONE, IN_VIAGGIO, BLOCCATO_IN_STAZIONE, BLOCCATO_IN_TRATTA, FERMO_CAPOLINEA |
+| T7 verso di marcia    | ANDATA o RITORNO, solo nelle quattro fasi in cui il convoglio percorre l'itinerario: senza itinerario un verso non c'e', e al capolinea T7 si e' chiusa |
+
+Il convoglio trattenuto da una stazione guasta davanti a lui, per esempio, si legge REGOLARE,
+BLOCCATO_IN_TRATTA, ANDATA. Finche' un convoglio non ha trasmesso dopo l'avvio della centrale
+resta il valore della colonna Treni.stato (M13).
+
+Per la stazione lo stato composto e' quello di M12 e, solo in MANUTENZIONE, anche quello che il
+nodo dichiara nel battito (S10): negli altri stati la centrale accetta quello che il nodo dichiara
+e i due coincidono, in MANUTENZIONE no (=accettaDalCampo=). Da OFFLINE il nodo non batte, e il suo
+ultimo stato non si stampa.
 
 ** Diagrammi degli stati
 
@@ -1847,8 +1662,7 @@ lascia mai T1, e infatti in T1 le altre macchine stanno *dentro* lo stato "Servi
 - il componente e' stato astratto in 11 macchine, ognuna con la sua sezione; la mappa qui sotto dice chi avvia chi
 - si leggono in quattro gruppi: l'aggancio alla centrale (T2 e T3), il motore di viaggio che simula il convoglio (T4, T5, T7), i canali verso e dalla centrale (T8, T9, T10) e lo stato del dominio (T6, T11)
 - le due variabili di stato non vanno confuse: T5 dice DOVE sta il convoglio lungo l'itinerario (faseViaggio), T6 dice COME sta (condizione: regolare, in emergenza, soppresso). Sono due campi distinti del TrainDB e cambiano per cause diverse, ed e' esattamente l'ortogonalita' che la specifica chiede in RF02.2.2.1 e RF02.2.2.3. Lo stato che il convoglio dichiara fuori (FERMO, IN_VIAGGIO, EMERGENZA, SOPPRESSO, CAPOLINEA) non e' una terza variabile: TrainDB.stato() lo calcola da quelle due
-- nel codice le macchine che cambiano lo stato del convoglio sono classi che offrono soltanto guardie (metodi che leggono e rispondono) e mosse (metodi che scrivono): AutomaViaggio per T5 e T7, AutomaCondizione per T6, AutomaStazioniNote per T11. A farle muovere e' un punto solo, GestoreEventi (T4), e gli eventi glieli portano tre generatori: GeneratoreEventiTempo (il tick e l'itinerario, T4 e T3), TrainGateway (gli alert, T9) e TrainIngestion (i sensori di bordo, T10)
-- ogni evento si gestisce in tre fasi, sempre in quest'ordine: prima tutte le guardie delle macchine che l'evento puo' muovere, senza scrivere niente; poi tutte le scritture; poi le azioni (pubblicare un passaggio o un guasto, scrivere nel log). Se una guardia dice di no si esce prima di aver scritto, quindi non resta mai una mossa fatta a meta' da disfare, e le azioni vedono lo stato gia' tutto scritto. Le macchine non si chiamano mai fra loro: quando un evento ne muove piu' d'una le elenca il gestore
+- nel codice le macchine che cambiano lo stato del convoglio sono classi con soltanto guardie (metodi che leggono) e mosse (metodi che scrivono): AutomaViaggio per T5 e T7, AutomaCondizione per T6, AutomaStazioniNote per T11. Le muove solo GestoreEventi (T4, dove sono descritte le tre fasi di ogni evento), con gli eventi di tre generatori: GeneratoreEventiTempo (T4 e T3), TrainGateway (T9) e TrainIngestion (T10)
 **** mappa delle macchine
 - requisiti coperti: nessuno in proprio, e' l'indice delle altre undici: i requisiti veri stanno scritti sopra le singole macchine
 #+begin_src  plantuml file: treno_00_mappa_delle_macchine.png
@@ -2263,7 +2077,7 @@ end note
 
 **** T4 tick e gestore degli eventi
 - il battito da 1 secondo del digital twin e il punto da cui passano tutte le mosse delle macchine del convoglio. GeneratoreEventiTempo.tick() fa tre controlli e poi manda l'evento TICK; GestoreEventi.gestisci() lo gestisce insieme a tutti gli altri eventi (l'itinerario di T3, gli alert di T9, il guasto di bordo di T10), uno alla volta
-- ogni evento attraversa tre fasi fisse: guardie, assegnamenti, azioni. Le guardie di tutte le macchine coinvolte si valutano prima di scrivere qualsiasi cosa, compreso il punto in cui si ritrovera' il convoglio, che si calcola in variabili locali; se una guardia dice di no si esce senza aver toccato niente. Le azioni (passaggi, guasti, log) partono dopo le scritture, quindi vedono lo stato gia' coerente
+- ogni evento attraversa tre fasi fisse: guardie, assegnamenti, azioni. Le guardie di tutte le macchine coinvolte si valutano prima di scrivere qualsiasi cosa (il punto in cui si ritrovera' il convoglio si calcola in variabili locali): se una dice di no si esce senza aver toccato niente, quindi non resta mai una mossa a meta'. Le azioni (passaggi, guasti, log) partono dopo le scritture e vedono lo stato gia' coerente
 - le macchine non si chiamano mai fra loro: quando un evento ne muove piu' d'una, come l'arrivo in stazione che installa anche l'itinerario rimasto in attesa, e' il gestore a elencarle, e le loro guardie stanno tutte nella prima fase
 - requisiti coperti: nessuno per intero, e' l'orchestratore: RF02.5.1 parzialmente (da soppresso il TICK non muove piu' niente), RF02.5.2 parzialmente (da qui parte la ricarica, e all'arrivo in stazione viene installato l'itinerario rimasto in attesa perche' il treno era a meta' tratta) e RF02.1.2.2 parzialmente (l'EMERGENZA congela l'avanzamento, pero' congela il convoglio e non l'infrastruttura, quindi RF02.1.2.2.1 e RF02.1.2.2.2 restano scoperti)
 #+begin_src  plantuml file: treno_04_macchina_tick_motore_viaggio.png
@@ -2377,7 +2191,7 @@ end note
 - il cuore della simulazione, cioe' dove si trova il convoglio lungo l'itinerario: comprende il trattenimento per stazione chiusa e l'attesa di un percorso quando l'itinerario non c'e'
 - le fasi ammesse sono sei, e sono i valori che =TrainDB.faseViaggio= puo' assumere: SENZA_ITINERARIO, IN_STAZIONE, IN_VIAGGIO, BLOCCATO_IN_STAZIONE, BLOCCATO_IN_TRATTA e FERMO_CAPOLINEA. Il blocco e' diviso in due perche' le due situazioni si comportano in modo diverso: al binario il treno aspetta e basta, a meta' tratta ha un avanzamento da congelare, e allo sblocco riprende la sosta oppure la marcia
 - la scrive solo AutomaViaggio, e solo quando glielo chiede il gestore degli eventi (T4). La condizione del convoglio (T6) e' un'altra variabile: qui la si legge nelle guardie, ma nessuna mossa di questa macchina la scrive, quindi un blocco o un avvio non possono cancellare un'EMERGENZA
-- requisiti coperti: RF02.2.2.1 completo (dove si trova il convoglio); RF02.2.1.1 completo insieme alla Centrale: il convoglio trattenuto resta fermo pur avendo una tappa da percorrere, e il ritardo che ne segue lo misura la Centrale confrontando l'arrivo con l'orario; RF02.1.1.2.1 e RF02.1.1.2.2 completi insieme a T9 e T11: non entra nella stazione non percorribile e riparte solo al ripristino, non per scadenza di un tempo; RF02.5.1 completo per la parte del convoglio, che con la fase SENZA_ITINERARIO smette davvero di viaggiare invece di dichiararsi in marcia stando fermo
+- requisiti coperti: RF02.2.2.1 completo (dove si trova il convoglio); RF02.2.1.1 completo insieme alla Centrale: il convoglio trattenuto resta fermo pur avendo una tappa da percorrere, e il ritardo lo fa crescere la Centrale (M3), che dalla telemetria vede la sosta allungarsi o l'avanzamento fermo mentre l'orario corre; RF02.1.1.2.1 e RF02.1.1.2.2 completi insieme a T9 e T11: non entra nella stazione non percorribile e riparte solo al ripristino, non per scadenza di un tempo; RF02.5.1 completo per la parte del convoglio, che con la fase SENZA_ITINERARIO smette davvero di viaggiare invece di dichiararsi in marcia stando fermo
 #+begin_src  plantuml file: treno_05_macchina_fase_viaggio.png
 @startuml T5 - Fase del viaggio
 ' =========================================================================
@@ -2723,7 +2537,8 @@ end note
 
 **** T8 telemetria verso la centrale
 - il frame ogni secondo con posizione, velocita', progresso, stato e passeggeri: e' cio' che alimenta la mappa dell'operatore (TrainElab, fatto girare dall'Orologio). Il frame non si pubblica direttamente: entra nella CodaPubblicazioni e lo consegna al broker il suo thread
-- requisiti coperti: RF02.2.2.1 e RF02.2.2.4 parzialmente (posizione, velocita' e passeggeri: qui c'e' la sorgente del dato, mentre la correttezza e la visualizzazione si chiudono in M3 e M11; il ritardo invece nel frame non c'e', lo misura la centrale al passaggio in M5 e lo comunica al convoglio in T9), RF03.3 parzialmente perche' la dichiarazione del convoglio e' la fonte di verita' per la posizione corrente, quella che alimenta il tempo reale
+- oltre allo stato, riassunto calcolato da =TrainDB.stato()=, il frame porta =condizione= (T6) e =faseViaggio= (T5): dal riassunto non si torna indietro (FERMO vale sia in sosta al binario sia a meta' tratta), e con i due campi l'interfaccia stampa lo stato composto (T6, T5 e il verso di T7)
+- requisiti coperti: RF02.2.2.1 e RF02.2.2.4 parzialmente (posizione, velocita' e passeggeri: qui c'e' la sorgente del dato, mentre la correttezza e la visualizzazione si chiudono in M3 e M11; il ritardo invece nel frame non c'e': la centrale lo rifa' a ogni frame in M3 a partire dalla stazione o dalla quota di tratta dichiarate, lo misura al passaggio in M5 e lo comunica al convoglio in T9), RF03.3 parzialmente perche' la dichiarazione del convoglio e' la fonte di verita' per la posizione corrente, quella che alimenta il tempo reale
 #+begin_src  plantuml file: treno_08_macchina_telemetria.png
 @startuml T8 - Telemetria del treno verso la Centrale
 ' =========================================================================
@@ -2766,7 +2581,7 @@ state "Frame scartato" as Errore
 state "M3 - ingestione della telemetria" as M3 <<esterna>>
 
 Attesa --> Soppresso : ogni secondo\n[trenoRiconosciuto = false] /\nnessun invio
-Attesa --> Pubblicato : ogni secondo [ID validato] /\nvelocita' simulata, poi posizione,\nstato, progresso, passeggeri,\nstazione corrente e prossima, direzione
+Attesa --> Pubblicato : ogni secondo [ID validato] /\nvelocita' simulata, poi posizione,\nstato, condizione e fase del viaggio,\nprogresso, passeggeri,\nstazione corrente e prossima, direzione
 Soppresso --> Attesa
 Pubblicato --> Attesa : il thread pubblicatore-mqtt\nlo consegna al broker (QoS 0)
 Pubblicato --> Errore : [broker non raggiungibile\noppure coda piena]
@@ -2774,9 +2589,9 @@ Errore --> Attesa
 Pubblicato -[dashed]-> M3 : la Centrale aggiorna\nla cache e lo storico
 
 note right of Pubblicato
-  La posizione non e' piu' inventata qui: le coordinate arrivano
-  dal motore di viaggio, che le interpola tra le due tappe. L'unico
-  dato ancora simulato e' la velocita' istantanea, 0 se il convoglio
+  Le coordinate arrivano dal motore di viaggio, che le interpola
+  tra le due tappe. L'unico dato simulato qui e' la velocita'
+  istantanea, 0 se il convoglio
   non e' in marcia e un valore tra 80 e 160 km/h se lo e'.
 
   Il ramo casuale e' legato allo stato IN_VIAGGIO, che non e'
@@ -3599,10 +3414,8 @@ Isolata --> Collegata : S6 - POST /rete/online\n(RETE_SU) / la coda riparte\ndal
 note right of Isolata
   Da sola la stazione non si dichiara mai isolata ne' di nuovo
   collegata: il flag lo cambiano solo le due POST /rete, ed e' la
-  leva della demo. Prima un invio fallito lo metteva a false, e
-  siccome a rimetterlo a true era solo la POST /rete/online, dopo un
-  riavvio del broker la stazione restava isolata finche' qualcuno
-  non la chiamava a mano.
+  leva della demo. Un invio fallito non lo tocca, se no dopo un
+  riavvio del broker la stazione resterebbe isolata.
 end note
 
 note bottom of Riprova
@@ -3970,14 +3783,12 @@ note bottom of Rilevato
   competente e' spento il transito non lo registra nessuno.
 
   E' il motivo per cui la stazione senza sensori vivi e' una
-  stazione guasta (S7) e non un nodo che se la cava lo stesso:
-  prima il transito lo scriveva il listener MQTT da se', e il
-  fail-stop del sensore non aveva nessuna conseguenza osservabile.
+  stazione guasta (S7).
 end note
 
 note bottom of Notificato
   Alla Centrale arriva solo questo messaggio
-  (railway/station/{id}/transit): il treno non le dichiara piu' il
+  (railway/station/{id}/transit): il treno non le dichiara il
   passaggio per conto suo. E' la fonte unica dello storico dei
   transiti (M5).
 end note
@@ -4059,11 +3870,9 @@ note right of Classificazione
   railway/alerts e' un unico topic condiviso da tutti: la stazione
   risente anche i guasti e i RESOLVED che ha appena pubblicato lei,
   uguali a quelli della Centrale tranne che per il marcatore
-  "origine". Prima li trattava come se arrivassero dalla Centrale, e
-  con lo store and forward un RESOLVED spedito in ritardo (rimasto
-  nel buffer mentre la rete era giu') poteva rimettere ONLINE una
-  stazione tornata GUASTA nel frattempo. La Centrale fa lo stesso
-  controllo, al contrario, per non riascoltare i suoi.
+  "origine": li scarta, se no un RESOLVED suo rimasto nel buffer
+  potrebbe rimettere ONLINE una stazione tornata GUASTA nel
+  frattempo. La Centrale fa lo stesso controllo, al contrario.
 end note
 
 note bottom of Ripristino
@@ -4272,7 +4081,7 @@ end note
 '    M5  05_macchina_ingestione_transiti.puml      IngestionService.onTransit -> GestoreEventi.suPassaggio
 '    M6  06_macchina_ingestione_allarmi.puml       IngestionService.onAlert -> GestoreEventi.suGuasto*
 '    M7  07_macchina_ciclo_vita_guasto.puml        AutomaGuasto (Guasto.risolto)
-'    M8  08_macchina_watchdog_faultmonitor.puml    GeneratoreEventiTempo -> GestoreEventi.suControllo*
+'    M8  08_macchina_watchdog.puml    GeneratoreEventiTempo -> GestoreEventi.suControllo*
 '    M9  09_macchina_sessione_autorizzazione.puml  SicurezzaKeycloak (pac4j) + FiltroAutorizzazione
 '    M10 10_macchina_gateway_rest.puml             RestApiGateway (+ GestoreEventi per i comandi)
 '    M11 11_macchina_websocket_realtime.puml       RealtimeWebSocket + NotificatoreRealtime
@@ -4556,7 +4365,9 @@ end note
 **** M3 ingestione della telemetria dei treni
 - consumo del topic railway/train/+/telemetry, aggiornamento della cache e storicizzazione solo al cambio di stato: IngestionService.onTelemetry traduce il frame nell'evento TELEMETRIA, GestoreEventi.suTelemetria decide e scrive, AutomaTreno.telemetria muove la copia in cache
 - e' anche il punto in cui la centrale si accorge che un convoglio dato per fermo ha ripreso a muoversi, e chiude da sola il guasto che si era aperta
-- requisiti coperti: RF02.2.2.1 e RF02.2.2.3 completi lato centrale (posizione e stato in cache), RF02.2.2.2 parzialmente (qui si rifa' la previsione di arrivo, il ritardo lo misura M5 al passaggio), RF02.1.4 completo per i convogli (il guasto dedotto si richiude quando la causa rientra, gemello di quello che M4 fa per le stazioni), RF02.7 parzialmente perche' storicizza solo al cambio di stato e non a ogni frame, che e' la regola di registrazione chiesta dal requisito, RF01.1.1 e RF01.1.2 parzialmente (il dato sta qui, la spinta al browser e' M11), RF02.1.2.1 parzialmente (normalizza lo stato nei valori ammessi da M13)
+- dal frame si copiano in cache anche =condizione= e =faseViaggio= (T6 e T5): non vanno a database e non cambiano nessuna decisione della centrale, servono solo allo stato composto della web app
+- a ogni frame si rifa' anche il ritardo, che nel frame non c'e': e' quello misurato ai passaggi (M5) piu' quello che il convoglio sta perdendo adesso, cioe' la sosta oltre il previsto oppure, in tratta, il tempo trascorso dalla partenza meno quello che l'orario assegna alla quota di tratta dichiarata (PrevisioneArrivi.aggiornaRitardo). Cosi' il ritardo di un treno trattenuto cresce finche' resta fermo, e al passaggio successivo la stima lascia il posto alla misura dello stesso tempo. Il convoglio che compare fermo nella prima stazione senza esserci entrato apre li' la sua sosta: e' la partenza della corsa, da cui esce senza ENTRATA. A corsa finita (capolinea, soppressione, convoglio sganciato dall'itinerario) il ritardo resta quello raggiunto
+- requisiti coperti: RF02.2.2.1 e RF02.2.2.3 completi lato centrale (posizione e stato in cache), RF02.2.1.1 completo lato centrale (il ritardo del convoglio fermo dove non dovrebbe cresce a ogni frame), RF02.2.2.2 parzialmente (qui si rifanno la previsione di arrivo e la quota di ritardo in corso, la misura la fa M5 al passaggio), RF02.1.4 completo per i convogli (il guasto dedotto si richiude quando la causa rientra, gemello di quello che M4 fa per le stazioni), RF02.7 parzialmente perche' storicizza solo al cambio di stato e non a ogni frame, che e' la regola di registrazione chiesta dal requisito, RF01.1.1 e RF01.1.2 parzialmente (il dato sta qui, la spinta al browser e' M11), RF02.1.2.1 parzialmente (normalizza lo stato nei valori ammessi da M13)
 #+begin_src  plantuml file: 03_macchina_ingestione_telemetria.png
 @startuml M3 - Ingestione della telemetria dei treni
 ' =========================================================================
@@ -4571,7 +4382,7 @@ end note
 '    it.uni.reti2.elaboration.AutomaGuasto#chiudi
 '    it.uni.reti2.entity.Guasto#MSG_TRENO_FERMO
 '    it.uni.reti2.elaboration.NavigazioneItinerario#trattaVerso, #estremoVersoCuiSiViaggia
-'    it.uni.reti2.elaboration.PrevisioneArrivi#aggiornaPrevisione
+'    it.uni.reti2.elaboration.PrevisioneArrivi#aggiornaPrevisione, #aggiornaRitardo
 '    it.uni.reti2.elaboration.TrafficLogicEngine#certificaPosizione
 '    it.uni.reti2.elaboration.PosizioneConvoglio#valuta
 '
@@ -4610,12 +4421,21 @@ state "M7 - ciclo di vita del guasto" as M7 <<esterna>>
 
 Ascolto --> Elaborazione : frame di telemetria
 Elaborazione --> Ascolto : [JSON malformato o treno sconosciuto] /\nscarta il frame, log
-Elaborazione --> Riallineato : [treno in cache] /\nstato gia' normalizzato; posizione, velocita,\npasseggeri e fermate dal frame (il ritardo no),\nprevisione di arrivo rifatta
+Elaborazione --> Riallineato : [treno in cache] /\nstato gia' normalizzato; condizione e fase,\nposizione, velocita, passeggeri e fermate\ndal frame (il ritardo no),\nprevisione di arrivo e ritardo rifatti
 Riallineato --> Aggiornato : [la tratta in cache non porta\nalla fermata dichiarata] /\ntratta dedotta dalla prossima fermata,\nscritta anche sulla riga del treno
 Riallineato --> Aggiornato : [la tratta e' gia' coerente] /\nnessuna lettura dell'itinerario
 Aggiornato --> Ascolto : /\nstato a DB (prima della cache), certifica\nla posizione, broadcast TELEMETRY
 Aggiornato -[dashed]-> M13 : [stato diverso dal precedente] /\nriga di Storico_Stato_Treni
 Aggiornato -[dashed]-> M7 : [velocita' > 0 oppure entrato in stazione,\ne c'e' un "treno fermo" dedotto aperto] /\nchiude il guasto, RESOLVED su MQTT\ne ALERT sulla websocket
+
+note left of Riallineato
+  Il ritardo non viaggia nel frame: la centrale lo rifa'
+  qui. E' quello misurato ai passaggi (M5) piu' quello che
+  il convoglio sta perdendo adesso: la sosta oltre il
+  previsto, oppure il tempo dalla partenza meno quello che
+  l'orario assegna alla quota di tratta dichiarata. Cosi'
+  cresce mentre il treno resta fermo, non solo quando riparte.
+end note
 
 note right of Elaborazione
   La telemetria non crea piu' il treno: la cache e' la
@@ -4680,7 +4500,8 @@ end note
 **** M4 ingestione degli heartbeat delle stazioni
 - consumo del topic railway/station/+/heartbeat e chiusura automatica dei guasti aperti dal watchdog quando il battito torna: IngestionService.onHeartbeat traduce il battito nell'evento HEARTBEAT, GestoreEventi.suHeartbeat decide e scrive, AutomaStazione muove la copia in cache
 - il battito dice che il nodo e' vivo, non in che stato si trova: durante un intervento aggiorna il solo istante di ultimo contatto, perche' dal campo la stazione continua a dichiararsi GUASTA e il primo battito cancellerebbe la manutenzione (M12). E' la guardia AutomaStazione.accettaDalCampo
-- quando invece il nodo si dichiara di nuovo sano e non gli resta aperto nessun allarme, il ritorno viene annunciato anche al campo con =STATO_STAZIONE=: e' l'unico messaggio che rimette in marcia i convogli trattenuti (T9), quindi se non partisse resterebbero fermi davanti a una stazione che nel frattempo ha riaperto
+- lo stato scritto nel battito si annota sempre in =Stazione.statoDichiarato=, anche quando la guardia lo rifiuta: e' lo stato di S10, che la web app mostra accanto a MANUTENZIONE
+- quando il nodo si dichiara di nuovo sano e non gli resta aperto nessun allarme, il ritorno viene annunciato al campo con =STATO_STAZIONE=, l'unico messaggio che rimette in marcia i convogli trattenuti (T9)
 - requisiti coperti: RF02.3.2 completo lato centrale e RF02.1.4 completo: il battito che torna riporta la stazione ONLINE e chiude da solo, senza intervento di un operatore, il guasto che il watchdog aveva dedotto dal silenzio
 #+begin_src  plantuml file: 04_macchina_ingestione_heartbeat.png
 @startuml M4 - Ingestione degli heartbeat delle stazioni
@@ -4730,7 +4551,7 @@ state "M7 - ciclo di vita del guasto" as M7 <<esterna>>
 
 Ascolto --> Elaborazione : battito ricevuto
 Elaborazione --> Ascolto : [stazione sconosciuta] / scarta
-Elaborazione --> Aggiornata : /\nstato = quello dichiarato dal nodo\n(non durante un intervento: li' cambia\nil solo ultimoHeartbeat),\nultimoHeartbeat = adesso
+Elaborazione --> Aggiornata : /\nstato = quello dichiarato dal nodo\n(non durante un intervento: li' cambia\nil solo ultimoHeartbeat),\nultimoHeartbeat = adesso,\nstatoDichiarato = quello del battito (sempre)
 Aggiornata --> Ascolto : /\nstorico solo se lo stato e' cambiato,\nSTATO_STAZIONE al campo se e' tornata\nagibile e non le resta nessun allarme,\nbroadcast HEARTBEAT
 Aggiornata --> Rientro : [la Centrale l'aveva marcata OFFLINE]
 Rientro --> Ascolto : /\npubblica RESOLVED su railway/alerts,\nbroadcast ALERT e HEARTBEAT
@@ -4756,6 +4577,7 @@ end note
 **** M5 ingestione dei transiti
 - ciclo di vita del transito di un treno in una stazione: la notizia arriva da una strada sola, quella del sensore di terra (onTransit, evento PASSAGGIO), e viene usata per due cose diverse, aggiornare la posizione del convoglio sull'itinerario e scrivere il transito con il suo storico (GestoreEventi.suPassaggio)
 - l'ora e il ritardo scritti nel transito sono quelli del passaggio e non quelli dell'elaborazione: sono due dati che invecchiano, e lo storico deve conservarli come erano
+- il passaggio e' il momento in cui il ritardo si misura: all'ingresso si confronta l'ora vera con quella fissata all'uscita precedente e si apre la sosta, all'uscita si conta la sosta oltre il previsto (doppia agli estremi dell'itinerario) e si fissa l'orario per la fermata dopo. La misura prende il posto della quota che M3 aveva stimato dall'ultimo passaggio, quindi lo stesso tempo non si conta due volte, e solo lei arriva al treno con l'alert RITARDO
 - requisiti coperti: RF02.3.1 e RF01.5 completi lato centrale (convoglio, stazione, tratta e orario di entrata e di uscita, a db e in cache), RF03.3 parzialmente perche' e' la via della rilevazione a terra, quella che fa la storia dei transiti, mentre l'altra via e' la telemetria (M3), RF02.7 e RF02.2.2.1 parzialmente (la posizione sulla tratta e la prossima stazione si aggiornano al passaggio)
 #+begin_src  plantuml file: 05_macchina_ingestione_transiti.png
 @startuml M5 - Ingestione dei transiti
@@ -4775,9 +4597,9 @@ end note
 '  Una strada sola e due effetti: la mossa di AutomaTreno misura il ritardo
 '  e sposta il convoglio sull'itinerario, e solo dopo il gestore apre o
 '  chiude la riga del Transito congelandoci sopra quel ritardo.
-'  Il topic su cui il treno dichiarava lo stesso passaggio non c'e' piu':
-'  adesso il convoglio annuncia il passaggio ai sensori della stazione
-'  (S8) e in Centrale entra solo quello che il sensore ha certificato.
+'  Il treno non dichiara il passaggio alla Centrale: lo annuncia ai
+'  sensori della stazione (S8) e in Centrale entra solo quello che il
+'  sensore ha certificato.
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -4811,7 +4633,8 @@ Nessuno --> Nessuno : [treno o stazione non presenti a DB] /\ntransito ignorato
 note right of Aperto
   Che cosa succede a ogni transito, in quest'ordine:
 
-  1. AutomaTreno.passaggio  misura il ritardo, sposta il
+  1. AutomaTreno.passaggio  misura il ritardo (al posto della
+     stima che M3 faceva dall'ultimo passaggio), sposta il
      convoglio sulla tratta giusta dell'itinerario e ricalcola
      la prossima stazione.
 
@@ -4819,9 +4642,9 @@ note right of Aperto
      Transito e la storicizza con il ritardo appena aggiornato;
      AutomaStazione aggiorna il contatore dei treni presenti.
 
-  3. azioni: se il ritardo e' cambiato lo si dice al treno con
-     un alert RITARDO, e parte il broadcast TRANSIT verso la
-     dashboard.
+  3. azioni: se il ritardo misurato e' cambiato lo si dice al
+     treno con un alert RITARDO, e parte il broadcast TRANSIT
+     verso la dashboard.
 
   L'ordine conta: se si scrivesse prima la riga, il ritardo
   congelato sarebbe quello del passaggio precedente.
@@ -4834,8 +4657,8 @@ note bottom of Chiuso
   telemetria, con "andata" come ripiego. Nella finestra fra
   un'inversione all'estremo dell'itinerario e il frame successivo
   (fino a P_tel) quel verso e' ancora quello vecchio: e' il prezzo
-  dichiarato di aver tolto il topic su cui il treno dichiarava il
-  passaggio insieme alla direzione.
+  dichiarato del fatto che il treno non dichiara il passaggio alla
+  Centrale (RF03.3).
 end note
 
 note left of Aperto
@@ -4865,7 +4688,7 @@ end note
 
 **** M6 ingestione degli allarmi dal campo
 - railway/alerts e' un topic condiviso, quindi la centrale deve filtrare i messaggi che ha pubblicato lei stessa (IngestionService.onAlert, marcatore "origine"); del campo interessano due eventi: il GUASTO che un nodo segnala (GUASTO_SEGNALATO) e il RESOLVED con cui un nodo dichiara rientrato un guasto che aveva segnalato lui (GUASTO_RIENTRATO), oggi mandato dalla stazione quando i sensori tornano a battere
-- il tipo del guasto lo dichiara la sorgente nel campo =tipoGuasto=: prima veniva indovinato cercando la parola "sensore" nel messaggio, ed era una classificazione fatta su una frase invece che su un dato
+- il tipo del guasto lo dichiara la sorgente nel campo =tipoGuasto=
 - una stazione guasta manda un alert per ogni treno che entra: la deduplica tiene un solo guasto aperto per sorgente e tipo, e la marcatura della sorgente passa dalla guardia di M12, che durante un intervento non la riporta a GUASTA
 - se a guastarsi e' un convoglio fermo in una stazione, la stazione diventa non percorribile anche lei: il gestore apre su di lei un guasto dedotto e lo pubblica sul campo
 - requisiti coperti: RF02.1.2.1 completo (il guasto dichiarato dal campo finisce a db), RF02.1.2.2.1 completo (il convoglio guasto in stazione chiude la stazione), RF02.1.1.2 completo per la parte di stazione (l'alert CRITICAL con sorgenteTipo STAZIONE la porta a GUASTA), RF01.4.1 per la parte di difesa dell'intervento in corso, RF01.2.2 parzialmente perche' e' qui che un guasto viene marcato come segnalato dal campo e non dedotto; la storia del guasto e' M7
@@ -4950,17 +4773,10 @@ note bottom of Guasto
 end note
 
 note left of Classificazione
-  Il TIPO del guasto non si indovina piu' leggendo il messaggio.
-  Prima bastava la parola "sensore" nel testo per classificarlo
-  come sensore_offline: siccome tutti i guasti di terra parlano
-  di sensori, il tipo stazione_guasta non veniva quasi mai
-  prodotto, e con lui spariva dall'interfaccia il comando "invia
-  la squadra"; per lo stesso motivo un'avaria di bordo che
-  nominava un sensore passava per guasto dell'infrastruttura.
-  Adesso il tipo lo dichiara chi segnala, nel campo tipoGuasto
-  del payload (la stazione lo valorizza per i sensori di
-  binario); se manca decide il tipo di sorgente, che e' un dato
-  strutturato e non una parola in una frase.
+  Il TIPO del guasto lo dichiara chi segnala, nel campo
+  tipoGuasto del payload (la stazione lo valorizza per i sensori
+  di binario); se manca decide il tipo di sorgente. Non si
+  ricava dal testo del messaggio.
 end note
 
 note right of Rientro
@@ -5080,11 +4896,8 @@ note left of Aperto
 
   Derivarlo pero' vuol dire che quello stato va difeso dove vive
   davvero, cioe' su M12: finche' l'intervento e' aperto nessun evento
-  del campo puo' riscrivere lo stato della stazione. Prima non era
-  cosi', e siccome una stazione guasta rimanda il suo alert a ogni
-  treno che entra, la prima ripetizione riportava il nodo a GUASTA:
-  il "preso in carico" spariva, e con lui il motivo per cui i
-  convogli erano fermi.
+  del campo puo' riscrivere lo stato della stazione, nemmeno
+  l'alert che una stazione guasta ripete a ogni treno che entra.
   Resta fuori l'assegnatario: la colonna OperatoreCheSeNeStaOccupandoFK
   e la tabella Storico_Assegnazioni_Guasti esistono nello schema, ma
   il campo Guasto.operatore non viene mai valorizzato e quella tabella
@@ -5103,7 +4916,7 @@ end note
 - il terzo controllo non manda soltanto i numeri: la fotografia comprende l'elenco di treni e stazioni, che e' cio' che le permette di riallineare davvero le schermate
 - prima si scrive e si chiude la transazione, poi si annuncia: un guasto annunciato prima del commit puo' fermare i convogli per qualcosa che a database non esiste
 - requisiti coperti: RF02.6.1, RF02.6.2 e RF02.6.3 completi: la stazione silenziosa oltre T_sil, il convoglio fermo fuori stazione oltre T_fer e la fotografia dello stato ogni P_ria, cioe' tutto cio' che i nodi di campo non sono in grado di segnalare da soli; RF01.1.5 e RF01.2.2 parzialmente. RF02.1.2.2.2 resta solo sfiorato: il convoglio fermo fra due stazioni fa aprire un allarme, ma la tratta non viene resa non percorribile
-#+begin_src  plantuml file: 08_macchina_watchdog_faultmonitor.png
+#+begin_src  plantuml file: 08_macchina_watchdog.png
 @startuml M8 - Watchdog della Centrale
 ' =========================================================================
 '  MACCHINA M8 - Watchdog della Centrale
@@ -5191,16 +5004,10 @@ note right of Job1
   i convogli si fermano solo sui guasti CRITICAL, e una
   stazione che TACE non e' una stazione impercorribile.
   E' la stessa regola che il vocabolario applica agli stati
-  (GUASTA e MANUTENZIONE trattengono i treni, OFFLINE no) e
-  prima le due cose si contraddicevano: lo stato diceva
-  "passa pure" mentre il guasto dedotto fermava tutti. Ne
-  usciva anche un comportamento che dipendeva dall'ordine di
-  accensione, perche' l'alert passa una volta sola: il
-  convoglio gia' in marcia si bloccava, quello avviato dopo
-  attraversava la stessa stazione senza accorgersene.
-  Quello che il silenzio produce davvero e' un buco di
-  informazione, non un binario chiuso: lo raccontano
-  l'allarme in dashboard e la posizione dichiarata incerta.
+  (GUASTA e MANUTENZIONE trattengono i treni, OFFLINE no).
+  Il silenzio produce un buco di informazione, non un binario
+  chiuso: lo raccontano l'allarme in dashboard e la posizione
+  dichiarata incerta.
 end note
 
 note left of Job2
@@ -5245,7 +5052,7 @@ end note
 
 **** M9 ciclo di vita del token e autorizzazione delle api rest
 - autenticazione OAuth2/OpenID Connect delegata a Keycloak e filtro dei permessi tecnico/amministratore su ogni chiamata: e' l'architettura base del PDF, non la variante 2
-- gli stati non sono piu' "sessione aperta / chiusa" lato Centrale, perche' la Centrale non tiene piu' nessuna sessione: quello che ha un ciclo di vita e' il token, e vive nel browser
+- la Centrale non tiene sessioni: quello che ha un ciclo di vita e' il token, e vive nel browser
 - la macchina si legge in due meta': in alto il token visto dalla web app (assente, valido, scaduto, rinnovato), in basso la singola richiesta vista dalla Centrale
 - la validita' del token (firma, scadenza, emittente, audience) la stabilisce pac4j dentro =SicurezzaKeycloak=, a cui il filtro chiede per ogni richiesta; il filtro decide solo chi puo' fare cosa. Il filtro e' un before-handler di Javalin su /api/*: se rifiuta scrive la risposta e ferma gli handler successivi, quindi l'endpoint non viene nemmeno chiamato
 - requisiti coperti: RF04.1 completo e RF04.2 parziale (le eccezioni dichiarate nella specifica ci sono tutte — le richieste preliminari del browser e le due sole letture di cui hanno bisogno i nodi di campo — ma i tre comandi operativi restano aperti a entrambi i ruoli), e RF01.6 completo lato centrale: il controllo dei permessi e' fatto qui, dalla parte che possiede i dati, non nascondendo i comandi nell'interfaccia
@@ -5336,8 +5143,8 @@ end note
 note bottom of B
   Casi esenti dal token: preflight OPTIONS, i percorsi fuori da
   /api e le due GET usate dai nodi di campo (itinerario del treno
-  e prossima stazione). Non c'e' piu' nessun endpoint di login da
-  lasciare aperto: le credenziali si danno a Keycloak.
+  e prossima stazione). Non c'e' nessun endpoint di login da lasciare
+  aperto: le credenziali si danno a Keycloak.
 
   Ruolo sufficiente: le letture e i tre comandi operativi che il
   PDF assegna al tecnico (sopprimi una corsa, risolvi un allarme,
@@ -5493,7 +5300,8 @@ end note
 
 **** M11 canale websocket realtime
 - punto di uscita comune di quasi tutte le altre macchine verso la dashboard (RealtimeWebSocket per le connessioni, NotificatoreRealtime per il vocabolario degli eventi): a chiamarlo e' il gestore degli eventi, nella fase delle azioni
-- sotto profilo tls il browser apre =wss://localhost:8444/ws/realtime=, e la porta HTTPS della Centrale parla solo HTTP/1.1 (=ssl.http2 = false= in =ServerRest=). Il plugin SSL di Javalin accenderebbe anche l'HTTP/2, e con quello acceso Firefox (e Zen) prova a far passare la WebSocket dentro la connessione HTTP/2, che Jetty 11 non accetta: il canale si chiudeva subito (codice 1006) e la dashboard restava ferma ai dati letti via REST all'apertura della pagina, mentre le REST funzionavano normalmente
+- sotto profilo tls il browser apre =wss://localhost:8444/ws/realtime=, e la porta HTTPS della Centrale parla solo HTTP/1.1 (=ssl.http2 = false= in =ServerRest=): con l'HTTP/2 acceso Firefox prova a far passare la WebSocket dentro quella connessione, che Jetty 11 non accetta
+- ogni evento TELEMETRY porta, oltre allo stato normalizzato, =condizione=, =faseViaggio= e =direzione= dalla cache, scritti sempre, a null quando non si sanno (anche nell'evento che parte senza telemetria, il treno rotto annunciato dalla centrale). L'HEARTBEAT porta =statoDichiarato=; SNAPSHOT e REST li hanno gia', perche' serializzano gli stessi oggetti della cache
 - requisiti coperti: RF01.1 e RF01.2 completi, e in particolare RF01.1.4: l'aggiornamento e' spinto nel momento in cui l'evento accade e non ottenuto da interrogazioni a orologio del browser; RF02.6.3 parzialmente, perche' e' anche il canale su cui viaggia la fotografia periodica
 #+begin_src  plantuml file: 11_macchina_websocket_realtime.png
 @startuml M11 - Canale WebSocket realtime
@@ -5560,8 +5368,7 @@ note bottom of Connessa
   l'evento, e con lui il lock del gestore.
   Sul WebSocket non c'e' filtro per destinatario ne' controllo
   del token: l'autorizzazione di M9 protegge solo le API REST.
-  Adesso che tutto il resto passa da Keycloak questa e' l'unica
-  porta rimasta senza controllo, ed e' un limite dichiarato:
+  E' l'unica porta senza controllo, ed e' un limite dichiarato:
   autenticare la handshake vorrebbe dire passare il token in
   query string o nel sottoprotocollo, perche' il browser non
   lascia mettere header sull'apertura di una WebSocket.
@@ -5574,7 +5381,8 @@ end note
 **** M12 stato runtime della stazione
 - gli stati ONLINE / OFFLINE / GUASTA / MANUTENZIONE come li vede la centrale: stanno solo in cache, sul db ne resta la traccia nello storico
 - requisiti coperti: RF02.3.4 completo lato centrale per tutti e quattro gli stati, compreso l'OFFLINE che il nodo non puo' conoscere di se'; RF01.4.1 per la MANUTENZIONE, che dura quanto l'intervento e non quanto la chiamata REST che la apre (vedi la nota). RF02.6.1 e RF01.1.3 parzialmente
-- lo stato si scrive in una classe sola, =AutomaStazione=, ed e' li' che vive la regola dell'intervento, nella guardia =accettaDalCampo=: gli eventi del campo non escono dalla MANUTENZIONE, i comandi dell'operatore si'. Le mosse le chiama solo GestoreEventi. Prima ogni chiamante scriveva =stazione.stato= per conto suo e la regola era ripetuta a memoria solo in due punti su cinque
+- lo stato si scrive in una classe sola, =AutomaStazione=, ed e' li' che vive la regola dell'intervento, nella guardia =accettaDalCampo=: gli eventi del campo non escono dalla MANUTENZIONE, i comandi dell'operatore si'. Le mosse le chiama solo GestoreEventi
+- MANUTENZIONE e' l'unico stato in cui questa macchina e S10 restano a lungo diverse, ed e' per questo che la web app accanto a MANUTENZIONE stampa anche =statoDichiarato= (vedi /Stato composto mostrato dall'interfaccia/)
 #+begin_src  plantuml file: 12_macchina_stato_stazione.png
 @startuml M12 - Stato runtime della stazione
 ' =========================================================================
@@ -5621,7 +5429,7 @@ state "MANUTENZIONE\nsquadra inviata\ndall'operatore" as MANUTENZIONE
 OFFLINE --> ONLINE : M4 - arriva un heartbeat /\nchiude i guasti automatici\ne pubblica RESOLVED
 ONLINE --> OFFLINE : M8 - silenzio oltre 30s /\nguasto WARNING e alert sul campo
 
-ONLINE --> GUASTA : M6 - alert CRITICAL della stazione\noppure M6 - un convoglio si rompe sui suoi binari\noppure M4 - il nodo si dichiara guasto\noppure M10 - l'amministratore la dichiara guasta
+ONLINE --> GUASTA : M6 - alert CRITICAL della stazione\noppure M6 - un convoglio si rompe sui suoi binari\noppure M4 - il nodo si dichiara guasto\noppure M10 - una PUT con lo stato la dichiara guasta
 GUASTA --> ONLINE : M4 - torna a battere ONLINE\noppure M6 - il nodo dichiara rientrato il guasto\noppure M10 - l'operatore risolve l'allarme\n[nessun altro guasto aperto]
 GUASTA --> OFFLINE : M8 - smette anche di battere
 
@@ -5633,10 +5441,12 @@ MANUTENZIONE --> MANUTENZIONE : qualunque evento del campo o del watchdog\n(M6 -
 OFFLINE --> [*] : M10 - stazione eliminata\n[409 se referenziata da tratte]
 
 note right of GUASTA
-  L'amministratore dal pannello (PUT /api/stazioni/{id} con lo
-  stato) puo' portare la stazione in uno qualsiasi dei quattro
-  stati, manutenzione compresa: e' un comando esplicito e passa
-  sopra alla guardia (imponiDallOperatore).
+  Una PUT /api/stazioni/{id} con lo stato puo' portare la
+  stazione in uno qualsiasi dei quattro stati, manutenzione
+  compresa: e' un comando esplicito e passa sopra alla guardia
+  (imponiDallOperatore). La web app pero' non la usa: il form
+  della stazione lo stato non lo chiede, quindi la strada resta
+  aperta solo a chi chiama le API della Centrale.
 end note
 
 note top of MANUTENZIONE
@@ -5668,8 +5478,8 @@ end note
 
 note left of ONLINE
   Ogni transizione decisa dalla Centrale viene annunciata al campo con
-  l'alert STATO_STAZIONE: l'invio della squadra, il cambio fatto a mano
-  dal pannello e il ritorno a ONLINE alla chiusura dell'allarme. Non e'
+  l'alert STATO_STAZIONE: l'invio della squadra, lo stato scritto con la
+  PUT della stazione e il ritorno a ONLINE alla chiusura dell'allarme. Non e'
   una notifica di cortesia: e' l'unico modo che i convogli hanno di
   sapere che quei binari sono chiusi (T11), perche' la MANUTENZIONE non
   nasce da nessun guasto segnalato dal campo, ed e' anche l'unico
@@ -5772,8 +5582,9 @@ note right of attivo
   CHECK e uno stato inventato avrebbe fatto fallire il commit.
   Il passaggio davanti al sensore alterna solo attivo e fermo: un
   convoglio rotto, soppresso o al capolinea non cambia stato per un
-  passaggio. L'amministratore dal pannello puo' scegliere uno
-  qualsiasi dei cinque valori; uno fuori vocabolario e' un 400.
+  passaggio. La PUT /api/treni/{id} accetta uno qualsiasi dei
+  cinque valori (uno fuori vocabolario e' un 400), ma la web app
+  non lo manda: il form del convoglio lo stato non lo chiede.
   Il watchdog dei treni fermi guarda la posizione e non lo stato:
   vale per ogni convoglio non soppresso, non solo per gli attivi.
 end note
@@ -5786,12 +5597,14 @@ note bottom of manutenzione
   nello stesso valore, quindi cache e database non divergono mai.
 
   Il prezzo di questa scelta va detto: "in manutenzione" e' anche il
-  valore che l'amministratore assegna a mano dall'anagrafica per la
+  valore che una PUT /api/treni/{id} con lo stato scriverebbe per la
   manutenzione vera, e il frontend rimappa "in manutenzione" ->
   "soppresso". I due significati collidono su una casella sola, quindi
-  un convoglio messo in manutenzione compare in dashboard come
-  soppresso e non c'e' modo di distinguerli. Servirebbe un valore in
-  piu' nel CHECK, oppure una colonna separata per la soppressione.
+  un convoglio messo in manutenzione in quel modo compare in dashboard
+  come soppresso e non c'e' modo di distinguerli. Dalla web app il caso
+  non nasce piu', perche' il form del convoglio lo stato non lo chiede;
+  resta aperto per chi chiama le API. Servirebbe un valore in piu' nel
+  CHECK, oppure una colonna separata per la soppressione.
 end note
 
 note left of capolinea
@@ -5855,9 +5668,9 @@ scritto (RF02.2.4). Dove i due giudizi divergono vale quello scritto accanto al 
 | RF02.1.2.2.2 |             | M8           | M8 apre solo un allarme sul convoglio, la tratta resta percorribile           |
 | RF02.1.3     |             | M7, M6, M8   | l'unicità per sorgente c'è ed è ciò che tiene leggibile l'elenco; mancano lo stato "preso in carico" e l'assegnatario |
 | RF02.1.4     | M4, M3      | M8           | il battito che torna chiude il guasto dedotto sulla stazione (M4), il convoglio che riprende a muoversi chiude il proprio (M3): in tutti e due i casi solo quelli con il prefisso della centrale |
-| RF02.2.1.1   | T5          | T9, T11      |                                                                               |
+| RF02.2.1.1   | T5, M3      | T9, T11      | T5 tiene fermo il convoglio, M3 ne fa crescere il ritardo a ogni frame        |
 | RF02.2.2.1   | T5, M3      | T7, T8, M5   | il cardine della specifica: sei macchine ci si appoggiano                     |
-| RF02.2.2.2   | M5          | M3, T9       | il ritardo lo misura la centrale al passaggio (M5) e lo comunica al convoglio (T9); M3 rifa' la previsione di arrivo |
+| RF02.2.2.2   | M5          | M3, T9       | il ritardo lo misura la centrale al passaggio (M5) e lo comunica al convoglio (T9); M3 lo stima a ogni frame fra un passaggio e l'altro e rifa' la previsione di arrivo |
 | RF02.2.2.3   | T6, M13     | M3           | lo stato è tenuto distinto dalla posizione, come chiede il requisito          |
 | RF02.2.2.4   | T8          |              | valori simulati, non alimentano nessuna decisione                             |
 | RF02.2.3     | T7          |              |                                                                               |
@@ -6472,7 +6285,7 @@ loop ogni secondo (Orologio)
         ELAB -> TDB : legge stato, posizione, progresso,\npasseggeri, direzione
         ELAB -> TDB : velocita = 0 se fermo,\n80 + random*80 se IN_VIAGGIO
         ELAB -> CODA : metti(topic, frame, QoS 0)
-        CODA -> BROKER : {"trenoId","stato","latitudine","longitudine",\n"velocita","progressPercent","passeggeri",\n"stazioneCorrente","prossimaStazione",\n"direzione","timestamp"}
+        CODA -> BROKER : {"trenoId","stato","condizione","faseViaggio",\n"latitudine","longitudine",\n"velocita","progressPercent","passeggeri",\n"stazioneCorrente","prossimaStazione",\n"direzione","timestamp"}
         note right of CODA
           Il frame lo consegna il thread pubblicatore-mqtt. A broker
           spento un frame a QoS 0 si butta: fra un secondo ne arriva
@@ -6485,7 +6298,7 @@ end
 
 BROKER -> ING : onTelemetry(payload)
 activate ING
-ING -> ING : TelemetriaMsg.da(json)\nIN_VIAGGIO->attivo, FERMO->fermo, EMERGENZA->rotto,\nSOPPRESSO->in manutenzione, CAPOLINEA->capolinea
+ING -> ING : TelemetriaMsg.da(json)\nIN_VIAGGIO->attivo, FERMO->fermo, EMERGENZA->rotto,\nSOPPRESSO->in manutenzione, CAPOLINEA->capolinea;\ncondizione e faseViaggio restano come sono
 ING -> GES : gestisci(TELEMETRIA)
 activate GES
 GES -> CACHE : 1. guardie: getTreno(trenoId)
@@ -6517,7 +6330,7 @@ else treno noto
     AUT -> CACHE : aggiornaTreno(treno) con stato, posizione,\nvelocita, passeggeri, fermate, ultimoAggiornamento
     CACHE -> CACHE : certificaPosizione(treno):\npartenza e arrivo garantiti, oppure incertezza
     deactivate AUT
-    GES -> WS : 3. NotificatoreRealtime.telemetria:\n{"eventType":"TELEMETRY","trainId",\n"stato","progressPercent","delayMinutes",\n"partenzaCorrente","arrivoCorrente","direzioneCorrente",\n"posizioneNota","incertezzaPosizione",...}
+    GES -> WS : 3. NotificatoreRealtime.telemetria:\n{"eventType":"TELEMETRY","trainId",\n"stato","condizione","faseViaggio","direzione",\n"progressPercent","delayMinutes",\n"partenzaCorrente","arrivoCorrente","direzioneCorrente",\n"posizioneNota","incertezzaPosizione",...}
     activate WS
     WS -->> WSC : messaggio sulla sessione aperta
     deactivate WS
@@ -6525,8 +6338,8 @@ end
 deactivate GES
 deactivate ING
 
-WSC -> STORE : updateTrain(trainId, {progressPercent,\nstatus, delayMinutes, currentStationId,\npreviousStationId, nextStationId, direction,\npositionKnown, positionDoubt})
-STORE -> USER : la mappa e l'elenco convogli si ridisegnano;\nsenza posizione garantita il convoglio esce dal\ndiagramma e passa nell'elenco degli incerti
+WSC -> STORE : updateTrain(trainId, {progressPercent,\nstatus, condition, journeyPhase, declaredDirection,\ndelayMinutes, currentStationId,\npreviousStationId, nextStationId, direction,\npositionKnown, positionDoubt})
+STORE -> USER : la mappa e l'elenco convogli si ridisegnano,\ncon lo stato composto (statiDelTreno: T6, T5, T7);\nsenza posizione garantita il convoglio esce dal\ndiagramma e passa nell'elenco degli incerti
 
 note over WSC, STORE
   I campi della posizione si scrivono sempre, anche a null: e' cosi'
@@ -6646,14 +6459,14 @@ else stazione nota
       Anche qui si storicizza solo al cambio: a ogni battito
       sarebbero circa 8.600 righe identiche al giorno per stazione.
     end note
-    GES -> AUT : 2. dalCampo(stato) se accettato,\nbattito(ultimoHeartbeat = adesso)
+    GES -> AUT : 2. dalCampo(stato) se accettato,\nbattito(ultimoHeartbeat = adesso,\nstatoDichiarato = stato del battito)
     opt tornataDalFailStop
         GES -> GES : 3. RESOLVED dei guasti chiusi\n-> continua in SQ10
     end
     opt annunciaStato
         GES -> GES : 3. STATO_STAZIONE su railway/alerts\n(fa ripartire i treni trattenuti)
     end
-    GES -> WS : 3. broadcast({"eventType":"HEARTBEAT","stationId",\n"status": operativa|guasta|manutenzione|offline})
+    GES -> WS : 3. broadcast({"eventType":"HEARTBEAT","stationId",\n"status": operativa|guasta|manutenzione|offline,\n"statoDichiarato": ONLINE|GUASTA})
 end
 deactivate GES
 deactivate ING
@@ -6673,7 +6486,7 @@ end note
 - e' il diagramma piu' importante del capitolo: fa vedere la catena con cui un fatto fisico diventa un dato, e i tre salti di responsabilita' che la compongono
 - il convoglio *passa* (MQTT verso i sensori), il sensore di binario *rileva* (REST verso il proprio nodo), la stazione *certifica* alla centrale (MQTT); nessuno dei tre fa il lavoro dell'altro
 - in centrale la notizia e' un evento PASSAGGIO per il gestore degli eventi, e serve a due cose in quest'ordine: prima la mossa di AutomaTreno misura il ritardo e sposta il convoglio sull'itinerario, poi il gestore scrive la riga del transito con quel ritardo gia' aggiornato
-- il topic su cui il treno dichiarava lo stesso passaggio alla centrale non c'e' piu': era il secondo testimone dello stesso fatto, ed e' stato tolto perche' rendeva innocuo il fail-stop del sensore
+- il treno non dichiara il passaggio alla centrale: un secondo testimone dello stesso fatto renderebbe innocuo il fail-stop del sensore
 - requisiti coperti: RF03.3 parzialmente (qui c'e' la via della rilevazione a terra, l'altra e' la telemetria di SQ04), RF03.4 perche' il passaggio entra nel nodo solo dalle sue API pubbliche, RF01.5 parzialmente perche' e' qui che nasce lo storico consultabile, RF02.2.4 per i passaggi spaiati degli estremi
 #+begin_src  plantuml file: sq_06_passaggio_due_sorgenti.png
 @startuml SQ06 - Passaggio in stazione dal binario alla Centrale
@@ -6819,12 +6632,12 @@ GES -> PG : 2. db.inTransazione: posizione sulla tratta
 GES -> AUT : 2. passaggio(treno, msg, posizione, ...)
 activate AUT
 alt tipo ENTRATA
-    AUT -> AUT : registraArrivo(): confronto con l'orario\nfissato all'uscita precedente -> ritardo
+    AUT -> AUT : registraArrivo(): confronto con l'orario\nfissato all'uscita precedente -> ritardo,\nal posto della stima fatta con la telemetria
 else tipo USCITA
-    AUT -> AUT : programmaArrivo(): fissa l'ora in cui\nil convoglio e' atteso alla prossima fermata
+    AUT -> AUT : programmaArrivo(): conta la sosta oltre il previsto\ne fissa l'ora in cui il convoglio e' atteso\nalla prossima fermata
 end
 AUT -> CACHE : stazioneCorrente, prossimaStazione,\ntratta, stato, progresso, ritardo
-AUT --> GES : variazione del ritardo
+AUT --> GES : variazione del ritardo misurato
 deactivate AUT
 
 GES -> GES : ritardoAlPassaggio = quello appena misurato
@@ -6845,7 +6658,7 @@ end
 PG --> GES : commit
 deactivate PG
 GES -> CACHE : 2. AutomaStazione: treniInStazione++ oppure --
-opt il ritardo e' cambiato
+opt il ritardo misurato e' cambiato
     GES -> GES : 3. pubblicaRitardo(): alert RITARDO su\nrailway/alerts con target il convoglio\n(a bordo il numero si annota e basta)
 end
 GES -> WS : 3. broadcast({"eventType":"TRANSIT","trainId",\n"stationId","type": ingresso|uscita,"delayMinutes"})
@@ -7005,11 +6818,11 @@ end note
 *** SQ08 convoglio trattenuto da una stazione guasta
 - due controlli in due momenti diversi: l'alert blocca subito il convoglio se la stazione guasta e' la corrente o la prossima, altrimenti la stazione resta annotata fra quelle guaste e sara' il controllo alla ripartenza a trattenerlo
 - quel secondo controllo e' anche quello che copre chi era gia' fermo in quella stazione quando il guasto e' arrivato
-- mentre e' bloccato a meta' tratta il cronometro della tratta viene congelato, cosi' la percentuale di avanzamento non cresce; il ritardo che ne segue non lo conta il convoglio, lo misura la Centrale quando il treno arriva alla fermata dopo l'orario previsto
+- mentre e' bloccato a meta' tratta il cronometro della tratta viene congelato, cosi' la percentuale di avanzamento non cresce; il ritardo non lo conta il convoglio: la Centrale lo vede crescere a ogni frame di telemetria (M3), perche' la sosta si allunga o l'avanzamento resta fermo mentre l'orario corre, e lo misura al passaggio successivo (M5)
 - riparte al ripristino e non allo scadere di un tempo, e non basta che l'allarme si chiuda: il permesso di ripartire e' solo lo =STATO_STAZIONE= ONLINE della Centrale, perche' un guasto chiuso non vuol dire che sui binari non ci sia ancora la squadra
 - lo stesso blocco lo provoca anche la manutenzione, che pero' non arriva da qui ma dalla Centrale con l'alert =STATO_STAZIONE= (SQ14): il convoglio non distingue i due casi, per lui quei binari non si attraversano e basta
 - lato treno ogni alert diventa un evento per il gestore, che prima valuta le guardie (la stazione e' la corrente o la prossima? il treno e' in una fase che si puo' bloccare?) e solo dopo scrive
-- requisiti coperti: RF02.1.1.2.1, RF02.1.1.2.2 e RF02.1.1.2.3 completi, RF02.2.1.1 perche' il convoglio trattenuto resta fermo e la Centrale ne misura il ritardo
+- requisiti coperti: RF02.1.1.2.1, RF02.1.1.2.2 e RF02.1.1.2.3 completi, RF02.2.1.1 perche' il convoglio trattenuto resta fermo e la Centrale ne fa crescere il ritardo finche' non riparte
 #+begin_src  plantuml file: sq_08_treno_trattenuto.png
 @startuml SQ08 - Treno trattenuto da una stazione guasta
 ' =========================================================================
@@ -7143,8 +6956,9 @@ note over TGW, VIA
   allo scadere di un tempo e nemmeno alla chiusura dell'allarme: non
   esiste nessun timer che lo liberi da solo. Se nel frattempo era
   andato in EMERGENZA ci resta, perche' lo sblocco scrive solo la fase
-  (T5) e la condizione e' un'altra macchina (T6). Il ritardo che ne
-  segue lo misura la Centrale all'arrivo alla fermata successiva.
+  (T5) e la condizione e' un'altra macchina (T6). Il ritardo intanto
+  cresce in Centrale, che a ogni frame vede il treno fermo mentre
+  l'orario corre, e al passaggio successivo diventa una misura.
 end note
 
 @enduml
@@ -7440,7 +7254,7 @@ note right of PG
   operatore, non il ritorno del battito.
 end note
 GES -> PG : 2. db.inTransazione: chiudiGuasto per ognuno\n(risolto = true, istante di chiusura)
-GES -> CACHE : 2. AutomaStazione.dalCampo(stato dichiarato),\nbattito(ultimoHeartbeat = adesso),\nAutomaGuasto.chiudi per ognuno
+GES -> CACHE : 2. AutomaStazione.dalCampo(stato dichiarato),\nbattito(ultimoHeartbeat = adesso, statoDichiarato),\nAutomaGuasto.chiudi per ognuno
 loop per ogni guasto chiuso
     GES -> BROKER : 3. pubblicaRisoluzione\n{"tipoEvento":"RESOLVED","origine":"CENTRALE",...}
     GES -> WS : 3. ALERT con risolto = true
@@ -7849,12 +7663,10 @@ else credenziali corrette
     CTRL --> AUTH : 200 {id, username, role,\ndisplayName, avatarInitials}
     deactivate CTRL
     note right of CTRL
-      Il payload e' identico a quello del vecchio login, cosi' il
-      frontend non ha dovuto cambiare struttura dati. Ma i valori
-      arrivano meta' dal token e meta' dall'anagrafica: l'id e'
-      l'id_utente (U1, U3...) a cui puntano le chiavi esterne dei
-      guasti, ritrovato partendo dal claim "matricola".
-      Il ruolo e' quello di realm, non piu' la colonna Utenti.tipo.
+      I valori arrivano meta' dal token e meta' dall'anagrafica:
+      l'id e' l'id_utente (U1, U3...) a cui puntano le chiavi
+      esterne dei guasti, ritrovato dal claim "matricola".
+      Il ruolo e' quello di realm, non la colonna Utenti.tipo.
     end note
     AUTH -> PAGE : isAuthenticated = true, user
     deactivate AUTH
@@ -8499,6 +8311,7 @@ end note
 - una stazione ancora estremo di qualche tratta non si cancella, e nemmeno una tratta usata da un itinerario, presente nei transiti ancora vivi o posizione corrente di un convoglio
 - per il convoglio invece si e' scelta la cancellazione a cascata degli storici: sono due decisioni diverse prese apposta, perche' una stazione tolta spezzerebbe archi ancora usati da altri percorsi
 - il nome del convoglio non e' modificabile perche' e' la chiave primaria e il riferimento delle chiavi esterne di quattro storici
+- dall'interfaccia si scrivono solo nome e coordinate della stazione, nome e itinerario del convoglio: lo stato (e i binari della stazione) la PUT lo accetta ancora, ma la web app non lo manda
 - requisiti coperti: RF01.3.1, RF01.3.2 e RF01.3.3 completi; RF01.3.5 parzialmente, perche' l'integrita' la tengono anche i vincoli del database e non solo questi controlli
 #+begin_src  plantuml file: sq_17_anagrafica.png
 @startuml SQ17 - Amministrazione dell'anagrafica della rete
@@ -8598,7 +8411,7 @@ deactivate REST
 
 == Modifica di un convoglio ==
 
-USER -> API : cambia stato o itinerario
+USER -> API : cambia l'itinerario
 API -> REST : PUT /api/treni/{id}
 activate REST
 alt il corpo prova a cambiare il nome
@@ -8622,6 +8435,11 @@ else modifica valida
     REST -> CACHE : allinea l'itinerario,\nconservando la telemetria gia' in memoria
     opt nel corpo c'e' uno stato
         REST -> REST : gestore: evento STATO_TRENO_OPERATORE\n(riga e cache le scrive AutomaTreno)
+        note right of REST
+          La web app non lo manda piu': il form del convoglio
+          ha solo l'itinerario. Il ramo resta per chi chiama
+          la PUT direttamente.
+        end note
     end
     opt l'itinerario e' cambiato
         REST -> BROKER : ITINERARIO_AGGIORNATO (SQ16)
@@ -8884,7 +8702,7 @@ nel capitolo /Specifica/: qui si dice quale conversazione lo mostra, non se il s
 | RF02.1.4     | SQ10       |              | il prefisso nel messaggio e' cio' che permette la chiusura automatica          |
 | RF02.2.1.1   | SQ08       |              | il ritardo cresce mentre il convoglio e' trattenuto                            |
 | RF02.2.2.1   | SQ04       | SQ06         | la posizione e' interpolata dal motore e corretta dai passaggi                 |
-| RF02.2.2.2   | SQ06       | SQ08         | il ritardo lo misura la centrale al passaggio e lo comunica al convoglio con l'alert RITARDO |
+| RF02.2.2.2   | SQ06       | SQ08         | il ritardo lo misura la centrale al passaggio e lo comunica al convoglio con l'alert RITARDO; fra un passaggio e l'altro lo stima dalla telemetria |
 | RF02.2.2.3   | SQ04       |              |                                                                               |
 | RF02.2.2.4   | SQ04       |              | velocita' e passeggeri sono gli unici dati ancora simulati                     |
 | RF02.2.3     |            | SQ06         | l'inversione all'estremo e' nel motore, nessuna conversazione la mostra sola   |
@@ -9951,7 +9769,7 @@ end note
 *** Il componente Centrale: mappa delle tre viste
 
 - requisiti coperti: nessuno in proprio, e' l'indice dei tre diagrammi che seguono
-- le viste erano due: lo scorporo dell'ingestione ha creato un confine che prima non c'era, quello fra chi sa di MQTT (C4a) e chi sa di ferrovia (C4b), e questa mappa serve soprattutto a farlo vedere. Con il passaggio al gestore degli eventi il confine e' diventato ancora piu' netto: tutto quello che sta sopra traduce e basta, tutto quello che cambia lo stato passa da un metodo solo, GestoreEventi.gestisci()
+- la mappa serve soprattutto a far vedere il confine fra chi sa di MQTT (C4a) e chi sa di ferrovia (C4b): tutto quello che sta sopra traduce e basta, tutto quello che cambia lo stato passa da un metodo solo, GestoreEventi.gestisci()
 #+begin_src  plantuml file: classi_mappa_centrale.png
 @startuml CC - Mappa dei diagrammi della centrale
 skinparam linetype ortho
@@ -10521,6 +10339,7 @@ class PubblicatoreAlert <<canale>> {
 package "ingestion.payload" as MSG {
   class TelemetriaMsg <<record>> <<messaggio>> {
     + trenoId, stato, direzione : String
+    + condizione, faseViaggio : String
     + latitudine, longitudine : double
     + velocita, progresso : double
     + passeggeri : int
@@ -10665,9 +10484,9 @@ end note
 note left of StatiCanonici
   Il vocabolario degli stati ammessi dal CHECK del database. Sta in
   entity/ perche' descrive il contenuto di due colonne, ed e' l'unica
-  classe di questa vista che serve anche a C3 e C4b: l'amministratore
-  che scrive uno stato dal pannello passa di qui come ci passa un
-  convoglio che lo dichiara su MQTT.
+  classe di questa vista che serve anche a C3 e C4b: una PUT che
+  scrive uno stato passa di qui come ci passa un convoglio che lo
+  dichiara su MQTT.
 end note
 
 note bottom of ExistIdForEdge
@@ -10703,12 +10522,9 @@ skinparam linetype ortho
 '  arriva gia' tipizzata da C4a, oppure da una richiesta REST (C3), oppure
 '  dal watchdog che guarda l'orologio, e diventa un EventoCentrale.
 '
-'  Prima questa logica stava in cinque servizi (MonitoraggioTreni,
-'  MonitoraggioStazioni, TransitiService, GuastiService, FaultMonitor) che
-'  scrivevano lo stato ognuno per conto suo: lo stato di una stazione lo
-'  cambiavano in cinque classi, e la regola della manutenzione era
-'  ripetuta a memoria in due. Adesso lo stato lo scrivono solo gli automi,
-'  e gli automi li muove solo il gestore.
+'  Lo stato lo scrivono solo gli automi, e gli automi li muove solo il
+'  gestore: ogni regola (per esempio quella della manutenzione) sta in un
+'  punto solo.
 '
 '  Le dipendenze non hanno cicli: gli automi non conoscono il gestore ne'
 '  si conoscono fra loro; quando un evento ne muove piu' d'uno (un guasto
@@ -10847,7 +10663,7 @@ class AutomaStazione <<automa>> {
   + accettaDalCampo(stazione, nuovoStato : String) : boolean
   + silenziosa(stazione, limite : Instant) : boolean
   .. mosse ..
-  + dalCampo(stazione, nuovoStato) / battito(stazione, quando) : void
+  + dalCampo(stazione, nuovoStato) / battito(stazione, quando, dichiarato) : void
   + vaiOffline(stazione) / guasta(stazione) : void
   + inviaSquadra(stazione) / tornaOnline(stazione, quando) : void
   + imponiDallOperatore(stazione, stato : String) : void
@@ -10895,7 +10711,12 @@ class PrevisioneArrivi <<servizio>> {
   - {static} TICK_DI_TOLLERANZA : int
   + fattoreAccelerazione : double
   + sostaSecondi : long
+  - tabellaDiMarcia : Map<String, Marcia>
+  - soste : Map<String, Sosta>
+  - ritardoInCorso : Map<String, Integer>
   + aggiornaPrevisione(treno : Treno) : void
+  + aggiornaRitardo(treno : Treno, adesso : Instant) : void
+  + ritardoMisurato(treno : Treno) : int
   + programmaArrivo(treno, stazionePartenza, quandoEUscito, direzione) : void
   + registraArrivo(treno, stazioneRaggiunta, quandoEEntrato) : boolean
   + previsioneVerso(treno : Treno, stazioneTarget : String) : Previsione
@@ -10954,7 +10775,7 @@ GestoreEventi --> AutomaStazione : guardie e mosse
 GestoreEventi --> AutomaGuasto : guardie e mosse
 GestoreEventi --> NavigazioneItinerario : dove si trova il convoglio\ne che fermata ha davanti
 GestoreEventi --> TrafficLogicEngine : legge soltanto
-AutomaTreno --> PrevisioneArrivi : orario previsto\ne ritardo misurato
+AutomaTreno --> PrevisioneArrivi : orario previsto,\nritardo misurato e in corso
 AutomaTreno --> TrafficLogicEngine : scrive la copia\nin cache
 AutomaStazione --> TrafficLogicEngine
 AutomaGuasto --> TrafficLogicEngine
@@ -11039,8 +10860,7 @@ note bottom of GeneratoreEventiTempo
   perche' con scheduleAtFixedRate un'eccezione uscita dal compito ne
   fermerebbe per sempre la ripetizione. Che cosa succede a ogni scatto
   lo decide il gestore, con le stesse guardie e mosse di tutti gli
-  altri eventi. Prima erano tre metodi del FaultMonitor, che guardava
-  e scriveva da solo.
+  altri eventi.
 end note
 
 note left of PrevisioneArrivi
@@ -11050,13 +10870,20 @@ note left of PrevisioneArrivi
   campiona la propria posizione, piu' il viaggio del passaggio dal
   sensore fino a qui) letto pero' con il righello dell'orario di
   servizio, quindi cresce insieme al fattore di accelerazione. Con il
-  fattore 100 un solo secondo reale vale gia' 1,67 minuti di orario: la
-  vecchia tolleranza di due minuti fissi ci passava sotto per un soffio
-  e ogni convoglio si prendeva due minuti di ritardo a OGNI fermata pur
-  viaggiando in perfetto orario. Il confronto, inoltre, si fa sullo
-  scarto vero e si arrotonda solo quello che finisce davvero nel
-  ritardo: arrotondare prima faceva passare per 2 minuti proprio il
-  quanto di campionamento che il controllo doveva fermare.
+  fattore 100 un solo secondo reale vale gia' 1,67 minuti di orario, e
+  una tolleranza fissa di due minuti darebbe a ogni convoglio due
+  minuti di ritardo a OGNI fermata pur viaggiando in perfetto orario.
+  Il confronto, inoltre, si fa sullo scarto vero e si arrotonda solo
+  quello che finisce davvero nel ritardo: arrotondando prima, il
+  quanto di campionamento passerebbe per 2 minuti.
+
+  Il ritardo ha due parti: quella MISURATA ai passaggi e quella IN
+  CORSO, che si rifa' a ogni frame di telemetria (la sosta oltre il
+  previsto, o il tempo dalla partenza meno quello che l'orario da'
+  alla quota di tratta fatta). La quota in corso sta anche in
+  ritardoInCorso, cosi' il passaggio dopo la puo' togliere e mettere
+  al suo posto la misura dello stesso tempo. Vale la stessa
+  tolleranza: la quota di tratta arriva con un frame vecchio di un tick.
 end note
 
 @enduml
@@ -11349,6 +11176,10 @@ class apiClient <<modulo>> {
   ' traduce per l'operatore il codice con cui la Centrale dichiara
   ' l'incertezza: lo usano la mappa, i Treni e il tabellone di stazione
   + descriviIncertezzaPosizione(motivo) : string
+  ' lo stato composto, un valore per automa: li usano tutte le
+  ' schermate che mostrano un treno o una stazione
+  + statiDelTreno(train) : StatoAutoma[]
+  + statiDellaStazione(station) : StatoAutoma[]
 }
 
 class WebSocketClient {
@@ -11408,6 +11239,10 @@ class Train <<tipo>> {
   status : TrainStatus
   currentStationId, nextStationId, previousStationId : string | null
   direction : 'andata' | 'ritorno' | null
+  ' lo stato dei tre automi del convoglio (T6, T5, T7) come lo dichiara
+  ' lui; status e' solo il riassunto della Centrale (M13)
+  condition, journeyPhase : string | null
+  declaredDirection : 'andata' | 'ritorno' | null
   ' i due campi con cui la Centrale dice se di questa posizione si fida
   positionKnown : boolean
   positionDoubt : string | null
@@ -11418,11 +11253,19 @@ class Train <<tipo>> {
 class Station <<tipo>> {
   id, code, name, city : string
   status : StationStatus
+  ' lo stato che il nodo dichiara nel battito (S10)
+  declaredStatus : string | null
   coordinates : {x, y}
   platforms : number
-  lastHeartbeat : number
+  lastHeartbeat : number | null
   operatorsDispatched : boolean
 }
+class StatoAutoma <<tipo>> {
+  automa : string
+  valore : string
+  tono : success | warning | danger | info | neutral
+}
+class "StatoComposto\n(components/ui)" as SC <<vista>>
 class Alert <<tipo>> {
   id : string
   type : AlertType
@@ -11492,6 +11335,9 @@ useRealtimeUpdates --> railwayStore : updateTrain, updateStation,\naddAlert, add
 
 railwayStore o-- Train
 railwayStore o-- Station
+P3 --> SC : stato composto di\ntreni e stazioni
+SC ..> StatoAutoma : un badge\nper automa
+apiClient ..> StatoAutoma
 railwayStore o-- Alert
 railwayStore o-- Transit
 railwayStore o-- Route
@@ -11501,9 +11347,8 @@ apiClient ..> DashboardKPI
 
 note right of apiClient
   apiClient tiene l'access token in una variabile di modulo, ma non e'
-  piu' lui a possederlo: glielo passa authStore dopo lo scambio del
-  codice e a ogni rinnovo. Non e' piu' un UUID inventato dalla Centrale
-  ma un JWT firmato da Keycloak. Le rotte non sono fisse nel codice,
+  lui a possederlo: glielo passa authStore dopo lo scambio del codice e
+  a ogni rinnovo. E' un JWT firmato da Keycloak. Le rotte non sono fisse nel codice,
   arrivano da VITE_API_BASE_URL, cosi' col profilo tls si punta a
   https://localhost:8444/api senza ricompilare.
 end note
@@ -11548,9 +11393,9 @@ note bottom of railwayStore
   null compreso, sia dallo snapshot sia dall'evento TELEMETRY: quel
   null e' la notizia (nessuno conferma piu' da dove il convoglio
   sta arrivando), non l'assenza di una notizia. Scrivendoli solo se
-  valorizzati - com'era prima - l'ultima posizione buona restava
-  appiccicata al treno mentre accanto gli arrivava una destinazione
-  aggiornata, e la coppia che ne usciva non era una tratta della rete.
+  valorizzati, l'ultima posizione buona resterebbe
+  appiccicata al treno mentre accanto gli arriva una destinazione
+  aggiornata, e la coppia non sarebbe una tratta della rete.
 end note
 
 note right of P3
@@ -11564,6 +11409,18 @@ note right of P3
   rimette insieme partenza e arrivo, poi torna sul diagramma da solo.
   Le stesse informazioni, con lo stesso vocabolario, compaiono nella
   pagina Treni e nel tabellone della stazione.
+end note
+
+note bottom of SC
+  Un elemento e' in tanti stati quanti sono i suoi automi, tutti nello
+  stesso momento: il treno trattenuto da una stazione guasta e'
+  REGOLARE (T6), BLOCCATO_IN_TRATTA (T5) e in ANDATA (T7). Prima le
+  schermate mostravano una parola sola, tradotta dal riassunto della
+  Centrale, e "fermo" diventava "in stazione" anche a meta' tratta.
+  StatoComposto la usano mappa, Treni, Stazioni, Dashboard e
+  Amministrazione: un badge per automa, col nome dell'automa nel
+  tooltip. La stazione mostra M12 e, solo in MANUTENZIONE, anche lo
+  stato che il nodo dichiara di se' (S10).
 end note
 
 @enduml
@@ -11583,7 +11440,7 @@ end note
 | RF01.2 (guasti)     |            | C6, C3, modello | l'entita' Guasto e il suo storico stanno nel capitolo Modello; il campo operatore resta sempre nullo |
 | RF01.3 (anagrafica) |            | C3, modello     | i comandi in C3, i vincoli e le chiavi esterne nel modello                 |
 | RF01.4 (comandi)    |            | C3, C1, C2      | partono da C3 e arrivano ai gateway dei nodi; nessuna classe registra chi li ha impartiti |
-| RF01.5 (storico)    |            | modello, C3     | le otto tabelle di storico e gli endpoint che le servono; solo quattro vengono davvero scritte, e la schermata che le mostra e' fuori dal menu |
+| RF01.5 (storico)    |            | modello, C3     | le otto tabelle di storico e gli endpoint che le servono; solo quattro vengono davvero scritte, e nell'interfaccia non c'e' una schermata che le mostri |
 | RF01.6 (accesso)    | C3         | C6              | filtro lato server, client OAuth2 e custodia del token lato browser        |
 | RF02.1.1.1          |            | C2              | la coda locale, i pubblicatori che la riempiono e il consumatore che la svuota |
 | RF02.1.1.2          |            | C1, C2          | le stazioni note al treno e l'automa del viaggio che si blocca             |
@@ -11612,16 +11469,11 @@ e si trovano i metodi, qui si parte dalla classe e si trova la macchina. Le sigl
 capitolo, T = treno (T1...T11), S = stazione (S1...S11), M = centrale (M1...M13), trentacinque
 macchine in tutto.
 
-*Che cosa vuol dire "cuore".* Una macchina a stati non sta quasi mai in una classe sola: per
-funzionare se ne tira dietro altre, e se le mettessi tutte in tabella ogni macchina comparirebbe
-quattro o cinque volte e la mappatura non direbbe piu' niente. Qui ogni macchina compare una volta
-sola, sulla riga della classe che ne *scrive le transizioni*, cioe' quella che assegna il valore
-nuovo alla variabile di stato. Le classi che servono la macchina senza farla transitare hanno un
-trattino, e la nota dice di quale macchina sono il contorno: sono i tre contenitori di stato
-(=TrainDB=, =DBLocale=, =TrafficLogicEngine=), che tengono in RAM le variabili ma non le muovono, i
-client (=Sensori=, =SecureHttpClient=, =CaricatoreItinerario=, le pagine della web app) e il
-=RailwayRepository=, che le
-variabili le scrive su disco ma solo quando gliel'ha detto qualcun altro.
+*Che cosa vuol dire "cuore".* Ogni macchina compare una volta sola, sulla riga della classe che ne
+*scrive le transizioni*, cioe' che assegna il valore nuovo alla variabile di stato. Le classi che
+servono la macchina senza farla transitare hanno un trattino, e la nota dice di quale macchina sono
+il contorno: i contenitori di stato (=TrainDB=, =DBLocale=, =TrafficLogicEngine=), i client e il
+=RailwayRepository=.
 
 #+ATTR_LATEX: :environment longtable :align L{0.30\textwidth}L{0.13\textwidth}L{0.44\textwidth} :font \small
 | classe                                 | macchine       | perche' e' lei il cuore (oppure di che cosa e' il contorno)                  |
@@ -11692,7 +11544,7 @@ variabili le scrive su disco ma solo quando gliel'ha detto qualcun altro.
 | AutomaTreno                            | M13            | scrive =Treno.stato=, la posizione e il ritardo nella cache; la riga del database la scrive il gestore |
 | GeneratoreEventiTempo                  | --             | e' il battito di M8, ma manda solo eventi: nessuna variabile di stato la scrive lui |
 | EventoCentrale                         | --             | l'alfabeto delle macchine: che cosa e' successo e i dati per reagire |
-| NavigazioneItinerario, PrevisioneArrivi | --            | nessuna transizione: rispondono a domande (dove sono, quando arrivo) e misurano il ritardo per AutomaTreno |
+| NavigazioneItinerario, PrevisioneArrivi | --            | nessuna transizione: rispondono a domande (dove sono, quando arrivo) e misurano e stimano il ritardo per AutomaTreno |
 | PosizioneConvoglio                     | --             | nemmeno lei fa transitare niente, ma non e' un contorno: e' un giudizio. Date le due fonti sulla posizione decide se la centrale e' in grado di rispondere, e sono funzioni pure, senza stato e senza database |
 | TrafficLogicEngine                     | --             | e' la cache dove vivono le variabili di M7, M12 e M13, come =TrainDB= a bordo: le transizioni gliele scrivono gli automi |
 |----------------------------------------+----------------+-----------------------------------------------------------------------------|
@@ -11702,19 +11554,16 @@ variabili le scrive su disco ma solo quando gliel'ha detto qualcun altro.
 | *C6 - la Web App*                       |                |                                                                             |
 | keycloak, authStore                    | M9 (meta' browser) | PKCE, scambio del codice e rinnovo del token: M9 e' l'unica macchina che attraversa due componenti |
 | apiClient, WebSocketClient, railwayStore, useRealtimeUpdates, le pagine | -- | sono i consumatori di M10 e M11: ridisegnano quello che ricevono, nessuno stato del dominio nasce qui |
+| StatoComposto, CampoNumerico           | --             | componenti di presentazione: il primo stampa un badge per automa (T5, T6, T7, M12, S10), il secondo e' il campo numerico dei form di amministrazione |
 
-*La macchina che non ha una riga.* Trentaquattro delle trentacinque stanno nella tabella; manca
-M1, il ciclo di vita del processo della centrale. Il suo cuore e' il =main= di
-=ServeCentraleOperativa=, che non e' disegnato in nessuna delle quattro viste perche' le viste
-cominciano a oggetti gia' creati e collegati. Sui nodi di campo la macchina corrispondente (T1, S1)
-invece c'e', e la ragione e' che li' il =main= fa anche la validazione dell'id.
+*La macchina che non ha una riga.* Manca solo M1, il ciclo di vita del processo della centrale: il
+suo cuore e' il =main= di =ServeCentraleOperativa=, che non compare nelle viste perche' queste
+partono da oggetti gia' creati e collegati. Sui nodi di campo T1 e S1 invece ci sono, perche' li'
+il =main= fa anche la validazione dell'id.
 
-Le tre macchine di dominio della centrale (M7 guasto, M12 stazione, M13 treno) una riga non
-l'avevano, finche' il loro cuore era un campo di un'entita' (=Guasto.risolto=, =Stazione.stato=,
-=Treno.stato=) che scrivevano classi diverse in punti diversi: lo stato di una stazione lo
-cambiavano cinque classi. Adesso ognuna ha un automa che ne e' l'unico scrittore, e un gestore
-degli eventi che e' l'unico a chiamarlo: e' il risultato piu' concreto della riscrittura, ed e'
-anche il motivo per cui la tabella e' passata da trentadue righe a trentaquattro.
+Le tre macchine di dominio della centrale (M7 guasto, M12 stazione, M13 treno) hanno ciascuna un
+automa che e' l'unico scrittore della sua variabile, e il gestore degli eventi e' l'unico a
+chiamarlo.
 
 ** Interfaccia utente
 *** Mappa della navigazione
@@ -11808,11 +11657,11 @@ state "Applicazione\n(cornice: barra laterale + titolo)" as App {
     Tratte : di percorrenza (RF01.3.3, sola lettura)
 
     state "Stazioni\n/stations" as Staz
-    Staz : stato e ultimo battito dei nodi, guasto in corso,
+    Staz : stato composto e ultimo battito dei nodi, guasto in corso,
     Staz : treni attesi, riparazione compiuta (RF01.1.3, RF01.4.2)
 
     state "Treni\n/trains" as Treni
-    Treni : stato, direzione, posizione e ritardo dei convogli,
+    Treni : stato composto, direzione, posizione e ritardo dei convogli,
     Treni : con la scheda del singolo treno (RF01.1.2)
 
     state "Allarmi\n/alerts" as All
@@ -11833,7 +11682,7 @@ state "Applicazione\n(cornice: barra laterale + titolo)" as App {
         AdmTreni : itinerario, lo ritira, lo sopprime (RF01.3.2)
 
         state "Stazioni" as AdmStaz <<scheda>>
-        AdmStaz : registra un nodo con coordinate e binari,
+        AdmStaz : registra un nodo con nome e coordinate,
         AdmStaz : lo modifica, lo elimina (RF01.3.1, RF01.3.5)
 
         [*] --> AdmItin : scheda aperta\nper prima
@@ -11884,10 +11733,8 @@ note bottom of App
   riparazione compiuta - compaiono solo al tecnico, la scrittura
   dell'anagrafica solo all'amministratore.
 
-  La pagina Transiti esiste nel codice (TransitsPage.tsx, storico
-  completo con filtri) ma il 19 agosto la sua rotta e la sua voce di
-  menu sono state tolte: i dati arrivano nello store e nessuno li
-  puo' consultare. E' il limite dichiarato di RF01.5.
+  Lo storico dei transiti arriva nello store ma nessuna pagina lo
+  mostra: e' il limite dichiarato di RF01.5.
 end note
 
 @enduml
@@ -11920,14 +11767,17 @@ ne' i client-id sul broker. Si lanciano con =./mvnw test= dentro ciascuno dei tr
 =npx vitest run= dentro =ClientWebAppIntefacciaUtente=.
 
 Le prove manuali richiedono invece il sistema completo: =docker compose up= per broker, PostgreSQL e
-Keycloak, i tre moduli Java (un =jar= per modulo, lanciato con =java -jar=, e =-Dprofilo=tls= per la
-versione cifrata) e la web app.
+Keycloak, poi =./popola_db.sh=, che crea le tabelle con lo =schema.sql= della Centrale e carica in
+una sola transazione i dati demo di =populate_db.sql= (10 stazioni, 20 tratte, 15 itinerari, 15
+convogli; si ferma se il database ha gia' delle stazioni), quindi i tre moduli Java (un =jar= per
+modulo, lanciato con =java -jar=, e =-Dprofilo=tls= per la versione cifrata) e la web app. Gli
+elenchi =stazioni.conf= e =treni.conf= dei nodi di campo contengono gli id dei dati demo: un id che
+non e' nel database viene rifiutato dalla validazione.
 
 ** Test automatici
 
-Esito dell'esecuzione del 30 settembre 2026, dopo la riscrittura dei tre moduli Java senza framework:
-*168 test, tutti superati, nessun fallimento* — 99 nella Centrale, 27 nei Treni, 21 nelle Stazioni e 21
-nella web app. Nelle classi della Centrale che provano una sequenza (=AdminApiTest=,
+Esito dell'ultima esecuzione (1 ottobre 2026): *184 test, tutti superati* — 106 nella Centrale, 28
+nei Treni, 20 nelle Stazioni e 30 nella web app. Nelle classi della Centrale che provano una sequenza (=AdminApiTest=,
 =ChiusuraGuastiTest=, =ItinerariTratteTest=, =MemoriaStoricaTest=, =RegressioniBugTest=) il conteggio
 comprende anche il primo passo, che prepara la rete, e l'ultimo, che la ripulisce.
 
@@ -11936,11 +11786,11 @@ comprende anche il primo passo, che prepara la rete, e l'ultimo, che la ripulisc
 |----------+-------------------------+------+--------------------------------------------------------------------------|
 | Centrale | =AdminApiTest=          |   14 | gli endpoint dell'anagrafica e il filtro sui ruoli: senza token si viene respinti, il tecnico legge ma non crea, i nomi duplicati sono rifiutati (RF01.3, RF04.2) |
 | Centrale | =SicurezzaTest=         |   13 | la verifica dei token fatta con pac4j: passa il token buono e prendono 401 quello scaduto, quello per un'altra applicazione, di un altro realm, firmato da un'altra chiave, non firmato o manomesso, e qualunque token finche' le chiavi del realm non sono arrivate; il tecnico non tocca l'anagrafica, le due letture dei nodi di campo e la preflight del browser restano aperte (RF04.1, RF04.2) |
-| Centrale | =GestoreEventiTest=     |   13 | il gestore degli eventi, un evento per test: stato degli automi dopo la mossa, righe scritte sul database, messaggi partiti verso il campo e la web app. Il battito e la manutenzione, l'alert ripetuto, l'eco della Centrale, il convoglio rotto in stazione che la chiude, il rientro dal campo, il fail-stop e il treno fermo con le loro chiusure automatiche, i passaggi che misurano il ritardo, la soppressione, lo stato deciso dall'operatore, la validazione degli id (RF02.1, RF02.6, RF01.4) |
-| Centrale | =PrevisioneArriviTest=  |   11 | l'orario di servizio: la previsione somma tratte e soste, il ritardo nasce dal confronto con l'orario previsto e cresce anche per una sosta troppo lunga (RF02.2.1, RF02.2.2.2) |
+| Centrale | =GestoreEventiTest=     |   16 | il gestore degli eventi, un evento per test: stato degli automi dopo la mossa, righe scritte sul database, messaggi partiti verso il campo e la web app. Il battito e la manutenzione (con lo stato che il nodo dichiara, tenuto anche quando la Centrale non lo accetta), la telemetria che porta condizione e fase del convoglio fino alla web app, anche a null nell'evento che parte senza telemetria, l'alert ripetuto, l'eco della Centrale, il convoglio rotto in stazione che la chiude, il rientro dal campo, il fail-stop e il treno fermo con le loro chiusure automatiche, i passaggi che misurano il ritardo, la soppressione, lo stato deciso dall'operatore, la validazione degli id (RF02.1, RF02.6, RF01.4) |
+| Centrale | =PrevisioneArriviTest=  |   15 | l'orario di servizio: la previsione somma tratte e soste, il ritardo nasce dal confronto con l'orario previsto e cresce anche per una sosta troppo lunga; cresce gia' mentre il treno e' fermo, in banchina, a meta' tratta e alla stazione di partenza, senza contare due volte lo stesso tempo quando arriva la misura del passaggio, e a corsa finita resta quello raggiunto (RF02.2.1, RF02.2.2.2) |
 | Centrale | =ItinerariTratteTest=   |    9 | un itinerario si appoggia solo su tratte esistenti; il rifiuto lascia l'itinerario com'era e non a metà; i treni assegnati alla creazione vengono avvisati (RF01.3.3, RF01.3.4) |
 | Centrale | =PosizioneConvoglioTest= |   8 | quando la centrale sa dire dove sta un convoglio e quando ammette di non saperlo: fermo in stazione la posizione e' sempre nota, in linea serve la tratta confermata dai sensori letta nel verso giusto, e con una tratta ormai vecchia la partenza non si inventa (RF02.2.2.1, RF01.1.1) |
-| Centrale | =RegressioniBugTest=    |    7 | i bug trovati e chiusi, con un test a guardia di ciascuno               |
+| Centrale | =RegressioniBugTest=    |    7 | casi limite dell'anagrafica e dello snapshot: una PUT che non parla di assegnazioni non sgancia i convogli, un itinerario che ripassa sulla stessa tratta prende un 400, una tratta usata come posizione di un convoglio non si elimina, lo snapshot porta treni e stazioni |
 | Centrale | =ChiusuraGuastiTest=    |    7 | i due comandi del tecnico: la squadra non si manda su una stazione sana, l'invio la mette in manutenzione, ne' un alert ripetuto ne' il rientro dichiarato dal campo chiudono l'intervento, la chiusura dell'allarme la rimette in servizio (RF01.4.1, RF01.4.2) |
 | Centrale | =MemoriaStoricaTest=    |    4 | eliminare una stazione o un convoglio non cancella la loro storia (RF01.5, RF02.7) |
 | Centrale | =AlertRitardoTest=      |    4 | il ritardo misurato viaggia verso il convoglio con la causa giusta, e il rientro in orario non è un allarme (RF02.2.2.2) |
@@ -11952,21 +11802,21 @@ comprende anche il primo passo, che prepara la rete, e l'ultimo, che la ripulisc
 | Treni    | =RiaggancioItinerarioTest= | 9 | il riaggancio dopo un cambio di itinerario: il treno resta dov'è, si inverte all'estremo nuovo, aspetta se è in mezzo a una tratta, chi ha chiuso la corsa riparte solo se il capolinea è stato tolto, e chi era trattenuto resta fermo o riparte secondo lo stato delle fermate arrivato insieme al percorso (RF02.5, RF01.3.4, SV05) |
 | Treni    | =GestoreEventiTest= | 7 | le due variabili di stato del convoglio non si cancellano a vicenda: il blocco di una stazione non toglie l'EMERGENZA, la soppressione resiste a un itinerario nuovo e a un guasto di bordo, il guasto della stazione di capolinea non riapre la corsa; e la ENTRATA parte dopo le mosse, quindi con la direzione gia' invertita; all'arrivo con un percorso nuovo che passa due volte dalla stessa stazione il riaggancio sceglie l'occorrenza vicina alla stazione di arrivo (RF02.1.1.2, RF02.5.1, RF02.2.3) |
 | Treni    | =StazioneInManutenzioneTest= | 6 | la stazione in manutenzione ferma il convoglio in arrivo e tiene fermo quello che è già dentro; il guasto risolto non basta se la squadra è ancora sul posto, mentre la stazione dichiarata agibile fa ripartire anche prima della chiusura dell'allarme; la manutenzione di un'altra stazione non lo riguarda (RF01.4.1, RF02.1.1.2) |
+| Treni    | =TelemetriaTest=        |    1 | il frame di telemetria porta, oltre allo stato riassunto, la condizione e la fase del viaggio: il treno trattenuto a meta' tratta e' FERMO, REGOLARE e BLOCCATO_IN_TRATTA (RF02.2.2.3) |
 | Treni    | =RitardoComunicatoTest= |    3 | il ritardo che la Centrale comunica finisce a bordo, il rientro lo azzera, quello di un altro convoglio viene ignorato |
 | Treni    | =ExampleTest=           |    2 | il guasto di bordo esce come alert nel formato giusto, con una coda finta al posto del broker, e resta un JSON valido anche con le virgolette nella descrizione |
 | Stazioni | =GestoreEventiTest=     |   11 | gli automi della stazione: il sensore muto la guasta una volta sola e il suo ritorno la rimette online, ma non cancella un guasto che non e' suo (segnalato o della Centrale); al riavvio la causa si ricostruisce dal registro; il treno che entra in una stazione guasta viene trattenuto; il ripristino della Centrale ricomincia a sorvegliare i sensori; la stazione non reagisce all'eco dei propri allarmi (RF02.3.3, RF02.3.4, RF02.1.1.2.3) |
 | Stazioni | =SensoriFailStopTest=   |    5 | i sensori di binario, con le API REST vere su una porta libera: si chiamano con l'id della stazione, battono via REST, il sensore muto la guasta e il suo ritorno la rimette operativa, il sensore fermo non rileva il passaggio, le richieste sbagliate sono rifiutate (RF02.3.3, RF03.4) |
 | Stazioni | =ConsumatoreBufferTest= |    4 | lo store and forward: gli eventi partono in ordine sul topic del loro canale, a rete staccata restano in coda e partono al ritorno, col broker giu' la testa non si perde e non viene sorpassata, e gli eventi non spediti sopravvivono a un riavvio (RF02.1.1.1.1, RF02.1.1.1.2) |
-| Stazioni | =ExampleTest=           |    1 | segnaposto, vedi i limiti in fondo al capitolo                          |
-| Web app  | =TrafficMapPage=, =apiClient=, =Card= | 21 | il rendering della mappa, le chiamate con il token e i componenti di base; piu' i convogli a posizione incerta, che non vanno disegnati ma elencati, e che tornano sul diagramma da soli appena partenza e arrivo sono di nuovo noti |
+| Web app  | =TrafficMapPage=, =apiClient=, =Card= | 27 | il rendering della mappa, le chiamate con il token e i componenti di base; i convogli a posizione incerta, elencati e non disegnati finche' partenza e arrivo non tornano noti; lo stato composto: il treno trattenuto a meta' tratta e' REGOLARE, BLOCCATO_IN_TRATTA, ANDATA e non "in stazione", senza itinerario e al capolinea non c'e' verso, senza telemetria resta lo stato della Centrale, la stazione in manutenzione mostra anche lo stato del nodo (RF01.1.2, RF02.2.2.3) |
+| Web app  | =CampoNumerico=         |    3 | il campo numerico dei form di amministrazione: lo 0 di partenza non resta davanti alle cifre scritte, il campo svuotato resta vuoto, il valore segue le modifiche che arrivano da fuori (RF01.3) |
 
-*** Le prove di regressione
+*** Le prove dei casi limite
 
-=RegressioniBugTest= merita una riga a parte perché non nasce da un requisito ma da un errore.
-Ogni suo test corrisponde a un bug che il sistema aveva davvero e che è stato chiuso: i nomi dei
-metodi sono l'enunciato del bug — =modificareLeStazioniNonSganciaITreniAssegnati=,
-=itinerarioCheRipassaSullaStessaTrattaVieneRifiutato=,
-=trattaUsataComePosizioneDiUnTrenoNonSiElimina=. Servono a impedire che tornino.
+=RegressioniBugTest= merita una riga a parte perché non nasce da un requisito ma da un caso
+limite: i nomi dei metodi sono l'enunciato del comportamento che garantiscono —
+=modificareLeStazioniNonSganciaITreniAssegnati=, =itinerarioCheRipassaSullaStessaTrattaVieneRifiutato=,
+=trattaUsataComePosizioneDiUnTrenoNonSiElimina=.
 
 ** Esecuzione degli scenari
 
@@ -11999,15 +11849,11 @@ console interattiva =Sensori= dei due nodi.
 
 ** Limiti della verifica
 
-Tre cose vanno dette, perché non sono coperte.
+Due cose vanno dette, perché non sono coperte.
 
 - I test automatici si fermano al confine del processo :: verificano gli endpoint e la logica
   interna di ogni nodo, con il broker sostituito da una coda finta, ma non la conversazione via
   broker fra processi separati. Che la telemetria pubblicata dal treno arrivi davvero in Centrale e'
   verificato dagli scenari a mano, non da un test.
-- Il nodo Stazione ha ancora un segnaposto :: il suo =ExampleTest= non verifica niente. La parte
-  piu' delicata del nodo, la coda locale e il suo svuotamento, adesso invece ha test propri
-  (=ConsumatoreBufferTest=): il consumatore si prova con un client MQTT finto che si puo' "spegnere"
-  per far fallire le pubblicazioni come farebbe quello vero col broker giu'.
 - Scenari e requisiti non funzionali sono verificati a mano :: si rieseguono a ogni modifica solo
   se qualcuno si ricorda di farlo.

@@ -1,6 +1,7 @@
 import { useRailwayStore } from '../store/railwayStore';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
+import StatoComposto from '../components/ui/StatoComposto';
+import { statiDelTreno, statiDellaStazione } from '../api/apiClient';
 import { useState } from 'react';
 import { ShieldAlert, Plus, Trash2, Edit } from 'lucide-react';
 import RouteEditorModal from '../components/admin/RouteEditorModal';
@@ -193,9 +194,7 @@ export default function AdminPage() {
                         <td className="font-mono font-bold text-primary">{train.id}</td>
                         <td className="text-sm">{route?.name || '-'}</td>
                         <td>
-                          <Badge type={train.status === 'soppresso' ? 'danger' : 'info'}>
-                            {train.status.toUpperCase()}
-                          </Badge>
+                          <StatoComposto stati={statiDelTreno(train)} />
                         </td>
                         <td>
                           <div className="flex gap-2">
@@ -209,7 +208,10 @@ export default function AdminPage() {
                             >
                               <Edit size={14} /> Modifica (UC8)
                             </button>
-                            {train.status === 'in_stazione' && (
+                            {/* La stessa guardia della Centrale (puoEssereSoppresso): fermo E in
+                                una stazione: un convoglio trattenuto a metà tratta è "fermo"
+                                ma la Centrale rifiuterebbe di sopprimerlo. */}
+                            {train.status === 'fermo' && !!train.currentStationId && (
                               <button
                                 className="btn btn-danger text-xs py-1 px-2 shadow-[0_0_10px_rgba(239,68,68,0.3)]"
                                 onClick={() => handleSuppress(train.id)}
@@ -266,12 +268,7 @@ export default function AdminPage() {
                       <td className="font-mono text-sm">{station.code}</td>
                       <td className="font-medium">{station.name}</td>
                       <td>
-                        <Badge type={
-                          station.status === 'operativa' ? 'success' :
-                          station.status === 'manutenzione' ? 'warning' : 'danger'
-                        }>
-                          {station.status.toUpperCase()}
-                        </Badge>
+                        <StatoComposto stati={statiDellaStazione(station)} />
                       </td>
                       <td>{station.platforms}</td>
                       <td>

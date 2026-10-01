@@ -30,7 +30,11 @@ public class Treno {
     public double longitudine;
     public double velocita;
     public Instant ultimoAggiornamento;
-    /** Ritardo accumulato in minuti (dalla telemetria/passaggi). */
+    /**
+     * Ritardo in minuti di servizio, calcolato dalla Centrale ({@code PrevisioneArrivi}):
+     * quello misurato ai passaggi piu' quello che il convoglio sta accumulando adesso, se e'
+     * fermo dove non dovrebbe. Il convoglio non lo manda.
+     */
     public int ritardo;
     /** Numero di passeggeri a bordo (simulato dal digital twin). */
     public int passeggeri;
@@ -42,6 +46,20 @@ public class Treno {
     public String prossimaStazione;
     /** Direzione di percorrenza dell'itinerario ("andata" o "ritorno"). */
     public String direzione;
+    /**
+     * Condizione del convoglio come la dichiara lui (REGOLARE, EMERGENZA, SOPPRESSO): è lo
+     * stato del suo automa T6, letto dalla telemetria. Null finché non arriva il primo
+     * frame dopo l'avvio della Centrale.
+     */
+    public String condizione;
+    /**
+     * Fase del viaggio come la dichiara il convoglio (SENZA_ITINERARIO, IN_STAZIONE,
+     * IN_VIAGGIO, BLOCCATO_IN_STAZIONE, BLOCCATO_IN_TRATTA, FERMO_CAPOLINEA): è lo stato del
+     * suo automa T5. Insieme a {@link #condizione} è lo stato composto del treno, quello che
+     * {@link #stato} riassume in una parola sola perdendo per strada, per esempio, la
+     * differenza fra un treno in sosta e uno trattenuto a metà tratta. Null come sopra.
+     */
+    public String faseViaggio;
     /**
      * Istante in cui la Centrale prevede che il convoglio entri nella prossima stazione.
      * Lo ricalcola {@code PrevisioneArrivi} a ogni frame di telemetria componendo il tempo

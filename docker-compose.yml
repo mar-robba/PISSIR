@@ -12,15 +12,13 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   # Identity Provider del sistema: qui vivono utenti, password e ruoli della
-  # Centrale Operativa. La Centrale non verifica piu' le credenziali, si limita a
+  # Centrale Operativa. La Centrale non verifica le credenziali, si limita a
   # controllare la firma dei token che Keycloak rilascia (vedi Keycloak/README.txt).
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     container_name: railway-keycloak
-    # Non piu' "start-dev" ma "start": in modalita' di sviluppo Keycloak tiene
-    # aperto l'HTTP in chiaro qualunque cosa si scriva in http-enabled (lo si e'
-    # verificato: il log continuava a dire "Listening on: http://0.0.0.0:8080"),
-    # e da qui passano le password degli utenti, quindi RF04.3 non sarebbe
+    # "start" e non "start-dev": in modalita' di sviluppo Keycloak tiene aperto
+    # l'HTTP in chiaro qualunque cosa si scriva in http-enabled, e da qui passano le password degli utenti, quindi RF04.3 non sarebbe
     # rispettato. In modalita' di produzione l'HTTP si spegne davvero e resta il
     # solo listener HTTPS. --import-realm carica il realm "railway" dal file
     # montato sotto, ma SOLO se non esiste gia'.
@@ -32,14 +30,13 @@ services:
       # chiaro sulla 8080 e la cifratura sarebbe solo una porta in piu' invece
       # dell'unico modo per parlargli.
       KC_HTTP_ENABLED: "false"
-      # H2 su file: e' il database che start-dev usava da solo. In modalita' di
-      # produzione va chiesto esplicitamente, altrimenti Keycloak si aspetta un
+      # H2 su file: in modalita' di produzione va chiesto esplicitamente, altrimenti Keycloak si aspetta un
       # database vero e si rifiuta di partire. Per un progetto didattico va bene:
       # gli unici dati sono i quattro utenti di prova del realm.
       KC_DB: dev-file
-      # In modalita' di produzione l'hostname non si indovina piu' dalla
+      # In modalita' di produzione l'hostname non si indovina dalla
       # richiesta: va detto, ed e' anche l'issuer che finisce dentro i token
-      # ("iss"), quello che la Centrale confronta con quarkus.oidc.auth-server-url.
+      # ("iss"), quello che la Centrale confronta con keycloak.url.
       KC_HOSTNAME: https://localhost:8543
       KC_HTTPS_PORT: 8443
       # Certificato firmato dalla CA privata del progetto, la stessa del broker e
@@ -47,18 +44,15 @@ services:
       KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/tls/server-keycloak.crt
       KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/tls/server-keycloak.key
     ports:
-      # 8543 sull'host e non 8443: stesso motivo per cui prima si usava la 8180 al
-      # posto della 8080, cioe' non litigare con le porte di default di Quarkus,
-      # che sono quelle che prenderebbero Stazioni e Treni se si dimenticasse
-      # -Dquarkus.http.port.
+      # 8543 sull'host, 8443 nel container.
       - "8543:8443"
     volumes:
       - ./Keycloak/realm-railway.json:/opt/keycloak/data/import/realm-railway.json:ro
       - ./BrokerMosquitto/tls/certs:/opt/keycloak/tls:ro
 
   # Broker MQTT: e' il canale su cui Stazioni, Treni e Centrale si scambiano i
-  # messaggi (prima stava nel docker-compose dentro BrokerMosquitto/, ora e' qui
-  # insieme agli altri servizi cosi' si avvia tutto con un comando solo).
+  # messaggi. Sta qui insieme agli altri servizi cosi' si avvia tutto con un
+  # comando solo.
   #   1883 -> MQTT in chiaro
   #   8883 -> MQTT su TLS (profilo "tls", certificati da BrokerMosquitto/tls/gen-certs.sh)
   #   9001 -> MQTT su WebSocket, quello che usa la web app dal browser

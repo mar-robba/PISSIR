@@ -23,12 +23,11 @@ import java.util.logging.Logger;
 /**
  * Persistenza locale del nodo Stazione su un file SQLite, con JDBC.
  *
- * <p>Prima lo stato della stazione viveva solo dentro {@link DBLocale} e {@link LocalBuffer},
- * cioè in RAM: se il processo moriva (il "fault energetico" del nodo di campo) tutto spariva
- * e la stazione ripartiva ONLINE, senza i treni che aveva sui binari e soprattutto senza gli
- * eventi che non era ancora riuscita a spedire alla Centrale. Qui invece ogni cambiamento di
- * stato viene scritto anche su disco (write-through), così al riavvio il nodo si ricostruisce
- * da solo la propria situazione senza dover chiedere niente a nessuno.</p>
+ * <p>Lo stato della stazione vive in {@link DBLocale} e {@link LocalBuffer}, cioè in RAM, e
+ * ogni cambiamento viene scritto anche qui (write-through). Se il processo muore (il "fault
+ * energetico" del nodo di campo) al riavvio il nodo si ricostruisce da solo la propria
+ * situazione: lo stato, i treni sui binari e gli eventi non ancora spediti alla Centrale.
+ * Senza, ripartirebbe ONLINE e a mani vuote.</p>
  *
  * <p>Il db è un file SQLite, non un server: è la scelta giusta per un nodo edge, perché non
  * aggiunge un processo da tenere vivo sul campo e il "database" è un singolo file che si può

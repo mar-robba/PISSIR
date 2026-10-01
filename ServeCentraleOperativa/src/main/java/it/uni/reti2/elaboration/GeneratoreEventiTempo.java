@@ -18,10 +18,9 @@ import java.util.logging.Logger;
  *   <li>FOTOGRAFIA: lo stato completo della rete inviato via WebSocket al frontend.</li>
  * </ul>
  *
- * <p>Prima erano tre metodi {@code @Scheduled(every = "10s")} del FaultMonitor, che guardava e
- * scriveva da solo. Adesso questa classe scandisce soltanto il tempo, come il tick del treno:
- * che cosa succede a ogni scatto lo decide il gestore, con le stesse guardie e mosse di tutti
- * gli altri eventi.</p>
+ * <p>Questa classe scandisce soltanto il tempo, come il tick del treno: che cosa succede a
+ * ogni scatto lo decide il gestore, con le stesse guardie e mosse di tutti gli altri
+ * eventi.</p>
  *
  * <p>I tre compiti girano su un solo thread ("watchdog"), uno dopo l'altro, e ognuno ha il
  * suo try/catch: un'eccezione che uscisse dal compito fermerebbe per sempre la sua
