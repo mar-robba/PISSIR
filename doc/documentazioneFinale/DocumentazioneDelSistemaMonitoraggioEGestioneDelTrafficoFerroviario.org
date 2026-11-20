@@ -83,7 +83,7 @@ rectangle "Monitoraggio e gestione del traffico ferroviario" {
     usecase "Consulta le tratte\ne gli itinerari\n(RF01.3, sola lettura)" as UC06
     usecase "Consulta gli allarmi\naperti\n(RF01.2)" as UC05
     usecase "Consulta gli indicatori\ndi sintesi\n(RF01.1.5)" as UC04 <<aggiunta>>
-    usecase "Consulta lo storico\ndei transiti\n(RF01.5)" as UC07 <<aggiunta>>
+    usecase "Consulta lo storico\ndei transiti\n(RF01.5)" as UC07 <<parziale>>
   }
 
   rectangle "Comandi operativi (RF01.4)" as G2 {
@@ -146,8 +146,9 @@ UC15 -[hidden]down- UC12
 legend bottom
   <b>Marcatura dei casi d'uso</b>
   nessuna marca : chiesto dalla consegna e realizzato per intero
-  <b>«parziale»</b> : chiesto dalla consegna, realizzato solo in parte; il pezzo
-  che manca sta nello stato di implementazione del requisito
+  <b>«parziale»</b> : realizzato solo in parte; il pezzo che manca sta nello
+  stato di implementazione del requisito (lo storico dei transiti e' anche
+  un'aggiunta: la consegna chiede di conservarlo, non di mostrarlo)
   <b>«aggiunta»</b> : non chiesto dalla consegna, realizzato lo stesso
 endlegend
 @enduml
@@ -337,7 +338,8 @@ per scontata una rete gia' popolata, e serviva un posto in cui crearla.
 - esito atteso: o l'eliminazione viene rifiutata con una spiegazione comprensibile, oppure viene
   eseguita insieme a tutto cio' che senza quell'entita' non avrebbe piu' significato.
 - stato di implementazione: completo. Ogni eliminazione o viene rifiutata con il motivo (la
-  stazione usata da una tratta, la tratta usata da un itinerario o gia' nei transiti storici),
+  stazione usata da una tratta; la tratta usata da un itinerario, da una riga di =Transiti= o come
+  posizione corrente di un convoglio, mentre lo =Storico_Transiti= non la trattiene),
   oppure porta via i record che senza quell'entita' non significano piu' niente. Una parte della
   garanzia la tengono i vincoli del database.
 
@@ -424,25 +426,28 @@ fatte mentre il sistema e' in funzione.
 
 *Stato di implementazione*: parziale. Sono completi il ramo dei convogli (RF02.2), quello delle
 stazioni (RF02.3), l'identita' dei nodi di campo (RF02.4), la modifica dell'itinerario a sistema
-acceso (RF02.5) e le anomalie che la centrale deduce da sola (RF02.6). Delle conseguenze del
-guasto del convoglio sull'infrastruttura (RF02.1.2.2) e' realizzata quella sulla stazione e non
-quella sulla tratta; sono parziali il ciclo di
-vita del guasto, che non registra la presa in carico (RF02.1.3), e la memoria storica, che di
+acceso (RF02.5) e le anomalie che la centrale deduce da sola (RF02.6). Del guasto della stazione
+restano scoperti due casi: i transiti prodotti mentre la centrale e' spenta e il broker acceso
+(RF02.1.1.1.1) e il convoglio che entra in una stazione ancora guasta dopo la chiusura di uno solo
+dei suoi allarmi (RF02.1.1.2.1). Delle conseguenze del guasto del convoglio sull'infrastruttura
+(RF02.1.2.2) e' realizzata quella sulla stazione e non quella sulla tratta; sono parziali il ciclo
+di vita del guasto, che non registra la presa in carico (RF02.1.3), e la memoria storica, che di
 cinque cose ne scrive tre (RF02.7).
 
 **** RF02.1 - Gestione dei guasti
 
-*Stato di implementazione*: parziale — il guasto della stazione e la chiusura automatica ci sono;
-del guasto del convoglio manca la conseguenza sulla tratta (RF02.1.2.2.2), e al ciclo di vita del
-guasto manca la presa in carico (RF02.1.3).
+*Stato di implementazione*: parziale — la chiusura automatica c'e'; del guasto della stazione
+restano scoperti due casi (RF02.1.1.1.1, RF02.1.1.2.1), del guasto del convoglio manca la
+conseguenza sulla tratta (RF02.1.2.2.2), e al ciclo di vita del guasto manca la presa in carico
+(RF02.1.3).
 
 ***** RF02.1.1 - Guasto della stazione
 
-*Stato di implementazione*: parziale, per il solo RF02.1.1.2.3.
+*Stato di implementazione*: parziale, per RF02.1.1.1.1 e RF02.1.1.2.1.
 
 ****** RF02.1.1.1 - Interruzione del collegamento con la centrale
 
-*Stato di implementazione*: completo.
+*Stato di implementazione*: parziale, per RF02.1.1.1.1.
 
 ******* RF02.1.1.1.1 - Nessun dato perduto durante l'interruzione
 - enunciato: mentre il collegamento con la centrale non e' disponibile, la stazione conserva
@@ -450,9 +455,15 @@ guasto manca la presa in carico (RF02.1.3).
 - precondizione: la stazione continua a funzionare e i suoi sensori continuano a rilevare.
 - esito atteso: al ritorno del collegamento la centrale riceve tutti gli eventi prodotti durante
   l'interruzione, nessuno escluso.
-- stato di implementazione: completo. Il nodo accoda cio' che non riesce a consegnare e svuota la
-  coda quando il collegamento torna. La coda ha una copia sul SQLite locale (tabella
-  =bufferChache=), quindi regge anche a un riavvio del processo.
+- stato di implementazione: parziale. Ogni transito e ogni allarme passa dalla coda del nodo, che
+  a collegamento giu' si allunga e si svuota quando il collegamento torna; la coda ha una copia sul
+  SQLite locale (tabella =bufferChache=), quindi regge anche a un riavvio del processo. La coda
+  pero' garantisce la consegna al broker, non alla centrale: la riga si cancella appena il broker ha
+  preso l'evento. Gli allarmi viaggiano a QoS 1 e il broker li tiene per la centrale spenta, che ha
+  una sessione persistente; i transiti viaggiano a QoS 0 e il broker non li conserva
+  (=queue_qos0_messages false= in =mosquitto.conf=), quindi un transito pubblicato mentre la
+  centrale e' spenta e il broker acceso si perde. Il caso coperto e' la stazione che perde il
+  collegamento (la leva =POST /stazione/rete/offline= di SV02), non la centrale che si ferma.
 
 ******* RF02.1.1.1.2 - Ordine di consegna preservato
 - enunciato: la consegna differita rispetta l'ordine in cui gli eventi sono stati generati; se una
@@ -466,7 +477,7 @@ guasto manca la presa in carico (RF02.1.3).
 
 ****** RF02.1.1.2 - Stazione non percorribile
 
-*Stato di implementazione*: completo.
+*Stato di implementazione*: parziale, per RF02.1.1.2.1.
 
 *Che cosa vuol dire "non percorribile"*: la stazione e' *guasta* (lo dice il campo) oppure in
 *manutenzione* (la squadra mandata dalla centrale, RF01.4.1). Per il convoglio sono la stessa cosa;
@@ -477,8 +488,14 @@ a distinguerle serve solo all'operatore.
   resta fermo dove si trova.
 - esito atteso: il convoglio risulta FERMO, la sua posizione non avanza e il ritardo cresce.
 - dipende da: RF02.2.2.1.
-- stato di implementazione: completo, per tutte e due le condizioni: il guasto dichiarato dal campo
-  e la manutenzione dichiarata dalla centrale con =STATO_STAZIONE=.
+- stato di implementazione: parziale. Il convoglio si ferma per tutte e due le condizioni, il
+  guasto dichiarato dal campo e la manutenzione dichiarata dalla centrale con =STATO_STAZIONE=, ma
+  resta scoperto un caso. Il =RESOLVED= di una stazione fa dimenticare al convoglio il guasto che si
+  era annotato anche quando alla stazione resta un altro allarme aperto: lo pubblica il nodo quando
+  tornano i sensori, e la centrale quando l'operatore chiude uno solo degli allarmi o quando torna
+  il battito. Se la stazione era chiusa solo dal =GUASTO= del campo, per cui la centrale non manda
+  nessuno =STATO_STAZIONE=, il convoglio che non era ancora fermo davanti la trova percorribile e ci
+  entra; lo trattiene poi la stazione stessa, all'ingresso.
 
 ******* RF02.1.1.2.2 - Riparte solo al ripristino
 - enunciato: il convoglio trattenuto riprende la corsa quando arriva il ripristino di quella
@@ -536,9 +553,13 @@ quello guasto in tratta.
 - *perche' l'unicita' e' un requisito*: le anomalie dedotte vengono ricontrollate a ritmo periodico,
   e senza unicita' la stessa condizione genererebbe un allarme nuovo a ogni controllo, rendendo
   l'elenco inutilizzabile proprio quando serve.
-- stato di implementazione: parziale. L'unicita' per sorgente c'e', e apertura e chiusura lasciano
-  traccia nello storico. Gli stati pero' sono due (il guasto porta solo "risolto" vero o falso) e
-  l'assegnatario non viene mai scritto: colonna e tabella delle assegnazioni restano vuote.
+- stato di implementazione: parziale. L'unicita' c'e', per sorgente e tipo, e apertura e chiusura
+  lasciano traccia nello storico. Gli stati pero' sono due (il guasto porta solo "risolto" vero o
+  falso) e l'assegnatario non viene mai scritto: colonna e tabella delle assegnazioni restano vuote.
+  In piu' il tipo non distingue sempre il motivo: =sensore_offline= vale sia per i sensori muti
+  dichiarati dalla stazione sia per il battito perso dedotto dalla centrale, e =treno_fermo= sia per
+  l'avaria di bordo sia per il convoglio fermo in linea. Con due motivi dello stesso tipo il secondo
+  guasto non si apre e si aggiorna solo il messaggio del primo, che conserva severita' e origine.
 
 ***** RF02.1.4 - Chiusura automatica quando la causa rientra
 - enunciato: un guasto aperto perche' un nodo taceva si chiude da solo quando il nodo torna a dare
@@ -592,8 +613,9 @@ quello guasto in tratta.
 ****** RF02.2.2.3 - Stato del convoglio
 - enunciato: il convoglio dichiara come sta, con uno dei valori del vocabolario degli stati, e questa
   informazione e' distinta dalla posizione.
-- stato di implementazione: completo; a database la colonna dello stato accetta solo i cinque
-  valori del vocabolario. Quei valori sono un riassunto: la telemetria porta anche condizione e fase
+- stato di implementazione: completo; a database la colonna dello stato accetta solo cinque
+  valori, uno per ogni stato del vocabolario con i nomi del database (=attivo=, =fermo=, =rotto=,
+  =in manutenzione= per SOPPRESSO, =capolinea=). Quei valori sono un riassunto: la telemetria porta anche condizione e fase
   del viaggio, ed e' quello che l'interfaccia mostra.
 
 ****** RF02.2.2.4 - Velocita' e passeggeri a bordo
@@ -728,8 +750,11 @@ anche l'unico invisibile.
   caduta, la mostra come OFFLINE e apre un guasto su di essa.
 - dipende da: RF02.3.2, perche' senza un segnale regolare non c'e' un silenzio da misurare.
 - si chiude da solo per RF02.1.4.
-- stato di implementazione: completo; il guasto viene pubblicato verso il campo, quindi i convogli
-  diretti alla stazione caduta si fermano.
+- stato di implementazione: completo. Il guasto viene pubblicato anche verso il campo, ma con
+  severita' WARNING, e il convoglio tiene chiusa una stazione solo per un =GUASTO= CRITICAL o per uno
+  =STATO_STAZIONE= GUASTA o MANUTENZIONE, che la caduta non manda: i convogli diretti alla stazione
+  caduta non si fermano e ci entrano. Se sulla stazione e' gia' aperto il guasto =sensore_offline=
+  dei sensori muti, quello del silenzio non si apre, perche' ha lo stesso tipo (RF02.1.3).
 
 ***** RF02.6.2 - Convoglio fermo fuori stazione oltre la soglia
 - enunciato: se un convoglio resta fermo fra due stazioni per piu' di =T_fer=, la centrale apre un
@@ -846,7 +871,9 @@ comandi operativi (RF04.2).
 - l'attestato e' verificabile da solo, senza interrogare il servizio di identita' a ogni richiesta.
 - l'attestato ha una durata limitata (=T_att=) e viene rinnovato senza disturbare l'utente finche'
   la sessione presso il servizio di identita' resta aperta (=T_ina=, =T_ses=).
-- stato di implementazione: completo: la centrale controlla la firma dell'attestato.
+- stato di implementazione: completo: la centrale controlla la firma dell'attestato. Se pero' nel
+  momento del rinnovo il servizio di identita' non risponde, la web app chiude la sessione e torna
+  alla schermata di accesso invece di riprovare.
 
 **** RF04.2 - Autorizzazione per ruolo
 - enunciato: ogni operazione e' permessa o negata in base al ruolo di chi la chiede: le letture sono
@@ -881,6 +908,10 @@ comandi operativi (RF04.2).
 - stato di implementazione: completo. Con il profilo apposito sono protetti MQTT (porta cifrata,
   compresa la validazione dei nodi), l'HTTPS verso la centrale e quello delle interfacce dei nodi di
   campo. Le parti si riconoscono tramite un'autorita' di certificazione privata del progetto.
+  Accanto ai canali cifrati pero' restano in ascolto quelli in chiaro: la centrale tiene l'HTTP
+  sulla 8781 insieme all'HTTPS sulla 8444, e il broker la 1883 anonima insieme alla 8883, che a sua
+  volta non chiede credenziali. Le parti del sistema sotto profilo non li usano, ma chi raggiunge
+  quelle porte parla con la centrale e pubblica sul broker senza nessuna protezione.
 
 ** Requisiti non funzionali osservabili
 
@@ -918,7 +949,7 @@ passo.
   6. il tecnico dichiara risolto il guasto: B torna ONLINE, l'allarme risulta chiuso e conservato
      nella storia;
   7. entrambi i convogli riprendono la corsa dal punto in cui erano, senza altri comandi.
-- requisiti coperti :: RF01.2.1, RF01.4.1, RF01.4.2, RF02.1.1.2, RF02.1.3, RF02.2.1.1.
+- requisiti coperti :: RF01.1.3, RF01.2.1, RF01.4.1, RF01.4.2, RF02.1.1.2, RF02.1.3, RF02.2.1.1.
 
 *** SV02 - Interruzione del collegamento fra stazione e centrale
 
@@ -931,7 +962,7 @@ passo.
   4. il collegamento viene ripristinato;
   5. la centrale riceve tutti i transiti avvenuti durante l'interruzione, nell'ordine giusto;
   6. l'allarme aperto per silenzio si chiude da solo e A torna ONLINE.
-- requisiti coperti :: RF02.1.1.1, RF02.1.4, RF02.6.1, RF03.2, RNF02.
+- requisiti coperti :: RF02.1.1.1, RF02.1.4, RF02.3.2, RF02.6.1, RF02.7, RF03.2, RNF02.
 
 *** SV03 - Guasto del convoglio, in stazione e in tratta
 
@@ -963,7 +994,7 @@ passo.
      salti di posizione e conservando il ritardo;
   2. il convoglio escluso si ferma e resta in attesa di soppressione, restando visibile;
   3. nessuno dei due continua a percorrere l'itinerario vecchio.
-- requisiti coperti :: RF01.3.4, RF02.5, RF03.5.
+- requisiti coperti :: RF01.1.2, RF01.3.4, RF02.5, RF03.5.
 
 *** SV06 - Corsa completa con inversione al capolinea
 
@@ -990,7 +1021,7 @@ passo.
 | RF01.4    | SV01                      |
 | RF01.5    | SV06                      |
 | RF01.6    | tutti (accesso preliminare) |
-| RF02.1    | SV01, SV02, SV03          |
+| RF02.1    | SV01, SV02, SV03, SV04    |
 | RF02.2    | SV01, SV03, SV06          |
 | RF02.3    | SV02                      |
 | RF02.4    | preliminare a tutti       |
@@ -1112,17 +1143,17 @@ Centrale -up- IApiCampo
 ' =====================================================
 '  PERSISTENZA
 ' =====================================================
-Centrale .down.> IPersistenza : storicizza transiti, guasti,\nstati e itinerari
+Centrale .down.> IPersistenza : anagrafica della rete,\nstorico di transiti, guasti e stati
 DB -up- IPersistenza
 
 ' =====================================================
 '  CAMPO
 ' =====================================================
-Centrale .down.> ITopic : sottoscrive telemetria, transiti,\nbattiti e validazioni,\npubblica gli allarmi
+Centrale .down.> ITopic : sottoscrive telemetria, transiti,\nbattiti, validazioni e allarmi,\npubblica allarmi ed esiti\ndelle validazioni
 Broker -up- ITopic
-Stazione .up.> ITopic : pubblica transiti e battiti,\nsottoscrive allarmi e i passaggi\ndiretti ai propri sensori
-Treno .up.> ITopic : pubblica la telemetria e i passaggi\nverso i sensori di stazione,\nsottoscrive allarmi
-Treno .up.> IApiCampo : scarica l'itinerario\nall'avvio (HTTP)
+Stazione .up.> ITopic : pubblica transiti, battiti, allarmi\ne validazione, sottoscrive allarmi,\nesito della validazione e passaggi\ndiretti ai propri sensori
+Treno .up.> ITopic : pubblica telemetria, guasti di bordo,\nvalidazione e passaggi verso i sensori\ndi stazione, sottoscrive allarmi\ned esito della validazione
+Treno .up.> IApiCampo : scarica l'itinerario\nall'avvio e a ogni modifica
 
 Stazione -down- ISensStaz
 Treno -down- ISensTreno
@@ -1136,7 +1167,10 @@ note as Legenda
   sotto il profilo <i>%tls</i> MQTT passa da 1883 a 8883,
   la Centrale aggiunge HTTPS 8444 accanto a HTTP 8781,
   e le API di stazioni e treni restano sulla loro porta
-  ma rispondono solo in HTTPS
+  ma rispondono solo in HTTPS.
+  8081 e 8082 sono le porte di default: con piu' istanze
+  ognuna ha la sua (avvioStazioni.sh parte dalla 8080,
+  avvioTreni.sh dalla 9080)
 end note
 
 @enduml
@@ -1186,8 +1220,8 @@ title Modello C4 - livello 2: contenitori del sistema di monitoraggio ferroviari
 ' =====================================================
 '  LIVELLO 1: chi sta fuori dal sistema
 ' =====================================================
-Person(operatore, "Operatore della centrale", "Sorveglia la rete, invia comandi e chiude i guasti")
-Person(admin, "Amministratore", "Gestisce stazioni, tratte e itinerari")
+Person(operatore, "Tecnico", "Sorveglia la rete, manda la squadra sulle stazioni guaste e chiude i guasti")
+Person(admin, "Amministratore", "Gestisce stazioni, convogli, tratte e itinerari e sopprime le corse")
 System_Ext(sensoriStazione, "Sensori di stazione", "Passaggio, guasto e keepalive: dispositivi esterni, nel progetto simulati", $baseShape="hexagon")
 System_Ext(sensoriTreno, "Sensori di bordo", "Guasto e passaggio: dispositivi esterni, nel progetto simulati", $baseShape="hexagon")
 
@@ -1200,17 +1234,17 @@ System_Boundary(sistema, "Sistema di monitoraggio e gestione del traffico ferrov
 
     Container(centrale, "Centrale Operativa", "Java 25, Javalin, JDBC - :8781 (:8444 https)", "Raccoglie la telemetria, calcola lo stato della rete, propaga gli allarmi e storicizza gli eventi", $baseShape="hexagon")
 
-    Container(stazione, "Stazione", "Java 25, Javalin - :8081, N istanze", "Rileva i transiti dai sensori, manda il battito, bufferizza quando la centrale non risponde", $baseShape="hexagon")
+    Container(stazione, "Stazione", "Java 25, Javalin - :8081, N istanze su porte diverse", "Rileva i transiti dai sensori, manda il battito, tiene in coda gli eventi finche' il broker non li prende", $baseShape="hexagon")
 
-    Container(treno, "Treno", "Java 25, Javalin - :8082, N istanze", "Simula la corsa lungo l'itinerario, pubblica la telemetria e reagisce agli allarmi della tratta", $baseShape="hexagon")
+    Container(treno, "Treno", "Java 25, Javalin - :8082, N istanze su porte diverse", "Simula la corsa lungo l'itinerario, pubblica la telemetria e reagisce agli allarmi della tratta", $baseShape="hexagon")
 
     ContainerQueue(broker, "Broker MQTT", "Eclipse Mosquitto - :1883 (:8883 tls), Docker", "Albero dei topic railway/#: disaccoppia il campo dalla centrale nel tempo e nei destinatari")
 
     Container(keycloak, "Identity Provider", "Keycloak 26 - :8543 https, Docker", "Realm railway: utenti, ruoli e token OIDC", $baseShape="hexagon")
 
-    ContainerDb(db, "Database centrale", "PostgreSQL 15 - :5432, Docker", "Storico di transiti, guasti, stati e itinerari")
+    ContainerDb(db, "Database centrale", "PostgreSQL 15 - :5432, Docker", "Anagrafica della rete e storico di transiti, guasti e stati")
 
-    ContainerDb(sqlite, "Base locale di stazione", "SQLite su file", "Eventi non ancora consegnati alla centrale")
+    ContainerDb(sqlite, "Base locale di stazione", "SQLite su file", "Stato della stazione, treni sui binari, guasti aperti e coda degli eventi da consegnare")
 }
 
 ' =====================================================
@@ -1224,13 +1258,13 @@ Rel(webapp, centrale, "Letture e comandi su /api, con Bearer token", "REST/JSON"
 Rel_D(webapp, centrale, "Si sottoscrive a /ws/realtime e riceve la fotografia della rete e gli eventi spinti", "WebSocket")
 Rel_R(centrale, keycloak, "Scarica le chiavi pubbliche, verifica firma e ruoli del token", "JWKS/HTTPS")
 
-Rel(centrale, db, "Legge e scrive lo storico", "JDBC")
-Rel(centrale, broker, "Sottoscrive telemetria, transiti, battiti e validazioni; pubblica gli allarmi", "MQTT QoS 1")
+Rel(centrale, db, "Legge e scrive anagrafica e storico", "JDBC")
+Rel(centrale, broker, "Sottoscrive telemetria, transiti, battiti, validazioni e allarmi; pubblica allarmi ed esiti delle validazioni", "MQTT, QoS 0 e QoS 1 per gli allarmi")
 
-Rel_U(stazione, broker, "Pubblica transiti e battiti, sottoscrive gli allarmi e i passaggi diretti ai propri sensori", "MQTT QoS 1")
-Rel_U(treno, broker, "Pubblica la telemetria verso la centrale e i passaggi verso i sensori di stazione, sottoscrive gli allarmi", "MQTT QoS 1")
-Rel_U(treno, centrale, "Scarica l'itinerario all'avvio: GET /api/treni/{id}/itinerario", "REST/JSON")
-Rel(stazione, sqlite, "Accoda gli eventi quando la centrale non risponde", "JDBC")
+Rel_U(stazione, broker, "Pubblica transiti, battiti, allarmi e validazione; sottoscrive allarmi, esito della validazione e passaggi diretti ai propri sensori", "MQTT, QoS 0 e QoS 1 per gli allarmi")
+Rel_U(treno, broker, "Pubblica telemetria, guasti di bordo, validazione e passaggi verso i sensori di stazione; sottoscrive allarmi ed esito della validazione", "MQTT, QoS 0 e QoS 1 per gli allarmi")
+Rel_U(treno, centrale, "Scarica l'itinerario all'avvio e a ogni modifica: GET /api/treni/{id}/itinerario", "REST/JSON")
+Rel(stazione, sqlite, "Salva stato, treni presenti, guasti aperti e coda degli eventi in uscita", "JDBC")
 
 Rel_U(sensoriStazione, stazione, "POST /stazione/sensore/*", "REST/JSON")
 Rel_U(sensoriTreno, treno, "POST /treno/sensore/*", "REST/JSON")
@@ -1274,9 +1308,10 @@ stazione dietro il NAT dell'ente ferroviario non è raggiungibile da fuori e un 
 movimento cambia rete di continuo. Con REST sarebbe la Centrale a dover contattare ogni nodo,
 quindi servirebbero un indirizzo stabile e una porta aperta per ciascuno; con il broker è il nodo
 ad aprire la connessione verso l'esterno, e sul firewall basta permettere il traffico in uscita.
-Il broker disaccoppia anche nel tempo — se la Centrale è giù la stazione continua a pubblicare, i
-messaggi con QoS 1 restano in coda e il =LocalBuffer= li ritenta, mentre un POST fallito sarebbe
-perso — e nei destinatari: pubblicare su =railway/alerts= raggiunge tutti i treni interessati
+Il broker disaccoppia anche nel tempo — se la Centrale è giù la stazione continua a pubblicare e
+gli allarmi, a QoS 1, restano in coda per lei nel broker; se è giù il broker, il =LocalBuffer= tiene
+gli eventi e li ritenta, mentre un POST fallito sarebbe perso (i transiti, a QoS 0, il broker non li
+tiene per la Centrale spenta: vedi RF02.1.1.1.1) — e nei destinatari: pubblicare su =railway/alerts= raggiunge tutti i treni interessati
 senza che chi pubblica sappia quanti sono (RNF05), cosa che con REST costringerebbe la Centrale a
 tenere l'elenco aggiornato dei nodi e a chiamarli uno per uno. Questo è il grande vantaggio del metodo uno a molti del pub/sub
 
@@ -1359,16 +1394,19 @@ predefinito e' quello con cui il sistema e' consegnato; cambiarlo non cambia la 
 | T_ses   | durata massima di una sessione, anche se l'utente sta lavorando               | 10 h               |
 
 Vincolo fra i parametri: deve valere =T_sil > P_bat=, con un margine che tolleri almeno un battito
-perso, altrimenti una singola consegna in ritardo verrebbe scambiata per una caduta. Allo stesso
-modo =T_fer= deve essere maggiore del piu' lungo tempo di percorrenza previsto fra due stazioni,
-altrimenti una corsa normale verrebbe segnalata come anomalia.
+perso, altrimenti una singola consegna in ritardo verrebbe scambiata per una caduta. Fra =T_fer= e
+i tempi di percorrenza invece non serve un vincolo: il convoglio in marcia dichiara una velocita'
+diversa da zero, e la centrale lo conta come immobile solo quando dichiara velocita' nulla fuori da
+una stazione o quando non trasmette da piu' di =T_fer=.
 
 =T_fer= vale sia come durata minima dell'immobilita' prima dell'anomalia, sia come soglia oltre la
 quale una telemetria non aggiornata conta come immobilita'.
 
 Vale =P_tel < T_pos < T_fer=: passato =T_pos= senza frame il convoglio diventa a posizione incerta,
-passato =T_fer= scatta l'allarme. Un convoglio che sparisce viene prima *dichiarato ignoto* e solo
-dopo *segnalato*.
+passato =T_fer= comincia a contare come immobile, e l'allarme scatta quando l'immobilita' dura a sua
+volta =T_fer= (il watchdog guarda ogni 10 s): per un convoglio che sparisce mentre corre, circa due
+=T_fer= dopo l'ultimo frame. Un convoglio che sparisce in linea viene quindi prima *dichiarato
+ignoto* e solo dopo *segnalato*; se sparisce mentre risulta in una stazione, l'allarme non scatta.
 
 Sui parametri dell'accesso vale =T_att < T_ina < T_ses=: l'attestato scade molto prima della
 sessione, e la sessione ha comunque una fine.
@@ -1410,15 +1448,17 @@ Anagrafica (i dati che l'amministratore crea dalla dashboard):
   =Stazione= perché è una proprietà del percorso: la stessa stazione può chiudere un itinerario ed
   essere una fermata qualunque di un altro, e infatti non va confusa con
   =Stazione.tipoCapolineaPartenzaoNormale=, che descrive invece la stazione in sé
-- =Treni=: stato del convoglio (attivo / fermo / rotto / in manutenzione / capolinea), itinerario
-  assegnato e posizione corrente. Da notare che =id_convoglio= è insieme chiave primaria e
+- =Treni=: stato del convoglio (attivo / fermo / rotto / in manutenzione / capolinea, cioe' i
+  cinque stati del vocabolario con i nomi del database: "in manutenzione" e' la corsa soppressa),
+  itinerario assegnato e posizione corrente. Da notare che =id_convoglio= è insieme chiave primaria e
   nome del treno (es. "IC 351"): non c'è una colonna nome separata, così il nome è univoco
   per costruzione, però diventa immutabile (per rinominare un convoglio va cancellato e
   ricreato)
 - =Utenti=: anagrafica degli operatori (nome, cognome, matricola univoca, tipo), *senza password*:
-  credenziali e ruoli stanno nel realm di Keycloak. Serve alle chiavi esterne di =Guasti= e
-  =Storico_Assegnazioni_Guasti= verso =id_utente=; il legame con l'utente di Keycloak è la
-  *matricola*, che viaggia nel token
+  credenziali e ruoli stanno nel realm di Keycloak. Serve alla chiave esterna dell'operatore di
+  =Guasti_Pervenuti_da_treni_o_Staz= verso =id_utente= (gli storici invece copiano id, nome e
+  matricola senza chiavi esterne); il legame con l'utente di Keycloak è la *matricola*, che viaggia
+  nel token
 
 Operative (le scrive il sistema, non l'amministratore):
 - =Transiti=: un treno dentro una stazione, con =tempoEntrata= e =tempoUscita=. La riga
@@ -1427,22 +1467,24 @@ Operative (le scrive il sistema, non l'amministratore):
   scritti dalla stazione nel messaggio, non quelli di arrivo: con lo store and forward i transiti
   accodati tornano tutti insieme. La colonna =ritardoMinuti= (estensione) congela il ritardo
   *nell'istante* del passaggio
-- =Guasti_Pervenuti_da_treni_o_Staz=: il guasto aperto, con tipo, severità, sorgente
-  (STAZIONE o TRENO più l'id), messaggio, timestamp di apertura e di risoluzione e
-  l'operatore che se ne sta occupando
-- =eventi_stazioni=: log degli eventi di stazione (heartbeat perso, guasto, manutenzione),
-  estensione
+- =Guasti_Pervenuti_da_treni_o_Staz=: i guasti, aperti e chiusi (=Stato_RisoltoONO=), con tipo,
+  severità, sorgente (STAZIONE o TRENO più l'id), origine (segnalato dal campo o dedotto dalla
+  Centrale), messaggio, timestamp di apertura e di risoluzione e l'operatore che se ne sta
+  occupando, colonna che pero' non viene mai scritta (RF02.1.3)
+- =eventi_stazioni=: log degli eventi di stazione, estensione. Ci scrive solo la Centrale quando
+  apre un guasto dedotto su una stazione: il battito perso (=HEARTBEAT_LOST=) e il convoglio guasto
+  in stazione (=CONVOGLIO_GUASTO=)
 
 Le estensioni (=ritardoMinuti=, le coordinate delle stazioni, =capolinea= degli itinerari e il
 valore =capolinea= nel CHECK di =Treni.stato=) stanno tutte in =schema.sql=, quindi un database
 creato da =schema.sql= (a mano o da =popola_db.sh=) le ha gia'.
 
-Storici: sono tabelle separate in sola aggiunta, ognuna con la sua chiave =SERIAL= e un campo
+Storici: sono tabelle separate in sola aggiunta, ognuna con la sua chiave =BIGSERIAL= e un campo
 =ts_storicizzazione=. La scelta è stata di non versionare le tabelle operative con dei flag
 ma di copiare la riga in una tabella gemella quando lo stato cambia: le query della
 dashboard sul dato corrente restano semplici e lo storico non le appesantisce.
-=Storico_Transiti= porta la stessa colonna =ritardoMinuti= di =Transiti=, ed è quella che la
-pagina Transiti legge (un valore nullo vale zero).
+=Storico_Transiti= porta la stessa colonna =ritardoMinuti= di =Transiti=, ed è la tabella che
+=GET /api/transiti= legge (nella web app un valore nullo vale zero).
 
 Le tabelle di storico sono otto, ma ne vengono scritte quattro, tutte dal =RailwayRepository=:
 
@@ -1526,8 +1568,8 @@ Topic della stazione, sotto il prefisso =railway/station/{id}/=:
 | transit             | stazione -> centrale | passaggio del treno visto dai sensori           |
 
 Le coppie =validation= / =validation-response= sono l'unico scambio richiesta-risposta: la
-Centrale ascolta tutte le richieste con un solo filtro (=railway/train/+/validation=), cerca l'id a
-database e risponde sul topic del mittente.
+Centrale ascolta le richieste con un filtro per tipo di nodo (=railway/train/+/validation= e
+=railway/station/+/validation=), cerca l'id a database e risponde sul topic del mittente.
 
 Fuori da questi due gruppi c'è un unico topic senza id, =railway/alerts=: il canale broadcast dei
 guasti, a cui sono iscritti tutti e tre i tipi di nodo, perché un guasto di stazione interessa
@@ -1541,10 +1583,12 @@ client-id fisso: =treno-<ID>=, =stazione-<ID>=, =centrale-operativa=): gli alert
 nodo era staccato il broker glieli consegna alla riconnessione, perché nessuno li ripete. Per
 questo i destinatari si registrano *prima* di collegarsi. Tutto il resto (telemetria, battiti,
 passaggi, transiti, validazioni) va a QoS 0: si ripete da solo o, per i transiti, resta nella coda
-della stazione finché non viene consegnato. Nessun nodo pubblica dal thread delle callback di
-Paho: i messaggi in uscita passano da una coda (=CodaPubblicazioni= sul treno e sulla Centrale,
-=LocalBuffer= sulla stazione) svuotata da un thread suo, perché una pubblicazione a QoS 1 aspetta
-la conferma che porta proprio quel thread.
+della stazione finché non lo prende il broker, che pero' non lo tiene per una Centrale spenta
+(RF02.1.1.1.1). Nessun nodo pubblica dal thread delle callback di Paho: i messaggi in uscita passano
+da una coda (=CodaPubblicazioni= sul treno e sulla Centrale, =LocalBuffer= sulla stazione) svuotata
+da un thread suo, perché una pubblicazione a QoS 1 aspetta la conferma che porta proprio quel
+thread. Fanno eccezione il battito e la richiesta di validazione della stazione, che sono a QoS 0 e
+partono direttamente dal thread dell'orologio e da quello del =main=.
 
 Un messaggio =GUASTO= porta =sorgenteTipo= (STAZIONE o TRENO), =sorgenteId=, =severita=,
 =messaggio= e =timestamp=, più un campo facoltativo =tipoGuasto= con cui *chi segnala dichiara di
@@ -1565,16 +1609,21 @@ solo la Centrale. A bordo il numero si ferma al display. L'alert parte solo quan
 misurato cambia.
 
 Un messaggio =STATO_STAZIONE= dice *in che stato la Centrale ha messo* una stazione. Porta
-=sorgenteId= e =stato= (uno dei quattro del vocabolario) e parte da tutti i punti in cui lo stato
-lo decide lei: l'invio della squadra, la PUT della stazione, il ritorno a ONLINE alla chiusura
-dell'allarme e quello dichiarato dal nodo con il battito, se non le resta nessun allarme aperto.
+=sorgenteId= e =stato= (uno dei quattro del vocabolario) e parte dall'invio della squadra, dalla
+PUT della stazione, dalla conferma della MANUTENZIONE quando durante l'intervento arriva un guasto
+nuovo, e dal ritorno a ONLINE quando alla stazione non resta nessun allarme aperto: alla chiusura
+dell'allarme da parte dell'operatore, al rientro dichiarato dal nodo (il =RESOLVED= dei sensori) e
+al battito che dichiara la stazione agibile. Non parte invece quando la Centrale la porta a GUASTA
+(ai treni arriva gia' il =GUASTO=, del campo o quello dedotto per il convoglio in stazione) ne'
+quando il watchdog la mette OFFLINE.
 Serve perché la MANUTENZIONE non nasce da nessun =GUASTO= del campo: senza questo annuncio i treni
 non la vedrebbero.
 
 Ne segue che il =RESOLVED= di un guasto *non è mai* il permesso di ripartire: sulla stazione può
 esserci ancora la squadra o un secondo allarme aperto, e quel messaggio lo pubblica anche il nodo di
 terra quando i sensori tornano a battere. A liberare i treni è soltanto lo =STATO_STAZIONE= che
-dichiara la stazione ONLINE.
+dichiara la stazione ONLINE. Il =RESOLVED= pero' non viene nemmeno ignorato: il convoglio che non e'
+fermo li' cancella il guasto che si era annotato, ed e' il caso scoperto di RF02.1.1.2.1.
 
 Lo stesso passaggio fisico attraversa tre canali in fila: su =railway/treno-simulatoriSensori/{id}=
 (MQTT) il convoglio *passa*, con =POST /stazione/sensore/treno= (REST) il sensore di binario
@@ -1589,7 +1638,7 @@ sensore è morto il transito non lo registra nessuno, ed è per questo che una s
 #+attr_latex: :align |p{0.22\textwidth}|p{0.68\textwidth}|
 | stato      | significato                                                                    |
 |------------+--------------------------------------------------------------------------------|
-| FERMO      | e' in sosta in una stazione, oppure e' trattenuto e non puo' ripartire          |
+| FERMO      | e' in sosta in una stazione, e' trattenuto e non puo' ripartire, oppure non ha un itinerario da percorrere |
 | IN_VIAGGIO | sta percorrendo una tratta elementare fra due stazioni                         |
 | EMERGENZA  | e' aperto un guasto che lo riguarda; la corsa e' sospesa dove si trovava        |
 | SOPPRESSO  | la corsa e' stata annullata: il convoglio non viaggia piu' e non riprendera'    |
@@ -1612,8 +1661,9 @@ contraddizione: e' la conseguenza di che cosa ciascuno dei due puo' sapere.
 
 I cinque valori dello stato del convoglio sono un *riassunto*: =TrainDB.stato()= li calcola dalla
 condizione (T6) e dalla fase del viaggio (T5), e nel calcolo si perde qualcosa. FERMO vale per il
-convoglio in sosta al binario, per quello trattenuto al binario e per quello trattenuto a meta'
-tratta; EMERGENZA nasconde la fase in cui il convoglio si e' fermato. Un elemento pero' non sta mai
+convoglio in sosta al binario, per quello trattenuto al binario, per quello trattenuto a meta'
+tratta e per quello senza itinerario; EMERGENZA e SOPPRESSO nascondono la fase in cui il convoglio
+si e' fermato. Un elemento pero' non sta mai
 in uno stato solo: sta in uno stato per ognuno dei suoi automi, tutti nello stesso momento, ed e'
 questo *stato composto* che l'interfaccia stampa, un badge per automa.
 
@@ -5954,7 +6004,7 @@ end note
 È la lettura al contrario delle righe "requisiti coperti" che stanno sopra ogni diagramma del
 capitolo /Progettazione/: qui si parte dal requisito e si trovano le macchine, lì si parte dalla
 macchina e si trovano i requisiti. T = treno, S = stazione, M = centrale, e i numeri sono quelli
-delle macchine a stati, non quelli dei grafi G1...G8 di questa specifica.
+delle macchine a stati.
 
 Un requisito è in *coperto da* quando le macchine elencate lo soddisfano per intero, in
 *parzialmente* quando ci contribuiscono senza chiuderlo da sole. Le righe vuote in entrambe le
@@ -6042,26 +6092,27 @@ Note generali:
 '  esistono, in che ordine si presentano nella vita del sistema e quali
 '  sono le due sole strade con cui i nodi parlano fra loro (MQTT e REST).
 '
-'    SQ01 01_avvio_validazione_id_treno.puml            TrainDatabaseValidator <-> ExistIdForEdge
-'    SQ02 02_avvio_validazione_id_stazione.puml         StationDatabaseValidator <-> ExistIdForEdgeStazione
-'    SQ03 03_caricamento_itinerario_treno.puml          GeneratoreEventiTempo -> CaricatoreItinerario -> RestApiGateway
-'    SQ04 04_telemetria_treno_verso_mappa.puml          TrainElab -> IngestionService -> GestoreEventi -> WebSocket
-'    SQ05 05_heartbeat_stazione.puml                    HeartbeatGenerator -> IngestionService -> GestoreEventi
-'    SQ06 06_passaggio_in_stazione_due_sorgenti.puml    PubblicatorePassaggi -> StationGateway -> LocalBuffer -> GestoreEventi
-'    SQ07 07_keepalive_sensori_stazione.puml            sensore -> StationIngestion -> GestoreEventi (stazione)
-'    SQ08 08_treno_trattenuto_da_stazione_guasta.puml   railway/alerts -> TrainGateway -> GestoreEventi
-'    SQ09 09_guasto_di_bordo_del_convoglio.puml         Sensori -> GestoreEventi (treno) -> GestoreEventi (centrale)
-'    SQ10 10_failstop_stazione_e_chiusura_automatica.puml GeneratoreEventiTempo -> GestoreEventi -> campo
-'    SQ11 11_treno_fermo_fuori_stazione.puml            GeneratoreEventiTempo -> GestoreEventi (CONTROLLO_TRENI_FERMI)
-'    SQ12 12_store_and_forward_stazione.puml            LocalBuffer + ConsumatoreBuffer
-'    SQ13 13_login_sessione_e_ruoli.puml                Keycloak (PKCE) + FiltroAutorizzazione + SicurezzaKeycloak
-'    SQ14 14_comandi_di_ripristino_operatore.puml       RestApiGateway -> GestoreEventi (manutenzione / risolvi)
-'    SQ15 15_soppressione_convoglio.puml                RestApiGateway -> GestoreEventi (sopprimi)
-'    SQ16 16_modifica_itinerario_a_caldo.puml           RestApiGateway (PUT /api/tratte/{id})
-'    SQ17 17_amministrazione_anagrafica.puml            RestApiGateway (CRUD)
-'    SQ18 18_dashboard_realtime_e_snapshot.puml         RealtimeWebSocket + GestoreEventi (FOTOGRAFIA)
+'    SQ01 TrainDatabaseValidator <-> ExistIdForEdge
+'    SQ02 StationDatabaseValidator <-> ExistIdForEdgeStazione
+'    SQ03 GeneratoreEventiTempo -> CaricatoreItinerario -> RestApiGateway
+'    SQ04 TrainElab -> IngestionService -> GestoreEventi -> WebSocket
+'    SQ05 HeartbeatGenerator -> IngestionService -> GestoreEventi
+'    SQ06 PubblicatorePassaggi -> StationGateway -> SimulatoreSensori
+'         -> GestoreEventi (stazione) -> LocalBuffer -> GestoreEventi (centrale)
+'    SQ07 sensore -> StationIngestion -> GestoreEventi (stazione) -> Centrale
+'    SQ08 railway/alerts -> TrainGateway -> GestoreEventi
+'    SQ09 Sensori -> GestoreEventi (treno) -> GestoreEventi (centrale)
+'    SQ10 GeneratoreEventiTempo -> GestoreEventi -> campo
+'    SQ11 GeneratoreEventiTempo -> GestoreEventi (CONTROLLO_TRENI_FERMI)
+'    SQ12 LocalBuffer + ConsumatoreBuffer
+'    SQ13 Keycloak (PKCE) + FiltroAutorizzazione + SicurezzaKeycloak
+'    SQ14 RestApiGateway -> GestoreEventi (manutenzione / risolvi)
+'    SQ15 RestApiGateway -> GestoreEventi (sopprimi)
+'    SQ16 RestApiGateway (PUT /api/tratte/{id})
+'    SQ17 RestApiGateway (CRUD)
+'    SQ18 RealtimeWebSocket + GestoreEventi (FOTOGRAFIA)
 '
-'  Le macchine a stati sorelle stanno in ../Stati_diagram/
+'  Le macchine a stati sorelle sono nella sezione "Diagrammi degli stati".
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -6137,9 +6188,10 @@ note bottom of Ingresso
 end note
 
 note right of Esercizio
-  SQ06 e' l'unica conversazione che attraversa tutti e tre i
-  processi: il convoglio annuncia il passaggio, il sensore della
-  stazione lo rileva e solo allora la Centrale ne sa qualcosa.
+  Nell'esercizio normale SQ06 e' l'unica conversazione che
+  attraversa tutti e tre i processi: il convoglio annuncia il
+  passaggio, il sensore della stazione lo rileva e solo allora
+  la Centrale ne sa qualcosa.
 end note
 
 legend bottom
@@ -6215,50 +6267,68 @@ note right of MAIN
   treno; altrimenti si prende la property treno.id di
   application.properties (default TRN001) e non si esce.
 end note
-MAIN -> DB : trenoId = args[0]
+MAIN -> DB : trainDB.trenoId = trenoId
 activate DB
 deactivate DB
 
-MAIN -> MAIN : crea e collega gli oggetti, accende il REST :8082,\nregistra i destinatari e si collega al broker
+MAIN -> MAIN : crea e collega gli oggetti, accende il REST :8082,\nregistra i destinatari, si collega al broker\ne avvia la CodaPubblicazioni
 
-loop finche' l'esito e' RIPROVA (sleep 5s fra un giro e l'altro)
+loop finche' l'esito e' RIPROVA (Thread.sleep(5000) fra un giro e l'altro)
     MAIN -> VAL : verificaSeNecessario()
     activate VAL
 
-    alt sono passati almeno 15s dall'ultimo tentativo
-        VAL -> BROKER : inviaRichiestaValidazione\nrailway/train/{id}/validation\n{"trenoId":"TRN001"}
-        activate BROKER
-        BROKER -> EXIST : interrogaIlDPerValidazione(messaggio)
-        deactivate BROKER
-        activate EXIST
-        EXIST -> PG : repository.esisteTreno(trenoId)\nSELECT COUNT(*) FROM Treni
-        activate PG
-        PG --> EXIST : conteggio
-        deactivate PG
-        EXIST -> BROKER : railway/train/{id}/validation-response\n{"trenoId":..., "esisteNelDb":true|false}\n(dalla CodaPubblicazioni, QoS 0)
-        note right of EXIST
-          Il topic di risposta si costruisce con l'id letto
-          nella richiesta, perche' dipende dal mittente.
-          Un payload rotto finisce nel catch e si scarta:
-          il client MQTT non si ferma e la Centrale continua
-          a validare gli altri. Se la risposta si perde, il
-          treno ripete la domanda dopo 15 secondi.
+    alt trenoRiconosciuto oppure esitoCorrente == VALIDATO
+        VAL --> MAIN : VALIDATO
+    else esitoCorrente == ID_NON_PRESENTE
+        VAL --> MAIN : ID_NON_PRESENTE
+    else sono passati almeno 15s dall'ultimo tentativo
+        VAL ->> BROKER : inviaRichiestaValidazione: coda.metti(QoS 0)\nrailway/train/{id}/validation\n{"trenoId":"TRN001"}
+        VAL --> MAIN : RIPROVA
+        note right of VAL
+          La risposta non si aspetta: verificaSeNecessario
+          esce subito con RIPROVA e il main dorme 5 secondi.
+          L'esito lo scrive gestisciRispostaValidazione sul
+          thread di Paho, e lo legge il giro dopo del loop.
         end note
-        deactivate EXIST
-        activate BROKER
-        BROKER --> VAL : gestisciRispostaValidazione(messaggio)
-        deactivate BROKER
-        VAL -> VAL : la risposta e' mia?\ntrenoIdRisposta == trainDB.trenoId
     else meno di 15s: non si ribussa
-        VAL -> VAL : niente da fare
+        VAL --> MAIN : RIPROVA
     end
+    deactivate VAL
+end
 
-    VAL --> MAIN : EsitoVerifica
+group intanto, sui thread di Paho (Centrale, poi Treno)
+    BROKER -> EXIST : interrogaIlDPerValidazione(payload)
+    activate EXIST
+    EXIST -> PG : repository.esisteTreno(trenoId)\nSELECT COUNT(*) FROM Treni WHERE id_convoglio = ?
+    activate PG
+    PG --> EXIST : conteggio
+    deactivate PG
+    EXIST ->> BROKER : railway/train/{id}/validation-response\nla richiesta + "esisteNelDb" e "ESISTE" (true|false)\n(dalla CodaPubblicazioni, QoS 0)
+    note right of EXIST
+      Il topic di risposta si costruisce con l'id letto
+      nella richiesta, perche' dipende dal mittente.
+      Un payload rotto (o senza trenoId) finisce nel catch
+      o nel log e non riceve risposta: il client MQTT non si
+      ferma e la Centrale continua a validare gli altri. Se
+      la risposta si perde, il treno ripete la domanda dopo
+      15 secondi.
+    end note
+    deactivate EXIST
+    activate BROKER
+    BROKER -> VAL : gestisciRispostaValidazione(payload)
+    deactivate BROKER
+    activate VAL
+    VAL -> VAL : la risposta e' mia?\ntrenoIdRisposta == trainDB.trenoId
+    alt esisteNelDb == true
+        VAL -> DB : trenoRiconosciuto = true
+        VAL -> VAL : esitoCorrente = VALIDATO
+    else esisteNelDb == false
+        VAL -> VAL : esitoCorrente = ID_NON_PRESENTE
+    end
     deactivate VAL
 end
 
 alt esito VALIDATO
-    VAL -> DB : trenoRiconosciuto = true
     MAIN -> MAIN : Orologio: tick del viaggio e telemetria ogni secondo,\nconsole dei sensori (solo se System.console() != null)
     note over MAIN, DB
       Da qui in poi partono gli altri flussi: la telemetria (SQ04) e
@@ -6336,34 +6406,48 @@ box "Centrale Operativa (:8781)" #F8F9FA
 end box
 
 MAIN -> MAIN : main(args)\nID = args[0], oppure la property stazione.id
-MAIN -> DB : stazioneId, poi ripristinaDaDisco()
+MAIN -> MAIN : persistenza.apri()
+MAIN -> DB : stazioneId, poi ripristinaDaDisco()\n(e LocalBuffer.ripristinaDaDisco())
 MAIN -> MAIN : REST :8081, broker collegato,\nconsumatore del buffer, Orologio\n(controllo sensori, keepalive, heartbeat)
 
-loop finche' l'esito e' RIPROVA (sleep 5s)
+loop finche' l'esito e' RIPROVA (Thread.sleep(5000))
     MAIN -> VAL : verificaSeNecessario()
     activate VAL
-    opt sono passati almeno 15s dall'ultimo tentativo
-        VAL -> BROKER : railway/station/{id}/validation\n{"stazioneId":"MI"}
-        activate BROKER
-        BROKER -> EXIST : interrogaIlDbPerValidazione(messaggio)
-        deactivate BROKER
-        activate EXIST
-        EXIST -> PG : repository.esisteStazione(stazioneId)
-        activate PG
-        PG --> EXIST : Stazione oppure null
-        deactivate PG
-        EXIST -> BROKER : railway/station/{id}/validation-response\n{"stazioneId":..., "esisteNelDb":true|false}\n(dalla CodaPubblicazioni, QoS 0)
-        deactivate EXIST
-        activate BROKER
-        BROKER --> VAL : gestisciRispostaValidazione(messaggio)
-        deactivate BROKER
+    alt stazioneRiconosciuta oppure esitoCorrente gia' deciso
+        VAL --> MAIN : VALIDATO oppure ID_NON_PRESENTE
+    else sono passati almeno 15s dall'ultimo tentativo
+        VAL ->> BROKER : clientMqtt.pubblica(QoS 0), senza LocalBuffer\nrailway/station/{id}/validation\n{"stazioneId":"MI"}
+        VAL --> MAIN : RIPROVA (la risposta non si aspetta)
+    else meno di 15s
+        VAL --> MAIN : RIPROVA
     end
-    VAL --> MAIN : EsitoVerifica
+    deactivate VAL
+end
+
+group intanto, sui thread di Paho (Centrale, poi Stazione)
+    BROKER -> EXIST : interrogaIlDbPerValidazione(payload)
+    activate EXIST
+    EXIST -> PG : repository.esisteStazione(stazioneId)\n(trovaStazione(id) != null)
+    activate PG
+    PG --> EXIST : Stazione oppure null
+    deactivate PG
+    EXIST ->> BROKER : railway/station/{id}/validation-response\nla richiesta + "esisteNelDb" e "ESISTE" (true|false)\n(dalla CodaPubblicazioni, QoS 0)
+    deactivate EXIST
+    activate BROKER
+    BROKER -> VAL : gestisciRispostaValidazione(payload)
+    deactivate BROKER
+    activate VAL
+    VAL -> VAL : la risposta e' mia?\n(il filtro ha la wildcard: arrivano anche quelle delle altre)
+    alt esisteNelDb == true
+        VAL -> DB : stazioneRiconosciuta = true
+        VAL -> VAL : esitoCorrente = VALIDATO
+    else esisteNelDb == false
+        VAL -> VAL : esitoCorrente = ID_NON_PRESENTE
+    end
     deactivate VAL
 end
 
 alt esito VALIDATO
-    VAL -> DB : stazioneRiconosciuta = true
     note over DB, HB
       L'Orologio chiama generaHeartbeat ogni 10 secondi gia' da prima,
       ma il primo controllo e' proprio stazioneRiconosciuta: finche'
@@ -6371,7 +6455,7 @@ alt esito VALIDATO
       giro dopo la conferma riparte da solo, senza che
       StationDatabaseValidator debba chiamare nessuno (SQ05).
     end note
-    HB -> BROKER : primo heartbeat
+    HB -> BROKER : primo heartbeat (se il collegamento\nsimulato e' su: connessione.collegata())
 else esito ID_NON_PRESENTE
     MAIN -> MAIN : System.exit(1)
 end
@@ -6430,6 +6514,7 @@ box "Processo Treno (:8082)" #F8F9FA
     participant "CaricatoreItinerario" as CAR
     participant "SecureHttpClient" as HTTP
     participant "GestoreEventi" as GES
+    participant "AutomaStazioniNote" as NOTE
     participant "AutomaViaggio" as VIA
 end box
 
@@ -6442,11 +6527,12 @@ end box
 GEN -> GEN : tick() ogni secondo\n(chiamato dall'Orologio)
 activate GEN
 
-alt trainDB.trenoRiconosciuto == false
+alt trainDB.trenoRiconosciuto == false, o trenoId vuoto
     GEN -> GEN : return, nessun evento
     note right of GEN
-      Il tick parte con il container, prima della validazione:
-      il primo controllo dentro tick() e' proprio l'ID riconosciuto.
+      L'Orologio lo accende il main solo dopo la validazione
+      (SQ01), quindi qui il treno e' gia' riconosciuto: il
+      controllo resta come difesa, se il tick partisse prima.
     end note
 end
 
@@ -6471,6 +6557,7 @@ loop finche' l'itinerario e' vuoto, un tentativo ogni 15 secondi (e nessun TICK)
     activate PG
     PG --> REST : tratte ordinate
     deactivate PG
+    REST -> REST : una tappa per stazione di partenza piu' l'ultimo arrivo;\nlo "stato" di ogni fermata si legge dalla cache\n(statoRete.getStazione), non dalla riga di anagrafica
 
     alt treno inesistente, senza itinerario o itinerario senza tratte
         REST --> HTTP : 404 {"errore": "..."}
@@ -6478,23 +6565,28 @@ loop finche' l'itinerario e' vuoto, un tentativo ogni 15 secondi (e nessun TICK)
         CAR --> GEN : NON_ASSEGNATO
         GEN -> GES : gestisci(ITINERARIO_REVOCATO)
         activate GES
-        GES -> VIA : restaSenzaItinerario(): fase SENZA_ITINERARIO,\npercorso vuoto, nuovo tentativo fra 15s
+        GES -> VIA : restaSenzaItinerario(): fase SENZA_ITINERARIO,\npercorso vuoto, velocita 0
         deactivate GES
+        note right of VIA
+          Il prossimo tentativo lo fa il tick fra 15 secondi:
+          l'itinerario e' vuoto e il caricatore aspetta.
+        end note
     else itinerario trovato
-        REST --> HTTP : 200 {"itinerarioId":"IT1", "capolineaId":null,\n "stazioni":[{id,nome,lat,lng,tempoVersoProssimaMinuti,stato}, ...]}
+        REST --> HTTP : 200 {"itinerarioId":"IT1", "capolineaId":null,\n "stazioni":[{id,nome,latitudine,longitudine,\n tempoVersoProssimaMinuti,stato}, ...]}
         deactivate REST
         HTTP --> CAR : corpo JSON
         deactivate HTTP
         CAR -> CAR : costruisce le TappaItinerario\ne gli stati delle fermate
         alt meno di 2 tappe
             CAR --> GEN : RIPROVA
-            GEN -> GEN : itinerario inutilizzabile, si riprova
+            GEN -> GEN : itinerario inutilizzabile, nessun evento
         else almeno 2 tappe
             CAR --> GEN : CARICATO, ultimoCaricato() = Itinerario\n(id, tappe, capolineaId, statoFermate)
             GEN -> GES : gestisci(ITINERARIO_CARICATO)
             activate GES
             GES -> GES : 1. guardie: il viaggio non e' ancora partito\n(SENZA_ITINERARIO), non c'e' niente da riagganciare
-            GES -> VIA : 2. assegnamenti: installa(itinerario):\nitinerarioId, itinerario, stazioniTratta, capolineaId;\nlo stato delle fermate va in statoStazioni (AutomaStazioniNote)
+            GES -> NOTE : 2. assegnamenti: annotaStati(statoFermate)\nin statoStazioni
+            GES -> VIA : installa(itinerario):\nitinerarioId, itinerario, stazioniTratta, capolineaId
             deactivate GES
             note right of VIA
               capolineaId nullo (il caso normale) vuol dire percorso
@@ -6503,6 +6595,12 @@ loop finche' l'itinerario e' vuoto, un tentativo ogni 15 secondi (e nessun TICK)
             end note
         end
     end
+    note right of CAR
+      Centrale spenta, timeout di 5 secondi o un codice
+      diverso da 200 e 404: il catch (o il controllo
+      sullo status) da' RIPROVA, e nessun evento arriva
+      al gestore.
+    end note
     deactivate CAR
 end
 
@@ -6641,8 +6739,9 @@ alt treno non in cache
       inventato si sarebbe auto-validato.
     end note
 else treno noto
-    GES -> GES : guardie: tratta da riallineare,\nguasti "treno fermo" da chiudere
-    GES -> PG : 2. db.inTransazione:\nscriviStatoTreno(trenoId, stato)
+    GES -> GES : guardie: tratta da riallineare (trattaDaRiallineare),\nguasti "treno fermo" dedotti da chiudere\n(il treno si muove o e' in una stazione)
+    GES -> PG : guardie: repository.trovaTreno(trenoId)\n(la riga, con lo stato di prima per lo storico)
+    GES -> PG : 2. db.inTransazione: aggiornaPosizioneTreno\n(solo con una tratta dedotta), scriviStatoTreno(stato),\nchiudiGuasto per ogni "treno fermo" da chiudere
     activate PG
     note right of PG
       Lo storico (Storico_Stato_Treni) si scrive SOLO quando lo
@@ -6651,20 +6750,25 @@ else treno noto
     end note
     PG --> GES : commit
     deactivate PG
-    GES -> AUT : 2. telemetria(treno, msg, ...)
+    GES -> AUT : 2. telemetria(treno, msg, trattaDedotta, adesso)
     activate AUT
-    AUT -> CACHE : aggiornaTreno(treno) con stato, posizione,\nvelocita, passeggeri, fermate, ultimoAggiornamento
+    AUT -> AUT : stato, condizione, faseViaggio, posizione, velocita,\npasseggeri, fermate, direzione, ultimoAggiornamento;\nprevisioni.aggiornaPrevisione e aggiornaRitardo
+    AUT -> CACHE : aggiornaTreno(treno)
     CACHE -> CACHE : certificaPosizione(treno):\npartenza e arrivo garantiti, oppure incertezza
     deactivate AUT
-    GES -> WS : 3. NotificatoreRealtime.telemetria:\n{"eventType":"TELEMETRY","trainId",\n"stato","condizione","faseViaggio","direzione",\n"progressPercent","delayMinutes",\n"partenzaCorrente","arrivoCorrente","direzioneCorrente",\n"posizioneNota","incertezzaPosizione",...}
+    GES -> GES : 2. guasti.chiudi(...) sui "treno fermo" chiusi
+    GES -> WS : 3. NotificatoreRealtime.telemetria:\n{"eventType":"TELEMETRY","trainId",\n"stato","condizione","faseViaggio","direzione",\n"progressPercent","delayMinutes","velocita",\n"arrivoPrevisto","minutiAllArrivo",\n"partenzaCorrente","arrivoCorrente","direzioneCorrente",\n"posizioneNota","incertezzaPosizione",...}
     activate WS
     WS -->> WSC : messaggio sulla sessione aperta
     deactivate WS
+    opt si e' chiuso un guasto "treno fermo"
+        GES -> WS : 3. annunciaChiusure: RESOLVED su railway/alerts\n(PubblicatoreAlert) ed evento ALERT con risolto = true
+    end
 end
 deactivate GES
 deactivate ING
 
-WSC -> STORE : updateTrain(trainId, {progressPercent,\nstatus, condition, journeyPhase, declaredDirection,\ndelayMinutes, currentStationId,\npreviousStationId, nextStationId, direction,\npositionKnown, positionDoubt})
+WSC -> STORE : callback TELEMETRY di useRealtimeUpdates:\nupdateTrain(trainId, {progressPercent,\nstatus, condition, journeyPhase, declaredDirection,\ndelayMinutes, currentStationId,\npreviousStationId, nextStationId, direction,\npositionKnown, positionDoubt,\narrivalTime, minutesToArrival, lastUpdate})
 STORE -> USER : la mappa e l'elenco convogli si ridisegnano,\ncon lo stato composto (statiDelTreno: T6, T5, T7);\nsenza posizione garantita il convoglio esce dal\ndiagramma e passa nell'elenco degli incerti
 
 note over WSC, STORE
@@ -6751,7 +6855,7 @@ loop ogni 10 secondi (Orologio)
     alt ID non ancora validato
         HB -> HB : nessun battito
     else
-        HB -> DBL : connessioneCentrale?
+        HB -> DBL : connessione.collegata()?\n(AutomaConnessione legge connessioneCentrale)
         alt collegamento simulato giu'
             HB -> HB : nessun battito: la Centrale ci vedra' OFFLINE
             note right of HB
@@ -6763,8 +6867,11 @@ loop ogni 10 secondi (Orologio)
             activate BUF
             BUF --> HB : numero di eventi pendenti
             deactivate BUF
-            HB -> HB : generatePayload(stazioneId, stato, bufferSize)
-            HB -> BROKER : pubblica diretto, QoS 0:\n{"stazioneId","stato","timestamp",\n"tipoEvento":"HEARTBEAT","bufferSize"}
+            HB -> HB : generatePayload(stazioneId, dbLocale.getStato(), bufferSize)
+            HB -> BROKER : clientMqtt.pubblica diretto, QoS 0:\n{"stazioneId","stato","timestamp",\n"tipoEvento":"HEARTBEAT","bufferSize"}
+            opt il broker non risponde (eccezione)
+                HB -> HB : il battito si perde, una riga di log:\nfra 10 secondi ne parte un altro
+            end
         end
     end
 end
@@ -6779,20 +6886,22 @@ alt stazione sconosciuta
     GES -> GES : evento IGNORATO\n(non avrebbe superato nemmeno SQ02)
 else stazione nota
     GES -> AUT : accettaDalCampo(stazione, stato)?\n(no se c'e' la squadra: resta MANUTENZIONE)
-    GES -> GES : statoCambiato, tornataDalFailStop\n(guasti "heartbeat assente" da chiudere),\nannunciaStato
+    GES -> GES : statoCambiato, tornataDalFailStop (era OFFLINE:\nguasti "heartbeat assente" dedotti da chiudere),\nannunciaStato (cambiato, non GUASTA/MANUTENZIONE\ne nessun altro guasto aperto)
+    GES -> PG : guardie: trovaStazione (solo se lo stato cambia)\ne guastiApertiDi (solo se torna dal fail-stop)
     GES -> PG : 2. db.inTransazione: storico dello stato\n(solo se cambia) e chiusura dei guasti
     note right of PG
       Anche qui si storicizza solo al cambio: a ogni battito
       sarebbero circa 8.600 righe identiche al giorno per stazione.
     end note
     GES -> AUT : 2. dalCampo(stato) se accettato,\nbattito(ultimoHeartbeat = adesso,\nstatoDichiarato = stato del battito)
+    GES -> GES : 2. guasti.chiudi(...) sui guasti del fail-stop
     opt tornataDalFailStop
         GES -> GES : 3. RESOLVED dei guasti chiusi\n-> continua in SQ10
     end
     opt annunciaStato
         GES -> GES : 3. STATO_STAZIONE su railway/alerts\n(fa ripartire i treni trattenuti)
     end
-    GES -> WS : 3. broadcast({"eventType":"HEARTBEAT","stationId",\n"status": operativa|guasta|manutenzione|offline,\n"statoDichiarato": ONLINE|GUASTA})
+    GES -> WS : 3. NotificatoreRealtime.heartbeat:\n{"eventType":"HEARTBEAT","stationId",\n"status": operativa|guasta|manutenzione|offline,\n"statoDichiarato": ONLINE|GUASTA})
 end
 deactivate GES
 deactivate ING
@@ -6897,9 +7006,11 @@ note right of PUB
   E' la fase delle azioni: stazione corrente, indice e direzione
   li ha gia' scritti AutomaViaggio, quindi il messaggio porta la
   direzione di dopo (all'estremo gia' invertita) e qui non si
-  scrive niente.
+  scrive niente. Lo stesso messaggio lo pubblica anche
+  POST /treno/sensore/passaggio (TrainIngestion), che pero'
+  non sposta il viaggio simulato.
 end note
-PUB -> B1 : {"trenoId","stazioneId","tipo",\n"timestamp","direzione"}
+PUB -> B1 : coda.metti(QoS 0):\n{"trenoId","stazioneId","tipo",\n"timestamp","direzione"}
 deactivate PUB
 
 == Il sensore di binario rileva ==
@@ -6953,41 +7064,48 @@ GES -> PG : navigazione.dopoIlPassaggio(itinerario,\nstazione, entrata, direzion
 activate PG
 PG --> GES : Posizione(prossimaStazione, trattaCorrente)
 deactivate PG
-GES -> GES : treno e stazione a DB? transito aperto?\ncambiaFaseAlPassaggio (solo attivo <-> fermo)
-GES -> PG : 2. db.inTransazione: posizione sulla tratta
-GES -> AUT : 2. passaggio(treno, msg, posizione, ...)
+GES -> PG : trovaTreno, trovaStazione: registrabile solo se\nci sono tutti e due; trovaTransitoAperto (solo per la USCITA)
+GES -> GES : cambiaFaseAlPassaggio (solo attivo <-> fermo)
+opt la posizione ha una tratta corrente
+    GES -> PG : 2. db.inTransazione: aggiornaPosizioneTreno
+end
+GES -> AUT : 2. passaggio(treno, msg, direzione, posizione, ...)\n(solo se il treno e' in cache)
 activate AUT
 alt tipo ENTRATA
-    AUT -> AUT : registraArrivo(): confronto con l'orario\nfissato all'uscita precedente -> ritardo,\nal posto della stima fatta con la telemetria
+    AUT -> AUT : previsioni.registraArrivo(): confronto con l'orario\nfissato all'uscita precedente -> ritardo,\nal posto della stima fatta con la telemetria
 else tipo USCITA
-    AUT -> AUT : programmaArrivo(): conta la sosta oltre il previsto\ne fissa l'ora in cui il convoglio e' atteso\nalla prossima fermata
+    AUT -> AUT : previsioni.programmaArrivo(): conta la sosta oltre il previsto\ne fissa l'ora in cui il convoglio e' atteso\nalla prossima fermata
 end
 AUT -> CACHE : stazioneCorrente, prossimaStazione,\ntratta, stato, progresso, ritardo
 AUT --> GES : variazione del ritardo misurato
 deactivate AUT
 
 GES -> GES : ritardoAlPassaggio = quello appena misurato
-GES -> PG : 2. db.inTransazione
-activate PG
-alt tipo ENTRATA
-    PG -> PG : nuovo Transito (tempoUscita null)\n+ StoricoTransito
-else tipo USCITA con transito aperto
-    PG -> PG : chiude il Transito aperto\n+ StoricoTransito
-else USCITA senza ENTRATA
-    PG -> PG : transito puntuale, entrata = uscita
-    note right of PG
-      E' il caso della stazione di partenza: il convoglio esce da dove
-      non e' mai "entrato". Il caso opposto, l'entrata che resta senza
-      uscita, e' il capolinea in cui la corsa si chiude (RF02.2.4).
-    end note
+alt registrabile (treno e stazione a DB)
+    GES -> PG : 2. db.inTransazione: scriviTransito
+    activate PG
+    alt tipo ENTRATA
+        PG -> PG : nuovo Transito (tempoUscita null)\n+ StoricoTransito
+    else tipo USCITA con transito aperto
+        PG -> PG : chiude il Transito aperto\n+ StoricoTransito
+    else USCITA senza ENTRATA
+        PG -> PG : transito puntuale, entrata = uscita\n+ StoricoTransito
+        note right of PG
+          E' il caso della stazione di partenza: il convoglio esce da dove
+          non e' mai "entrato". Il caso opposto, l'entrata che resta senza
+          uscita, e' il capolinea in cui la corsa si chiude (RF02.2.4).
+        end note
+    end
+    PG --> GES : commit
+    deactivate PG
+else treno o stazione non a DB
+    GES -> GES : nessuna riga: "Transito ignorato" nel log\n(l'evento TRANSIT al browser parte lo stesso)
 end
-PG --> GES : commit
-deactivate PG
-GES -> CACHE : 2. AutomaStazione: treniInStazione++ oppure --
+GES -> CACHE : 2. AutomaStazione.entraTreno oppure esceTreno:\ntreniInStazione++ o -- (se la stazione e' in cache)
 opt il ritardo misurato e' cambiato
-    GES -> GES : 3. pubblicaRitardo(): alert RITARDO su\nrailway/alerts con target il convoglio\n(a bordo il numero si annota e basta)
+    GES -> GES : 3. PubblicatoreAlert.pubblicaRitardo(): alert RITARDO su\nrailway/alerts con target il convoglio\n(a bordo TrainGateway annota il numero e basta)
 end
-GES -> WS : 3. broadcast({"eventType":"TRANSIT","trainId",\n"stationId","type": ingresso|uscita,"delayMinutes"})
+GES -> WS : 3. NotificatoreRealtime.transito:\n{"eventType":"TRANSIT","trainId",\n"stationId","type": ingresso|uscita,"delayMinutes",\n"trattaId", piu' i campi del payload della stazione}
 deactivate GES
 deactivate ING
 
@@ -7008,7 +7126,7 @@ end note
 - la stazione sa in partenza quali sensori aspettarsi (li mette sotto osservazione il main, con il timeout che parte dall'avvio): un sensore gia' morto quando il nodo si accende risulta guasto lo stesso, perche' non si aspetta il suo primo battito per cominciare a contare
 - la severita' e' CRITICAL e non warning, perche' e' quello che porta la stazione in stato guasta e quindi trattiene i convogli; il tipo del guasto (sensore_offline) lo dichiara la stazione, la centrale non lo deve indovinare
 - lato stazione il battito e il giro di controllo sono due eventi per il gestore (BATTITO_SENSORE e CONTROLLO_SENSORI); lato centrale l'allarme e' un evento GUASTO_SEGNALATO
-- requisiti coperti: RF02.3.3 completo, RF03.4 completo per il contratto dei sensori
+- requisiti coperti: RF02.3.3 completo, RF03.4 completo per il contratto dei sensori; parzialmente RF01.2.1, RF02.1.1.2.1 e RF02.1.1.2.2 (i sensori muti chiudono la stazione e il loro ritorno, se non restano altri guasti, la riapre) e RF02.1.4 (il RESOLVED del campo chiude l'allarme)
 #+begin_src  plantuml :file sq_07_keepalive_sensori.png
 @startuml SQ07 - Keepalive dei sensori di binario
 ' =========================================================================
@@ -7074,14 +7192,19 @@ end box
 == Finche' il sensore e' vivo ==
 
 loop ogni 5 secondi
-    SENS -> REST : POST /stazione/sensore/heartbeat\n{"sensoreId":"MI-BIN1-IN"}
+    SENS -> REST : POST /stazione/sensore/heartbeat\n{"sensoreId":"MI-BIN1-IN","tipo","binario"}
     activate REST
     alt sensoreId mancante o vuoto
         REST --> SENS : 400
     else
         REST -> GES : gestisci(BATTITO_SENSORE)
         activate GES
-        GES -> SEN : 2. registraBattito(sensoreId, adesso)
+        GES -> SEN : 1. guardie: muto(sensoreId)? ultimoMuto(sensoreId)?
+        GES -> SEN : 2. registraBattito(sensoreId, adesso)\n(e lo toglie da sensoriGuasti)
+        opt era muto ed era l'ultimo: i sensori battono tutti di nuovo
+            GES -> STA : 2. tornaOnline se puoRientrareDaSola(),\naltrimenti chiudiGuastiDeiSensori
+            GES -> BUF : 3. PubblicatoreAlert.inviaRipristino:\nRESOLVED "sensore_offline" (in fondo al diagramma)
+        end
         deactivate GES
         REST --> SENS : 200 {"success":true}
     end
@@ -7125,10 +7248,34 @@ ING -> GC : gestisci(GUASTO_SEGNALATO)
 activate GC
 GC -> GC : 1. guardie: tipo dichiarato "sensore_offline";\nc'e' gia' un guasto aperto per la stazione\ne quel tipo? stazione in manutenzione?
 GC -> PG : 2. salvaGuasto + salvaStoricoGuasto\n(oppure solo il nuovo testo, se era gia' aperto)
-GC -> GC : 2. AutomaGuasto.apri, AutomaStazione.guasta
-GC -> WS : 3. broadcast STATION_STATUS e ALERT
+GC -> GC : 2. AutomaGuasto.apri (o aggiornaMessaggio),\nAutomaStazione.guasta solo se accettaDalCampo\n(con la squadra sul posto resta MANUTENZIONE)
+opt la stazione e' in MANUTENZIONE
+    GC -> GC : 3. PubblicatoreAlert.pubblicaStatoStazione(MANUTENZIONE)\nsu railway/alerts: lo ridice al campo
+end
+GC -> WS : 3. NotificatoreRealtime.statoStazione e allarme:\nSTATION_STATUS e ALERT
 deactivate GC
 deactivate ING
+
+== I sensori tornano a battere ==
+
+BUF -> BROKER : ConsumatoreBuffer: il RESOLVED "sensore_offline",\nQoS 1 (senza "origine": e' del campo)
+BROKER -> ING : onAlert(payload)
+activate ING
+ING -> GC : gestisci(GUASTO_RIENTRATO)
+activate GC
+GC -> GC : 1. guardie: c'e' un guasto aperto per la stazione\ne il tipo "sensore_offline"? (no: IGNORATO)\nla squadra e' sul posto? (si': allarme lasciato aperto, IGNORATO)
+GC -> PG : 1. trovaGuasto; stazioneCheTornaOnline:\nguastiApertiDi(stazione) senza contare questo
+GC -> PG : 2. db.inTransazione: chiudiGuasto,\nstorico ONLINE se la stazione torna operativa
+GC -> GC : 2. AutomaGuasto.chiudi, AutomaStazione.tornaOnline\n(solo se non le resta nessun altro guasto aperto)
+GC -> WS : 3. STATION_STATUS (se torna ONLINE) e ALERT con risolto = true
+GC -> BROKER : 3. STATO_STAZIONE ONLINE, solo se torna operativa:\ne' il permesso di ripartire per i treni trattenuti (SQ08)
+deactivate GC
+deactivate ING
+note right of GC
+  Il guasto aperto di quel tipo puo' essere anche quello che il
+  watchdog ha dedotto dal silenzio della stazione (SQ10), che ha
+  lo stesso tipo "sensore_offline": in quel caso si chiude quello.
+end note
 
 note over SENS, GES
   La stazione sa in partenza quali sensori aspettarsi: il main li
@@ -7215,13 +7362,13 @@ alt severita' diversa da CRITICAL
 else severita' CRITICAL
     TGW -> GES : gestisci(GUASTO_STAZIONE "PD")
     activate GES
-    GES -> VIA : 1. guardie: puoBloccarsiPer("PD")?\nfaseDiBlocco()
-    VIA --> GES : PD e' la corrente o la prossima?\nBLOCCATO_IN_STAZIONE o BLOCCATO_IN_TRATTA
+    GES -> VIA : 1. guardie: non soppresso e puoBloccarsiPer("PD")?\nfaseDiBlocco()
+    VIA --> GES : fase IN_STAZIONE o IN_VIAGGIO e PD e' la\ncorrente o la prossima? BLOCCATO_IN_STAZIONE\no BLOCCATO_IN_TRATTA
     GES -> NOTE : 2. assegnamenti: annotaGuasto("PD")
-    alt PD e' la stazione corrente o la prossima
+    alt miFermo: PD e' la corrente o la prossima,\nil treno e' in sosta o in marcia e non e' soppresso
         GES -> VIA : blocca("PD", faseDiBlocco):\nfaseViaggio = BLOCCATO_IN_x,\nstazioneBloccante = "PD", velocita = 0
         GES -> GES : 3. azioni: log "mi fermo"
-    else PD e' altrove sull'itinerario
+    else PD e' altrove sull'itinerario (o il treno e' gia' fermo)
         note right of GES
           Per ora non blocca niente, ma PD resta fra le stazioni
           guaste: quando il convoglio dovra' partire verso di lei
@@ -7263,6 +7410,16 @@ activate GES
 GES -> NOTE : dimenticaGuasto("PD")
 GES -> GES : nessuna mossa del viaggio: resto fermo
 deactivate GES
+note right of GES
+  Vale per chi e' gia' BLOCCATO_IN_x: lo sblocca solo
+  STATO_STAZIONE ONLINE. Per un convoglio non ancora fermo
+  invece PD esce da stazioniGuaste, e se statoStazioni non
+  dice GUASTA o MANUTENZIONE (il GUASTO del campo non fa
+  partire nessuno STATO_STAZIONE) la guardia della partenza
+  non lo trattiene piu': anche un RESOLVED parziale, come
+  quello dei soli sensori, lo lascia entrare in PD mentre la
+  stazione e' ancora GUASTA.
+end note
 
 == Il ripristino ==
 
@@ -7270,7 +7427,7 @@ CEN -> BROKER : {"tipoEvento":"STATO_STAZIONE","sorgenteTipo":"STAZIONE",\n"sorg
 BROKER -> TGW : riceviAlert(payload)
 TGW -> GES : gestisci(STATO_STAZIONE "PD" ONLINE)
 activate GES
-GES -> VIA : 1. guardie: bloccatoDa("PD")? faseDiSblocco()
+GES -> VIA : 1. guardie: ONLINE, non soppresso e bloccatoDa("PD")?\nfaseDiSblocco()
 VIA --> GES : si', IN_STAZIONE oppure IN_VIAGGIO
 GES -> NOTE : 2. assegnamenti: annotaStato("PD", "ONLINE"),\ndimenticaGuasto("PD")
 GES -> VIA : sblocca(faseDiSblocco): stazioneBloccante = null
@@ -7295,7 +7452,7 @@ end note
 - il convoglio si ferma in locale prima ancora che il messaggio parta: non aspetta il permesso della centrale, ed e' il senso dell'autonomia del nodo
 - lato centrale la parte interessante e' la deduplica, perche' una sorgente che ripete l'allarme riempirebbe la tabella di righe identiche e il comando risolvi ne chiuderebbe una sola
 - e' anche il diagramma dove si vedono le conseguenze sull'infrastruttura: se il convoglio si rompe dentro una stazione, la centrale chiude anche quella stazione con un guasto dedotto; se si rompe in tratta, la tratta continua a risultare percorribile, ed e' il limite dichiarato
-- requisiti coperti: RF02.1.2.1 completo, RF02.1.2.2.1 completo, RF02.1.3 parzialmente per l'unicita' per sorgente, RF01.2.1 per l'elenco degli allarmi aperti; RF02.1.2.2.2 non e' coperto ed e' segnato nella nota
+- requisiti coperti: RF02.1.2.1 completo, RF02.1.2.2.1 completo, RF02.1.3 parzialmente per l'unicita' per sorgente, RF01.2.1 per l'elenco degli allarmi aperti, RF02.1.1.2.1 parzialmente perche' la stazione chiusa dal convoglio ferma chi ci e' diretto; RF02.1.2.2.2 non e' coperto ed e' segnato nella nota
 #+begin_src  plantuml :file sq_09_guasto_di_bordo.png
 @startuml SQ09 - Guasto rilevato dai sensori di bordo
 ' =========================================================================
@@ -7359,7 +7516,7 @@ end box
 
 alt terminale interattivo disponibile
     SENS -> CONS : voce "3) Segnala un guasto di bordo"
-    CONS -> REST : POST http://localhost:8082/treno/sensore/guasto\n{"descrizione":"..."}
+    CONS -> REST : POST http(s)://localhost:8082/treno/sensore/guasto\n{"descrizione":"..."}
 else nessun terminale (container, output rediretto)
     SENS -> REST : POST /treno/sensore/guasto
 end
@@ -7386,7 +7543,7 @@ REST --> SENS : 200 {"success":true,\n"messaggio":"Guasto inviato. Treno in EMER
 deactivate REST
 
 loop ogni secondo
-    GES -> GES : gestisci(TICK): condizione EMERGENZA,\nfase IN_VIAGGIO -> congela()
+    GES -> GES : gestisci(TICK): condizione EMERGENZA,\nfase IN_VIAGGIO -> AutomaViaggio.congela()
     note right of GES
       Il viaggio e' congelato: il cronometro della tratta viene
       spostato avanti di un secondo per giro, quindi il
@@ -7406,26 +7563,37 @@ CACHE --> GC : guasto gia' aperto oppure null
 deactivate CACHE
 GC -> GC : CRITICAL da un TRENO: il convoglio si rompe;\ne' fermo in una stazione ancora aperta?\nallora anche quella si chiude, con un guasto dedotto
 
+GC -> PG : guardie: trovaTreno (la riga, per lo storico dello stato)
 alt esiste gia' un guasto aperto per questa sorgente e tipo
-    GC -> PG : 2. aggiornaMessaggioGuasto(id, messaggio)
+    GC -> PG : 2. db.inTransazione: aggiornaMessaggioGuasto(id, messaggio),\nstato del treno "rotto" (+ storico, solo se cambia)
+    GC -> CACHE : 2. AutomaGuasto.aggiornaMessaggio, AutomaTreno.rompi
     note right of GC
       Deduplica: una sorgente che ripete l'allarme non riempie la
       tabella di righe identiche. Con N righe aperte il comando
       "risolvi" ne chiuderebbe una sola e l'allarme resterebbe.
+      Il guasto gia' aperto puo' essere anche quello che il
+      watchdog ha dedotto per il treno fermo (SQ11): il tipo e'
+      lo stesso, "treno_fermo", quindi il suo testo viene
+      sostituito da quello del campo e perde il prefisso del
+      guasto dedotto.
     end note
 else nessun guasto aperto
-    GC -> PG : 2. db.inTransazione: salvaGuasto + salvaStoricoGuasto,\nstato del treno "rotto" (+ storico)
+    GC -> PG : 2. db.inTransazione: salvaGuasto + salvaStoricoGuasto,\nstato del treno "rotto" (+ storico, solo se cambia)
     GC -> CACHE : 2. AutomaGuasto.apri, AutomaTreno.rompi
 end
-opt il convoglio era fermo in una stazione ancora aperta
-    GC -> CACHE : 2. AutomaStazione.guasta(stazione),\nguasto dedotto convoglio_guasto_in_stazione
+opt il convoglio era fermo in una stazione non ancora GUASTA o in MANUTENZIONE
+    GC -> CACHE : 2. AutomaStazione.guasta(stazione)
+    opt non c'e' gia' un guasto convoglio_guasto_in_stazione aperto li'
+        GC -> PG : 2. scriviGuastoDedotto, in una transazione sua:\nguasto + storico, riga di eventi_stazioni\ne storico dello stato della stazione
+        GC -> CACHE : 2. AutomaGuasto.apri(dedotto), solo se scritto
+    end
 end
-GC -> WS : 3. broadcast TELEMETRY con lo stato "rotto"
+GC -> WS : 3. broadcast TELEMETRY con lo stato "rotto"\n(NotificatoreRealtime.statoTreno)
 opt la stazione e' stata chiusa dal convoglio
-    GC -> WS : 3. STATION_STATUS e ALERT del guasto dedotto
-    GC -> BROKER : 3. GUASTO CRITICAL della Centrale sulla stazione\n(i treni diretti li' si fermano, SQ08)
+    GC -> WS : 3. STATION_STATUS, e l'ALERT del guasto dedotto se scritto
+    GC -> BROKER : 3. GUASTO CRITICAL della Centrale sulla stazione\n(i treni diretti li' si fermano, SQ08; il nodo della\nstazione lo riceve come GUASTO_DALLA_CENTRALE e passa GUASTA)
 end
-GC -> WS : 3. per ultimo l'ALERT del guasto del convoglio\n({"eventType":"ALERT","id","type","severity",\n"message","trainId","origine","timestamp"})
+GC -> WS : 3. per ultimo l'ALERT del guasto del convoglio\n({"eventType":"ALERT","id","type","severity",\n"message","sorgenteId","trainId","origine",\n"timestamp","risolto":false})
 deactivate GC
 deactivate ING
 
@@ -7450,7 +7618,7 @@ end note
 - due dettagli reggono tutto il meccanismo: il marcatore sull'origine, che impedisce alla centrale di riascoltarsi e creare un secondo guasto per un allarme scritto da lei, e il prefisso nel messaggio, che le permette di riconoscere i guasti suoi e chiuderli da sola senza toccare quelli dichiarati dalla stazione
 - il silenzio lo scandisce il tempo: GeneratoreEventiTempo manda al gestore un CONTROLLO_HEARTBEAT ogni 10 secondi, e il ritorno del battito e' un evento HEARTBEAT come gli altri. Tutte e due le strade passano dalle tre fasi del gestore
 - le stazioni che non hanno mai battuto vengono saltate, se no dieci secondi dopo l'accensione la centrale aprirebbe guasti falsi su tutta la rete
-- requisiti coperti: RF02.6.1 completo, RF02.1.4 completo per la chiusura automatica quando la causa rientra, RF01.2.2 per la distinzione fra guasto segnalato e dedotto, che arriva all'operatore nel campo "origine"
+- requisiti coperti: RF02.6.1 completo, RF02.1.4 completo per la chiusura automatica quando la causa rientra, RF01.2.2 per la distinzione fra guasto segnalato e dedotto, che arriva all'operatore nel campo "origine", RF02.1.1.2.2 parzialmente perche' il ritorno del battito puo' mandare lo STATO_STAZIONE ONLINE
 #+begin_src  plantuml :file sq_10_failstop_stazione.png
 @startuml SQ10 - Fail-stop della stazione e chiusura automatica
 ' =========================================================================
@@ -7527,8 +7695,16 @@ loop ogni 10 secondi (thread watchdog)
           la rete dieci secondi dopo l'accensione.
         end note
     else ultimoHeartbeat piu' vecchio di 30s
-        GES -> GES : nuovoDedotto("sensore_offline", "WARNING",\n"STAZIONE", id, MSG_HEARTBEAT_PERSO + ...)\nsolo se non ce n'e' gia' uno aperto
-        GES -> CACHE : 2. AutomaStazione.vaiOffline
+        GES -> GES : guasti.nuovoDedotto("sensore_offline", "WARNING",\n"STAZIONE", id, MSG_HEARTBEAT_PERSO + ...)\nsolo se non ce n'e' gia' uno aperto di quel tipo
+        note right of GES
+          Il controllo guarda sorgente e tipo, non l'origine: se la
+          stazione ha gia' aperto l'allarme "sensore_offline" dei
+          suoi sensori (SQ07), che ha lo stesso tipo, il watchdog
+          non apre il suo. La stazione va OFFLINE senza un guasto
+          "heartbeat assente", e al ritorno del battito non c'e'
+          niente da chiudere da soli.
+        end note
+        GES -> CACHE : 2. AutomaStazione.vaiOffline (sempre)
         GES -> PG : 2. scriviGuastoDedotto: salvaGuasto + salvaStoricoGuasto\n+ salvaEventoStazione (HEARTBEAT_LOST)
         note right of PG
           L'id del guasto porta un suffisso casuale: due guasti
@@ -7538,8 +7714,11 @@ loop ogni 10 secondi (thread watchdog)
           cache e niente notifiche per un guasto che non esiste.
         end note
         GES -> CACHE : 2. AutomaGuasto.apri(guasto)
-        GES -> WS : 3. STATION_STATUS e {"eventType":"ALERT", ...,\n"origine":"DEDOTTO_CENTRALE"}
-        GES -> BROKER : 3. pubblicaGuasto: {"tipoEvento":"GUASTO","origine":"CENTRALE",\n"sorgenteTipo":"STAZIONE","severita":"WARNING",...}
+        GES -> WS : 3. STATION_STATUS (sempre)
+        opt il guasto nuovo e' stato scritto
+            GES -> WS : 3. {"eventType":"ALERT", ...,\n"origine":"DEDOTTO_CENTRALE"}
+            GES -> BROKER : 3. pubblicaGuasto: {"tipoEvento":"GUASTO","origine":"CENTRALE",\n"sorgenteTipo":"STAZIONE","severita":"WARNING","guastoId",...}
+        end
     end
     deactivate GES
 end
@@ -7557,7 +7736,7 @@ deactivate ING
 BROKER -> TGW : riceviAlert -> severita' WARNING:\nil convoglio NON si trattiene e tira dritto
 
 note right of TGW
-  E' il filtro di T11: il twin di bordo si ferma solo sui guasti
+  E' il filtro di T9: il twin di bordo si ferma solo sui guasti
   CRITICAL. Una stazione che tace non e' una stazione chiusa, e
   fermare i treni per un collegamento caduto vorrebbe dire bloccare
   la rete ogni volta che un processo viene riavviato. Se quella
@@ -7591,7 +7770,16 @@ end
 deactivate GES
 deactivate ING
 
-BROKER -> TGW : RESOLVED -> nessun convoglio da sbloccare:\nnessuno si era fermato per questo
+BROKER -> TGW : RESOLVED -> GUASTO_STAZIONE_RISOLTO:\nogni convoglio fa dimenticaGuasto(id), nessuno\nda sbloccare perche' nessuno si era fermato per il WARNING
+note right of TGW
+  Il RESOLVED non dice quale guasto si e' chiuso: se la stazione
+  era fra le stazioniGuaste del treno per un GUASTO CRITICAL
+  ancora aperto, ne esce lo stesso (vedi la nota di SQ08).
+  Lo STATO_STAZIONE ONLINE, se parte, sblocca chi era
+  trattenuto da questa stazione. Lo stesso RESOLVED, firmato
+  CENTRALE, arriva anche al nodo della stazione: se in quel
+  momento e' GUASTA torna ONLINE (SQ14).
+end note
 
 note over GES, PG
   La distinzione fra guasto dedotto e guasto segnalato (RF01.2.2) sta
@@ -7686,8 +7874,8 @@ loop ogni 10 secondi (thread watchdog)
         GES -> GES : da segnare: parte l'orologio
     else immobile da meno di T_fer
         GES -> GES : niente, si aspetta
-    else immobile da almeno T_fer e nessun guasto "treno_fermo" aperto
-        GES -> GES : nuovoDedotto("treno_fermo", "warning", "TRENO",\ntrenoId, MSG_TRENO_FERMO + "...fermo fuori da una stazione...")
+    else immobile da almeno T_fer e nessun guasto "treno_fermo" aperto\n(lo stesso tipo che ha l'avaria dichiarata dal treno, SQ09)
+        GES -> GES : guasti.nuovoDedotto("treno_fermo", "warning", "TRENO",\ntrenoId, MSG_TRENO_FERMO + "...fermo fuori da una stazione...")
     end
     GES -> AUT : 2. azzeraFermo / segnaFermo,\ntieniFermiSoloDi(treni che esistono ancora)
     opt guasto da aprire
@@ -7702,12 +7890,14 @@ end
 
 == Il convoglio riparte ==
 
-ELAB -> ING : telemetria: velocita > 0
+ELAB -> ING : telemetria: velocita > 0\n(oppure stazioneCorrente valorizzata)
 ING -> GES : gestisci(TELEMETRIA)
 activate GES
-GES -> GES : 1. guardie: c'e' un guasto "treno_fermo" aperto\ndedotto dal watchdog (prefisso MSG_TRENO_FERMO)?
+GES -> GES : 1. guardie: il guasto "treno_fermo" aperto in cache\ne' dedotto dal watchdog (prefisso MSG_TRENO_FERMO)?
+GES -> PG : 1. dedottiAperti(trenoId, "TRENO", MSG_TRENO_FERMO)
 GES -> PG : 2. chiudiGuasto nella stessa transazione\ndello stato del treno
-GES -> BROKER : 3. RESOLVED con "origine":"CENTRALE"
+GES -> GES : 2. AutomaGuasto.chiudi
+GES -> BROKER : 3. annunciaChiusure: RESOLVED con "origine":"CENTRALE"
 GES -> WS : 3. ALERT con risolto = true
 deactivate GES
 
@@ -7715,7 +7905,9 @@ note over BROKER
   L'alert finisce anche sul campo, ma nessun convoglio reagisce:
   TrainGateway blocca solo sui GUASTO di STAZIONE con severita'
   CRITICAL. Qui e' TRENO e warning, quindi la tratta resta
-  percorribile: e' il limite dichiarato per RF02.1.2.2.2.
+  percorribile: e' il limite dichiarato per RF02.1.2.2.2. Il
+  RESOLVED arriva al convoglio come GUASTO_BORDO_RISOLTO, ma
+  uno REGOLARE non ha nessuna emergenza da cui rientrare.
 end note
 
 note over GES, AUT
@@ -7813,7 +8005,7 @@ end
 == Gli eventi continuano ad accadere ==
 
 loop ogni transito o guasto rilevato mentre si e' offline
-    GES -> BUF : 3. azioni: add(canale, payload, idGuasto, idTreno)
+    GES -> BUF : 3. azioni, da PubblicatoreTransiti o PubblicatoreAlert:\nadd(canale, payload, idGuasto, idTreno)
     activate BUF
     BUF -> BUF : addLast in RAM e riga\nnella tabella bufferChache
     deactivate BUF
@@ -7920,7 +8112,7 @@ actor "Utente\n(tecnico o amministratore)" as USER
 box "Web App" #F8F9FA
     participant "LoginPage" as PAGE
     participant "authStore" as AUTH
-    participant "keycloak.ts" as KC
+    participant "keycloak" as KC
     participant "apiClient" as API
 end box
 
@@ -7958,7 +8150,7 @@ USER -> IDP : matricola e password\n(sulla pagina di Keycloak)
 note right of IDP
   La password si digita QUI. Ne' la web app ne' la Centrale
   la vedono mai, e la Centrale non ne conserva nessuna copia:
-  la colonna password della tabella Utenti non esiste piu'.
+  la tabella Utenti e' solo anagrafica, senza colonna password.
 end note
 
 alt credenziali sbagliate
@@ -7996,6 +8188,12 @@ else credenziali corrette
     end note
     AUTH -> PAGE : isAuthenticated = true, user
     deactivate AUTH
+    note left of AUTH
+      Se manca il verifier, lo state non torna, Keycloak rifiuta
+      lo scambio o GET /api/auth/me fallisce, completaAccesso
+      pulisce la sessione, toglie il token e LoginPage mostra
+      loginError: si resta fuori.
+    end note
 end
 
 == Chiavi del realm (all'avvio della Centrale) ==
@@ -8062,8 +8260,11 @@ deactivate KC
 AUTH -> API : setAuthToken(nuovo)
 note right of AUTH
   Senza il rinnovo l'utente si vedrebbe comparire dei 401 mentre
-  sta lavorando sulla dashboard. Se il refresh viene rifiutato
-  (sessione SSO chiusa o scaduta) si torna alla pagina di accesso.
+  sta lavorando sulla dashboard. Se rinnovaToken restituisce null
+  si torna alla pagina di accesso: succede quando il refresh viene
+  rifiutato (sessione SSO chiusa o scaduta, e la sessione locale si
+  pulisce), ma anche quando Keycloak non risponde, perche' il catch
+  restituisce null allo stesso modo.
 end note
 
 == Uscita ==
@@ -8102,7 +8303,7 @@ end note
 - quando la stazione torna ONLINE il cronometro dell'heartbeat riparte: senza, una stazione rimessa operativa a mano ma in realta' ancora spenta resterebbe operativa per sempre
 - il filtro sul tipo di sorgente serve perche' l'identificativo da solo non e' univoco fra convogli e stazioni
 - di tutti e due i comandi si vede l'effetto ma non l'autore: nessuno dei due scrive chi lo ha impartito
-- requisiti coperti: RF01.4.1 completo (il comando porta la stazione in MANUTENZIONE, lo storicizza e avvisa il campo, e lo stato dura fino alla chiusura del guasto, vedi M12), RF01.4.2 completo (la chiusura sblocca chi era trattenuto e chiude in storico l'intervallo aperto dal comando precedente), RF02.1.3 parzialmente: il ciclo di vita del guasto si apre e si chiude, e l'intervallo di lavorazione e' leggibile come MANUTENZIONE sulla stazione, ma l'assegnatario non viene mai registrato
+- requisiti coperti: RF01.4.1 completo (il comando porta la stazione in MANUTENZIONE, lo storicizza e avvisa il campo, e lo stato dura fino alla chiusura del guasto, vedi M12), RF01.4.2 completo (la chiusura sblocca chi era trattenuto e chiude in storico l'intervallo aperto dal comando precedente), RF02.1.3 parzialmente: il ciclo di vita del guasto si apre e si chiude, e l'intervallo di lavorazione e' leggibile come MANUTENZIONE sulla stazione, ma l'assegnatario non viene mai registrato; RF02.1.1.2.1 e RF02.1.1.2.2 parzialmente, perche' la squadra chiude i binari e la chiusura dell'allarme li riapre
 #+begin_src  plantuml :file sq_14_comandi_ripristino.png
 @startuml SQ14 - Comandi di ripristino dell'operatore
 ' =========================================================================
@@ -8186,10 +8387,10 @@ else nessun guasto aperto sulla stazione
       stesso identificativo di una stazione farebbe passare il
       controllo al posto suo.
     end note
-else stazione guasta
-    GES -> PG : 2. StoricoStatoStazione(MANUTENZIONE <- statoPrima)
+else almeno un guasto aperto sulla stazione
+    GES -> PG : 2. db.inTransazione: repository.salvaStoricoStatoStazione\n(stazione, MANUTENZIONE, statoPrecedente)
     GES -> CACHE : 2. AutomaStazione.inviaSquadra: stato = "MANUTENZIONE"
-    GES -> API : 3. STATION_STATUS (websocket)
+    GES -> API : 3. STATION_STATUS sulla WebSocket (a tutti i browser)
     GES -> BROKER : 3. {"tipoEvento":"MAINTENANCE_DISPATCHED",\n"origine":"CENTRALE","sorgenteId","timestamp"}
     BROKER -> SGW : riceviAlert -> log "operatori in arrivo"\ndbLocale.stato resta GUASTA
     GES -> BROKER : 3. {"tipoEvento":"STATO_STAZIONE","sorgenteId",\n"stato":"MANUTENZIONE","severita":"CRITICAL"}
@@ -8198,7 +8399,7 @@ else stazione guasta
       E' l'unico modo che il convoglio ha di sapere che i tecnici sono
       sui binari: la manutenzione la decide la Centrale e non nasce da
       nessun guasto segnalato dal campo. Senza questo messaggio i treni
-      entravano in stazione durante l'intervento.
+      entrerebbero in stazione durante l'intervento.
     end note
     GES --> REST : FATTO -> 200 stazione in manutenzione
     note right of CACHE
@@ -8225,10 +8426,10 @@ FILTRO -> REST : risolviAllarme(ctx)
 activate REST
 REST -> GES : gestisci(RISOLVI_GUASTO, id)
 activate GES
-alt guasto inesistente
+alt guasto inesistente (repository.trovaGuasto)
     GES --> REST : NON_TROVATO -> 404
-else guasto trovato
-    GES -> PG : 1. guardie: la sorgente e' una STAZIONE a cui,\nchiuso questo, non resta nessun guasto aperto?\ne' un TRENO rotto, con guasti che ha lasciato\nnelle stazioni (convoglio_guasto_in_stazione)?
+else guasto trovato (anche se gia' risolto: si richiude)
+    GES -> PG : 1. guardie: la sorgente e' una STAZIONE a cui,\nchiuso questo, non resta nessun guasto aperto\n(qualunque sia il suo stato, OFFLINE compreso)?\ne' un TRENO, con i guasti che ha lasciato nelle stazioni\n(quelli il cui messaggio contiene il suo id)? per ognuno,\nla stazione torna ONLINE solo se e' ancora GUASTA\ne non le restano altri guasti
     GES -> PG : 2. db.inTransazione: chiudiGuasto (e i derivati),\ntreno di nuovo "fermo", storico delle stazioni\nche tornano ONLINE
     GES -> CACHE : 2. AutomaGuasto.chiudi, AutomaTreno.rimettiInServizio,\nAutomaStazione.tornaOnline (ultimoHeartbeat = adesso)
     note right of GES
@@ -8242,7 +8443,8 @@ else guasto trovato
     opt il guasto era di un convoglio che si era rotto in una stazione
         GES -> BROKER : 3. RESOLVED dei guasti che il convoglio\naveva lasciato nelle stazioni
     end
-    opt una stazione e' tornata ONLINE
+    opt una stazione e' tornata ONLINE (se sono piu' d'una, si annuncia solo l'ultima)
+        GES -> API : 3. STATION_STATUS sulla WebSocket
         GES -> BROKER : 3. {"tipoEvento":"STATO_STAZIONE","sorgenteId",\n"stato":"ONLINE","severita":"INFO"}
         BROKER -> TGW : e' questo messaggio a liberare i convogli\ntrattenuti, non il RESOLVED
         note right of TGW
@@ -8253,10 +8455,18 @@ else guasto trovato
           allarme.
         end note
     end
-    GES -> BROKER : 3. per ultimo il RESOLVED del guasto\n{"tipoEvento":"RESOLVED","origine":"CENTRALE",...}
+    GES -> BROKER : 3. il RESOLVED del guasto\n{"tipoEvento":"RESOLVED","origine":"CENTRALE",...}
+    GES -> API : 3. per ultimo l'ALERT con risolto = true,\nsolo per questo guasto (non per i derivati)
     BROKER -> SGW : RESOLVED per questa stazione ->\nevento RIPRISTINO_DALLA_CENTRALE: ONLINE (S9)
-    BROKER -> TGW : RESOLVED -> stazioniGuaste.remove;\nnessuna mossa del viaggio (SQ08)
-    GES --> REST : FATTO -> 200 guasto aggiornato
+    note right of SGW
+      Il nodo torna ONLINE a ogni RESOLVED firmato dalla Centrale
+      per lui, se e' GUASTA: anche quando in Centrale le restano
+      altri guasti aperti e la stazione e' ancora GUASTA o in
+      MANUTENZIONE, perche' il messaggio non dice se era l'ultimo.
+    end note
+    BROKER -> TGW : RESOLVED di una STAZIONE -> dimenticaGuasto;\nnessuna mossa del viaggio (SQ08)
+    BROKER -> TGW : RESOLVED di un TRENO, a quel convoglio ->\nGUASTO_BORDO_RISOLTO: da EMERGENZA torna REGOLARE\ne riprende dalla fase in cui era (SQ09)
+    GES --> REST : FATTO -> 200 con il guasto
 end
 deactivate GES
 deactivate REST
@@ -8381,6 +8591,11 @@ else convoglio fermo in stazione
     end note
     GC -> BROKER : 3. {"tipoEvento":"STOP","origine":"CENTRALE","target":"<id>",\n"motivo":"Soppresso da operatore","timestamp"}
     GC --> REST : FATTO -> 200 treno aggiornato
+    note right of GC
+      Nessun evento WebSocket parte da qui: il browser che ha dato
+      il comando ha la risposta HTTP, gli altri vedono la corsa
+      soppressa con la telemetria successiva o con lo snapshot.
+    end note
 end
 deactivate GC
 deactivate REST
@@ -8402,11 +8617,12 @@ end
 deactivate TGW
 
 loop ogni secondo
-    GES -> GES : gestisci(TICK): condizione SOPPRESSO,\nnessuna mossa
+    GES -> GES : gestisci(TICK): condizione SOPPRESSO,\nsuTick esce subito, nessuna mossa
     note right of GES
       E' uno stato definitivo: nessun evento riporta indietro un
-      convoglio soppresso, nemmeno un itinerario riassegnato (l'avvio
-      lo esclude nella guardia): va rilanciato il processo.
+      convoglio soppresso. Un itinerario riassegnato si installa
+      ma non lo fa ripartire, perche' il primo controllo di suTick
+      e' proprio la soppressione: va rilanciato il processo.
     end note
 end
 
@@ -8559,19 +8775,22 @@ else itinerario trovato
     note right of REST
       Vanno letti PRIMA di assegnaTreni: quel metodo sgancia i convogli
       non piu' in elenco e una query fatta dopo non li troverebbe piu'.
-      Erano proprio quelli a non ricevere mai la notifica, e continuavano
-      a girare sul percorso vecchio.
+      Se no proprio quelli non riceverebbero la notifica e
+      continuerebbero a girare sul percorso vecchio.
     end note
-    REST -> REST : assegnaTreni(itinerario, treniIds, sganciaAssenti = true)
-    REST -> PG : convogli esclusi: itinerario = null
-    REST -> CACHE : stessa cosa sulla copia in RAM
-    REST -> PG : convogli aggiunti: itinerario = questo
-    REST -> REST : daNotificare = vecchi + nuovi
+    opt nel JSON c'e' "treniIds" (assente = assegnazioni non toccate)
+        REST -> REST : assegnaTreni(itinerario, treniIds, sganciaAssenti = true)
+        REST -> PG : convogli esclusi: itinerario = null
+        REST -> CACHE : stessa cosa sulla copia in RAM
+        REST -> PG : convogli aggiunti (se esistono): itinerario = questo,\nanche in cache
+        REST -> REST : daNotificare = vecchi + quelli dell'elenco
+    end
     REST -> PG : commit
 
     loop per ogni convoglio coinvolto, dopo il commit
         REST -> BROKER : PubblicatoreAlert.pubblicaItinerarioAggiornato\n{"tipoEvento":"ITINERARIO_AGGIORNATO","origine":"CENTRALE",\n"target":"<trenoId>","timestamp"}
     end
+    REST -> REST : previsioni.itinerariCambiati():\nle previsioni di arrivo si rifanno sul percorso nuovo
     REST --> API : 200 tratta nel formato del frontend
 end
 deactivate REST
@@ -8589,14 +8808,22 @@ deactivate TGW
 ENG -> ENG : al tick successivo
 activate ENG
 ENG -> ENG : GET dell'itinerario -> SQ03\n(l'itinerario vecchio resta in uso finche' non arriva la risposta)
-ENG -> GES : gestisci(ITINERARIO_CARICATO)
+ENG -> GES : gestisci(ITINERARIO_CARICATO)\n(con un 404 e' invece ITINERARIO_REVOCATO, vedi la nota)
 activate GES
-GES -> TDB : 1. guardie: dove si trova il convoglio?\nfermataDiRiaggancio(nuovo, stazione, stati nuovi)
-alt fermo in stazione
-    GES -> TDB : 2. assegnamenti: installa(nuovo), fermaIn(fermata):\nindiceStazione della stazione in cui si trova,\ndirezione e prossima fermata ricalcolate, sosta riaperta
-else in mezzo a una tratta
-    GES -> TDB : 2. assegnamenti: mettiInAttesa(nuovo),\ninstallato all'arrivo in stazione
+GES -> TDB : 1. guardie: dove si trova il convoglio?\nnei casi di riaggancio fermataDiRiaggancio(nuovo, stazione,\nstati nuovi), o primaFermata se la stazione non c'e' piu'
+GES -> GES : 2. assegnamenti: AutomaStazioniNote.annotaStati\n(gli stati delle fermate valgono in ogni caso)
+alt soppresso, oppure SENZA_ITINERARIO
+    GES -> TDB : 2. installa(nuovo) e basta: l'avvio lo fa il tick
+else FERMO_CAPOLINEA (riaggancio sempre, anche con le stesse fermate)
+    GES -> TDB : 2. installa(nuovo), fermaIn(fermata)
+else stesse identiche fermate di prima
+    GES -> TDB : 2. installa(nuovo) e basta: i tempi di percorrenza\nsi aggiornano, la sosta non si riapre
+else in mezzo a una tratta (IN_VIAGGIO o BLOCCATO_IN_TRATTA)
+    GES -> TDB : 2. mettiInAttesa(nuovo),\ninstallato all'arrivo in stazione (arrivoInStazione)
+else fermo in stazione (IN_STAZIONE o BLOCCATO_IN_STAZIONE)
+    GES -> TDB : 2. installa(nuovo), fermaIn(fermata):\nindiceStazione della stazione in cui si trova,\ndirezione e prossima fermata ricalcolate, sosta riaperta
 end
+GES -> GES : 3. azioni: solo il log, nessun passaggio pubblicato
 deactivate GES
 deactivate ENG
 
@@ -8625,7 +8852,8 @@ note over ENG, TDB
   spostato) potrebbe non toccare l'elenco delle stazioni. Se pero' il
   capolinea e' ancora la stazione in cui si trova, la corsa resta chiusa:
   ITINERARIO_AGGIORNATO arriva a tutti i convogli assegnati, quindi
-  bastava agganciarne un altro per far ripartire questo.
+  senza questo controllo basterebbe agganciarne un altro per far
+  ripartire questo.
 end note
 
 @enduml
@@ -8635,8 +8863,8 @@ end note
 *** SQ17 amministrazione dell'anagrafica della rete
 - il diagramma mostra i rifiuti, non i casi che vanno bene: sono quelli la parte osservabile del requisito sull'integrita' dei dati
 - una stazione ancora estremo di qualche tratta non si cancella, e nemmeno una tratta usata da un itinerario, presente nei transiti ancora vivi o posizione corrente di un convoglio
-- per il convoglio invece si e' scelta la cancellazione a cascata degli storici: sono due decisioni diverse prese apposta, perche' una stazione tolta spezzerebbe archi ancora usati da altri percorsi
-- il nome del convoglio non e' modificabile perche' e' la chiave primaria e il riferimento delle chiavi esterne di quattro storici
+- per il convoglio invece non c'e' nessun rifiuto: si cancellano a cascata i suoi transiti vivi e poi il treno, mentre gli storici restano (RF02.7). Sono due decisioni diverse prese apposta, perche' una stazione tolta spezzerebbe archi ancora usati da altri percorsi
+- il nome del convoglio non e' modificabile perche' e' la chiave primaria: la tabella viva dei Transiti la referenzia con una chiave esterna, e gli storici la conservano come riferimento logico
 - dall'interfaccia si scrivono solo nome e coordinate della stazione, nome e itinerario del convoglio: lo stato (e i binari della stazione) la PUT lo accetta ancora, ma la web app non lo manda
 - requisiti coperti: RF01.3.1, RF01.3.2 e RF01.3.3 completi; RF01.3.5 parzialmente, perche' l'integrita' la tengono anche i vincoli del database e non solo questi controlli
 #+begin_src  plantuml :file sq_17_anagrafica.png
@@ -8743,10 +8971,13 @@ activate REST
 alt il corpo prova a cambiare il nome
     REST --> API : 400 "il nome identifica il treno e non e' modificabile"
     note right of REST
-      E' la chiave primaria e il riferimento delle FK degli storici:
+      E' la chiave primaria, referenziata dalla tabella viva dei
+      Transiti e conservata negli storici come riferimento logico:
       per cambiarlo si elimina il convoglio e lo si ricrea. Infatti
       l'interfaccia mostra quel campo in sola lettura in modifica.
     end note
+else convoglio inesistente
+    REST --> API : 404
 else stato fuori dal vocabolario della colonna
     REST --> API : 400 "Stato del treno non ammesso"
     note right of REST
@@ -8762,9 +8993,9 @@ else modifica valida
     opt nel corpo c'e' uno stato
         REST -> REST : gestore: evento STATO_TRENO_OPERATORE\n(riga e cache le scrive AutomaTreno)
         note right of REST
-          La web app non lo manda piu': il form del convoglio
-          ha solo l'itinerario. Il ramo resta per chi chiama
-          la PUT direttamente.
+          La web app non lo manda: il form del convoglio ha
+          solo l'itinerario. Il ramo serve a chi chiama la PUT
+          direttamente. Lo stato va sulla riga senza storico.
         end note
     end
     opt l'itinerario e' cambiato
@@ -8798,13 +9029,15 @@ else compare nella tabella viva dei Transiti
     REST --> API : 409 "Tratta presente nei transiti e non eliminabile"
     note right of REST
       Il rifiuto protegge la tabella viva, che verso Tratte ha una
-      chiave esterna. Lo storico invece non blocca piu' niente: la
+      chiave esterna. Lo storico invece non blocca niente: la
       riga di Storico_Transiti si porta dentro l'id e la
       descrizione della tratta (RF02.7).
     end note
 else posizione corrente di qualche convoglio
     REST --> API : 409 "Tratta usata come posizione corrente di N convogli"
 else libera
+    REST -> PG : eliminaTratta
+    REST -> REST : previsioni.itinerariCambiati()
     REST --> API : 204
 end
 deactivate REST
@@ -8812,10 +9045,14 @@ deactivate REST
 USER -> API : elimina un convoglio
 API -> REST : DELETE /api/treni/{id}
 activate REST
-REST -> PG : cancella i Transiti vivi, poi il Treno\n(lo storico non si tocca: RF02.7)
-REST -> CACHE : rimuoviTreno(id)
-REST -> BROKER : {"tipoEvento":"STOP","target":"<id>",\n"motivo":"Treno eliminato da operatore"}
-REST --> API : 204
+alt convoglio inesistente
+    REST --> API : 404
+else convoglio trovato
+    REST -> PG : cancella i Transiti vivi, poi il Treno\n(lo storico non si tocca: RF02.7)
+    REST -> CACHE : rimuoviTreno(id), previsioni.dimenticaTreno(id)
+    REST -> BROKER : {"tipoEvento":"STOP","origine":"CENTRALE","target":"<id>",\n"motivo":"Treno eliminato da operatore"}
+    REST --> API : 204
+end
 deactivate REST
 
 note over PG
@@ -8841,7 +9078,8 @@ end note
 '
 '  Codice astratto:
 '    src/store/railwayStore.ts#initialize                 (le GET iniziali)
-'    src/hooks/useRealtimeUpdates.ts                      (le quattro subscribe)
+'    src/App.tsx#RailwayApp                               (initialize e useRealtimeUpdates al montaggio)
+'    src/hooks/useRealtimeUpdates.ts                      (le sei subscribe)
 '    src/api/websocketClient.ts#connect, #subscribe       (+ reconnect a 5s)
 '    it.uni.reti2.gateway.RealtimeWebSocket#onOpen, #broadcast, #onClose (app.ws di Javalin)
 '    it.uni.reti2.gateway.NotificatoreRealtime                 (tutti gli eventType)
@@ -8876,7 +9114,7 @@ title SQ18 - Fotografia iniziale, flusso continuo e snapshot dei KPI ogni 10 sec
 actor "Tecnico" as USER
 
 box "Web App" #F8F9FA
-    participant "DashboardPage" as PAGE
+    participant "RailwayApp\n(App.tsx)" as PAGE
     participant "railwayStore" as STORE
     participant "apiClient" as API
     participant "useRealtimeUpdates" as HOOK
@@ -8893,21 +9131,22 @@ end box
 
 == 1. La fotografia iniziale (HTTP) ==
 
-USER -> PAGE : apre la dashboard
+USER -> PAGE : entra nell'applicazione\n(la RailwayApp si monta una volta, per tutte le pagine)
 PAGE -> STORE : initialize()
 activate STORE
-STORE -> API : GET /api/treni, /api/stazioni, /api/tratte,\n/api/tratte-elementari, /api/allarmi, /api/transiti
+STORE -> API : in parallelo GET /api/treni, /api/stazioni,\n/api/allarmi, /api/tratte, /api/tratte-elementari,\n/api/transiti, /api/dashboard
 API -> REST : richieste con Bearer <token>
 activate REST
 REST -> CACHE : getTuttiTreni(), getTutteStazioni()
 note right of REST
   Treni e stazioni si leggono dalla cache in RAM, non dal database:
-  e' il punto per cui il TrafficLogicEngine esiste. Allarmi, transiti
-  e itinerari arrivano invece da PostgreSQL, perche' sono storia.
+  e' il punto per cui il TrafficLogicEngine esiste, e da li' esce anche
+  kpiDashboard per /api/dashboard. Allarmi, transiti e itinerari
+  arrivano invece da PostgreSQL, perche' sono storia.
 end note
 REST --> API : liste nel formato del frontend
 deactivate REST
-API --> STORE : Train[], Station[], Alert[], Transit[], ...
+API --> STORE : Train[], Station[], Alert[], Route[],\nTrackSegment[], Transit[], KPI
 deactivate STORE
 
 == 2. Il flusso continuo (WebSocket) ==
@@ -8918,8 +9157,12 @@ HOOK -> WSC : connect()
 WSC -> WS : handshake su /ws/realtime
 activate WS
 WS -> WS : onOpen: sessions.add(session)
+note right of WS
+  La WebSocket non passa dal FiltroAutorizzazione, che sta
+  solo su /api/*: l'handshake non porta nessun token.
+end note
 deactivate WS
-HOOK -> WSC : subscribe("TELEMETRY" | "HEARTBEAT" | "ALERT" | "TRANSIT")
+HOOK -> WSC : subscribe("TELEMETRY" | "HEARTBEAT" | "STATION_STATUS"\n| "ALERT" | "TRANSIT" | "SNAPSHOT")
 deactivate HOOK
 
 loop finche' la pagina resta aperta
@@ -8927,11 +9170,13 @@ loop finche' la pagina resta aperta
     activate WS
     WS -->> WSC : messaggio JSON (invio asincrono a ogni sessione)
     deactivate WS
-    WSC -> WSC : instrada in base al campo "eventType"
+    WSC -> WSC : instrada in base al campo "eventType"\nalle callback registrate dall'hook
     alt TELEMETRY
         WSC -> STORE : updateTrain(...)
     else HEARTBEAT
-        WSC -> STORE : updateStation(...)
+        WSC -> STORE : updateStation(status, declaredStatus, lastHeartbeat)
+    else STATION_STATUS
+        WSC -> STORE : updateStation(status, operatorsDispatched)\n(l'ora dell'ultimo battito non si tocca)
     else ALERT
         WSC -> STORE : addAlert(...)
     else TRANSIT
@@ -8949,8 +9194,10 @@ loop ogni 10 secondi (thread watchdog)
     activate CACHE
     CACHE --> ING : totalTrains, trainsInMotion, trainsDelayed,\nstationsOperative, stationsFaulty,\nactiveAlerts, avgDelay; treni e stazioni
     deactivate CACHE
-    ING -> WS : broadcast({"eventType":"SNAPSHOT","dashboard":{...},\n"treni":[...],"stazioni":[...]})
+    ING -> WS : NotificatoreRealtime.snapshot:\n{"eventType":"SNAPSHOT","dashboard":{...},\n"treni":[...],"stazioni":[...]}
     deactivate ING
+    WS -->> WSC : SNAPSHOT
+    WSC -> STORE : setKpi(dashboard), setTrains, setStations\n(con mapApiTrain e mapApiStation, come le GET)
 end
 
 note over ING, CACHE
@@ -9004,7 +9251,7 @@ nel capitolo /Specifica/: qui si dice quale conversazione lo mostra, non se il s
 | RF01.1.3     | SQ05       | SQ06, SQ18   | lo stato della stazione dal battito, i presenti sui binari dal transito        |
 | RF01.1.4     | SQ18       |              | l'evento arriva quando accade, non a interrogazione                            |
 | RF01.1.5     | SQ18       |              | i numeri di sintesi viaggiano nello snapshot da 10 secondi                     |
-| RF01.2.1     | SQ09       | SQ10, SQ11   | l'elenco si riempie da tre sorgenti diverse                                    |
+| RF01.2.1     | SQ09       | SQ07, SQ10, SQ11 | l'elenco si riempie da quattro sorgenti diverse                            |
 | RF01.2.2     | SQ10, SQ09 |              | SQ09 e' la porta del segnalato e SQ10 quella del dedotto; l'origine arriva all'elenco nel campo =origine= |
 | RF01.3.1     | SQ17       |              |                                                                               |
 | RF01.3.2     | SQ17       |              |                                                                               |
@@ -9018,14 +9265,14 @@ nel capitolo /Specifica/: qui si dice quale conversazione lo mostra, non se il s
 | RF01.6       | SQ13       |              |                                                                               |
 | RF02.1.1.1.1 | SQ12       |              |                                                                               |
 | RF02.1.1.1.2 | SQ12       |              | la testa si toglie solo a invio riuscito: e' cio' che conserva l'ordine        |
-| RF02.1.1.2.1 | SQ08       | SQ07, SQ10   | la stazione diventa impercorribile per due strade diverse                      |
-| RF02.1.1.2.2 | SQ08       | SQ14, SQ10   | riparte al ripristino, non per scadenza di un tempo                            |
+| RF02.1.1.2.1 | SQ08       | SQ07, SQ09, SQ14 | la stazione diventa impercorribile per i sensori muti, per un convoglio rotto sui binari o per la squadra mandata dall'operatore; il silenzio di SQ10 invece non ferma nessuno |
+| RF02.1.1.2.2 | SQ08       | SQ14, SQ07, SQ10 | riparte allo STATO_STAZIONE ONLINE, non per scadenza di un tempo: lo mandano la chiusura dell'allarme, il rientro dei sensori o il ritorno del battito |
 | RF02.1.1.2.3 |            | SQ08         | chi era gia' fermo li' viene trattenuto solo al controllo di ripartenza        |
 | RF02.1.2.1   | SQ09       |              |                                                                               |
 | RF02.1.2.2.1 | SQ09       | SQ08         | la centrale chiude la stazione in cui il convoglio si e' rotto; chi ci e' diretto si ferma come in SQ08 |
 | RF02.1.2.2.2 |            | SQ11         | si apre solo un allarme sul convoglio, la tratta resta percorribile            |
-| RF02.1.3     |            | SQ09, SQ14   | apertura con deduplica e chiusura sono i due estremi del ciclo, ma in mezzo non c'e' ne' la presa in carico ne' l'assegnatario |
-| RF02.1.4     | SQ10       |              | il prefisso nel messaggio e' cio' che permette la chiusura automatica          |
+| RF02.1.3     |            | SQ09, SQ14   | apertura con deduplica e chiusura sono i due estremi del ciclo; in mezzo la presa in carico si vede solo come MANUTENZIONE della stazione, l'assegnatario non c'e' |
+| RF02.1.4     | SQ10       | SQ07, SQ11   | il prefisso nel messaggio e' cio' che permette la chiusura automatica; i sensori che tornano a battere la chiedono con un RESOLVED del campo |
 | RF02.2.1.1   | SQ08       |              | il ritardo cresce mentre il convoglio e' trattenuto                            |
 | RF02.2.2.1   | SQ04       | SQ06         | la posizione e' interpolata dal motore e corretta dai passaggi                 |
 | RF02.2.2.2   | SQ06       | SQ08         | il ritardo lo misura la centrale al passaggio e lo comunica al convoglio con l'alert RITARDO; fra un passaggio e l'altro lo stima dalla telemetria |
@@ -9067,32 +9314,41 @@ decide (il gestore degli eventi e gli automi), =C5= il piano della persistenza s
 
 In nessuno dei tre moduli Java c'e' un framework che crea gli oggetti: ogni processo ha un =main=
 che li crea con =new=, una copia sola per classe, e ne assegna a mano i campi con cui si parlano,
-gli stessi che assegnano i test. Le frecce dei diagrammi sono quei campi.
+gli stessi che assegnano i test. Le frecce dei diagrammi sono quei campi. Gli oggetti che non nascono
+nel =main= sono i dati (entita', messaggi, eventi) e i due =SensoreBinario= della stazione, che li crea
+il =SimulatoreSensori=.
 
 *Legenda degli archi.* Sono quelli di UML e in tutto il capitolo ne compaiono sette:
 
 - =A --> B= :: *associazione diretta*: A conosce B e lo usa. Nei moduli Java e' un campo di A che
   punta a B, assegnato dal =main=, oppure un campo che conserva un valore di B (in =C1= l'=Itinerario=
-  tenuto in attesa); in =C6= un import fra moduli.
-- =A ..> B= :: *dipendenza*: A usa B senza tenerne un campo, tipicamente una chiamata REST fra due
-  processi. Tratteggiata anche quando il campo c'e' ma B sta fuori dal diagramma.
+  tenuto in attesa). Le frecce del =main=, che non ha campi, partono dalle sue variabili locali. In
+  =C6= e' l'import di un modulo di cui si usano le funzioni.
+- =A ..> B= :: *dipendenza*: A usa B senza tenerne un campo: una chiamata REST fra due processi, una
+  funzione statica, un parametro, un destinatario registrato con =ascolta()= (=ClientMqtt= conosce
+  solo l'interfaccia =Destinatario=). In =C6= e' l'uso di un tipo.
 - =A ..|> B= :: *realizzazione*: A implementa l'interfaccia B.
 - =A +-- B= :: *classe annidata*: B e' dichiarata dentro A, come i DTO di =RestApiGateway=.
 - =A o-- B= :: *aggregazione*: A raccoglie dei B che pero' esistono anche senza A. Solo in =C6=.
 - =A *-- B= :: *composizione*: i B nascono dentro A e vivono solo con lui. Solo in =C2=: i
   sensori di binario simulati li crea e li tiene il =SimulatoreSensori=.
-- =A <.. B= :: *dipendenza entrante*: la stessa di =..>=, disegnata al contrario.
+- =A <-- B= :: *associazione entrante*: la stessa di =-->=, disegnata al contrario: e' B ad avere il
+  campo che punta ad A.
 
 Non compare l'*ereditarieta'* (=--|>=): nel codice le sole sottoclassi estendono una classe di
-libreria (=VerificaToken= il =JwtAuthenticator= di pac4j, il formato dei log il =Formatter= di
-=java.util.logging=), e non sono gerarchie del sistema. Il filo tratteggiato
+libreria (=VerificaToken= il =JwtAuthenticator= di pac4j, =Json.IstanteIso= il =TypeAdapter= di Gson,
+il formato dei log il =Formatter= di =java.util.logging=, nella web app =ErroreApi= l'=Error= di
+JavaScript), e non sono gerarchie del sistema. Per lo stesso motivo non sono disegnate le interfacce
+di libreria implementate: =MqttCallbackExtended= di Paho, che implementano i tre =ClientMqtt= (sono i
+metodi raggruppati sotto /callback di Paho/), e =AuthorizationGenerator= di pac4j, che implementa
+=RuoliDelRealm=. Il filo tratteggiato
 senza punta lega le note al loro riquadro, gli archi =-[hidden]-= della mappa servono solo a
 impaginare, e i colori sono stereotipi locali a ogni figura.
 
 *** Il componente Treno (C1)
 
 - requisiti coperti: RF03.1 parzialmente, il convoglio e' un processo a se' con il proprio stato; RF02.2.2 per i campi che descrivono il convoglio
-- il viaggio si legge in tre ruoli: i generatori di eventi (GeneratoreEventiTempo, TrainGateway, TrainIngestion) traducono quello che succede in un EventoTreno; GestoreEventi e' l'unico che fa muovere le macchine, un evento alla volta e sempre nell'ordine guardie, assegnamenti, azioni; le macchine (AutomaViaggio, AutomaCondizione, AutomaStazioniNote) offrono solo guardie e mosse e non si conoscono fra loro. Quello che esce verso la rete lo pubblicano PubblicatorePassaggi e PubblicatoreAlert, che il gestore chiama dopo le mosse
+- il viaggio si legge in tre ruoli: i generatori di eventi (GeneratoreEventiTempo, TrainGateway, TrainIngestion) traducono quello che succede in un EventoTreno; GestoreEventi e' l'unico che fa muovere le macchine, un evento alla volta e sempre nell'ordine guardie, assegnamenti, azioni; le macchine (AutomaViaggio, AutomaCondizione, AutomaStazioniNote) offrono solo guardie e mosse e non si conoscono fra loro. Quello che esce verso il broker passa tutto dalla CodaPubblicazioni: i passaggi e il guasto di bordo li preparano PubblicatorePassaggi e PubblicatoreAlert, che il gestore chiama dopo le mosse (i passaggi anche TrainIngestion, per il passaggio forzato via REST), la telemetria TrainElab e la richiesta di validazione TrainDatabaseValidator
 #+begin_src  plantuml :file classi_01_treno.png
 @startuml C1 - Classi del componente Treno
 ' =========================================================================
@@ -9112,9 +9368,10 @@ impaginare, e i colori sono stereotipi locali a ogni figura.
 '  Nessun framework: il main crea una sola copia di ogni classe con new e
 '  ne assegna a mano i campi con cui si parlano (gli stessi che assegnano
 '  i test). TrainDB e' lo stato condiviso da tutti gli altri.
-'  Itinerario, EventoTreno e AutomaViaggio.Fermata sono record; Percorso,
-'  Configurazione, ContestoTls e CampiJson sono classi di sole funzioni
-'  statiche (Configurazione a parte la lettura del file).
+'  Itinerario, EventoTreno, AutomaViaggio.Fermata, CodaPubblicazioni.MessaggioInUscita
+'  e ClientMqtt.Sottoscrizione sono record; Percorso, ContestoTls, CampiJson e
+'  LogSuFile sono classi di sole funzioni statiche. Configurazione ha di statico
+'  solo carica(), che legge il file e ne crea l'istanza.
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -9164,6 +9421,7 @@ class TrainDB <<stato>> {
   + progressPercent : double
   + ritardoMinuti : volatile int
   + ritardoRilevatoA : volatile String
+  + ritardoAggiornatoIl : volatile Instant
   + passeggeri : int
   + itinerarioId : String
   + capolineaId : String
@@ -9242,6 +9500,7 @@ class AutomaViaggio <<automa>> {
   ~ sostaSecondi : long
   ~ fattoreAccelerazione : double
   ~ autostart : boolean
+  - random : Random
   - sostaCorrenteSecondi : long
   - itinerarioPendente : Itinerario
   .. guardie ..
@@ -9259,6 +9518,8 @@ class AutomaViaggio <<automa>> {
   + primaFermata(tappe) : Fermata
   + fermataDiArrivo() : Fermata
   + fermataDiRiaggancio(nuovo, stazioneAncora, statiNuovi, arrivatoViaggiando) : Fermata
+  - chiusa(stazioneId, statiNuovi) : boolean
+  - nuoviPasseggeri() : int
   .. mosse ..
   + fermaIn(fermata : Fermata) : void
   + parti(prossima : TappaItinerario) : void
@@ -9367,7 +9628,9 @@ class ClientMqtt <<canale>> {
   ~ host : String
   ~ port : int
   ~ tls : boolean
+  ~ caPath : String
   ~ clientId : String
+  - client : MqttClient
   - sottoscrizioni : Map<String, Sottoscrizione>
   + ascolta(topic : String, qos : int, d : Destinatario) : void
   + connetti() : void
@@ -9377,19 +9640,32 @@ class ClientMqtt <<canale>> {
   + connectComplete(riconnessione : boolean, indirizzo : String) : void
   + connectionLost(causa : Throwable) : void
   + messageArrived(topic : String, messaggio : MqttMessage) : void
+  + deliveryComplete(token : IMqttDeliveryToken) : void
+  - risottoscrivi() : void
 }
 
 interface Destinatario {
   + ricevi(payload : String) : void
 }
 
+class Sottoscrizione <<record>> {
+  + qos : int
+  + destinatario : Destinatario
+}
+
 class CodaPubblicazioni <<canale>> {
   - {static} CAPIENZA : int = 1000
+  - {static} ATTESA_RIPROVA_MS : long = 1000
   - coda : BlockingQueue<MessaggioInUscita>
   + metti(topic : String, payload : String, qos : int) : void
   + avvia() : void
   - consuma() : void
   - consegna(messaggio : MessaggioInUscita) : void
+}
+
+class MessaggioInUscita <<record>> {
+  + topic, payload : String
+  + qos : int
 }
 
 class Orologio {
@@ -9446,6 +9722,7 @@ class Sensori {
   ~ httpPort : int
   ~ https : boolean
   + avviaMenu() : void
+  - stampaMenu() : void
   .. interrogazioni ..
   - stampaStatoTreno() : void
   - stampaTratta() : void
@@ -9456,7 +9733,11 @@ class Sensori {
   .. chiamate REST ..
   - inviaGet(path : String) : String
   - inviaPost(path : String, body : String) : String
+  - indirizzo(path : String) : String
   - esegui(richiesta : HttpRequest, stampaEsito : boolean) : String
+  .. testo ..
+  - vuotoSeAssente(valore : String) : String
+  - escapeJson(valore : String) : String
 }
 
 class LogSuFile <<utility>> {
@@ -9465,6 +9746,7 @@ class LogSuFile <<utility>> {
   + {static} fileCorrente() : Path
   + {static} attiva(trenoId : String) : Path
   + {static} disattiva() : void
+  - {static} nomeSicuro(trenoId : String) : String
 }
 
 class SecureHttpClient {
@@ -9479,12 +9761,16 @@ CaricatoreItinerario +-- EsitoCaricamento
 EventoTreno +-- Tipo
 AutomaViaggio +-- Fermata
 ClientMqtt +-- Destinatario
+ClientMqtt +-- Sottoscrizione
 
 main ..> Configurazione : legge le property\ne il profilo
+main ..> LogSuFile : preparaTerminale
+main --> SecureHttpClient : init()
 main --> TrainDB : imposta trenoId
 main --> TrainDatabaseValidator : ciclo di verifica\nall'avvio
 main --> ServerRest : lo accende
 main --> ClientMqtt : registra i destinatari\ne si collega
+main --> CodaPubblicazioni : avvia(),\ndopo connetti()
 main --> Orologio : tick e telemetria,\ndopo la validazione
 main ..> Sensori : avviaMenu su thread daemon\n(solo con terminale)
 
@@ -9494,6 +9780,7 @@ ServerRest --> TrainIngestion : rotte /treno/...
 ClientMqtt ..> TrainGateway : railway/alerts
 ClientMqtt ..> TrainDatabaseValidator : validation-response
 CodaPubblicazioni --> ClientMqtt : pubblica\n(thread pubblicatore-mqtt)
+CodaPubblicazioni +-- MessaggioInUscita
 TrainElab --> CodaPubblicazioni : telemetria, QoS 0
 PubblicatorePassaggi --> CodaPubblicazioni : passaggi, QoS 0
 PubblicatoreAlert --> CodaPubblicazioni : guasti, QoS 1
@@ -9506,7 +9793,7 @@ GeneratoreEventiTempo --> CaricatoreItinerario : chiede l'itinerario\ne ne legge
 GeneratoreEventiTempo --> GestoreEventi : TICK e risposte\ndella Centrale
 TrainGateway --> GestoreEventi : alert tradotti in eventi
 TrainGateway --> GeneratoreEventiTempo : ricarica\ndell'itinerario
-TrainGateway --> TrainDB : trenoId e\nritardo comunicato
+TrainGateway --> TrainDB : legge trenoId, scrive\nil ritardo comunicato
 TrainIngestion --> GestoreEventi : GUASTO_BORDO
 GestoreEventi ..> EventoTreno : lo riceve
 GestoreEventi --> TrainDB : legge soltanto
@@ -9518,25 +9805,32 @@ GestoreEventi --> PubblicatoreAlert : guasto di bordo
 AutomaViaggio --> TrainDB : fase, posizione,\ndirezione, itinerario
 AutomaViaggio --> Itinerario : lo tiene in attesa\n(itinerarioPendente)
 AutomaViaggio ..> Percorso : prossima tappa, tempi,\ninterpolazione
+GestoreEventi ..> Percorso : tappa corrente\ne prossima
 AutomaCondizione --> TrainDB : condizione
 AutomaStazioniNote --> TrainDB : stazioniGuaste,\nstatoStazioni
 CaricatoreItinerario --> SecureHttpClient : GET dell'itinerario
+CaricatoreItinerario --> TrainDB : legge trenoId\nper la GET
 CaricatoreItinerario --> Itinerario : lo costruisce\ndalla risposta JSON
 Percorso ..> TrainDB : legge itinerario,\nindice e direzione
 PubblicatorePassaggi --> TrainDB : legge id e direzione
 PubblicatoreAlert --> TrainDB : legge l'id
-TrainElab --> TrainDB : legge la fotografia\ndel convoglio
-TrainIngestion --> TrainDB
+TrainElab --> TrainDB : legge la fotografia\ndel convoglio e scrive\nla velocita'
+TrainIngestion --> TrainDB : legge lo stato; setTratta\nscrive stazioniTratta\ne prossimaStazione
 TrainIngestion --> PubblicatorePassaggi : passaggio forzato\nvia REST
 TrainDatabaseValidator --> TrainDB : trenoRiconosciuto
 Sensori ..> TrainIngestion : GET e POST su localhost:8082\n(non chiama i metodi)
 Sensori ..> LogSuFile : sposta i log su file\ne li riporta a schermo
+TrainGateway ..> CampiJson : legge i campi\ndel JSON
+TrainDatabaseValidator ..> CampiJson
+CaricatoreItinerario ..> CampiJson
+Sensori ..> CampiJson
 
 note right of TrainDB
   Non e' un database: e' un oggetto solo, in RAM. Un riavvio del
   processo azzera tutto, itinerario compreso, che infatti viene
   riscaricato dalla Centrale. E' la scelta opposta a quella
-  fatta sulla stazione (DBLocale su SQLite), e il motivo e' che
+  fatta sulla stazione (DBLocale, ricopiato su SQLite da
+  PersistenzaLocale), e il motivo e' che
   qui non si perde nessun dato: il treno non produce niente che
   non sappia gia' la Centrale.
   Le variabili di stato del convoglio sono due, condizione e
@@ -9547,7 +9841,9 @@ note right of TrainDB
   che stato la Centrale le ha messe, e una stazione puo' avere il
   guasto risolto con i tecnici ancora sul posto.
   stazioneImpercorribile() e' la domanda che le guardie fanno a tutte
-  e due insieme, ed e' l'unico punto in cui le due cose si sommano.
+  e due insieme. L'altra somma e' AutomaViaggio.chiusa(), che fa la
+  stessa domanda con gli stati arrivati insieme a un itinerario nuovo,
+  non ancora scritti qui.
 end note
 
 note bottom of GestoreEventi
@@ -9563,9 +9859,11 @@ end note
 note bottom of AutomaCondizione
   Le tre macchine offrono solo guardie (leggono e rispondono) e
   mosse (scrivono e basta): non pubblicano, non scrivono log e non
-  si chiamano fra loro. Ognuna scrive soltanto le sue variabili del
-  TrainDB, quindi una mossa del viaggio non puo' cancellare la
-  condizione del convoglio.
+  si chiamano fra loro. Ognuna scrive le sue variabili del TrainDB,
+  quindi una mossa del viaggio non puo' cancellare la condizione del
+  convoglio. La sola variabile in comune e' velocita: la mettono a
+  zero tutte e due (fermata, blocco, emergenza, soppressione) e la
+  riscrive TrainElab a ogni telemetria.
 end note
 
 note bottom of PubblicatorePassaggi
@@ -9630,7 +9928,7 @@ note bottom of Sensori
   stesso terminale e le righe coprono il menu mentre lo si sta
   leggendo: LogSuFile stacca dal logger radice gli handler che
   scrivono a schermo e ci attacca un file dentro logs/, uguale a
-  quelli che avviaTreni.sh genera per le istanze in background. Il
+  quelli che avvioTreni.sh genera per le istanze in background. Il
   menu resta visibile perche' sono System.out, non log.
 end note
 
@@ -9645,9 +9943,11 @@ end note
 *** Il componente Stazione (C2)
 
 - requisiti coperti: RF02.1.1.1.1 e RF02.1.1.1.2 per la struttura che regge il caching, RF03.1 per l'autonomia del nodo (con PersistenzaLocale il nodo si ricostruisce da solo anche dopo un riavvio, senza chiedere niente alla Centrale)
-- si legge negli stessi tre ruoli del treno: i generatori di eventi (GeneratoreEventiTempo, StationIngestion, StationGateway) traducono quello che succede in un EventoStazione; GestoreEventi e' l'unico che fa muovere le macchine, un evento alla volta e sempre nell'ordine guardie, assegnamenti, azioni; le macchine (AutomaStatoStazione, AutomaSensori, AutomaTreniPresenti, AutomaConnessione) offrono solo guardie e mosse e non si conoscono fra loro. Quello che esce verso la Centrale lo preparano PubblicatoreTransiti e PubblicatoreAlert, lo accoda il LocalBuffer e lo pubblica il ConsumatoreBuffer
+- si legge negli stessi tre ruoli del treno: i generatori di eventi (GeneratoreEventiTempo, StationIngestion, StationGateway) traducono quello che succede in un EventoStazione; GestoreEventi e' l'unico che fa muovere le macchine, un evento alla volta e sempre nell'ordine guardie, assegnamenti, azioni, con una sola eccezione all'avvio: prima che arrivi qualunque evento il main chiama da solo sorveglia e segnaMuti di AutomaSensori e ripristinaCausa di AutomaStatoStazione, per ricostruire dal disco i sensori attesi e la causa del guasto; le macchine (AutomaStatoStazione, AutomaSensori, AutomaTreniPresenti, AutomaConnessione) offrono solo guardie e mosse e non si conoscono fra loro. Quello che esce verso la Centrale lo preparano PubblicatoreTransiti e PubblicatoreAlert, lo accoda il LocalBuffer e lo pubblica il ConsumatoreBuffer
+- le classi tecniche (ClientMqtt, ServerRest, Orologio, Configurazione, ContestoTls, CampiJson, SecureHttpClient) qui non sono disegnate: fanno lo stesso mestiere di quelle del treno in C1, quindi il clientMqtt.pubblica che si vede in SQ02 e SQ05 e' il ClientMqtt della stazione, uguale a quello di C1. Cambiano in tre punti: l'Orologio da' a ogni compito il suo periodo e ha un ferma() che nessuno chiama, ServerRest ha porta() e ferma(), ClientMqtt ha disconnetti()
 #+begin_src  plantuml :file classi_02_stazione.png
 @startuml C2 - Classi del componente Stazione
+skinparam linetype ortho
 ' =========================================================================
 '  DIAGRAMMA DELLE CLASSI C2 - modulo Stazioni (Java + Javalin, una istanza per stazione)
 '
@@ -9664,9 +9964,10 @@ end note
 '
 '  Nessun framework: il main crea una sola copia di ogni classe con new e
 '  ne assegna a mano i campi con cui si parlano, come nel treno.
-'  E' l'unico componente con una interfaccia dichiarata (HeartbeatKA), l'unico
-'  con una coda di persistenza temporanea (LocalBuffer) e l'unico nodo di campo
-'  con un database locale su file (PersistenzaLocale, SQLite).
+'  E' l'unico componente con un'interfaccia in un file suo (HeartbeatKA; le
+'  altre del sistema, ClientMqtt.Destinatario e Database.Lavoro, sono annidate),
+'  l'unico con una coda di persistenza temporanea (LocalBuffer) e l'unico nodo
+'  di campo con un database locale su file (PersistenzaLocale, SQLite).
 '
 '  I sensori di binario sono il pezzo che rende il nodo verificabile: la
 '  coppia SimulatoreSensori/SensoreBinario simula i dispositivi e parla col
@@ -9676,8 +9977,17 @@ end note
 '  spire vere senza toccare l'altra meta'.
 '
 '  Le classi tecniche (ClientMqtt, ServerRest, Orologio, Configurazione,
-'  ContestoTls, CampiJson, SecureHttpClient) sono le stesse del nodo Treno
-'  (C1) e qui non sono disegnate: chi le usa lo dice il main.
+'  ContestoTls, CampiJson, SecureHttpClient) fanno lo stesso mestiere di
+'  quelle del nodo Treno (C1) e qui non sono disegnate. Cambiano in tre punti:
+'  Orologio.ogni(nome, periodoSecondi, compito) da' a ogni compito il suo
+'  periodo (5 s il controllo e il keepalive dei sensori, 10 s l'heartbeat) e
+'  ha un ferma() che nessuno chiama; ServerRest ha porta() e ferma();
+'  ClientMqtt ha disconnetti(). L'hook di arresto del main chiama
+'  ServerRest.ferma(), ClientMqtt.disconnetti() e PersistenzaLocale.chiudi().
+'  Chi le usa: ClientMqtt il ConsumatoreBuffer, l'HeartbeatGenerator e lo
+'  StationDatabaseValidator; SecureHttpClient il SimulatoreSensori e la
+'  ConsoleSensori; CampiJson lo StationGateway, la StationIngestion, lo
+'  StationDatabaseValidator e la ConsoleSensori.
 ' =========================================================================
 
 skinparam backgroundColor #FEFEFE
@@ -9739,6 +10049,7 @@ class DBLocale <<stato>> {
   + ripristinaDaDisco() : void
   + getStato() : String
   + scriviStato(stato, inizioFault, fineFault) : void
+  + getInizioUltimoFault() / getFineUltimoFault() : Instant
   + registraEntrataTreno(trenoId, quando) : void
   + registraUscitaTreno(trenoId, quando) : void
   + getTreniPresenti() : Map<String, Instant>
@@ -9755,6 +10066,8 @@ class GestoreEventi {
   - suRipristino() : void
   - suReteGiu() : void
   - suReteSu() : void
+  .. supporto ..
+  - {static} descrizioneSensoreMuto(sensoreId : String) : String
 }
 
 class EventoStazione <<record>> {
@@ -9762,6 +10075,11 @@ class EventoStazione <<record>> {
   + soggettoId : String
   + dettaglio : String
   + tipoGuasto : String
+  + {static} di(tipo : Tipo) : EventoStazione
+  + {static} battito(sensoreId) : EventoStazione
+  + {static} transito(trenoId, tipo) : EventoStazione
+  + {static} guastoRilevato(descrizione, tipoGuasto) : EventoStazione
+  + {static} guastoDallaCentrale(messaggio) : EventoStazione
 }
 
 enum TipoEvento as "EventoStazione.Tipo" {
@@ -9780,6 +10098,7 @@ class GeneratoreEventiTempo {
 }
 
 class AutomaStatoStazione <<automa>> {
+  + {static} TIPO_GUASTO_SENSORE / TIPO_GUASTO_STAZIONE : String
   + online() : boolean
   + guasta() : boolean
   + guastiDeiSensoriAperti() : boolean
@@ -9798,6 +10117,7 @@ class AutomaStatoStazione <<automa>> {
 
 class AutomaSensori <<automa>> {
   ~ timeoutSecondi : long
+  + timeoutSecondi() : long
   .. guardie ..
   + muto(sensoreId : String) : boolean
   + ultimoMuto(sensoreId : String) : boolean
@@ -9823,6 +10143,7 @@ class AutomaConnessione <<automa>> {
 class PubblicatoreAlert <<canale>> {
   + inviaGuasto(descrizione, severita, tipoGuasto, idGuasto) : void
   + inviaRipristino(tipoGuasto : String, descrizione : String) : void
+  - accoda(payload : String, idGuasto : Long) : void
 }
 
 class PubblicatoreTransiti <<canale>> {
@@ -9853,6 +10174,9 @@ class EventoBufferizzato <<record>> {
 }
 
 class ConsumatoreBuffer <<canale>> {
+  - {static} ATTESA_MS : long = 1000
+  ~ stazioneId : String
+  - thread : Thread
   + avvia() : void
   + ferma() : void
   - consuma() : void
@@ -9866,6 +10190,8 @@ class PersistenzaLocale <<persistenza>> {
   - attiva : volatile boolean
   + apri() : void
   + chiudi() : void
+  + isAttiva() : boolean
+  + getPercorsoDb() : String
   - impostaPragma() : void
   - creaSchema() : void
   + salvaStato(stazioneId, stato, inizioFault, fineFault) : void
@@ -9877,9 +10203,12 @@ class PersistenzaLocale <<persistenza>> {
   + risolviGuastiAperti(quando) : void
   + risolviGuastiApertiDiTipo(tipo, quando) : void
   + contaGuastiApertiDiTipo(tipo) / contaGuastiApertiTranne(tipo) : int
+  + contaGuastiAperti() : int
   + salvaEventoBuffer(evento) : void
   + rimuoviEventoBuffer(idEvento : long) : void
   + leggiBuffer() : List<EventoBufferizzato>
+  - {static} testo(istante : Instant) : String
+  - {static} istante(testo : String) : Instant
 }
 
 class StatoPersistito <<record>> {
@@ -9895,11 +10224,15 @@ interface HeartbeatKA {
 }
 
 class HeartbeatGenerator <<canale>> {
+  - battitoAnnunciato : boolean
+  - motivoSospensione : String
   + generatePayload(...) : String
   + generaHeartbeat() : void
+  - sospendi(motivo : String) : void
 }
 
 class StationGateway <<canale>> {
+  - {static} ORIGINE_CENTRALE : String
   + riceviAlert(payload : String) : void
   + riceviPassaggio(payload : String) : void
 }
@@ -9926,11 +10259,17 @@ class StationIngestion {
   + heartbeatSensore(ctx : Context) : void
   + fermaSensore(ctx) / riavviaSensore(ctx) : void
   + reteOffline(ctx) / reteOnline(ctx) : void
+  - {static} corpo(ctx : Context) : JsonObject
 }
 
 class SimulatoreSensori <<sensore>> {
+  ~ stazioneId : String
+  ~ binario : int
+  ~ indirizzoApi : String
+  ~ httpClient : HttpClient
   - sensori : Map<String, SensoreBinario>
   + creaSensori() : void
+  - creaSensore(tipo : Tipo) : void
   + battito() : void
   + rilevaPassaggio(trenoId : String, tipo : String) : boolean
   + elenco() : Collection<SensoreBinario>
@@ -9947,6 +10286,8 @@ class SensoreBinario <<sensore>> {
   - attivo : volatile boolean
   - ultimoBattitoInviato : volatile Instant
   + {static} idPer(stazioneId, binario, tipo) : String
+  + getId() / getTipo() / getBinario()
+  + getUltimoBattitoInviato() : Instant
   + isAttivo() : boolean
   + ferma() / riprendi() : void
   + segnaBattito(quando : Instant) : void
@@ -9956,15 +10297,25 @@ class SensoreBinario <<sensore>> {
 enum Tipo {
   INGRESSO
   USCITA
+  - transito : String
+  + transito() : String
 }
 
 class ConsoleSensori {
+  ~ stazioneId, indirizzoApi : String
+  ~ httpClient : HttpClient
   + avviaMenu() : void
+  - stampaMenu() : void
   - stampaStatoSensori() : void
   - cambiaHeartbeat(scanner : Scanner, azione : String) : void
   - simulaPassaggio(scanner : Scanner) : void
   - simulaGuasto(scanner : Scanner) : void
   - cambiaDestinazioneLog() : void
+  .. chiamate REST ..
+  - inviaGet(path : String) : String
+  - inviaPost(path : String, body : String) : String
+  - esegui(richiesta : HttpRequest, stampaEsito : boolean) : String
+  - escapeJson(valore : String) : String
 }
 
 class LogSuFile <<utility>> {
@@ -9973,6 +10324,7 @@ class LogSuFile <<utility>> {
   + {static} fileCorrente() : Path
   + {static} attiva(stazioneId : String) : Path
   + {static} disattiva() : void
+  - {static} nomeSicuro(stazioneId : String) : String
 }
 
 HeartbeatGenerator ..|> HeartbeatKA
@@ -9984,6 +10336,12 @@ SensoreBinario +-- Tipo
 SimulatoreSensori *-- SensoreBinario : due per binario,\nuno per verso
 
 main --> DBLocale : imposta stazioneId,\nripristino da disco
+main --> PersistenzaLocale : apri(), e chiudi()\nnell'hook di arresto
+main --> LocalBuffer : ripristinaDaDisco()
+main --> AutomaSensori : sorveglia e segnaMuti,\nall'avvio e senza gestore
+main --> AutomaStatoStazione : ripristinaCausa, guasta?,\nguastiDeiSensoriAperti?\nall'avvio e senza gestore
+main --> SimulatoreSensori : creaSensori()
+main ..> LogSuFile : preparaTerminale
 main --> StationDatabaseValidator : ciclo di verifica all'avvio
 main ..> ConsoleSensori : avviaMenu su thread daemon\n(solo con terminale)
 
@@ -9991,6 +10349,7 @@ GeneratoreEventiTempo --> GestoreEventi : CONTROLLO_SENSORI\n(Orologio, ogni 5s)
 StationIngestion --> GestoreEventi : BATTITO_SENSORE, TRANSITO,\nGUASTO_RILEVATO, RETE_GIU / RETE_SU
 StationGateway --> GestoreEventi : alert della Centrale\ntradotti in eventi
 StationGateway --> SimulatoreSensori : gira il passaggio del treno\nal sensore competente
+StationGateway --> DBLocale : legge stazioneId
 GestoreEventi ..> EventoStazione : lo riceve
 GestoreEventi --> DBLocale : legge soltanto
 GestoreEventi --> AutomaStatoStazione : guardie e mosse
@@ -10008,9 +10367,13 @@ AutomaConnessione --> DBLocale : connessioneCentrale
 
 PubblicatoreAlert --> LocalBuffer : add("alert", ...)
 PubblicatoreTransiti --> LocalBuffer : add("transit", ...)
+PubblicatoreAlert --> DBLocale : legge stazioneId
+PubblicatoreTransiti --> DBLocale
+PubblicatoreAlert --> AutomaConnessione : collegata?\n(solo per il log)
+PubblicatoreTransiti --> AutomaConnessione
 ConsumatoreBuffer --> LocalBuffer : attendiTesta,\nconfermaInvio
 ConsumatoreBuffer --> AutomaConnessione : collegata?
-HeartbeatGenerator --> DBLocale
+HeartbeatGenerator --> DBLocale : id, stato\ne validazione
 HeartbeatGenerator --> LocalBuffer : legge la dimensione
 HeartbeatGenerator --> AutomaConnessione : collegata?
 
@@ -10018,7 +10381,7 @@ SimulatoreSensori ..> StationIngestion : POST /stazione/sensore/*\n(non chiama i
 StationIngestion --> SimulatoreSensori : stato, stop e start\ndei dispositivi
 ConsoleSensori ..> StationIngestion : HTTP(S) sulla porta del nodo,\ncome un terminale di manutenzione
 ConsoleSensori ..> LogSuFile : sposta i log dal terminale\na logs/manuale-{id}.log
-StationIngestion --> DBLocale
+StationIngestion --> DBLocale : stato, sensori\ne treni presenti
 StationIngestion --> LocalBuffer : ispezione diagnostica
 StationIngestion --> PersistenzaLocale : GET /stazione/persistenza
 StationDatabaseValidator --> DBLocale : stazioneRiconosciuta
@@ -10039,8 +10402,8 @@ note right of LocalBuffer
 end note
 
 note bottom of GestoreEventi
-  L'unico punto da cui passano le mosse delle macchine.
-  gestisci() e' synchronized: i keepalive e i transiti arrivano
+  L'unico punto da cui passano le mosse delle macchine, a parte le
+  tre chiamate del main all'avvio. gestisci() e' synchronized: i keepalive e i transiti arrivano
   sui thread di Javalin, gli alert su quello di Paho, il giro di
   controllo su quello dell'Orologio. Dentro non c'e' niente di
   lento: i messaggi per la Centrale finiscono nel LocalBuffer e
@@ -10085,7 +10448,7 @@ note right of PersistenzaLocale
   tutti synchronized perche' la toccano i thread di Paho,
   dell'Orologio, del consumatore e delle richieste REST.
   Non deve mai poter fermare la stazione: se il file non si apre
-  logga, mette attiva a false e il nodo lavora in RAM come prima.
+  logga, mette attiva a false e il nodo continua solo in RAM.
 end note
 
 @enduml
@@ -10190,7 +10553,7 @@ rectangle "C3 - verso l'operatore\n<size:11>l'operatore entra da qui: HTTP e Web
 rectangle "C4a - la porta MQTT\n<size:11>il campo entra ed esce da qui: Paho</size>" as C4A <<porta>> {
     rectangle "ClientMqtt + CodaPubblicazioni\n<size:11>la connessione, i destinatari dei topic</size>\n<size:11>e il thread che pubblica</size>" as CLIENT <<classe>>
     rectangle "IngestionService\n<size:11>quattro topic, quattro metodi: traduce</size>\n<size:11>il messaggio in un EventoCentrale</size>" as INGEST <<classe>>
-    rectangle "i quattro messaggi + Payload\n<size:11>TelemetriaMsg, HeartbeatMsg, TransitoMsg,</size>\n<size:11>AlertMsg: da qui in giu' nessuno</size>\n<size:11>vede piu' un JsonObject</size>" as MSG <<classe>>
+    rectangle "i quattro messaggi + Payload\n<size:11>TelemetriaMsg, HeartbeatMsg, TransitoMsg,</size>\n<size:11>AlertMsg: da qui in giu' nessuno</size>\n<size:11>legge piu' un JsonObject</size>" as MSG <<classe>>
     rectangle "ExistIdForEdge\nExistIdForEdgeStazione\n<size:11>validano l'id del nodo</size>\n<size:11>che si accende</size>" as VALID <<classe>>
     rectangle "PubblicatoreAlert\n<size:11>l'unica bocca verso railway/alerts</size>" as PUB <<incontro>>
 }
@@ -10241,10 +10604,13 @@ note as CONFINE
   chiamano C4b e C3. Ognuno sta in casa di chi ne conosce il formato, ed e'
   per questo che sono diagrammi distinti e non meta' dello stesso.
 
-  Fra C4a e C4b il confine va in una direzione sola: i messaggi scendono
-  come eventi, non risalgono. Si riconosce da una regola semplice: se una
-  classe nomina un topic o un JsonObject sta sopra, se nomina un treno o un
-  guasto sta sotto.
+  Fra C4a e C4b il confine si passa in due punti soli: i messaggi del
+  campo scendono come eventi (IngestionService -> GestoreEventi) e le
+  decisioni risalgono come alert (GestoreEventi -> PubblicatoreAlert).
+  Sopra si conoscono i topic e si legge il JSON, sotto si decide su
+  treni e guasti: il JSON del campo che arriva fino al gestore
+  (payloadDalCampo) non lo legge nessuno, passa intatto al
+  NotificatoreRealtime.
 
   L'arco da C3 al gestore dice la cosa piu' importante: chiudere un guasto
   vuol dire la stessa cosa che lo chieda un operatore dalla dashboard o che
@@ -10330,6 +10696,10 @@ skinparam note {
 }
 hide empty members
 
+' la figura supera i 4096 pixel che PlantUML accetta: la si rimpicciolisce
+' tutta insieme, se no la parte destra verrebbe tagliata
+scale max 4096 width
+
 title C3 - Centrale Operativa: REST, autorizzazione e WebSocket
 
 class ServerRest {
@@ -10352,19 +10722,26 @@ class SicurezzaKeycloak <<sicurezza>> {
   + indirizzoRealm : String
   + caPath : String
   + audience : String
+  - {static} RIPROVA_SECONDI : int = 5
+  - verificatore : VerificaToken
+  - config : Config
+  - controllo : SecurityHandler
   - pronta : volatile boolean
   + avvia() : void
   + usaChiavi(jwks : String, emittente : String) : void
   + autentica(ctx : Context) : boolean
   + profilo(ctx : Context) : Optional<UserProfile>
+  - prepara() : void
   - scaricaChiavi() : void
+  - scarica(http : HttpClient, indirizzo : String) : String
   - carica(jwks : String, emittente : String) : void
 }
 
 class VerificaToken <<sicurezza>> {
-  ~ emittente : String
-  ~ audience : String
+  ~ emittente : volatile String
+  ~ audience : volatile String
   + validate(ctx, credenziali) : Optional<Credentials>
+  - {static} contiene(aud : Object, atteso : String) : boolean
 }
 
 class RuoliDelRealm <<sicurezza>> {
@@ -10416,9 +10793,16 @@ class RestApiGateway {
   - verificaCapolinea(stazioni, capolinea : String) : Risposta
   - componiItinerario(itinerario, stazioni, travelTimes) : Risposta
   - assegnaTreni(itinerario, treniIds, sganciaAssenti) : void
-  - rispondi(ctx, esito : GestoreEventi.Esito) : void
+  - estraiItinerarioId(dto : TrenoDTO) : String
+  - normalizzaCapolinea(capolinea : String) : String
+  - tappaItinerario(stazione, tempoVersoProssima) : Map
   - trattaToDto(it : Itinerario) : Map
+  - trattaElementoToDto(tratta : Tratta) : Map
   - tipoAllarmePerFrontend(g : Guasto) : String
+  - {static} corpo(ctx, tipo : Class<T>) : T
+  - {static} errore(stato : int, messaggio : String) : Risposta
+  - {static} rispondi(ctx, risposta : Risposta) : void
+  - {static} rispondi(ctx, esito : GestoreEventi.Esito) : void
 }
 
 class StazioneDTO <<dto>> {
@@ -10462,6 +10846,11 @@ class Json <<utility>> {
   + {static} oggetto(testo : String) : JsonObject
 }
 
+class IstanteIso {
+  + write(out : JsonWriter, istante : Instant) : void
+  + read(in : JsonReader) : Instant
+}
+
 class NotificatoreRealtime {
   .. treni ..
   + telemetria(payloadDalCampo : JsonObject, treno : Treno) : void
@@ -10474,7 +10863,10 @@ class NotificatoreRealtime {
   + allarme(guasto : Guasto) : void
   + snapshot(kpi : Map, treni : List, stazioni : List) : void
   .. traduzioni verso il vocabolario del browser ..
+  - scriviPosizione(evento : JsonObject, treno : Treno) : void
+  - scriviStatoComposto(evento : JsonObject, treno : Treno) : void
   - scriviPrevisione(evento : JsonObject, treno : Treno) : void
+  - scriviTestoONull(evento, campo : String, valore : String) : void
   - statoPerFrontend(stato : String) : String
 }
 
@@ -10507,13 +10899,14 @@ RestApiGateway +-- EsitoScritturaTreno
 RestApiGateway +-- Risposta
 TrenoDTO --> ItinerarioRef
 
-RestApiGateway ..> "TrafficLogicEngine,\nPrevisioneArrivi,\nNavigazioneItinerario (C4b)" : legge la cache, i treni attesi\ne l'itinerario servito ai convogli
+RestApiGateway --> "TrafficLogicEngine,\nPrevisioneArrivi,\nNavigazioneItinerario (C4b)" : legge la cache, i treni attesi\ne l'itinerario servito ai convogli;\navvisa la previsione quando\nitinerari o treni cambiano
 RestApiGateway --> "RailwayRepository, Database\n<size:11>(C5)</size>" : ogni lettura e ogni scrittura\ndell'anagrafica, dentro\ndb.inTransazione
 RestApiGateway --> "GestoreEventi\n(C4b)" : i comandi operativi e gli stati\nscelti a mano: qui resta il\ncodice HTTP, la decisione sta di la'
 RestApiGateway --> "PubblicatoreAlert\n(C4a)" : STOP e ITINERARIO_AGGIORNATO\nquando l'anagrafica cambia
 NotificatoreRealtime --> RealtimeWebSocket : l'unico che ci scrive
 NotificatoreRealtime ..> Json : lo stesso Gson\ndelle GET
-NotificatoreRealtime <.. "GestoreEventi\n(C4b)" : fase delle azioni: ogni\nnotizia che il browser\ndeve vedere
+Json +-- IstanteIso
+NotificatoreRealtime <-- "GestoreEventi\n(C4b)" : fase delle azioni: ogni\nnotizia che il browser\ndeve vedere
 
 note right of EsitoScritturaTreno
   Esiste per un motivo preciso: permette di chiudere la transazione
@@ -10531,9 +10924,9 @@ note bottom of FiltroAutorizzazione
   la validazione dell'ID via MQTT.
 
   Il filtro ragiona sui percorsi invece di dichiarare i ruoli rotta per
-  rotta: cosi' le regole stanno in un posto solo e sono rimaste identiche
-  a prima di Keycloak, ma un endpoint nuovo finisce nella regola "solo
-  amministratore" per esclusione e non per dichiarazione. Quando
+  rotta: cosi' le regole stanno in un posto solo, ma un endpoint nuovo
+  finisce nella regola "solo amministratore" per esclusione e non per
+  dichiarazione. Quando
   rifiuta scrive la risposta e ferma gli handler successivi: l'endpoint
   non viene nemmeno chiamato.
 end note
@@ -10575,7 +10968,8 @@ end note
 '    DbValidator/ExistIdForEdge.java, DbValidator/ExistIdForEdgeStazione.java
 '
 '  Questa vista e' tutto cio' che la Centrale sa di MQTT, e finisce qui: da
-'  C4b in giu' nessuno tocca piu' un topic, un byte o un JsonObject.
+'  C4b in giu' nessuno tocca piu' un topic o un byte, e il JsonObject del
+'  campo il gestore lo riceve solo per girarlo intatto al NotificatoreRealtime.
 '
 '  Il confine fra le due meta' e' il motivo per cui sono due figure e non
 '  una: sopra si sa di protocollo e non si sa di ferrovia, sotto si sa di
@@ -10615,6 +11009,7 @@ class ClientMqtt <<canale>> {
   + port : int
   + tls : boolean
   + caPath, clientId : String
+  - client : MqttClient
   - sottoscrizioni : Map<String, Sottoscrizione>
   + ascolta(topic : String, qos : int, d : Destinatario) : void
   + connetti() : void
@@ -10624,19 +11019,32 @@ class ClientMqtt <<canale>> {
   + connectComplete(riconnessione, indirizzo) : void
   + connectionLost(causa : Throwable) : void
   + messageArrived(topic : String, messaggio : MqttMessage) : void
+  + deliveryComplete(token : IMqttDeliveryToken) : void
+  - risottoscrivi() : void
 }
 
 interface Destinatario {
   + ricevi(payload : String) : void
 }
 
+class Sottoscrizione <<record>> {
+  + qos : int
+  + destinatario : Destinatario
+}
+
 class CodaPubblicazioni <<canale>> {
   - {static} CAPIENZA : int = 1000
+  - {static} ATTESA_RIPROVA_MS : long = 1000
   - coda : BlockingQueue<MessaggioInUscita>
   + metti(topic : String, payload : String, qos : int) : void
   + avvia() : void
   - consuma() : void
   - consegna(messaggio : MessaggioInUscita) : void
+}
+
+class MessaggioInUscita <<record>> {
+  + topic, payload : String
+  + qos : int
 }
 
 class IngestionService <<canale>> {
@@ -10651,6 +11059,7 @@ class IngestionService <<canale>> {
 
 class PubblicatoreAlert <<canale>> {
   + {static} TOPIC_ALERTS : String
+  + {static} CAUSA_RITARDO_IN_LINEA / CAUSA_SOSTA_PROLUNGATA : String
   + pubblicaGuasto(guasto : Guasto) : void
   + pubblicaRisoluzione(guasto : Guasto) : void
   + pubblicaRitardo(treno, stazioneId, variazione, entrata) : void
@@ -10698,6 +11107,7 @@ package "ingestion.payload" as MSG {
     + {static} testoOpzionale(root, campo) : String
     + {static} numero / intero(...) : double / int
     + {static} istante(root : JsonObject) : Instant
+    - {static} presente(root, campo) : boolean
   }
 
   ' i cinque riquadri su due colonne, se no il package viene lungo una pagina
@@ -10709,12 +11119,14 @@ package "ingestion.payload" as MSG {
 
 class StatiCanonici <<utility>> <<messaggio>> {
   + {static} TRENO : List<String>
+  + {static} TRENO_CAPOLINEA : String
   + {static} STAZIONE_ONLINE / GUASTA : String
   + {static} STAZIONE_MANUTENZIONE / OFFLINE : String
   + {static} trenoDalCampo(dichiarato : String) : String
   + {static} trenoDallOperatore(scelto : String) : String
   + {static} stazioneDallOperatore(scelto : String) : String
   + {static} stazioneTrattieneITreni(stato : String) : boolean
+  + {static} interventoInCorso(stato : String) : boolean
 }
 
 ' i riquadri di rimando: dichiarati qui e non dentro le frecce, perche'
@@ -10729,15 +11141,18 @@ class ExistIdForEdge <<canale>> {
 }
 
 class ExistIdForEdgeStazione <<canale>> {
+  + {static} TOPIC_RICHIESTE : String
   + sottoscrivi(client : ClientMqtt) : void
   + interrogaIlDbPerValidazione(payload : String) : void
 }
 
 ClientMqtt +-- Destinatario
+ClientMqtt +-- Sottoscrizione
 ClientMqtt ..> IngestionService : consegna i payload dei\nquattro topic (thread di Paho)
 ClientMqtt ..> ExistIdForEdge : railway/train/+/validation
 ClientMqtt ..> ExistIdForEdgeStazione : railway/station/+/validation
 CodaPubblicazioni --> ClientMqtt : pubblica\n(thread pubblicatore-mqtt)
+CodaPubblicazioni +-- MessaggioInUscita
 PubblicatoreAlert --> CodaPubblicazioni : railway/alerts, QoS 1
 ExistIdForEdge --> CodaPubblicazioni : la risposta, QoS 0
 ExistIdForEdgeStazione --> CodaPubblicazioni : la risposta, QoS 0
@@ -10753,7 +11168,7 @@ TelemetriaMsg ..> StatiCanonici : lo stato arriva gia'\ntradotto per il database
 
 ' e poi lo consegna al gestore, dentro un EventoCentrale
 IngestionService --> GESTORE : TELEMETRIA, HEARTBEAT, PASSAGGIO,\nGUASTO_SEGNALATO, GUASTO_RIENTRATO
-PubblicatoreAlert <.. GESTORE : fase delle azioni:\nGUASTO, RESOLVED, RITARDO,\nSTOP, STATO_STAZIONE...
+PubblicatoreAlert <-- GESTORE : fase delle azioni:\nGUASTO, RESOLVED, RITARDO,\nSTOP, STATO_STAZIONE...
 
 ExistIdForEdge --> REPO : esisteTreno
 ExistIdForEdgeStazione --> REPO : esisteStazione
@@ -10804,15 +11219,17 @@ note bottom of MSG
   vale "fermo") sono decisioni, e stanno scritte qui una volta sola.
   I metodi che non sono da(...) sono le domande che il gestore fa al
   messaggio: e' entrata o uscita, l'alert viene dal campo o e' l'eco di
-  uno nostro. Cosi' da C4b in giu' nessuno vede piu' un JsonObject.
+  uno nostro. Cosi' da C4b in giu' nessuno legge piu' un JsonObject:
+  quello del campo viaggia nell'EventoCentrale solo per arrivare
+  intatto al NotificatoreRealtime.
 end note
 
 note left of StatiCanonici
   Il vocabolario degli stati ammessi dal CHECK del database. Sta in
-  entity/ perche' descrive il contenuto di due colonne, ed e' l'unica
-  classe di questa vista che serve anche a C3 e C4b: una PUT che
-  scrive uno stato passa di qui come ci passa un convoglio che lo
-  dichiara su MQTT.
+  entity/ perche' descrive il contenuto di due colonne, e serve anche
+  a C3 e C4b, come il PubblicatoreAlert e i record dei messaggi: una
+  PUT che scrive uno stato passa di qui come ci passa un convoglio che
+  lo dichiara su MQTT.
 end note
 
 note bottom of ExistIdForEdge
@@ -10843,7 +11260,7 @@ skinparam linetype ortho
 '    PosizioneConvoglio.java, TrafficLogicEngine.java
 '
 '  Qui la Centrale sa di ferrovia e non sa piu' niente di MQTT: nessuna di
-'  queste classi vede un topic, un byte o un JsonObject (il JSON del campo
+'  queste classi tocca un topic o un byte, e nessuna legge un JsonObject (il JSON del campo
 '  passa solo per essere rilanciato al browser cosi' com'e'). La notizia
 '  arriva gia' tipizzata da C4a, oppure da una richiesta REST (C3), oppure
 '  dal watchdog che guarda l'orologio, e diventa un EventoCentrale.
@@ -10912,15 +11329,27 @@ class GestoreEventi <<servizio>> {
   - suControlloTreniFermi() : Esito
   - suFotografia() : Esito
   .. supporto ..
+  - trattaDaRiallineare(treno, msg) : Tratta
+  - guastiTrenoFermoDaChiudere(trenoId, msg) : List<Guasto>
+  - scriviTransito(msg, suDb, stazioneSuDb, aperto, quando, ritardo) : void
+  - nuovoTransito(treno, stazione, quando, ritardo) : Transito
   - scriviStatoTreno(suDb, trenoId, stato) : void
   - scriviGuastoDedotto(guasto, audit) : boolean
+  - scriviAudit(guasto, audit) : void
   - dedottiAperti(sorgenteId, sorgenteTipo, prefisso) : List<Guasto>
+  - restanoGuastiAperti(sorgenteId, sorgenteTipo, chiusi) : boolean
   - stazioneCheTornaOnline(stazioneId, soloSeGuasta, chiusi) : Stazione
+  .. annunci della fase delle azioni ..
+  - annunciaStazioneChiusaDalConvoglio(treno, stazioneId, ...) : void
+  - annunciaChiusure(chiusi, motivo) : void
+  - annunciaStatoAlCampo(stazione) : void
 }
 class Esito <<record>> <<messaggio>> {
   + risposta : Risposta
   + corpo : Object
   + errore : String
+  ~ {static} fatto(corpo) / fatto() / ignorato() : Esito
+  ~ {static} nonTrovato() / rifiutato(errore) / conflitto() : Esito
 }
 enum Risposta <<messaggio>> {
   FATTO
@@ -10940,6 +11369,11 @@ class EventoCentrale <<record>> <<messaggio>> {
   + payloadDalCampo : JsonObject
   + id : String
   + stato : String
+  + {static} di(tipo) : EventoCentrale
+  + {static} telemetria / passaggio / heartbeat(msg, payload) : EventoCentrale
+  + {static} alert(tipo, msg : AlertMsg) : EventoCentrale
+  + {static} comando(tipo, id) : EventoCentrale
+  + {static} statoDallOperatore(tipo, id, stato) : EventoCentrale
 }
 enum TipoEvento as "EventoCentrale.Tipo" <<messaggio>> {
   TELEMETRIA
@@ -10959,6 +11393,7 @@ enum TipoEvento as "EventoCentrale.Tipo" <<messaggio>> {
 
 class GeneratoreEventiTempo {
   - {static} PERIODO_SECONDI : long = 10
+  - orologio : ScheduledExecutorService
   + avvia() : void
   + ferma() : void
   - programma(tipo : EventoCentrale.Tipo) : void
@@ -10994,10 +11429,12 @@ class AutomaStazione <<automa>> {
   + inviaSquadra(stazione) / tornaOnline(stazione, quando) : void
   + imponiDallOperatore(stazione, stato : String) : void
   + entraTreno(stazione) / esceTreno(stazione) : void
+  - scrivi(stazione, stato : String) : void
 }
 
 class AutomaGuasto <<automa>> {
   + {static} TIPO_CONVOGLIO_IN_STAZIONE : String
+  - {static} TIPI_NOTI : List<String>
   + {static} tipoPerFrontend(sorgenteTipo, tipoDichiarato) : String
   .. guardia ..
   + apertoPer(sorgenteId : String, tipo : String) : Guasto
@@ -11020,6 +11457,7 @@ class NavigazioneItinerario <<servizio>> {
 class Posizione <<record>> <<messaggio>> {
   + prossimaStazione : String
   + trattaCorrente : Tratta
+  + {static} sconosciuta() : Posizione
 }
 
 class PosizioneConvoglio <<utility>> <<messaggio>> {
@@ -11030,13 +11468,17 @@ class PosizioneConvoglio <<utility>> <<messaggio>> {
   + {static} valuta(treno : Treno, freschezzaSecondi : long) : void
   - {static} partenzaConfermata(tratta, direzione, arrivoDichiarato) : String
   - {static} telemetriaFresca(treno : Treno, freschezzaSecondi : long) : boolean
+  - {static} valorizzato(valore : String) : String
+  - {static} scrivi(treno, partenza, arrivo, direzione, nota, incertezza) : void
 }
 
 class PrevisioneArrivi <<servizio>> {
   - {static} TICK_DEL_TWIN : Duration
   - {static} TICK_DI_TOLLERANZA : int
+  - {static} MINUTI_TRATTA_PREDEFINITI : int
   + fattoreAccelerazione : double
   + sostaSecondi : long
+  - percorsi : Map<String, List<Tappa>>
   - tabellaDiMarcia : Map<String, Marcia>
   - soste : Map<String, Sosta>
   - ritardoInCorso : Map<String, Integer>
@@ -11049,7 +11491,38 @@ class PrevisioneArrivi <<servizio>> {
   + treniAttesi(stazioneId : String) : List<Map>
   + dimenticaTreno(trenoId : String) : void
   + itinerariCambiati() : void
-  - tolleranzaMinuti() : double
+  .. supporto privato ..
+  - contaSostaOltreIlPrevisto(treno, stazione, quandoEUscito) : void
+  - corsaFinita(treno) : boolean
+  - sostaPrevistaIn(treno, stazioneId) : double
+  - sostaValida(treno) : Sosta
+  - marciaValida(treno) : Marcia
+  - quotaInCorso(treno, adesso) / togliQuotaInCorso(treno) : int
+  - percorsoDi(itinerarioId) / leggiPercorso(itinerarioId) : List<Tappa>
+  - indiceDi(tappe, stazioneId) : int
+  - superata(posizione, target, andata) : boolean
+  - minutiFra(tappe, da, a) / minutiResiduiDellaTratta(...) : double
+  - tolleranzaMinuti() / sostaMinuti() : double
+  - durataReale(minutiDiServizio : double) : Duration
+  - minutiDiServizio(reale : Duration) : double
+  - arrotonda(minuti : double) : int
+}
+class Tappa <<record>> <<messaggio>> {
+  + stazioneId : String
+  + minutiVersoProssima : int
+}
+class Marcia <<record>> <<messaggio>> {
+  + stazioneAttesa : String
+  + partenza, arrivoProgrammato : Instant
+}
+class Sosta <<record>> <<messaggio>> {
+  + stazioneId : String
+  + inizio : Instant
+  + minutiPrevisti : double
+}
+class Previsione <<record>> <<messaggio>> {
+  + minuti : int
+  + fermateIntermedie : int
 }
 
 class TrafficLogicEngine <<cache>> {
@@ -11072,6 +11545,7 @@ class TrafficLogicEngine <<cache>> {
   + aggiungiGuasto(guasto : Guasto) : void
   + getGuasto(id : String) : Guasto
   + getGuastiAttivi() : List<Guasto>
+  + haGuastiAperti(sorgenteId : String, sorgenteTipo : String) : boolean
   + getGuastoApertoPerSorgente(sorgenteId : String, tipo : String) : Guasto
   + kpiDashboard() : Map<String, Object>
 }
@@ -11088,6 +11562,10 @@ Esito +-- Risposta
 GestoreEventi +-- EventoAudit
 EventoCentrale +-- TipoEvento
 NavigazioneItinerario +-- Posizione
+PrevisioneArrivi +-- Tappa
+PrevisioneArrivi +-- Marcia
+PrevisioneArrivi +-- Sosta
+PrevisioneArrivi +-- Previsione
 
 ' 1. da dove arrivano gli eventi: tre generatori, un gestore
 ADAPTER --> GestoreEventi : i messaggi del campo
@@ -11293,6 +11771,10 @@ interface Lavoro<T> {
   + esegui(connessione : Connection) : T
 }
 
+interface LavoroSenzaRisultato {
+  + esegui() : void
+}
+
 class RailwayRepository <<persistenza>> {
   + db : Database
   .. stazioni ..
@@ -11335,15 +11817,27 @@ class RailwayRepository <<persistenza>> {
   + ultimoStatoStoricizzato(stazioneId) : StoricoStatoStazione
   + salvaEventoStazione(stazioneId, nome, stato, tipoEvento, descrizione) : void
   + salvaStoricoTransito(transito : Transito) : void
+  - inserisciStoricoGuasto(storico : StoricoGuasto) : void
   - nomeDellaSorgente(guasto : Guasto) : String
   .. utenti ..
   + trovaUtentePerMatricola(matricola : String) : Utente
+  .. supporto privato: letture e conversioni ..
+  - leggiStazione / leggiItinerario / leggiTratta(c, id)
+  - leggiTrenoSenzaRelazioni(c, id) / leggiUtente(c, filtro, valore)
+  - stazioneDa / itinerarioDa(rs) / trenoDa(c, rs) / trenoDa(c, id, ...)
+  - treniDove(filtro, parametro) : List<Treno>
+  - guastiDove(filtro, parametri...) : List<Guasto>
+  - esegui(sql, parametri...) : int
+  - conta(sql, parametri...) : long
+  - {static} timestamp / istante / intero / decimale(...)
+  - {static} setInteger / setDouble(ps, indice, valore) : void
 }
 
 class "entita'\n<size:11>Stazione, Treno, Tratta, Itinerario, ItinerarioTratta, Transito,</size>\n<size:11>Guasto, EventoStazione, Utente e i quattro storici scritti</size>" as ENTITA <<modello>>
 entity "PostgreSQL\n<size:11>schema.sql, eseguito a ogni avvio</size>" as PG <<persistenza>>
 
 Database +-- Lavoro
+Database +-- LavoroSenzaRisultato
 RailwayRepository --> Database : conConnessione: la transazione\ndel thread, se c'e'
 Database --> PG : JDBC (driver postgresql),\nDriverManager senza pool
 
@@ -11410,6 +11904,7 @@ end note
 - requisiti coperti: RF01.1, RF01.2 e RF01.3 per le schermate, RF01.6 per l'accesso; RF04.2 solo in apparenza, perche' il ruolo lo decide il server e non queste classi
 #+begin_src  plantuml :file classi_06_webapp.png
 @startuml C6 - Classi della Web App
+skinparam linetype ortho
 ' =========================================================================
 '  DIAGRAMMA DELLE CLASSI C6 - ClientWebAppIntefacciaUtente (React + Vite + TS)
 '
@@ -11417,7 +11912,7 @@ end note
 '    api/apiClient.ts, api/keycloak.ts, api/websocketClient.ts, api/apiTypes.ts
 '    store/authStore.ts, store/railwayStore.ts
 '    hooks/useRealtimeUpdates.ts, types/index.ts
-'    pages/*.tsx, components/*
+'    App.tsx, pages/*.tsx, components/*
 '
 '  In TypeScript non tutto e' una classe: apiClient e gli store sono moduli
 '  e oggetti, non istanze. Sono disegnati come classi perche' e' il ruolo
@@ -11457,14 +11952,22 @@ skinparam note {
 }
 hide empty members
 
+' la figura supera i 4096 pixel che PlantUML accetta: la si rimpicciolisce
+' tutta insieme, se no la parte destra verrebbe tagliata
+scale max 4096 width
+
 title C6 - Web App: pagine, store, client OAuth2, client REST e client WebSocket
 
 class keycloak <<modulo>> <<oauth2>> {
   - {static} KEYCLOAK_URL, REALM, CLIENT_ID : string
   - {static} BASE_OIDC : string
+  - {static} CHIAVE_VERIFIER, CHIAVE_STATE, CHIAVE_TOKEN : string
+  - redirectUri() : string
   - base64url(byte) : string
   - casuale(byte) : string
   - sfida(verifier) : Promise<string>
+  - salva(token) : void
+  - daRisposta(dati : RispostaToken) : TokenKeycloak
   + avviaLogin() : Promise<void>
   + completaLogin(code, state) : Promise<TokenKeycloak>
   + rinnovaToken() : Promise<TokenKeycloak | null>
@@ -11483,11 +11986,14 @@ class apiClient <<modulo>> {
   - {static} authToken : string | null
   + setAuthToken(token) : void
   - authHeaders(conBody) : Record<string,string>
-  - createApiError(res) : Promise<Error>
+  - createApiError(res) : Promise<ErroreApi>
+  - mapBackendRole(role) : UserRole
+  - mapProfilo(dati) : User
   + getProfilo() : Promise<User>
   + getDashboard() : Promise<DashboardKPI>
   + getTrains() : Promise<Train[]>
   + getStations() : Promise<Station[]>
+  + getExpectedTrains(stationId) : Promise<ExpectedTrain[]>
   + getRoutes() : Promise<Route[]>
   + getTrackSegments() : Promise<TrackSegment[]>
   + getAlerts() : Promise<Alert[]>
@@ -11497,7 +12003,11 @@ class apiClient <<modulo>> {
   + createTrain / updateTrain / deleteTrain
   + createStation / updateStation / deleteStation
   + suppressTrain(id) / dispatchOperators(id) / acknowledgeAlert(id)
+  + mapApiTrain(t) : Train
+  + mapApiStation(s) : Station
+  - mapApiRoute / mapApiExpectedTrain / mapApiTrackSegment
   + mapBackendStatus(s) : TrainStatus
+  + mapFrontendStatus(s) : string
   + mapBackendStationStatus(s) : StationStatus
   ' traduce per l'operatore il codice con cui la Centrale dichiara
   ' l'incertezza: lo usano la mappa, i Treni e il tabellone di stazione
@@ -11506,6 +12016,13 @@ class apiClient <<modulo>> {
   ' schermate che mostrano un treno o una stazione
   + statiDelTreno(train) : StatoAutoma[]
   + statiDellaStazione(station) : StatoAutoma[]
+  - tonoCondizione(condizione) / tonoFase(fase) : tono
+  - {static} FASI_CON_UN_VERSO, STATO_STAZIONE_CENTRALE
+}
+
+class ErroreApi {
+  + coppieMancanti : ApiCoppiaMancante[]
+  + constructor(messaggio, coppieMancanti)
 }
 
 class WebSocketClient {
@@ -11513,6 +12030,7 @@ class WebSocketClient {
   - handlers : Map<string, MessageHandler[]>
   - reconnectTimer : any
   - url : string
+  + constructor(url : string)
   + connect() : void
   + subscribe(eventType, handler) : () => void
   + disconnect() : void
@@ -11520,10 +12038,12 @@ class WebSocketClient {
 
 class wsClient <<singleton>> {
   {static} istanza unica su VITE_WS_URL
+  {static} (di riserva wss://localhost:8444/ws/realtime)
 }
 
 class useRealtimeUpdates <<hook>> {
   + useRealtimeUpdates() : void
+  - istanteEvento(timestamp) : number
 }
 
 class authStore <<store>> <<zustand>> {
@@ -11532,6 +12052,7 @@ class authStore <<store>> <<zustand>> {
   + sessionePronta : boolean
   + loginError : string | null
   - timerRinnovo : Timeout | null
+  - fermaRinnovo() : void
   - attivaToken(token) : void
   + login() : Promise<void>
   + completaAccesso(code, state) : Promise<boolean>
@@ -11546,18 +12067,25 @@ class railwayStore <<store>> <<zustand>> {
   + routes : Route[]
   + trackSegments : TrackSegment[]
   + transits : Transit[]
+  + kpi : DashboardKPI | null
+  + notifications : UiNotification[]
   + selectedTrainId / selectedStationId : string | null
   + initialize() : void
   + setTrains / updateTrain
   + setStations / updateStation
   + addAlert / acknowledgeAlert
   + addTransit
+  + setKpi
+  + pushNotification / dismissNotification
   + addRoute / updateRoute / deleteRoute
   + createTrackSegment / updateTrackSegment / deleteTrackSegment
   + adminCreateTrain / adminUpdateTrain / adminDeleteTrain
   + adminCreateStation / adminUpdateStation / adminDeleteStation
   + suppressTrain(trainId) / dispatchOperators(stationId)
+  + completeMaintenance(stationId)
   + selectTrain / selectStation
+  - dettaglioErrore(err) : string
+  - routesConAssegnazione(routes, trainId, routeId) : Route[]
 }
 
 class Train <<tipo>> {
@@ -11572,6 +12100,8 @@ class Train <<tipo>> {
   ' i due campi con cui la Centrale dice se di questa posizione si fida
   positionKnown : boolean
   positionDoubt : string | null
+  arrivalTime, departureTime : number | null
+  minutesToArrival : number | null
   delayMinutes, passengers : number
   progressPercent : number
   lastUpdate : number
@@ -11584,7 +12114,9 @@ class Station <<tipo>> {
   coordinates : {x, y}
   platforms : number
   lastHeartbeat : number | null
-  operatorsDispatched : boolean
+  operatorsDispatched? : boolean
+  faultDescription? : string
+  faultSince? : number
 }
 class StatoAutoma <<tipo>> {
   automa : string
@@ -11598,11 +12130,14 @@ class Alert <<tipo>> {
   severity : AlertSeverity
   message : string
   trainId?, stationId? : string
+  origin : 'segnalato_campo' | 'dedotto_centrale'
   timestamp : number
   acknowledged : boolean
+  resolvedAt? : number
 }
 class Transit <<tipo>> {
   id, trainId, stationId : string
+  trackSegmentId : string | null
   type : 'ingresso' | 'uscita'
   timestamp : number
   delayed : boolean
@@ -11614,6 +12149,7 @@ class Route <<tipo>> {
   travelTimes : number[]
   terminusStationId : string | null
   active : boolean
+  createdAt : number
 }
 class TrackSegment <<tipo>> {
   id : string
@@ -11630,6 +12166,23 @@ class User <<tipo>> {
   id, username, displayName, avatarInitials : string
   role : UserRole
 }
+class ExpectedTrain <<tipo>> {
+  trainId : string
+  kind : 'in_arrivo' | 'in_partenza'
+  status : TrainStatus
+  delayMinutes, minutesToArrival, stopsBefore : number
+  arrivalTime : number | null
+  nextStationId : string | null
+  direction : 'andata' | 'ritorno' | null
+  positionKnown : boolean
+  positionDoubt : string | null
+}
+class UiNotification <<tipo>> {
+  id, message : string
+  kind : 'treno_soppresso' | 'operatori_inviati' | 'errore_comando'
+  severity : AlertSeverity | 'success'
+  timestamp : number
+}
 
 class "LoginPage" as P1 <<vista>>
 class "DashboardPage" as P2 <<vista>>
@@ -11637,31 +12190,48 @@ class "TrafficMapPage" as P3 <<vista>>
 class "TrainsPage / StationsPage /\nRoutesPage / TrackSegmentsPage" as P4 <<vista>>
 class "AlertsPage" as P5 <<vista>>
 class "AdminPage (+ i quattro modali)" as P6 <<vista>>
+class "App\n(ProtectedRoute, RailwayApp)" as APP <<vista>>
+class "MainLayout / Sidebar / Topbar" as LAYOUT <<vista>>
+class "CampoNumerico\n(components/ui)" as CN <<vista>>
 
 class "Keycloak\n(realm railway, :8543 https)" as IDP <<esterno>>
 
-wsClient ..|> WebSocketClient
+wsClient ..> WebSocketClient : la sua sola istanza,\nnew WebSocketClient(WS_URL)
 keycloak +-- TokenKeycloak
 keycloak ..> IDP : /auth, /token, /logout
 
+APP --> useRealtimeUpdates : una volta sola,\nper tutta l'applicazione
+APP --> railwayStore : initialize()
+APP --> authStore : ProtectedRoute: senza sessione\nal login, /admin solo\nall'amministratore
+LAYOUT --> authStore : utente, logout e la voce\nAmministrazione solo\nall'amministratore
+LAYOUT --> railwayStore : il numero di\nallarmi aperti
 P1 --> authStore
 P2 --> railwayStore
-P2 --> useRealtimeUpdates
 P3 --> railwayStore
 P4 --> railwayStore
 P5 --> railwayStore
+P5 --> authStore : i comandi del tecnico
+P4 --> authStore : fine manutenzione solo\nal tecnico (StationsPage)
 P6 --> railwayStore
-P6 --> authStore : mostra i comandi\nsolo all'amministratore
+P6 --> CN : i campi numerici\ndei modali
+P2 --> apiClient : statiDelTreno
+P3 --> apiClient : statiDelTreno, statiDellaStazione,\ndescriviIncertezzaPosizione
+P4 --> apiClient : getExpectedTrains (StationsPage)\ne le stesse traduzioni
+P6 --> apiClient : statiDelTreno, statiDellaStazione,\nErroreApi (RouteEditorModal)
 
 authStore --> keycloak : avviaLogin, completaLogin,\nrinnovaToken, logoutKeycloak
 authStore --> apiClient : setAuthToken / getProfilo
 railwayStore --> apiClient : tutte le chiamate REST
-useRealtimeUpdates --> wsClient : connect + quattro subscribe
-useRealtimeUpdates --> railwayStore : updateTrain, updateStation,\naddAlert, addTransit
+useRealtimeUpdates --> wsClient : connect, sei subscribe\ne disconnect
+useRealtimeUpdates --> railwayStore : updateTrain, updateStation,\naddAlert, addTransit,\nsetKpi, setTrains, setStations
+useRealtimeUpdates --> apiClient : mapApiTrain, mapApiStation,\nmapBackendStatus
 
 railwayStore o-- Train
 railwayStore o-- Station
 P3 --> SC : stato composto di\ntreni e stazioni
+P2 --> SC
+P4 --> SC
+P6 --> SC
 SC ..> StatoAutoma : un badge\nper automa
 apiClient ..> StatoAutoma
 railwayStore o-- Alert
@@ -11670,6 +12240,10 @@ railwayStore o-- Route
 railwayStore o-- TrackSegment
 authStore o-- User
 apiClient ..> DashboardKPI
+apiClient ..> ExpectedTrain
+apiClient +-- ErroreApi
+railwayStore o-- DashboardKPI
+railwayStore o-- UiNotification
 
 note right of apiClient
   apiClient tiene l'access token in una variabile di modulo, ma non e'
@@ -11740,9 +12314,9 @@ end note
 note bottom of SC
   Un elemento e' in tanti stati quanti sono i suoi automi, tutti nello
   stesso momento: il treno trattenuto da una stazione guasta e'
-  REGOLARE (T6), BLOCCATO_IN_TRATTA (T5) e in ANDATA (T7). Prima le
-  schermate mostravano una parola sola, tradotta dal riassunto della
-  Centrale, e "fermo" diventava "in stazione" anche a meta' tratta.
+  REGOLARE (T6), BLOCCATO_IN_TRATTA (T5) e in ANDATA (T7). Una parola
+  sola, tradotta dal riassunto della Centrale, non basterebbe: "fermo"
+  diventerebbe "in stazione" anche a meta' tratta.
   StatoComposto la usano mappa, Treni, Stazioni, Dashboard e
   Amministrazione: un badge per automa, col nome dell'automa nel
   tooltip. La stazione mostra M12 e, solo in MANUTENZIONE, anche lo
@@ -11766,13 +12340,13 @@ end note
 | RF01.2 (guasti)     |            | C6, C3, modello | l'entita' Guasto e il suo storico stanno nel capitolo Modello; il campo operatore resta sempre nullo |
 | RF01.3 (anagrafica) |            | C3, modello     | i comandi in C3, i vincoli e le chiavi esterne nel modello                 |
 | RF01.4 (comandi)    |            | C3, C1, C2      | partono da C3 e arrivano ai gateway dei nodi; nessuna classe registra chi li ha impartiti |
-| RF01.5 (storico)    |            | modello, C3     | le otto tabelle di storico e gli endpoint che le servono; solo quattro vengono davvero scritte, e nell'interfaccia non c'e' una schermata che le mostri |
+| RF01.5 (storico)    |            | modello, C3     | le otto tabelle di storico e l'endpoint che serve quella dei transiti (=GET /api/transiti=); solo quattro vengono davvero scritte, e nell'interfaccia non c'e' una schermata che le mostri |
 | RF01.6 (accesso)    | C3         | C6              | filtro lato server, client OAuth2 e custodia del token lato browser        |
 | RF02.1.1.1          |            | C2              | la coda locale, i pubblicatori che la riempiono e il consumatore che la svuota |
 | RF02.1.1.2          |            | C1, C2          | le stazioni note al treno e l'automa del viaggio che si blocca             |
 | RF02.1.2            |            | C1, C4a, C4b    | il gateway di bordo, l'ingestione degli allarmi, il gestore e l'automa che li aprono |
 | RF02.1.3            |            | modello, C4b    | il ciclo di vita e' un campo dell'entita', ma le sue transizioni stanno in un posto solo, AutomaGuasto: restano due stati, senza assegnatario |
-| RF02.2.1            |            | C1              | il convoglio trattenuto resta fermo; il ritardo lo calcola la Centrale     |
+| RF02.2.1            |            | C1, C4b         | il convoglio trattenuto resta fermo (C1); il ritardo lo calcola la Centrale, in =PrevisioneArrivi= (C4b) |
 | RF02.2.2            |            | C1, modello     | i campi volatili del convoglio, negli stessi nomi ai due capi              |
 | RF02.2.3            |            | C1              | direzione e indice della stazione nel modello locale del treno             |
 | RF02.3              |            | C2, C4b         | lo stato del nodo e la sua copia nella cache della centrale                |
@@ -11781,7 +12355,7 @@ end note
 | RF02.6              |            | C4b             | il watchdog con i suoi tre lavori periodici                                |
 | RF02.7              |            | modello, C5     | le otto tabelle di storico stanno nel Modello e non in un diagramma; a scriverle e' tutte il repository, che e' l'unica classe che parla col database; quattro di esse restano sempre vuote |
 | RF03.1              |            | C1, C2          | ogni nodo ha il proprio stato e il proprio punto di ingresso               |
-| RF03.2              |            | C1, C2, C4a     | nessuna classe condivisa fra i processi: e' la mappa C0 a dirlo            |
+| RF03.2              |            | C1, C2, C4a     | nessuna classe condivisa fra i processi: ogni modulo ha le sue copie di =ClientMqtt=, =Configurazione= e =ContestoTls=            |
 | RF03.3              |            | C4a, C2         | due destinatari distinti in centrale (telemetria e transito) e, sul nodo, i sensori che certificano il passaggio |
 | RF03.4              |            | C1, C2          | gli endpoint REST dei nodi sono l'unica porta dei sensori                  |
 | RF03.5              |            | C3, C1          | l'endpoint dell'itinerario e il client che lo chiama                       |
@@ -11866,13 +12440,13 @@ il contorno: i contenitori di stato (=TrainDB=, =DBLocale=, =TrafficLogicEngine=
 | *C4b - il dominio*                      |                |                                                                             |
 | GestoreEventi                          | M3, M4, M5, M6, M8 | le macchine di ingestione e il watchdog sono i suoi metodi (=suTelemetria=, =suHeartbeat=, =suPassaggio=, =suGuastoSegnalato= e =suGuastoRientrato=, =suControllo...=): ognuno passa per guardie, assegnamenti e azioni, e le variabili le scrivono gli automi su sua richiesta |
 | AutomaGuasto                           | M7             | l'unico posto in cui un guasto si apre e si chiude, qualunque sia la strada da cui la notizia e' arrivata |
-| AutomaStazione                         | M12            | l'unica classe che scrive =Stazione.stato=; la guardia =accettaDalCampo= difende la manutenzione (RF01.4.1) |
+| AutomaStazione                         | M12            | scrive =Stazione.stato= a ogni evento; fuori dall'automa lo assegnano solo la POST che crea la stazione (=RestApiGateway=) e la ripresa della manutenzione all'avvio (=TrafficLogicEngine=). La guardia =accettaDalCampo= difende la manutenzione (RF01.4.1) |
 | AutomaTreno                            | M13            | scrive =Treno.stato=, la posizione e il ritardo nella cache; la riga del database la scrive il gestore |
 | GeneratoreEventiTempo                  | --             | e' il battito di M8, ma manda solo eventi: nessuna variabile di stato la scrive lui |
 | EventoCentrale                         | --             | l'alfabeto delle macchine: che cosa e' successo e i dati per reagire |
 | NavigazioneItinerario, PrevisioneArrivi | --            | nessuna transizione: rispondono a domande (dove sono, quando arrivo) e misurano e stimano il ritardo per AutomaTreno |
 | PosizioneConvoglio                     | --             | nemmeno lei fa transitare niente, ma non e' un contorno: e' un giudizio. Date le due fonti sulla posizione decide se la centrale e' in grado di rispondere, e sono funzioni pure, senza stato e senza database |
-| TrafficLogicEngine                     | --             | e' la cache dove vivono le variabili di M7, M12 e M13, come =TrainDB= a bordo: le transizioni gliele scrivono gli automi |
+| TrafficLogicEngine                     | --             | e' la cache dove vivono le variabili di M7, M12 e M13, come =TrainDB= a bordo: le transizioni gliele scrivono gli automi, e lei scrive solo la MANUTENZIONE che rimette all'avvio |
 |----------------------------------------+----------------+-----------------------------------------------------------------------------|
 | *C5 - la persistenza*                   |                |                                                                             |
 | Database, RailwayRepository            | --             | non fanno transitare niente: aprono le transazioni ed eseguono le query per conto delle altre. Sono il contorno di tutte le macchine della centrale che lasciano una traccia su database, cioe' M3-M8 e M10 |
@@ -11888,8 +12462,9 @@ partono da oggetti gia' creati e collegati. Sui nodi di campo T1 e S1 invece ci 
 il =main= fa anche la validazione dell'id.
 
 Le tre macchine di dominio della centrale (M7 guasto, M12 stazione, M13 treno) hanno ciascuna un
-automa che e' l'unico scrittore della sua variabile, e il gestore degli eventi e' l'unico a
-chiamarlo.
+automa che ne scrive la variabile a sistema acceso, e il gestore degli eventi e' l'unico a
+chiamarlo. Fuori dagli automi restano solo i valori di partenza: lo stato con cui la POST crea una
+stazione o un convoglio, e la MANUTENZIONE che il =TrafficLogicEngine= rimette all'avvio.
 
 ** Interfaccia utente
 *** Mappa della navigazione
@@ -11995,19 +12570,19 @@ state "Applicazione\n(cornice: barra laterale + titolo)" as App {
     All : tecnico manda la squadra e dichiara risolto (RF01.2, RF01.4)
 
     state "Amministrazione\n/admin" as Admin <<riservata>> {
-        state "Itinerari\n(UC6, UC7)" as AdmItin <<scheda>>
+        state "Itinerari\n(UC14)" as AdmItin <<scheda>>
         AdmItin : compone un percorso con le tratte fisiche,
         AdmItin : lo modifica a convogli in marcia (RF01.3.4)
 
-        state "Tratte fisiche" as AdmTratte <<scheda>>
+        state "Tratte fisiche\n(UC13)" as AdmTratte <<scheda>>
         AdmTratte : dichiara il collegamento fra due stazioni
         AdmTratte : e il tempo di percorrenza (RF01.3.3)
 
-        state "Treni\n(UC8, UC9)" as AdmTreni <<scheda>>
+        state "Treni\n(UC12, UC10)" as AdmTreni <<scheda>>
         AdmTreni : immette un convoglio e lo assegna a un
-        AdmTreni : itinerario, lo ritira, lo sopprime (RF01.3.2)
+        AdmTreni : itinerario, lo ritira, lo sopprime (RF01.3.2, RF01.4.3)
 
-        state "Stazioni" as AdmStaz <<scheda>>
+        state "Stazioni\n(UC11)" as AdmStaz <<scheda>>
         AdmStaz : registra un nodo con nome e coordinate,
         AdmStaz : lo modifica, lo elimina (RF01.3.1, RF01.3.5)
 
@@ -12096,30 +12671,34 @@ Le prove manuali richiedono invece il sistema completo: =docker compose up= per 
 Keycloak, poi =./popola_db.sh=, che crea le tabelle con lo =schema.sql= della Centrale e carica in
 una sola transazione i dati demo di =populate_db.sql= (10 stazioni, 20 tratte, 15 itinerari, 15
 convogli; si ferma se il database ha gia' delle stazioni), quindi i tre moduli Java (un =jar= per
-modulo, lanciato con =java -jar=, e =-Dprofilo=tls= per la versione cifrata) e la web app. Gli
-elenchi =stazioni.conf= e =treni.conf= dei nodi di campo contengono gli id dei dati demo: un id che
-non e' nel database viene rifiutato dalla validazione.
+modulo, lanciato con =java -jar=, e =-Dprofilo=tls= per la versione cifrata) e la web app. Stazioni
+e treni si accendono con =avvioStazioni.sh= e =avvioTreni.sh=, che lanciano un processo per ogni
+riga di =stazioni.conf= e =treni.conf=, gia' sotto profilo =tls= e su porte crescenti dalla 8080 e
+dalla 9080. I due elenchi contengono gli id dei dati demo (=FI= e =Pietra= ci sono ma commentati): un
+id che non e' nel database viene rifiutato dalla validazione.
 
 ** Test automatici
 
 Esito dell'ultima esecuzione (1 ottobre 2026): *184 test, tutti superati* — 106 nella Centrale, 28
-nei Treni, 20 nelle Stazioni e 30 nella web app. Nelle classi della Centrale che provano una sequenza (=AdminApiTest=,
-=ChiusuraGuastiTest=, =ItinerariTratteTest=, =MemoriaStoricaTest=, =RegressioniBugTest=) il conteggio
-comprende anche il primo passo, che prepara la rete, e l'ultimo, che la ripulisce.
+nei Treni, 20 nelle Stazioni e 30 nella web app. Nelle classi della Centrale che provano una
+sequenza il conteggio comprende anche i passi che preparano la rete e la ripuliscono, scritti come
+test: il primo e l'ultimo in =ItinerariTratteTest=, =RegressioniBugTest= e =PrevisioneArriviTest=,
+solo il primo in =ChiusuraGuastiTest= e =MemoriaStoricaTest=. =AdminApiTest= e' ordinato ma non ne
+ha.
 
 #+ATTR_LATEX: :environment longtable :align L{0.13\textwidth}L{0.24\textwidth}L{0.07\textwidth}L{0.42\textwidth} :font \small
 | modulo   | classe                  | test | che cosa verifica                                                        |
 |----------+-------------------------+------+--------------------------------------------------------------------------|
-| Centrale | =AdminApiTest=          |   14 | gli endpoint dell'anagrafica e il filtro sui ruoli: senza token si viene respinti, il tecnico legge ma non crea, i nomi duplicati sono rifiutati (RF01.3, RF04.2) |
-| Centrale | =SicurezzaTest=         |   13 | la verifica dei token fatta con pac4j: passa il token buono e prendono 401 quello scaduto, quello per un'altra applicazione, di un altro realm, firmato da un'altra chiave, non firmato o manomesso, e qualunque token finche' le chiavi del realm non sono arrivate; il tecnico non tocca l'anagrafica, le due letture dei nodi di campo e la preflight del browser restano aperte (RF04.1, RF04.2) |
+| Centrale | =AdminApiTest=          |   14 | gli endpoint dell'anagrafica e il filtro sui ruoli: senza token si viene respinti, il tecnico legge ma non crea, i nomi duplicati e il cambio di nome di un convoglio sono rifiutati, uno stato fuori vocabolario prende un 400, la soppressione e il profilo dell'utente collegato (RF01.3, RF04.2) |
+| Centrale | =SicurezzaTest=         |   13 | la verifica dei token fatta con pac4j: passa il token buono e prendono 401 quello scaduto, quello per un'altra applicazione, di un altro realm, firmato da un'altra chiave, non firmato o manomesso, e qualunque token finche' le chiavi del realm non sono arrivate; un utente senza ruoli del progetto prende 403 e un corpo che non e' JSON un 400; il tecnico non tocca l'anagrafica, le due letture dei nodi di campo e la preflight del browser restano aperte (RF04.1, RF04.2) |
 | Centrale | =GestoreEventiTest=     |   16 | il gestore degli eventi, un evento per test: stato degli automi dopo la mossa, righe scritte sul database, messaggi partiti verso il campo e la web app. Il battito e la manutenzione (con lo stato che il nodo dichiara, tenuto anche quando la Centrale non lo accetta), la telemetria che porta condizione e fase del convoglio fino alla web app, anche a null nell'evento che parte senza telemetria, l'alert ripetuto, l'eco della Centrale, il convoglio rotto in stazione che la chiude, il rientro dal campo, il fail-stop e il treno fermo con le loro chiusure automatiche, i passaggi che misurano il ritardo, la soppressione, lo stato deciso dall'operatore, la validazione degli id (RF02.1, RF02.6, RF01.4) |
-| Centrale | =PrevisioneArriviTest=  |   15 | l'orario di servizio: la previsione somma tratte e soste, il ritardo nasce dal confronto con l'orario previsto e cresce anche per una sosta troppo lunga; cresce gia' mentre il treno e' fermo, in banchina, a meta' tratta e alla stazione di partenza, senza contare due volte lo stesso tempo quando arriva la misura del passaggio, e a corsa finita resta quello raggiunto (RF02.2.1, RF02.2.2.2) |
-| Centrale | =ItinerariTratteTest=   |    9 | un itinerario si appoggia solo su tratte esistenti; il rifiuto lascia l'itinerario com'era e non a metà; i treni assegnati alla creazione vengono avvisati (RF01.3.3, RF01.3.4) |
+| Centrale | =PrevisioneArriviTest=  |   15 | l'orario di servizio: la previsione somma tratte e soste, il ritardo nasce dal confronto con l'orario previsto e cresce anche per una sosta troppo lunga; cresce gia' mentre il treno e' fermo, in banchina, a meta' tratta e alla stazione di partenza, senza contare due volte lo stesso tempo quando arriva la misura del passaggio, e a corsa finita resta quello raggiunto; il tabellone dei treni attesi segue l'itinerario e non la posizione, e il suo endpoint risponde (RF02.2.1, RF02.2.2.2, RF01.1.3) |
+| Centrale | =ItinerariTratteTest=   |    9 | un itinerario si appoggia solo su tratte esistenti e ha almeno due stazioni; il rifiuto lascia l'itinerario com'era e non a metà; i treni assegnati alla creazione vengono avvisati (RF01.3.3, RF01.3.4) |
 | Centrale | =PosizioneConvoglioTest= |   8 | quando la centrale sa dire dove sta un convoglio e quando ammette di non saperlo: fermo in stazione la posizione e' sempre nota, in linea serve la tratta confermata dai sensori letta nel verso giusto, e con una tratta ormai vecchia la partenza non si inventa (RF02.2.2.1, RF01.1.1) |
-| Centrale | =RegressioniBugTest=    |    7 | casi limite dell'anagrafica e dello snapshot: una PUT che non parla di assegnazioni non sgancia i convogli, un itinerario che ripassa sulla stessa tratta prende un 400, una tratta usata come posizione di un convoglio non si elimina, lo snapshot porta treni e stazioni |
-| Centrale | =ChiusuraGuastiTest=    |    7 | i due comandi del tecnico: la squadra non si manda su una stazione sana, l'invio la mette in manutenzione, ne' un alert ripetuto ne' il rientro dichiarato dal campo chiudono l'intervento, la chiusura dell'allarme la rimette in servizio (RF01.4.1, RF01.4.2) |
-| Centrale | =MemoriaStoricaTest=    |    4 | eliminare una stazione o un convoglio non cancella la loro storia (RF01.5, RF02.7) |
-| Centrale | =AlertRitardoTest=      |    4 | il ritardo misurato viaggia verso il convoglio con la causa giusta, e il rientro in orario non è un allarme (RF02.2.2.2) |
+| Centrale | =RegressioniBugTest=    |    7 | casi limite dell'anagrafica e dello snapshot: una PUT che non parla di assegnazioni non sgancia i convogli e una con l'elenco vuoto li sgancia davvero, un itinerario che ripassa sulla stessa tratta prende un 400, una tratta usata come posizione di un convoglio non si elimina, lo snapshot porta KPI, treni e stazioni |
+| Centrale | =ChiusuraGuastiTest=    |    7 | i due comandi del tecnico: la squadra non si manda su una stazione sana, l'invio la mette in manutenzione, ne' un alert ripetuto ne' il rientro dichiarato dal campo chiudono l'intervento, la chiusura dell'allarme la rimette in servizio, e chiudere un allarme che non esiste da' 404 (RF01.4.1, RF01.4.2) |
+| Centrale | =MemoriaStoricaTest=    |    4 | eliminare una stazione o un convoglio non cancella la loro storia, e una tratta che compare solo nello storico si puo' eliminare (RF01.5, RF02.7, RF01.3.5) |
+| Centrale | =AlertRitardoTest=      |    4 | il ritardo misurato viaggia verso il convoglio con la causa giusta, il rientro in orario non è un allarme, e il RESOLVED porta la firma della Centrale (RF02.2.2.2) |
 | Centrale | =DatabaseTest=          |    4 | le transazioni JDBC: il lavoro riuscito va in commit, un'eccezione annulla tutto, una transazione dentro un'altra e' indipendente, lo schema si puo' rieseguire senza toccare i dati |
 | Centrale | =GuastoTest=            |    2 | i campi del guasto e la distinzione fra allarme segnalato e dedotto (RF01.2.2) |
 | Centrale | =AvvioTest=             |    1 | la Centrale di prova si accende, crea le tabelle e risponde             |
@@ -12131,7 +12710,7 @@ comprende anche il primo passo, che prepara la rete, e l'ultimo, che la ripulisc
 | Treni    | =TelemetriaTest=        |    1 | il frame di telemetria porta, oltre allo stato riassunto, la condizione e la fase del viaggio: il treno trattenuto a meta' tratta e' FERMO, REGOLARE e BLOCCATO_IN_TRATTA (RF02.2.2.3) |
 | Treni    | =RitardoComunicatoTest= |    3 | il ritardo che la Centrale comunica finisce a bordo, il rientro lo azzera, quello di un altro convoglio viene ignorato |
 | Treni    | =ExampleTest=           |    2 | il guasto di bordo esce come alert nel formato giusto, con una coda finta al posto del broker, e resta un JSON valido anche con le virgolette nella descrizione |
-| Stazioni | =GestoreEventiTest=     |   11 | gli automi della stazione: il sensore muto la guasta una volta sola e il suo ritorno la rimette online, ma non cancella un guasto che non e' suo (segnalato o della Centrale); al riavvio la causa si ricostruisce dal registro; il treno che entra in una stazione guasta viene trattenuto; il ripristino della Centrale ricomincia a sorvegliare i sensori; la stazione non reagisce all'eco dei propri allarmi (RF02.3.3, RF02.3.4, RF02.1.1.2.3) |
+| Stazioni | =GestoreEventiTest=     |   11 | gli automi della stazione: il sensore muto la guasta una volta sola e il suo ritorno la rimette online, ma non cancella un guasto che non e' suo (segnalato o della Centrale); al riavvio la causa si ricostruisce dal registro; il treno che entra in una stazione guasta viene trattenuto; il ripristino della Centrale ricomincia a sorvegliare i sensori; la stazione non reagisce all'eco dei propri allarmi, e una descrizione con le virgolette non rompe l'allarme (RF02.3.3, RF02.3.4, RF02.1.1.2.3) |
 | Stazioni | =SensoriFailStopTest=   |    5 | i sensori di binario, con le API REST vere su una porta libera: si chiamano con l'id della stazione, battono via REST, il sensore muto la guasta e il suo ritorno la rimette operativa, il sensore fermo non rileva il passaggio, le richieste sbagliate sono rifiutate (RF02.3.3, RF03.4) |
 | Stazioni | =ConsumatoreBufferTest= |    4 | lo store and forward: gli eventi partono in ordine sul topic del loro canale, a rete staccata restano in coda e partono al ritorno, col broker giu' la testa non si perde e non viene sorpassata, e gli eventi non spediti sopravvivono a un riavvio (RF02.1.1.1.1, RF02.1.1.1.2) |
 | Web app  | =TrafficMapPage=, =apiClient=, =Card= | 27 | il rendering della mappa, le chiamate con il token e i componenti di base; i convogli a posizione incerta, elencati e non disegnati finche' partenza e arrivo non tornano noti; lo stato composto: il treno trattenuto a meta' tratta e' REGOLARE, BLOCCATO_IN_TRATTA, ANDATA e non "in stazione", senza itinerario e al capolinea non c'e' verso, senza telemetria resta lo stato della Centrale, la stazione in manutenzione mostra anche lo stato del nodo (RF01.1.2, RF02.2.2.3) |
@@ -12156,7 +12735,7 @@ console interattiva =Sensori= dei due nodi.
 |----------+------------------------------------------------------------------------------+------------------------------------------------------------|
 | SV01     | =POST /stazione/sensore/guasto= sulla stazione B, poi i due comandi del tecnico dalla dashboard | schermata delle stazioni e degli allarmi; i due convogli si fermano e ripartono da soli |
 | SV02     | =POST /stazione/rete/offline= su A, si fanno transitare dei convogli, poi =POST /stazione/rete/online= | =GET /stazione/buffer= durante l'interruzione, lo storico dei transiti dopo |
-| SV03     | =POST /treno/sensore/guasto= su due convogli, uno in sosta e uno in tratta   | l'elenco degli allarmi: la sorgente è la stazione nel primo caso, la tratta nel secondo |
+| SV03     | =POST /treno/sensore/guasto= su due convogli, uno in sosta e uno in tratta   | l'elenco degli allarmi: per il primo c'è anche il guasto dedotto sulla stazione C, per il secondo solo quello del convoglio, perché la tratta non ha uno stato (RF02.1.2.2.2 non realizzato) |
 | SV04     | si ferma un convoglio fuori stazione e si aspetta =T_fer=                    | l'allarme compare da solo ed è marcato come dedotto        |
 | SV05     | si modifica l'itinerario dalla dashboard a convogli in marcia                 | posizione e ritardo dei due convogli prima e dopo          |
 | SV06     | si lascia percorrere una corsa intera, andata e ritorno; poi si marca il capolinea su un estremo e si lascia arrivare il convoglio | lo storico dei transiti (entrate e uscite nell'ordine reale) e, dopo il capolinea, il treno fermo con l'entrata rimasta senza uscita |
