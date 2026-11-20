@@ -383,7 +383,7 @@ public class GestoreEventi {
         // 2. assegnamenti
         stazioni.annotaGuasto(stazioneId);
         if (miFermo) {
-            viaggio.blocca(stazioneId, faseDiBlocco);
+            viaggio.blocca(stazioneId, faseDiBlocco); // questo automi nucleari non sono proprio ben astratti come dovrebbero qua ci sono anche delle azioni proprie dell'automa interessato ma che andrebbero portate fuori seconod il modello rigido
         }
 
         // 3. azioni

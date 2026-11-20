@@ -161,7 +161,9 @@ public class AutomaViaggio {
                 && (stazioneId.equals(trainDB.stazioneCorrente) || stazioneId.equals(trainDB.prossimaStazione));
     }
 
-    /** @return La fase in cui porta il blocco, che dipende da dove si trova il treno adesso. */
+    /** @return La fase in cui porta il blocco, che dipende da dove si trova il treno adesso.  */
+    // qua c'è anche una computazione del nuovo staoto corretto: bloccato_in_tratta, bloccato_in_stazione, c'è da capire
+    // come diamine è rappresentato l'automa nel database semplicemente
     public String faseDiBlocco() {
         return "IN_VIAGGIO".equals(trainDB.faseViaggio) ? "BLOCCATO_IN_TRATTA" : "BLOCCATO_IN_STAZIONE";
     }
